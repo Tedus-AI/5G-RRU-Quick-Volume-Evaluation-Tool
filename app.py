@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 
 # === APP 設定 ===
-st.set_page_config(page_title="5G RRU Thermal Calculator (Excel Logic)", layout="wide")
+st.set_page_config(page_title="5G RRU Thermal Calculator", layout="wide")
 
 st.title("📡 5G RRU 體積估算引擎 (Smart Formulas)")
 st.markdown("### ⚡ 自動連動版：輸入參數後，幾何與熱阻將自動計算並鎖定")
@@ -29,14 +29,32 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=False):
     H_shield = st.number_input("HSK內腔深度 (mm)", value=20)
     H_filter = st.number_input("Filter 厚度 (mm)", value=42)
 
-# 材料參數
-with st.sidebar.expander("3. 材料參數 (隱藏設定)", expanded=False):
-    K_Putty, t_Putty = 9.1, 0.5
-    K_Pad, t_Pad = 7.5, 1.7
-    K_Grease, t_Grease = 3.0, 0.05
-    K_Solder, t_Solder = 58.0, 0.3
-    Voiding = 0.75
-    K_Via, Via_Eff = 30.0, 0.9
+# 材料參數 (已解鎖編輯功能)
+with st.sidebar.expander("3. 材料參數 (導熱係數/厚度)", expanded=False):
+    st.markdown("**Thermal Putty**")
+    c1, c2 = st.columns(2)
+    K_Putty = c1.number_input("K (Putty)", value=9.1)
+    t_Putty = c2.number_input("t (Putty)", value=0.5)
+    
+    st.markdown("**Thermal Pad**")
+    c3, c4 = st.columns(2)
+    K_Pad = c3.number_input("K (Pad)", value=7.5)
+    t_Pad = c4.number_input("t (Pad)", value=1.7)
+    
+    st.markdown("**Thermal Grease**")
+    c5, c6 = st.columns(2)
+    K_Grease = c5.number_input("K (Grease)", value=3.0)
+    t_Grease = c6.number_input("t (Grease)", value=0.05, format="%.3f")
+    
+    st.markdown("**Solder (錫)**")
+    c7, c8 = st.columns(2)
+    K_Solder = c7.number_input("K (Solder)", value=58.0)
+    t_Solder = c8.number_input("t (Solder)", value=0.3)
+    Voiding = st.number_input("錫片空洞率 (Voiding)", value=0.75)
+    
+    st.markdown("**PCB Thermal Via**")
+    K_Via = st.number_input("Via 等效 K值", value=30.0)
+    Via_Eff = st.number_input("Via 製程係數", value=0.9)
 
 # 散熱器參數
 with st.sidebar.expander("4. 鰭片幾何", expanded=False):
@@ -51,8 +69,7 @@ Top, Btm, Left, Right = 11, 13, 11, 11
 st.subheader("🔥 元件熱源清單 (Table 2)")
 st.info("📝 請修改白色背景的欄位，灰色欄位 (Base, Loc_Amb, R_int...) 會自動計算。")
 
-# 1. 定義初始輸入資料 (只包含 User 需要輸入的欄位)
-# 注意：這裡不包含 Base_L, Base_W, Loc_Amb 等計算欄位，這些會由程式生成
+# 1. 定義初始輸入資料
 input_data = {
     "Component": ["Final PA", "Driver PA", "Pre Driver", "Circulator", "Cavity Filter", "CPU (FPGA)", "Si5518", "16G DDR", "Power Mod", "SFP"],
     "Qty": [4, 4, 4, 4, 1, 1, 1, 2, 1, 1],
@@ -70,17 +87,16 @@ input_data = {
 df_input = pd.DataFrame(input_data)
 
 # 2. 顯示「輸入用」表格
-# 使用 data_editor 讓使用者修改輸入值
 edited_df = st.data_editor(
     df_input,
     column_config={
         "TIM_Type": st.column_config.SelectboxColumn(
             "TIM Type", options=["Solder", "Grease", "Pad", "Putty", "None"], required=True, width="small"
         ),
-        "Component": st.column_config.TextColumn("Component", disabled=False), # 允許改名
+        "Component": st.column_config.TextColumn("Component", disabled=False), 
         "Qty": st.column_config.NumberColumn("Qty", min_value=0, step=1, width="small"),
     },
-    num_rows="dynamic", # 允許新增刪除列
+    num_rows="dynamic",
     use_container_width=True,
     key="editor"
 )
@@ -88,7 +104,6 @@ edited_df = st.data_editor(
 # ==================================================
 # 3. 邏輯運算引擎 (Excel Formulas in Python)
 # ==================================================
-# 這裡接手所有的計算工作，模擬 Excel 公式行為
 
 tim_props = {
     "Solder": {"k": K_Solder, "t": t_Solder},
@@ -100,12 +115,8 @@ tim_props = {
 
 def apply_excel_formulas(row):
     # A. 【幾何公式】: Base L/W 自動計算
-    # 邏輯: 對於 Driver PA 等一般元件，Base = Pad + Thick (Excel 邏輯)
-    # 例外: Final PA 在 Excel 是手動輸入 55，這裡我們用邏輯判斷 (Pad+35) 或固定值
-    # 為保持彈性，我們統一使用公式: Base = Pad + Thickness (若 user 覺得不對，可調整 Thick 或 Pad)
-    # 但為了還原您 Final PA 的 55 (Pad 20, Thick 2.5)，這顯然是有額外 Spread。
-    # **重要**: 為了完全還原，我對 "Final PA" 做特殊處理
-    
+    # 邏輯: Base = Pad + Thick
+    # 例外: Final PA 
     if row['Component'] == "Final PA":
         base_l = 55.0
         base_w = 35.0
@@ -113,12 +124,10 @@ def apply_excel_formulas(row):
         base_l = 0.0
         base_w = 0.0
     else:
-        # Excel 原本邏輯: Base = Pad + Thick (例如 Driver PA: 5+2=7)
         base_l = row['Pad_L'] + row['Thick(mm)']
         base_w = row['Pad_W'] + row['Thick(mm)']
         
     # B. 【局部環溫公式】(Loc_Amb)
-    # Excel: = B3 + (D * Slope)
     loc_amb = T_amb + (row['Height(mm)'] * Slope)
     
     # C. 【熱阻公式】(R_int)
@@ -130,10 +139,9 @@ def apply_excel_formulas(row):
         r_int_val = (row['Thick(mm)']/1000) / (row['K_Board'] * eff_area)
         
         if row['Component'] == "Final PA":
-            # Add Solder Voiding
             r_int = r_int_val + ((t_Solder/1000) / (K_Solder * pad_area * Voiding))
         else:
-            r_int = r_int_val / 0.9 # Via Eff
+            r_int = r_int_val / Via_Eff
     else:
         r_int = 0
         
@@ -157,8 +165,6 @@ def apply_excel_formulas(row):
 if not edited_df.empty:
     calc_results = edited_df.apply(apply_excel_formulas, axis=1)
     calc_results.columns = ['Base_L', 'Base_W', 'Loc_Amb', 'R_int', 'R_TIM', 'Total_W', 'Drop', 'Allowed_dT']
-    
-    # 合併結果
     final_df = pd.concat([edited_df, calc_results], axis=1)
 else:
     final_df = pd.DataFrame()
@@ -167,7 +173,6 @@ else:
 # 4. 顯示「計算結果」表格 (鎖定版)
 # ==================================================
 st.markdown("#### 🔒 自動計算結果 (唯讀)")
-# 這裡展示所有的欄位，並且將計算欄位設為 disabled
 if not final_df.empty:
     st.dataframe(
         final_df,
@@ -180,7 +185,6 @@ if not final_df.empty:
             "Drop": st.column_config.NumberColumn("Drop", format="%.1f"),
             "Allowed_dT": st.column_config.NumberColumn("Allowed_dT", format="%.2f"),
             "Total_W": st.column_config.NumberColumn("Total W", format="%.1f"),
-            # 隱藏輸入欄位以免重複混淆 (可選)
             "Pad_L": None, "Pad_W": None, "Thick(mm)": None, "K_Board": None, 
             "Limit(C)": None, "R_jc": None, "TIM_Type": None, "Height(mm)": None
         },
@@ -188,7 +192,6 @@ if not final_df.empty:
         hide_index=True
     )
 
-    # 瓶頸計算
     valid_rows = final_df[final_df['Total_W'] > 0]
     if not valid_rows.empty:
         Total_Watts_Sum = valid_rows['Total_W'].sum()
