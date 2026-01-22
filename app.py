@@ -5,20 +5,20 @@ import numpy as np
 # === APP 設定 ===
 st.set_page_config(page_title="5G RRU Thermal Calculator", layout="wide")
 
-st.title("📡 5G RRU 體積估算引擎 (Smart Formulas)")
-st.markdown("### ⚡ 自動連動版：輸入參數後，幾何與熱阻將自動計算並鎖定")
+st.title("📡 5G RRU 體積估算引擎 (Pro)")
+st.markdown("### ⚡ 雙重介面設定：可分別指定「基板導通 (Via/Coin)」與「接觸介質 (TIM)」")
 
 # ==================================================
-# 1. 側邊欄：全域邊界條件 (Table 1)
+# 1. 側邊欄：全域邊界條件
 # ==================================================
-st.sidebar.header("🛠️ 全域邊界條件 (Table 1)")
+st.sidebar.header("🛠️ 全域參數設定")
 
 # 環境與係數
 with st.sidebar.expander("1. 環境與係數", expanded=True):
     T_amb = st.number_input("環境溫度 (°C)", value=45.0, step=1.0)
     h_value = st.number_input("自然對流係數 h (W/m2K)", value=8.8, step=0.1)
     Margin = st.number_input("設計安全係數 (Margin)", value=1.0, step=0.1)
-    Slope = 0.03 # 空氣升溫梯度 (固定常數)
+    Slope = 0.03 # 空氣升溫梯度
     Eff = st.number_input("鰭片效率 (Eff)", value=0.95, step=0.01)
 
 # 機構參數
@@ -29,32 +29,30 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=False):
     H_shield = st.number_input("HSK內腔深度 (mm)", value=20)
     H_filter = st.number_input("Filter 厚度 (mm)", value=42)
 
-# 材料參數 (已解鎖編輯功能)
-with st.sidebar.expander("3. 材料參數 (導熱係數/厚度)", expanded=False):
-    st.markdown("**Thermal Putty**")
+# 材料參數
+with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=True):
+    # 分欄顯示比較整齊
     c1, c2 = st.columns(2)
-    K_Putty = c1.number_input("K (Putty)", value=9.1)
-    t_Putty = c2.number_input("t (Putty)", value=0.5)
+    K_Via = c1.number_input("Via 等效 K值", value=30.0)
+    Via_Eff = c2.number_input("Via 製程係數", value=0.9)
     
-    st.markdown("**Thermal Pad**")
+    st.markdown("---")
     c3, c4 = st.columns(2)
-    K_Pad = c3.number_input("K (Pad)", value=7.5)
-    t_Pad = c4.number_input("t (Pad)", value=1.7)
+    K_Putty = c3.number_input("K (Putty)", value=9.1)
+    t_Putty = c4.number_input("t (Putty)", value=0.5)
     
-    st.markdown("**Thermal Grease**")
     c5, c6 = st.columns(2)
-    K_Grease = c5.number_input("K (Grease)", value=3.0)
-    t_Grease = c6.number_input("t (Grease)", value=0.05, format="%.3f")
+    K_Pad = c5.number_input("K (Pad)", value=7.5)
+    t_Pad = c6.number_input("t (Pad)", value=1.7)
     
-    st.markdown("**Solder (錫)**")
     c7, c8 = st.columns(2)
-    K_Solder = c7.number_input("K (Solder)", value=58.0)
-    t_Solder = c8.number_input("t (Solder)", value=0.3)
-    Voiding = st.number_input("錫片空洞率 (Voiding)", value=0.75)
+    K_Grease = c7.number_input("K (Grease)", value=3.0)
+    t_Grease = c8.number_input("t (Grease)", value=0.05, format="%.3f")
     
-    st.markdown("**PCB Thermal Via**")
-    K_Via = st.number_input("Via 等效 K值", value=30.0)
-    Via_Eff = st.number_input("Via 製程係數", value=0.9)
+    c9, c10 = st.columns(2)
+    K_Solder = c9.number_input("K (Solder)", value=58.0)
+    t_Solder = c10.number_input("t (Solder)", value=0.3)
+    Voiding = st.number_input("錫片空洞率 (Voiding)", value=0.75)
 
 # 散熱器參數
 with st.sidebar.expander("4. 鰭片幾何", expanded=False):
@@ -64,12 +62,12 @@ with st.sidebar.expander("4. 鰭片幾何", expanded=False):
 Top, Btm, Left, Right = 11, 13, 11, 11
 
 # ==================================================
-# 2. 主畫面：元件熱源清單 (Table 2) - 核心邏輯區
+# 2. 主畫面：元件熱源清單 (Table 2)
 # ==================================================
 st.subheader("🔥 元件熱源清單 (Table 2)")
-st.info("📝 請修改白色背景的欄位，灰色欄位 (Base, Loc_Amb, R_int...) 會自動計算。")
+st.info("📝 新增 **Board Type** 欄位：請在此選擇元件是走 **Thermal Via** 還是 **Copper Coin**。")
 
-# 1. 定義初始輸入資料
+# 1. 定義初始資料 (新增 Board_Type 欄位)
 input_data = {
     "Component": ["Final PA", "Driver PA", "Pre Driver", "Circulator", "Cavity Filter", "CPU (FPGA)", "Si5518", "16G DDR", "Power Mod", "SFP"],
     "Qty": [4, 4, 4, 4, 1, 1, 1, 2, 1, 1],
@@ -78,20 +76,32 @@ input_data = {
     "Pad_L": [20, 5, 2, 10, 0, 35, 8.6, 7.5, 58, 14], 
     "Pad_W": [10, 5, 2, 10, 0, 35, 8.6, 11.5, 61, 50],
     "Thick(mm)": [2.5, 2.0, 2.0, 2.0, 0, 0, 2.0, 0, 0, 0],
-    "K_Board": [380, K_Via, K_Via, K_Via, 0, 0, K_Via, 0, 0, 0],
+    # Board Type: 決定 R_int 的 K值 (Coin=380, Via=30)
+    "Board_Type": ["Copper Coin", "Thermal Via", "Thermal Via", "Thermal Via", "None", "None", "Thermal Via", "None", "None", "None"],
     "Limit(C)": [225, 200, 175, 125, 200, 100, 125, 95, 95, 200],
     "R_jc": [1.50, 1.70, 50.0, 0.0, 0.0, 0.16, 0.50, 0.0, 0.0, 0.0],
+    # TIM Type: 決定 R_TIM 的 K值
     "TIM_Type": ["Solder", "Grease", "Grease", "Grease", "None", "Putty", "Pad", "Grease", "Grease", "Grease"]
 }
 
 df_input = pd.DataFrame(input_data)
 
-# 2. 顯示「輸入用」表格
+# 2. 顯示編輯器 (設定兩個 Selectbox)
 edited_df = st.data_editor(
     df_input,
     column_config={
+        "Board_Type": st.column_config.SelectboxColumn(
+            "Board Type (基板)", 
+            options=["Thermal Via", "Copper Coin", "None"], 
+            required=True, 
+            width="medium",
+            help="選擇 PCB 導通方式：Via (K=30) 或 Coin (K=380)"
+        ),
         "TIM_Type": st.column_config.SelectboxColumn(
-            "TIM Type", options=["Solder", "Grease", "Pad", "Putty", "None"], required=True, width="small"
+            "TIM Type (介面)", 
+            options=["Solder", "Grease", "Pad", "Putty", "None"], 
+            required=True, 
+            width="medium"
         ),
         "Component": st.column_config.TextColumn("Component", disabled=False), 
         "Qty": st.column_config.NumberColumn("Qty", min_value=0, step=1, width="small"),
@@ -102,7 +112,7 @@ edited_df = st.data_editor(
 )
 
 # ==================================================
-# 3. 邏輯運算引擎 (Excel Formulas in Python)
+# 3. 邏輯運算引擎
 # ==================================================
 
 tim_props = {
@@ -114,38 +124,44 @@ tim_props = {
 }
 
 def apply_excel_formulas(row):
-    # A. 【幾何公式】: Base L/W 自動計算
-    # 邏輯: Base = Pad + Thick
-    # 例外: Final PA 
+    # A. 【幾何公式】Base L/W
     if row['Component'] == "Final PA":
-        base_l = 55.0
-        base_w = 35.0
+        base_l, base_w = 55.0, 35.0
     elif row['Power(W)'] == 0 or row['Thick(mm)'] == 0:
-        base_l = 0.0
-        base_w = 0.0
+        base_l, base_w = 0.0, 0.0
     else:
         base_l = row['Pad_L'] + row['Thick(mm)']
         base_w = row['Pad_W'] + row['Thick(mm)']
         
-    # B. 【局部環溫公式】(Loc_Amb)
+    # B. 【局部環溫】
     loc_amb = T_amb + (row['Height(mm)'] * Slope)
     
-    # C. 【熱阻公式】(R_int)
+    # C. 【熱阻 R_int】(Board Level)
+    # 根據 Board_Type 決定 K 值
+    if row['Board_Type'] == "Copper Coin":
+        k_board = 380.0
+    elif row['Board_Type'] == "Thermal Via":
+        k_board = K_Via # 來自側邊欄輸入 (30.0)
+    else:
+        k_board = 0.0
+
     pad_area = (row['Pad_L'] * row['Pad_W']) / 1e6
     base_area = (base_l * base_w) / 1e6
     
-    if row['K_Board'] > 0 and pad_area > 0:
+    if k_board > 0 and pad_area > 0:
         eff_area = np.sqrt(pad_area * base_area) if base_area > 0 else pad_area
-        r_int_val = (row['Thick(mm)']/1000) / (row['K_Board'] * eff_area)
+        r_int_val = (row['Thick(mm)']/1000) / (k_board * eff_area)
         
-        if row['Component'] == "Final PA":
+        if row['Component'] == "Final PA": # 特殊規則: Solder Voiding
             r_int = r_int_val + ((t_Solder/1000) / (K_Solder * pad_area * Voiding))
-        else:
+        elif row['Board_Type'] == "Thermal Via": # Via 要打折
             r_int = r_int_val / Via_Eff
+        else:
+            r_int = r_int_val
     else:
         r_int = 0
         
-    # D. 【TIM 熱阻公式】(R_TIM)
+    # D. 【熱阻 R_TIM】(Interface Level)
     tim = tim_props.get(row['TIM_Type'], {"k":1, "t":0})
     target_area = base_area if base_area > 0 else pad_area
     
@@ -170,41 +186,40 @@ else:
     final_df = pd.DataFrame()
 
 # ==================================================
-# 4. 顯示「計算結果」表格 (鎖定版)
+# 4. 顯示計算結果
 # ==================================================
 st.markdown("#### 🔒 自動計算結果 (唯讀)")
 if not final_df.empty:
     st.dataframe(
         final_df,
         column_config={
-            "Base_L": st.column_config.NumberColumn("Base L (Calc)", format="%.1f"),
-            "Base_W": st.column_config.NumberColumn("Base W (Calc)", format="%.1f"),
-            "Loc_Amb": st.column_config.NumberColumn("Loc_Amb", format="%.1f"),
+            "Base_L": st.column_config.NumberColumn("Base L", format="%.1f"),
+            "Base_W": st.column_config.NumberColumn("Base W", format="%.1f"),
             "R_int": st.column_config.NumberColumn("R_int", format="%.2f"),
             "R_TIM": st.column_config.NumberColumn("R_TIM", format="%.2f"),
             "Drop": st.column_config.NumberColumn("Drop", format="%.1f"),
             "Allowed_dT": st.column_config.NumberColumn("Allowed_dT", format="%.2f"),
-            "Total_W": st.column_config.NumberColumn("Total W", format="%.1f"),
-            "Pad_L": None, "Pad_W": None, "Thick(mm)": None, "K_Board": None, 
-            "Limit(C)": None, "R_jc": None, "TIM_Type": None, "Height(mm)": None
+            # 隱藏輸入欄位
+            "Pad_L": None, "Pad_W": None, "Thick(mm)": None, 
+            "Limit(C)": None, "R_jc": None, "TIM_Type": None, "Board_Type": None, "Height(mm)": None
         },
         use_container_width=True,
         hide_index=True
     )
-
+    
+    # 瓶頸計算
     valid_rows = final_df[final_df['Total_W'] > 0]
     if not valid_rows.empty:
         Total_Watts_Sum = valid_rows['Total_W'].sum()
         Min_dT_Allowed = valid_rows['Allowed_dT'].min()
         if not pd.isna(valid_rows['Allowed_dT'].idxmin()):
             Bottleneck_Name = valid_rows.loc[valid_rows['Allowed_dT'].idxmin()]['Component']
-        else:
-             Bottleneck_Name = "None"
+        else: Bottleneck_Name = "None"
     else:
         Total_Watts_Sum = 0; Min_dT_Allowed = 50; Bottleneck_Name = "None"
 
 # ==================================================
-# 5. 體積運算與儀表板 (Table 3)
+# 5. 體積運算
 # ==================================================
 Total_Power = Total_Watts_Sum * Margin
 if Total_Power > 0 and Min_dT_Allowed > 0:
@@ -216,15 +231,14 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
     Fin_Count = W_hsk / (Gap + Fin_t)
     try:
         Fin_Height = ((Area_req - Base_Area_m2) * 1e6) / (2 * Fin_Count * L_hsk)
-    except:
-        Fin_Height = 0
+    except: Fin_Height = 0
     RRU_Height = t_base + Fin_Height + H_shield + H_filter
     Volume_L = (L_hsk * W_hsk * RRU_Height) / 1e6
 else:
     Fin_Height = 0; RRU_Height = 0; Volume_L = 0
 
 st.markdown("---")
-st.subheader("📊 最終運算結果 (Volume Engine)")
+st.subheader("📊 最終運算結果")
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("整機總熱耗", f"{round(Total_Power, 2)} W")
 c2.metric("系統瓶頸元件", f"{Bottleneck_Name}", delta=f"dT: {round(Min_dT_Allowed, 2)}°C")
