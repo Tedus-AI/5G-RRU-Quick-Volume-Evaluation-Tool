@@ -114,4 +114,174 @@ edited_df = st.data_editor(
             label="Pad 長 (mm)",
             help="元件底部散熱焊盤 (Thermal Pad) 的長度"
         ),
-        "Pad
+        "Pad_W": st.column_config.NumberColumn(
+            label="Pad 寬 (mm)",
+            help="元件底部散熱焊盤 (Thermal Pad) 的寬度"
+        ),
+        "Thick(mm)": st.column_config.NumberColumn(
+            label="基板厚度 (mm)",
+            help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度",
+            format="%.1f"
+        ),
+        "Board_Type": st.column_config.SelectboxColumn(
+            label="基板導通",
+            help="PCB 垂直導熱的方式。Thermal Via (K=30) 或 Copper Coin (K=380)",
+            options=["Thermal Via", "Copper Coin", "None"],
+            required=True,
+            width="medium"
+        ),
+        "TIM_Type": st.column_config.SelectboxColumn(
+            label="介面材料",
+            help="元件與散熱器之間的接觸介質 (如導熱膏、墊片)",
+            options=["Solder", "Grease", "Pad", "Putty", "None"],
+            required=True,
+            width="medium"
+        ),
+        "R_jc": st.column_config.NumberColumn(
+            label="熱阻 Rjc",
+            help="結點到殼 (Junction to Case) 的內部熱阻值",
+            format="%.2f"
+        ),
+        "Limit(C)": st.column_config.NumberColumn(
+            label="限溫 (°C)",
+            help="元件允許的最高運作溫度 (Tj 或 Tc)",
+            format="%.1f"
+        )
+    },
+    num_rows="dynamic",
+    use_container_width=True,
+    key="editor"
+)
+
+# ==================================================
+# 3. 邏輯運算引擎
+# ==================================================
+
+tim_props = {
+    "Solder": {"k": K_Solder, "t": t_Solder},
+    "Grease": {"k": K_Grease, "t": t_Grease},
+    "Pad":    {"k": K_Pad,    "t": t_Pad},
+    "Putty":  {"k": K_Putty,  "t": t_Putty},
+    "None":   {"k": 1,        "t": 0}
+}
+
+def apply_excel_formulas(row):
+    # A. 【幾何公式】Base L/W
+    if row['Component'] == "Final PA":
+        base_l, base_w = 55.0, 35.0
+    elif row['Power(W)'] == 0 or row['Thick(mm)'] == 0:
+        base_l, base_w = 0.0, 0.0
+    else:
+        base_l = row['Pad_L'] + row['Thick(mm)']
+        base_w = row['Pad_W'] + row['Thick(mm)']
+        
+    # B. 【局部環溫】
+    loc_amb = T_amb + (row['Height(mm)'] * Slope)
+    
+    # C. 【熱阻 R_int】(Board Level)
+    if row['Board_Type'] == "Copper Coin":
+        k_board = 380.0
+    elif row['Board_Type'] == "Thermal Via":
+        k_board = K_Via
+    else:
+        k_board = 0.0
+
+    pad_area = (row['Pad_L'] * row['Pad_W']) / 1e6
+    base_area = (base_l * base_w) / 1e6
+    
+    if k_board > 0 and pad_area > 0:
+        eff_area = np.sqrt(pad_area * base_area) if base_area > 0 else pad_area
+        r_int_val = (row['Thick(mm)']/1000) / (k_board * eff_area)
+        
+        if row['Component'] == "Final PA":
+            r_int = r_int_val + ((t_Solder/1000) / (K_Solder * pad_area * Voiding))
+        elif row['Board_Type'] == "Thermal Via":
+            r_int = r_int_val / Via_Eff
+        else:
+            r_int = r_int_val
+    else:
+        r_int = 0
+        
+    # D. 【熱阻 R_TIM】(Interface Level)
+    tim = tim_props.get(row['TIM_Type'], {"k":1, "t":0})
+    target_area = base_area if base_area > 0 else pad_area
+    
+    if target_area > 0 and tim['t'] > 0:
+        r_tim = (tim['t']/1000) / (tim['k'] * target_area)
+    else:
+        r_tim = 0
+        
+    # E. 【總熱耗與溫升】
+    total_w = row['Qty'] * row['Power(W)']
+    drop = row['Power(W)'] * (row['R_jc'] + r_int + r_tim)
+    allowed_dt = row['Limit(C)'] - drop - loc_amb
+    
+    return pd.Series([base_l, base_w, loc_amb, r_int, r_tim, total_w, drop, allowed_dt])
+
+# 執行運算
+if not edited_df.empty:
+    calc_results = edited_df.apply(apply_excel_formulas, axis=1)
+    calc_results.columns = ['Base_L', 'Base_W', 'Loc_Amb', 'R_int', 'R_TIM', 'Total_W', 'Drop', 'Allowed_dT']
+    final_df = pd.concat([edited_df, calc_results], axis=1)
+else:
+    final_df = pd.DataFrame()
+
+# ==================================================
+# 4. 顯示計算結果
+# ==================================================
+st.markdown("#### 🔒 自動計算結果 (唯讀)")
+if not final_df.empty:
+    st.dataframe(
+        final_df,
+        column_config={
+            "Base_L": st.column_config.NumberColumn("Base L", format="%.1f"),
+            "Base_W": st.column_config.NumberColumn("Base W", format="%.1f"),
+            "R_int": st.column_config.NumberColumn("R_int", format="%.2f"),
+            "R_TIM": st.column_config.NumberColumn("R_TIM", format="%.2f"),
+            "Drop": st.column_config.NumberColumn("Drop", format="%.1f"),
+            "Allowed_dT": st.column_config.NumberColumn("Allowed_dT", format="%.2f"),
+            "Pad_L": None, "Pad_W": None, "Thick(mm)": None, 
+            "Limit(C)": None, "R_jc": None, "TIM_Type": None, "Board_Type": None, "Height(mm)": None
+        },
+        use_container_width=True,
+        hide_index=True
+    )
+    
+    # 瓶頸計算
+    valid_rows = final_df[final_df['Total_W'] > 0]
+    if not valid_rows.empty:
+        Total_Watts_Sum = valid_rows['Total_W'].sum()
+        Min_dT_Allowed = valid_rows['Allowed_dT'].min()
+        if not pd.isna(valid_rows['Allowed_dT'].idxmin()):
+            Bottleneck_Name = valid_rows.loc[valid_rows['Allowed_dT'].idxmin()]['Component']
+        else: Bottleneck_Name = "None"
+    else:
+        Total_Watts_Sum = 0; Min_dT_Allowed = 50; Bottleneck_Name = "None"
+
+# ==================================================
+# 5. 體積運算
+# ==================================================
+Total_Power = Total_Watts_Sum * Margin
+if Total_Power > 0 and Min_dT_Allowed > 0:
+    R_sa = Min_dT_Allowed / Total_Power
+    Area_req = 1 / (h_value * R_sa * Eff)
+    L_hsk = L_pcb + Top + Btm
+    W_hsk = W_pcb + Left + Right
+    Base_Area_m2 = (L_hsk * W_hsk) / 1e6
+    Fin_Count = W_hsk / (Gap + Fin_t)
+    try:
+        Fin_Height = ((Area_req - Base_Area_m2) * 1e6) / (2 * Fin_Count * L_hsk)
+    except: Fin_Height = 0
+    RRU_Height = t_base + Fin_Height + H_shield + H_filter
+    Volume_L = (L_hsk * W_hsk * RRU_Height) / 1e6
+else:
+    Fin_Height = 0; RRU_Height = 0; Volume_L = 0
+
+st.markdown("---")
+st.subheader("📊 最終運算結果")
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("整機總熱耗", f"{round(Total_Power, 2)} W")
+c2.metric("系統瓶頸元件", f"{Bottleneck_Name}", delta=f"dT: {round(Min_dT_Allowed, 2)}°C")
+c3.metric("建議鰭片高度", f"{round(Fin_Height, 2)} mm")
+c4.metric("★ 整機估算體積", f"{round(Volume_L, 2)} L")
+```[2026-01-23]
