@@ -27,7 +27,8 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=False):
     W_pcb = st.number_input("PCB 寬度 (mm)", value=250)
     t_base = st.number_input("散熱器基板厚 (mm)", value=7)
     H_shield = st.number_input("HSK內腔深度 (mm)", value=20)
-    H_filter = st.number_input("Filter 厚度 (mm)", value=42)
+    # [修正 1] 更名為 Cavity Filter
+    H_filter = st.number_input("Cavity Filter 厚度 (mm)", value=42)
 
 # 材料參數
 with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=True):
@@ -36,7 +37,9 @@ with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=True):
     K_Via = c1.number_input("Via 等效 K值", value=30.0)
     Via_Eff = c2.number_input("Via 製程係數", value=0.9)
     
-    st.markdown("---")
+    st.markdown("---") # 分隔線
+    st.caption("熱介面材料 (TIM)")
+    
     c3, c4 = st.columns(2)
     K_Putty = c3.number_input("K (Putty)", value=9.1)
     t_Putty = c4.number_input("t (Putty)", value=0.5)
@@ -49,9 +52,13 @@ with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=True):
     K_Grease = c7.number_input("K (Grease)", value=3.0)
     t_Grease = c8.number_input("t (Grease)", value=0.05, format="%.3f")
     
+    # [修正 2 & 3] 加入分隔線與改中文名
+    st.markdown("---") 
+    st.markdown("**Solder (錫片)**") # 標題區隔
+    
     c9, c10 = st.columns(2)
-    K_Solder = c9.number_input("K (Solder)", value=58.0)
-    t_Solder = c10.number_input("t (Solder)", value=0.3)
+    K_Solder = c9.number_input("K (錫片)", value=58.0)
+    t_Solder = c10.number_input("t (錫片)", value=0.3)
     Voiding = st.number_input("錫片空洞率 (Voiding)", value=0.75)
 
 # 散熱器參數
@@ -67,7 +74,7 @@ Top, Btm, Left, Right = 11, 13, 11, 11
 st.subheader("🔥 元件熱源清單 (Table 2)")
 st.info("📝 新增 **Board Type** 欄位：請在此選擇元件是走 **Thermal Via** 還是 **Copper Coin**。")
 
-# 1. 定義初始資料 (新增 Board_Type 欄位)
+# 1. 定義初始資料
 input_data = {
     "Component": ["Final PA", "Driver PA", "Pre Driver", "Circulator", "Cavity Filter", "CPU (FPGA)", "Si5518", "16G DDR", "Power Mod", "SFP"],
     "Qty": [4, 4, 4, 4, 1, 1, 1, 2, 1, 1],
@@ -76,17 +83,17 @@ input_data = {
     "Pad_L": [20, 5, 2, 10, 0, 35, 8.6, 7.5, 58, 14], 
     "Pad_W": [10, 5, 2, 10, 0, 35, 8.6, 11.5, 61, 50],
     "Thick(mm)": [2.5, 2.0, 2.0, 2.0, 0, 0, 2.0, 0, 0, 0],
-    # Board Type: 決定 R_int 的 K值 (Coin=380, Via=30)
+    # Board Type
     "Board_Type": ["Copper Coin", "Thermal Via", "Thermal Via", "Thermal Via", "None", "None", "Thermal Via", "None", "None", "None"],
     "Limit(C)": [225, 200, 175, 125, 200, 100, 125, 95, 95, 200],
     "R_jc": [1.50, 1.70, 50.0, 0.0, 0.0, 0.16, 0.50, 0.0, 0.0, 0.0],
-    # TIM Type: 決定 R_TIM 的 K值
+    # TIM Type
     "TIM_Type": ["Solder", "Grease", "Grease", "Grease", "None", "Putty", "Pad", "Grease", "Grease", "Grease"]
 }
 
 df_input = pd.DataFrame(input_data)
 
-# 2. 顯示編輯器 (設定兩個 Selectbox)
+# 2. 顯示編輯器
 edited_df = st.data_editor(
     df_input,
     column_config={
@@ -137,11 +144,10 @@ def apply_excel_formulas(row):
     loc_amb = T_amb + (row['Height(mm)'] * Slope)
     
     # C. 【熱阻 R_int】(Board Level)
-    # 根據 Board_Type 決定 K 值
     if row['Board_Type'] == "Copper Coin":
         k_board = 380.0
     elif row['Board_Type'] == "Thermal Via":
-        k_board = K_Via # 來自側邊欄輸入 (30.0)
+        k_board = K_Via
     else:
         k_board = 0.0
 
@@ -152,9 +158,9 @@ def apply_excel_formulas(row):
         eff_area = np.sqrt(pad_area * base_area) if base_area > 0 else pad_area
         r_int_val = (row['Thick(mm)']/1000) / (k_board * eff_area)
         
-        if row['Component'] == "Final PA": # 特殊規則: Solder Voiding
+        if row['Component'] == "Final PA":
             r_int = r_int_val + ((t_Solder/1000) / (K_Solder * pad_area * Voiding))
-        elif row['Board_Type'] == "Thermal Via": # Via 要打折
+        elif row['Board_Type'] == "Thermal Via":
             r_int = r_int_val / Via_Eff
         else:
             r_int = r_int_val
@@ -199,7 +205,6 @@ if not final_df.empty:
             "R_TIM": st.column_config.NumberColumn("R_TIM", format="%.2f"),
             "Drop": st.column_config.NumberColumn("Drop", format="%.1f"),
             "Allowed_dT": st.column_config.NumberColumn("Allowed_dT", format="%.2f"),
-            # 隱藏輸入欄位
             "Pad_L": None, "Pad_W": None, "Thick(mm)": None, 
             "Limit(C)": None, "R_jc": None, "TIM_Type": None, "Board_Type": None, "Height(mm)": None
         },
