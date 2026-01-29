@@ -87,67 +87,22 @@ input_data = {
 
 df_input = pd.DataFrame(input_data)
 
-# 2. 顯示編輯器 (修復 Help 參數)
+# 2. 顯示編輯器
+# [修改重點] R_int 與 R_TIM 格式改為 %.5f 以顯示微小數值
 edited_df = st.data_editor(
     df_input,
     column_config={
-        "Component": st.column_config.TextColumn(
-            label="元件名稱",
-            help="元件型號或代號 (如 PA, FPGA)",
-            disabled=False
-        ),
-        "Qty": st.column_config.NumberColumn(
-            label="數量",
-            help="該元件的使用數量",
-            min_value=0, step=1, width="small"
-        ),
-        "Power(W)": st.column_config.NumberColumn(
-            label="單顆功耗 (W)",
-            help="單一顆元件的發熱瓦數 (TDP)",
-            format="%.2f"
-        ),
-        "Height(mm)": st.column_config.NumberColumn(
-            label="元件高度 (mm)",
-            help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。",
-            format="%.1f"
-        ),
-        "Pad_L": st.column_config.NumberColumn(
-            label="Pad 長 (mm)",
-            help="元件底部散熱焊盤 (Thermal Pad) 的長度"
-        ),
-        "Pad_W": st.column_config.NumberColumn(
-            label="Pad 寬 (mm)",
-            help="元件底部散熱焊盤 (Thermal Pad) 的寬度"
-        ),
-        "Thick(mm)": st.column_config.NumberColumn(
-            label="基板厚度 (mm)",
-            help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度",
-            format="%.1f"
-        ),
-        "Board_Type": st.column_config.SelectboxColumn(
-            label="基板導通",
-            help="PCB 垂直導熱的方式。Thermal Via (K=30) 或 Copper Coin (K=380)",
-            options=["Thermal Via", "Copper Coin", "None"],
-            required=True,
-            width="medium"
-        ),
-        "TIM_Type": st.column_config.SelectboxColumn(
-            label="介面材料",
-            help="元件與散熱器之間的接觸介質 (如導熱膏、墊片)",
-            options=["Solder", "Grease", "Pad", "Putty", "None"],
-            required=True,
-            width="medium"
-        ),
-        "R_jc": st.column_config.NumberColumn(
-            label="熱阻 Rjc",
-            help="結點到殼 (Junction to Case) 的內部熱阻值",
-            format="%.2f"
-        ),
-        "Limit(C)": st.column_config.NumberColumn(
-            label="限溫 (°C)",
-            help="元件允許的最高運作溫度 (Tj 或 Tc)",
-            format="%.1f"
-        )
+        "Component": st.column_config.TextColumn(label="元件名稱", help="元件型號或代號 (如 PA, FPGA)", disabled=False),
+        "Qty": st.column_config.NumberColumn(label="數量", help="該元件的使用數量", min_value=0, step=1, width="small"),
+        "Power(W)": st.column_config.NumberColumn(label="單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f"),
+        "Height(mm)": st.column_config.NumberColumn(label="元件高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。", format="%.1f"),
+        "Pad_L": st.column_config.NumberColumn(label="Pad 長 (mm)", help="元件底部散熱焊盤 (Thermal Pad) 的長度"),
+        "Pad_W": st.column_config.NumberColumn(label="Pad 寬 (mm)", help="元件底部散熱焊盤 (Thermal Pad) 的寬度"),
+        "Thick(mm)": st.column_config.NumberColumn(label="基板厚度 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
+        "Board_Type": st.column_config.SelectboxColumn(label="基板導通", help="PCB 垂直導熱的方式。Thermal Via (K=30) 或 Copper Coin (K=380)", options=["Thermal Via", "Copper Coin", "None"], required=True, width="medium"),
+        "TIM_Type": st.column_config.SelectboxColumn(label="介面材料", help="元件與散熱器之間的接觸介質 (如導熱膏、墊片)", options=["Solder", "Grease", "Pad", "Putty", "None"], required=True, width="medium"),
+        "R_jc": st.column_config.NumberColumn(label="熱阻 Rjc", help="結點到殼 (Junction to Case) 的內部熱阻值", format="%.2f"),
+        "Limit(C)": st.column_config.NumberColumn(label="限溫 (°C)", help="元件允許的最高運作溫度 (Tj 或 Tc)", format="%.1f")
     },
     num_rows="dynamic",
     use_container_width=True,
@@ -233,8 +188,9 @@ if not final_df.empty:
         column_config={
             "Base_L": st.column_config.NumberColumn("Base L", format="%.1f"),
             "Base_W": st.column_config.NumberColumn("Base W", format="%.1f"),
-            "R_int": st.column_config.NumberColumn("R_int", format="%.2f"),
-            "R_TIM": st.column_config.NumberColumn("R_TIM", format="%.2f"),
+            # [修改重點] 格式改為 %.5f
+            "R_int": st.column_config.NumberColumn("R_int", format="%.5f"),
+            "R_TIM": st.column_config.NumberColumn("R_TIM", format="%.5f"),
             "Drop": st.column_config.NumberColumn("Drop", format="%.1f"),
             "Allowed_dT": st.column_config.NumberColumn("Allowed_dT", format="%.2f"),
             "Pad_L": None, "Pad_W": None, "Thick(mm)": None, 
@@ -254,15 +210,15 @@ if not final_df.empty:
         Total_Watts_Sum = 0; Min_dT_Allowed = 50; Bottleneck_Name = "None"
 
 # ==================================================
-# 5. 體積運算與結果顯示 (Highlight Update)
+# 5. 體積運算與結果顯示
 # ==================================================
 
-# A. 基礎機構計算 (無關功耗)
+# A. 基礎機構計算
 L_hsk = L_pcb + Top + Btm
 W_hsk = W_pcb + Left + Right
 Fin_Count = W_hsk / (Gap + Fin_t)
 
-# B. 熱流計算 (有關功耗)
+# B. 熱流計算
 Total_Power = Total_Watts_Sum * Margin
 if Total_Power > 0 and Min_dT_Allowed > 0:
     R_sa = Min_dT_Allowed / Total_Power
@@ -292,7 +248,7 @@ c5, c6 = st.columns(2)
 c5.metric("建議鰭片高度", f"{round(Fin_Height, 2)} mm")
 c6.metric("RRU 整機尺寸 (L x W x H)", f"{L_hsk} x {W_hsk} x {round(RRU_Height, 1)} mm")
 
-# 第三排：體積 Highlight (CSS Style)
+# 第三排：體積 Highlight
 st.markdown("---")
 st.markdown(f"""
 <div style="
