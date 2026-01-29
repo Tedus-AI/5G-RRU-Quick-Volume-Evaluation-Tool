@@ -4,10 +4,9 @@ import numpy as np
 import plotly.express as px
 
 # ==============================================================================
-# 版本：v3.10 (Color Logic Fix)
+# 版本：v3.11 (Scale Bar Added)
 # 日期：2026-01-29
-# 更新：修正 Tab 2 熱力圖的顏色邏輯。移除強制設定的 vmin/vmax 範圍，
-#       改為自動偵測資料最大最小值，確保與 Tab 3 長條圖的紅綠邏輯一致 (低紅高綠)。
+# 更新：在 Tab 2 表格旁新增垂直 Scale Bar (色階條)，並標註 Max/Min 值與物理意義。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -45,7 +44,7 @@ if not check_password():
 st.title("📡 5G RRU 體積估算引擎")
 
 # --------------------------------------------------
-# [CSS] 自定義樣式 (Metric Cards)
+# [CSS] 自定義樣式 (Metric Cards & Legend)
 # --------------------------------------------------
 st.markdown("""
 <style>
@@ -61,6 +60,48 @@ st.markdown("""
     .kpi-title { color: #666; font-size: 0.9rem; font-weight: 500; margin-bottom: 5px; }
     .kpi-value { color: #333; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; }
     .kpi-desc { color: #888; font-size: 0.8rem; }
+    
+    /* Scale Bar 樣式 */
+    .legend-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-top: 20px;
+        font-family: sans-serif;
+    }
+    .gradient-bar {
+        width: 20px;
+        height: 200px;
+        background: linear-gradient(to top, #d73027, #fee08b, #1a9850); /* RdYlGn 近似色 */
+        border-radius: 4px;
+        margin: 5px 0;
+    }
+    .legend-labels {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        height: 200px;
+        margin-left: 5px;
+        font-size: 0.8rem;
+        color: #555;
+        text-align: left;
+    }
+    .legend-box {
+        display: flex;
+        flex-direction: row;
+    }
+    .legend-title {
+        font-weight: bold;
+        font-size: 0.9rem;
+        margin-bottom: 5px;
+        color: #333;
+    }
+    .legend-note {
+        font-size: 0.75rem;
+        color: #888;
+        margin-top: 5px;
+        text-align: center;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -147,13 +188,7 @@ with tab_input:
         column_config={
             "Component": st.column_config.TextColumn(label="元件名稱", help="元件型號或代號", width="medium"),
             "Qty": st.column_config.NumberColumn(label="數量", min_value=0, step=1, width="small"),
-            "Power(W)": st.column_config.NumberColumn(
-                label="單顆功耗 (W)", 
-                help="單一顆元件的發熱瓦數 (TDP)", 
-                format="%.2f", 
-                min_value=0.0,
-                step=0.1
-            ),
+            "Power(W)": st.column_config.NumberColumn(label="單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f", min_value=0.0, step=0.1),
             "Height(mm)": st.column_config.NumberColumn(label="元件高度 (mm)", help="元件距離 PCB 底部的垂直高度", format="%.1f"),
             "Pad_L": st.column_config.NumberColumn(label="Pad 長 (mm)", help="元件底部散熱焊盤長度"),
             "Pad_W": st.column_config.NumberColumn(label="Pad 寬 (mm)", help="元件底部散熱焊盤寬度"),
@@ -240,39 +275,67 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
 else:
     R_sa = 0; Area_req = 0; Fin_Height = 0; RRU_Height = 0; Volume_L = 0
 
-# --- Tab 2: 詳細數據 (美化版 - 修正顏色邏輯) ---
+# --- Tab 2: 詳細數據 (含 Scale Bar) ---
 with tab_data:
     st.subheader("🔢 詳細計算數據 (唯讀)")
-    st.caption("💡 **提示：Allowed_dT 欄位使用熱力圖顯示（紅=預度不足/危險，綠=預度充足/安全）。**")
     
     if not final_df.empty:
-        # [修正] 移除 vmin/vmax，改為自動偵測資料範圍，以對齊長條圖的紅綠邏輯
-        styled_df = final_df.style.background_gradient(
-            subset=['Allowed_dT'], 
-            cmap='RdYlGn'  # 紅(最小值) -> 黃 -> 綠(最大值)
-        ).format({
-            "Base_L": "{:.1f}", "Base_W": "{:.1f}", "Loc_Amb": "{:.1f}",
-            "R_int": "{:.5f}", "R_TIM": "{:.5f}", "Drop": "{:.1f}",
-            "Allowed_dT": "{:.2f}", "Total_W": "{:.1f}"
-        })
+        # 計算 Range 供 Scale Bar 使用
+        min_dt = final_df['Allowed_dT'].min()
+        max_dt = final_df['Allowed_dT'].max()
+        mid_dt = (min_dt + max_dt) / 2
 
-        st.dataframe(
-            styled_df, 
-            column_config={
-                "Base_L": st.column_config.NumberColumn(label="Base 長 (mm)", help="熱量擴散後的底部有效長度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。"),
-                "Base_W": st.column_config.NumberColumn(label="Base 寬 (mm)", help="熱量擴散後的底部有效寬度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。"),
-                "Loc_Amb": st.column_config.NumberColumn(label="局部環溫 (°C)", help="該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)。"),
-                "R_int": st.column_config.NumberColumn(label="基板熱阻 (°C/W)", help="元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值。"),
-                "R_TIM": st.column_config.NumberColumn(label="介面熱阻 (°C/W)", help="元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)。"),
-                "Drop": st.column_config.NumberColumn(label="內部溫降 (°C)", help="熱量從晶片核心傳導到散熱器表面的溫差。公式：Power × (Rjc + Rint + Rtim)。"),
-                "Allowed_dT": st.column_config.NumberColumn(label="允許溫升 (°C)", help="散熱器剩餘可用的溫升預算。數值越小代表該元件越容易過熱 (瓶頸)。公式：Limit - Loc_Amb - Drop。"),
-                "Total_W": st.column_config.NumberColumn(label="總功耗 (W)", help="該元件的總發熱量 (單顆功耗 × 數量)。"),
-                "Pad_L": None, "Pad_W": None, "Thick(mm)": None, 
-                "Limit(C)": None, "R_jc": None, "TIM_Type": None, "Board_Type": None, "Height(mm)": None, "Component": None, "Qty": None, "Power(W)": None
-            },
-            use_container_width=True,
-            hide_index=True
-        )
+        # 版面配置: 表格(85%) + Scale Bar(15%)
+        c_table, c_legend = st.columns([0.85, 0.15])
+        
+        with c_table:
+            # 表格顯示 (維持原本邏輯)
+            styled_df = final_df.style.background_gradient(
+                subset=['Allowed_dT'], cmap='RdYlGn'
+            ).format({
+                "Base_L": "{:.1f}", "Base_W": "{:.1f}", "Loc_Amb": "{:.1f}",
+                "R_int": "{:.5f}", "R_TIM": "{:.5f}", "Drop": "{:.1f}",
+                "Allowed_dT": "{:.2f}", "Total_W": "{:.1f}"
+            })
+            
+            st.dataframe(
+                styled_df, 
+                column_config={
+                    "Base_L": st.column_config.NumberColumn(label="Base 長 (mm)", help="熱量擴散後的底部有效長度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。"),
+                    "Base_W": st.column_config.NumberColumn(label="Base 寬 (mm)", help="熱量擴散後的底部有效寬度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。"),
+                    "Loc_Amb": st.column_config.NumberColumn(label="局部環溫 (°C)", help="該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)。"),
+                    "R_int": st.column_config.NumberColumn(label="基板熱阻 (°C/W)", help="元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值。"),
+                    "R_TIM": st.column_config.NumberColumn(label="介面熱阻 (°C/W)", help="元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)。"),
+                    "Drop": st.column_config.NumberColumn(label="內部溫降 (°C)", help="熱量從晶片核心傳導到散熱器表面的溫差。公式：Power × (Rjc + Rint + Rtim)。"),
+                    "Allowed_dT": st.column_config.NumberColumn(label="允許溫升 (°C)", help="散熱器剩餘可用的溫升預算。數值越小代表該元件越容易過熱 (瓶頸)。公式：Limit - Loc_Amb - Drop。"),
+                    "Total_W": st.column_config.NumberColumn(label="總功耗 (W)", help="該元件的總發熱量 (單顆功耗 × 數量)。"),
+                    "Pad_L": None, "Pad_W": None, "Thick(mm)": None, 
+                    "Limit(C)": None, "R_jc": None, "TIM_Type": None, "Board_Type": None, "Height(mm)": None, "Component": None, "Qty": None, "Power(W)": None
+                },
+                use_container_width=True,
+                hide_index=True
+            )
+            st.caption("💡 **提示：Allowed_dT 欄位使用熱力圖顯示。右側色階條顯示當前數值範圍與意義。**")
+
+        with c_legend:
+            # HTML 垂直色階條 (動態數值)
+            st.markdown(f"""
+            <div class="legend-container">
+                <div class="legend-title">允許溫升 (°C)</div>
+                <div class="legend-box">
+                    <div class="gradient-bar"></div>
+                    <div class="legend-labels">
+                        <span>{max_dt:.0f}</span>
+                        <span>{mid_dt:.0f}</span>
+                        <span>{min_dt:.0f}</span>
+                    </div>
+                </div>
+                <div class="legend-note">
+                    <span style="color: #1a9850;">● 綠 = 充足</span><br>
+                    <span style="color: #d73027;">● 紅 = 不足</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
 # --- Tab 3: 視覺化報告 ---
 with tab_viz:
