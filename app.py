@@ -4,17 +4,16 @@ import numpy as np
 import plotly.express as px
 
 # ==============================================================================
-# 版本：v3.13 (Terminology Update: 裕度)
+# 版本：v3.14 (UI Enhancement)
 # 日期：2026-01-29
-# 基底：v3.12
+# 基底：v3.13
 # 修改內容：
-# 1. 全文搜尋並替換： "預度" -> "裕度"
-# 2. 全文搜尋並替換： "預算" -> "裕度"
-#    (修改範圍包含 Tab 2 提示、Tooltip、下方註釋以及 Tab 3 圖表標題)
+# 1. 頁籤 (Tabs)：加大字體、加粗、自定義背景色與選中狀態顏色。
+# 2. 表格 (Tables)：透過 CSS 注入，嘗試將表格標題改為黑色、增加黑色邊框。
 # ==============================================================================
 
 # === APP 設定 ===
-st.set_page_config(page_title="5G RRU Thermal Calculator", layout="wide")
+st.set_page_config(page_title="5G RRU Thermal Calculator v3.14", layout="wide")
 
 # ==================================================
 # 🔐 密碼保護功能
@@ -45,10 +44,10 @@ if not check_password():
 # 👇 主程式開始
 # ==================================================
 
-st.title("📡 5G RRU 體積估算引擎")
+st.title("📡 5G RRU 體積估算引擎 v3.14")
 
 # --------------------------------------------------
-# [CSS] 樣式設定
+# [CSS] 樣式設定 (本次修改重點)
 # --------------------------------------------------
 st.markdown("""
 <style>
@@ -66,12 +65,54 @@ st.markdown("""
     .kpi-value { color: #333; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; }
     .kpi-desc { color: #888; font-size: 0.8rem; }
 
-    /* 表格表頭強制置中 */
+    /* =========================================
+       UI 優化需求 1: 頁籤 (Tabs) 樣式
+       ========================================= */
+    /* 調整頁籤按鈕的字體與背景 */
+    button[data-baseweb="tab"] {
+        font-size: 18px !important;     /* 字體加大 */
+        font-weight: bold !important;   /* 字體加粗 */
+        background-color: #f0f2f6;      /* 未選中時的底色 (淺灰) */
+        color: #555 !important;         /* 未選中時的文字顏色 */
+        border: 1px solid #ddd !important;
+        border-radius: 5px 5px 0 0 !important;
+        margin-right: 2px !important;
+    }
+
+    /* 調整「選中狀態」的頁籤 */
+    button[data-baseweb="tab"][aria-selected="true"] {
+        background-color: #ADD8E6 !important; /* 選中時的底色 (淺藍) */
+        color: black !important;              /* 選中時文字全黑 */
+        border-bottom: 2px solid #000 !important;
+    }
+
+    /* =========================================
+       UI 優化需求 2 & 3: 表格邊框與標題顏色
+       (Streamlit 表格渲染較複雜，以下 CSS 盡力覆蓋)
+       ========================================= */
+    
+    /* 強制表頭 (Header) 文字為黑色 */
     th {
+        color: black !important;
+        font-weight: 900 !important; /* 加粗 */
+        font-size: 1rem !important;
+        background-color: #e0e0e0 !important; /* 增加表頭背景色區隔 */
+        border: 1px solid black !important;   /* 表頭邊框 */
         text-align: center !important;
     }
 
-    /* Scale Bar 樣式 */
+    /* 強制表格內容 (Cell) 邊框 */
+    td {
+        border: 1px solid black !important; /* 嘗試強制黑框 */
+        color: black !important;            /* 內容文字黑色 */
+    }
+
+    /* 針對 Streamlit 新版 Dataframe 的容器邊框 */
+    [data-testid="stDataFrame"], [data-testid="stDataEditor"] {
+        border: 2px solid black !important;
+    }
+
+    /* Scale Bar 樣式 (保留原設定) */
     .legend-container {
         display: flex;
         flex-direction: column;
@@ -285,7 +326,6 @@ else:
 # --- Tab 2: 詳細數據 (更新用語：裕度) ---
 with tab_data:
     st.subheader("🔢 詳細計算數據 (唯讀)")
-    # [修改] 提示文字：預度 -> 裕度
     st.caption("💡 **提示：Allowed_dT 欄位使用熱力圖顯示（紅=裕度不足/危險，綠=裕度充足/安全）。將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。**")
     
     if not final_df.empty:
@@ -318,7 +358,7 @@ with tab_data:
                     "R_int": st.column_config.NumberColumn(label="基板熱阻 (°C/W)", help="元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值。"),
                     "R_TIM": st.column_config.NumberColumn(label="介面熱阻 (°C/W)", help="元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)。"),
                     "Drop": st.column_config.NumberColumn(label="內部溫降 (°C)", help="熱量從晶片核心傳導到散熱器表面的溫差。公式：Power × (Rjc + Rint + Rtim)。"),
-                    # [修改] Tooltip：預算 -> 裕度
+                    
                     "Allowed_dT": st.column_config.NumberColumn(label="允許溫升 (°C)", help="散熱器剩餘可用的溫升裕度。數值越小代表該元件越容易過熱 (瓶頸)。公式：Limit - Loc_Amb - Drop。"),
                     "Total_W": st.column_config.NumberColumn(label="總功耗 (W)", help="該元件的總發熱量 (單顆功耗 × 數量)。"),
                     
@@ -344,7 +384,6 @@ with tab_data:
             </div>
             """, unsafe_allow_html=True)
 
-        # [修改] 註釋：預算 -> 裕度
         st.info("""
         ℹ️ **名詞解釋 - 允許溫升 (Allowed dT)** 此數值代表 **「散熱器可用的溫升裕度」** (Limit - Local Ambient - Drop)。  
         * 🟩 **綠色 (數值高)**：代表散熱裕度充足，該元件不易過熱。
@@ -380,7 +419,6 @@ with tab_viz:
             valid_rows_sorted = valid_rows.sort_values(by="Allowed_dT", ascending=True)
             fig_bar = px.bar(
                 valid_rows_sorted, x='Component', y='Allowed_dT', 
-                # [修改] 標題：預度 -> 裕度
                 title='<b>各元件剩餘溫升裕度 (Thermal Budget)</b>',
                 color='Allowed_dT', color_continuous_scale='RdYlGn',
                 labels={'Allowed_dT': '允許溫升 (°C)'}
