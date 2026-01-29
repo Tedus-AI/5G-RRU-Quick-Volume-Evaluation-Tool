@@ -4,15 +4,16 @@ import numpy as np
 import plotly.express as px
 
 # ==============================================================================
-# 版本：v3.9.4 (Restored Columns & Tooltips)
+# 版本：v3.12 (Scale Bar & Annotation)
 # 日期：2026-01-29
-# 修正：
-# 1. Tab 2: 恢復顯示 Component, Qty, Power(W) 三個欄位及其名詞解釋。
-# 2. Tab 2: 修正標題下方的提示文字。
-# 3. 保持 v3.9.3 的所有 CSS 置中與熱力圖邏輯。
+# 基底：v3.9.4
+# 修改內容：
+# 1. [新增] Tab 2: 表格右側增加垂直 Scale Bar (色階條)，動態顯示 Max/Min 數值。
+# 2. [新增] Tab 2: 表格下方增加「允許溫升」的名詞解釋註釋區塊。
+# 3. [保持] 其他所有功能 (Tab 1 可編輯、CSS 置中、邏輯) 完全不動。
 # ==============================================================================
 
-# === APP 設定 (必須是第一行) ===
+# === APP 設定 ===
 st.set_page_config(page_title="5G RRU Thermal Calculator", layout="wide")
 
 # ==================================================
@@ -47,7 +48,8 @@ if not check_password():
 st.title("📡 5G RRU 體積估算引擎")
 
 # --------------------------------------------------
-# [CSS] 樣式優化
+# [CSS] 樣式設定
+# 包含：KPI卡片、表格置中、以及新增的 Scale Bar 樣式
 # --------------------------------------------------
 st.markdown("""
 <style>
@@ -65,9 +67,42 @@ st.markdown("""
     .kpi-value { color: #333; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; }
     .kpi-desc { color: #888; font-size: 0.8rem; }
 
-    /* 表格優化：強制所有 DataFrame 的表頭置中 */
+    /* 表格表頭強制置中 */
     th {
         text-align: center !important;
+    }
+
+    /* 新增：Scale Bar 樣式 */
+    .legend-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-top: 40px; /* 與頂部對齊 */
+        font-family: sans-serif;
+        font-size: 0.85rem;
+    }
+    .legend-title {
+        font-weight: bold;
+        margin-bottom: 5px;
+        color: #555;
+    }
+    .legend-body {
+        display: flex;
+        align-items: stretch;
+        height: 200px; /* 色階條高度 */
+    }
+    .gradient-bar {
+        width: 15px;
+        background: linear-gradient(to top, #d73027, #fee08b, #1a9850); /* 紅 -> 黃 -> 綠 */
+        border-radius: 3px;
+        margin-right: 8px;
+        border: 1px solid #ddd;
+    }
+    .legend-labels {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        color: #666;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -248,48 +283,77 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
 else:
     R_sa = 0; Area_req = 0; Fin_Height = 0; RRU_Height = 0; Volume_L = 0
 
-# --- Tab 2: 詳細數據 (Restored Columns) ---
+# --- Tab 2: 詳細數據 (含 Scale Bar) ---
 with tab_data:
     st.subheader("🔢 詳細計算數據 (唯讀)")
-    # [修正] 恢復您指定的提示文字
+    # 標題下方的提示文字
     st.caption("💡 **提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。**")
     
     if not final_df.empty:
-        # 熱力圖設定 (紅=低/危險，綠=高/安全)
-        styled_df = final_df.style.background_gradient(
-            subset=['Allowed_dT'], 
-            cmap='RdYlGn'
-        ).format({
-            "Base_L": "{:.1f}", "Base_W": "{:.1f}", "Loc_Amb": "{:.1f}",
-            "R_int": "{:.5f}", "R_TIM": "{:.5f}", "Drop": "{:.1f}",
-            "Allowed_dT": "{:.2f}", "Total_W": "{:.1f}"
-        }).set_properties(**{'text-align': 'center'})
+        # 1. 準備 Scale Bar 的數值
+        min_val = final_df['Allowed_dT'].min()
+        max_val = final_df['Allowed_dT'].max()
+        mid_val = (min_val + max_val) / 2
 
-        st.dataframe(
-            styled_df, 
-            column_config={
-                # [修正] 恢復 Component, Qty, Power(W) 欄位與 Tooltips
-                "Component": st.column_config.TextColumn(label="元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
-                "Qty": st.column_config.NumberColumn(label="數量", help="該元件的使用數量", format="%d"),
-                "Power(W)": st.column_config.NumberColumn(label="單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f"),
-                
-                # 既有欄位
-                "Base_L": st.column_config.NumberColumn(label="Base 長 (mm)", help="熱量擴散後的底部有效長度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。"),
-                "Base_W": st.column_config.NumberColumn(label="Base 寬 (mm)", help="熱量擴散後的底部有效寬度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。"),
-                "Loc_Amb": st.column_config.NumberColumn(label="局部環溫 (°C)", help="該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)。"),
-                "R_int": st.column_config.NumberColumn(label="基板熱阻 (°C/W)", help="元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值。"),
-                "R_TIM": st.column_config.NumberColumn(label="介面熱阻 (°C/W)", help="元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)。"),
-                "Drop": st.column_config.NumberColumn(label="內部溫降 (°C)", help="熱量從晶片核心傳導到散熱器表面的溫差。公式：Power × (Rjc + Rint + Rtim)。"),
-                "Allowed_dT": st.column_config.NumberColumn(label="允許溫升 (°C)", help="散熱器剩餘可用的溫升預算。數值越小代表該元件越容易過熱 (瓶頸)。公式：Limit - Loc_Amb - Drop。"),
-                "Total_W": st.column_config.NumberColumn(label="總功耗 (W)", help="該元件的總發熱量 (單顆功耗 × 數量)。"),
-                
-                # 隱藏不需要的欄位
-                "Pad_L": None, "Pad_W": None, "Thick(mm)": None, 
-                "Limit(C)": None, "R_jc": None, "TIM_Type": None, "Board_Type": None, "Height(mm)": None
-            },
-            use_container_width=True,
-            hide_index=True
-        )
+        # 2. 分割版面: 左邊(表格 90%) + 右邊(色階 10%)
+        col_table, col_legend = st.columns([0.9, 0.1])
+
+        with col_table:
+            # 3. 顯示表格 (使用 Pandas Style 確保置中與熱力圖)
+            styled_df = final_df.style.background_gradient(
+                subset=['Allowed_dT'], 
+                cmap='RdYlGn'
+            ).format({
+                "Base_L": "{:.1f}", "Base_W": "{:.1f}", "Loc_Amb": "{:.1f}",
+                "R_int": "{:.5f}", "R_TIM": "{:.5f}", "Drop": "{:.1f}",
+                "Allowed_dT": "{:.2f}", "Total_W": "{:.1f}"
+            }).set_properties(**{'text-align': 'center'})
+
+            st.dataframe(
+                styled_df, 
+                column_config={
+                    "Component": st.column_config.TextColumn(label="元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
+                    "Qty": st.column_config.NumberColumn(label="數量", help="該元件的使用數量", format="%d"),
+                    "Power(W)": st.column_config.NumberColumn(label="單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f"),
+                    
+                    "Base_L": st.column_config.NumberColumn(label="Base 長 (mm)", help="熱量擴散後的底部有效長度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。"),
+                    "Base_W": st.column_config.NumberColumn(label="Base 寬 (mm)", help="熱量擴散後的底部有效寬度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。"),
+                    "Loc_Amb": st.column_config.NumberColumn(label="局部環溫 (°C)", help="該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)。"),
+                    "R_int": st.column_config.NumberColumn(label="基板熱阻 (°C/W)", help="元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值。"),
+                    "R_TIM": st.column_config.NumberColumn(label="介面熱阻 (°C/W)", help="元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)。"),
+                    "Drop": st.column_config.NumberColumn(label="內部溫降 (°C)", help="熱量從晶片核心傳導到散熱器表面的溫差。公式：Power × (Rjc + Rint + Rtim)。"),
+                    "Allowed_dT": st.column_config.NumberColumn(label="允許溫升 (°C)", help="散熱器剩餘可用的溫升預算。數值越小代表該元件越容易過熱 (瓶頸)。公式：Limit - Loc_Amb - Drop。"),
+                    "Total_W": st.column_config.NumberColumn(label="總功耗 (W)", help="該元件的總發熱量 (單顆功耗 × 數量)。"),
+                    
+                    "Pad_L": None, "Pad_W": None, "Thick(mm)": None, 
+                    "Limit(C)": None, "R_jc": None, "TIM_Type": None, "Board_Type": None, "Height(mm)": None
+                },
+                use_container_width=True,
+                hide_index=True
+            )
+
+        with col_legend:
+            # 4. 顯示右側 Scale Bar (HTML)
+            st.markdown(f"""
+            <div class="legend-container">
+                <div class="legend-title">允許溫升<br>(°C)</div>
+                <div class="legend-body">
+                    <div class="gradient-bar"></div>
+                    <div class="legend-labels">
+                        <span>{max_val:.0f}</span>
+                        <span>{mid_val:.0f}</span>
+                        <span>{min_val:.0f}</span>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # 5. 表格下方的名詞解釋註釋 (Alert Box)
+        st.info("""
+        ℹ️ **名詞解釋 - 允許溫升 (Allowed dT)** 此數值代表 **「散熱器可用的溫升預算」** (Limit - Local Ambient - Drop)。  
+        * 🟩 **綠色 (數值高)**：代表散熱裕度充足，該元件不易過熱。
+        * 🟥 **紅色 (數值低)**：代表散熱裕度極低，該元件是系統的熱瓶頸。
+        """)
 
 # --- Tab 3: 視覺化報告 ---
 with tab_viz:
