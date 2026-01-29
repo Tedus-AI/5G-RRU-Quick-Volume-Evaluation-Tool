@@ -4,13 +4,12 @@ import numpy as np
 import plotly.express as px
 
 # ==============================================================================
-# 版本：v3.9.3 (Clean Paste & Centering)
+# 版本：v3.9.4 (Restored Columns & Tooltips)
 # 日期：2026-01-29
 # 修正：
-# 1. 修復 SyntaxError (請務必清空檔案再貼上)
-# 2. Tab 1: 強制標題置中 (數值內容依循試算表標準靠右)
-# 3. Tab 2: 使用 Pandas Styler 強制「內容與標題」全部置中
-# 4. Tab 1: 恢復詳細版 Tooltip
+# 1. Tab 2: 恢復顯示 Component, Qty, Power(W) 三個欄位及其名詞解釋。
+# 2. Tab 2: 修正標題下方的提示文字。
+# 3. 保持 v3.9.3 的所有 CSS 置中與熱力圖邏輯。
 # ==============================================================================
 
 # === APP 設定 (必須是第一行) ===
@@ -131,7 +130,7 @@ Top, Btm, Left, Right = 11, 13, 11, 11
 # ==================================================
 tab_input, tab_data, tab_viz = st.tabs(["📝 元件清單設定", "🔢 詳細計算數據", "📊 視覺化分析結果"])
 
-# --- Tab 1: 輸入介面 (CSS 置中 Header) ---
+# --- Tab 1: 輸入介面 ---
 with tab_input:
     st.subheader("🔥 元件熱源清單設定")
     st.caption("💡 **提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。**")
@@ -156,15 +155,21 @@ with tab_input:
         column_config={
             "Component": st.column_config.TextColumn(label="元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
             "Qty": st.column_config.NumberColumn(label="數量", help="該元件的使用數量", min_value=0, step=1, width="small"),
-            "Power(W)": st.column_config.NumberColumn(label="單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f", min_value=0.0, step=0.1),
+            "Power(W)": st.column_config.NumberColumn(
+                label="單顆功耗 (W)", 
+                help="單一顆元件的發熱瓦數 (TDP)", 
+                format="%.2f", 
+                min_value=0.0,
+                step=0.1
+            ),
             "Height(mm)": st.column_config.NumberColumn(label="元件高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。", format="%.1f"),
             "Pad_L": st.column_config.NumberColumn(label="Pad 長 (mm)", help="元件底部散熱焊盤 (Thermal Pad) 的長度"),
             "Pad_W": st.column_config.NumberColumn(label="Pad 寬 (mm)", help="元件底部散熱焊盤 (Thermal Pad) 的寬度"),
             "Thick(mm)": st.column_config.NumberColumn(label="基板厚度 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
-            "Board_Type": st.column_config.SelectboxColumn(label="基板導通", help="PCB 垂直導熱的方式。Thermal Via (K=30) 或 Copper Coin (K=380)", options=["Thermal Via", "Copper Coin", "None"], width="medium"),
-            "TIM_Type": st.column_config.SelectboxColumn(label="介面材料", help="元件與散熱器之間的接觸介質 (如導熱膏、墊片)", options=["Solder", "Grease", "Pad", "Putty", "None"], width="medium"),
-            "R_jc": st.column_config.NumberColumn(label="熱阻 Rjc", help="結點到殼 (Junction to Case) 的內部熱阻值", format="%.2f"),
-            "Limit(C)": st.column_config.NumberColumn(label="限溫 (°C)", help="元件允許的最高運作溫度 (Tj 或 Tc)", format="%.1f")
+            "Board_Type": st.column_config.SelectboxColumn(label="基板導通", help="PCB 垂直導熱方式", options=["Thermal Via", "Copper Coin", "None"], width="medium"),
+            "TIM_Type": st.column_config.SelectboxColumn(label="介面材料", help="接觸介質類型", options=["Solder", "Grease", "Pad", "Putty", "None"], width="medium"),
+            "R_jc": st.column_config.NumberColumn(label="熱阻 Rjc", help="結點到殼的內部熱阻", format="%.2f"),
+            "Limit(C)": st.column_config.NumberColumn(label="限溫 (°C)", help="元件允許最高運作溫度", format="%.1f")
         },
         num_rows="dynamic",
         use_container_width=True,
@@ -243,15 +248,14 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
 else:
     R_sa = 0; Area_req = 0; Fin_Height = 0; RRU_Height = 0; Volume_L = 0
 
-# --- Tab 2: 詳細數據 (使用 Pandas Style 強制置中) ---
+# --- Tab 2: 詳細數據 (Restored Columns) ---
 with tab_data:
     st.subheader("🔢 詳細計算數據 (唯讀)")
-    st.caption("💡 **提示：Allowed_dT 欄位使用熱力圖顯示（紅=預度不足/危險，綠=預度充足/安全）。**")
+    # [修正] 恢復您指定的提示文字
+    st.caption("💡 **提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。**")
     
     if not final_df.empty:
-        # [美化] 
-        # 1. 移除 vmin/vmax，改為自動偵測 (對齊長條圖邏輯)
-        # 2. 加入 set_properties 讓「內容」置中
+        # 熱力圖設定 (紅=低/危險，綠=高/安全)
         styled_df = final_df.style.background_gradient(
             subset=['Allowed_dT'], 
             cmap='RdYlGn'
@@ -264,6 +268,12 @@ with tab_data:
         st.dataframe(
             styled_df, 
             column_config={
+                # [修正] 恢復 Component, Qty, Power(W) 欄位與 Tooltips
+                "Component": st.column_config.TextColumn(label="元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
+                "Qty": st.column_config.NumberColumn(label="數量", help="該元件的使用數量", format="%d"),
+                "Power(W)": st.column_config.NumberColumn(label="單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f"),
+                
+                # 既有欄位
                 "Base_L": st.column_config.NumberColumn(label="Base 長 (mm)", help="熱量擴散後的底部有效長度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。"),
                 "Base_W": st.column_config.NumberColumn(label="Base 寬 (mm)", help="熱量擴散後的底部有效寬度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。"),
                 "Loc_Amb": st.column_config.NumberColumn(label="局部環溫 (°C)", help="該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)。"),
@@ -272,8 +282,10 @@ with tab_data:
                 "Drop": st.column_config.NumberColumn(label="內部溫降 (°C)", help="熱量從晶片核心傳導到散熱器表面的溫差。公式：Power × (Rjc + Rint + Rtim)。"),
                 "Allowed_dT": st.column_config.NumberColumn(label="允許溫升 (°C)", help="散熱器剩餘可用的溫升預算。數值越小代表該元件越容易過熱 (瓶頸)。公式：Limit - Loc_Amb - Drop。"),
                 "Total_W": st.column_config.NumberColumn(label="總功耗 (W)", help="該元件的總發熱量 (單顆功耗 × 數量)。"),
+                
+                # 隱藏不需要的欄位
                 "Pad_L": None, "Pad_W": None, "Thick(mm)": None, 
-                "Limit(C)": None, "R_jc": None, "TIM_Type": None, "Board_Type": None, "Height(mm)": None, "Component": None, "Qty": None, "Power(W)": None
+                "Limit(C)": None, "R_jc": None, "TIM_Type": None, "Board_Type": None, "Height(mm)": None
             },
             use_container_width=True,
             hide_index=True
