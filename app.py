@@ -3,22 +3,28 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 
+# ==============================================================================
+# 版本：v3.6.1
+# 日期：2026-01-29
+# 更新：移除重複標題、加入密碼保護 (tedus)、保留 v3.6 所有功能
+# ==============================================================================
+
 # === APP 設定 ===
 st.set_page_config(page_title="5G RRU Thermal Calculator", layout="wide")
 
-# ==========================================
+# ==================================================
 # 🔐 密碼保護功能 (Password Protection)
-# ==========================================
+# ==================================================
 def check_password():
     """如果不正確返回 False，正確返回 True"""
     
-    # 設定您的密碼 (您可以修改這裡的 "123456")
-    ACTUAL_PASSWORD = "tedus" 
+    # [設定] 您的指定密碼
+    ACTUAL_PASSWORD = "tedus"
     
     def password_entered():
         if st.session_state["password"] == ACTUAL_PASSWORD:
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # 不要在 session 中保留密碼明文
+            del st.session_state["password"]  # 不保留明文
         else:
             st.session_state["password_correct"] = False
 
@@ -27,7 +33,7 @@ def check_password():
         st.text_input("🔒 請輸入存取密碼 (Password)", type="password", on_change=password_entered, key="password")
         return False
     elif not st.session_state["password_correct"]:
-        # 密碼錯誤，再次顯示輸入框
+        # 密碼錯誤
         st.text_input("🔒 請輸入存取密碼 (Password)", type="password", on_change=password_entered, key="password")
         st.error("❌ 密碼錯誤，請重試")
         return False
@@ -36,23 +42,13 @@ def check_password():
         return True
 
 if not check_password():
-    st.stop()  # ⛔ 如果沒通過驗證，程式直接在這裡停止，不執行下方內容
+    st.stop()  # ⛔ 驗證未通過前，停止執行下方程式碼
 
-# ==========================================
-# 👇 以下是原本的主程式 (完全不用動)
-# ==========================================
+# ==================================================
+# 👇 主程式開始 (驗證通過後才會執行)
+# ==================================================
 
-st.title("📡 5G RRU 體積估算引擎")
-
-# ... (接續原本 v3.6 的所有程式碼) ...
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.express as px
-
-# === APP 設定 ===
-st.set_page_config(page_title="5G RRU Thermal Calculator", layout="wide")
-
+# [修正] 確保只有這一個主標題
 st.title("📡 5G RRU 體積估算引擎")
 
 # ==================================================
@@ -122,11 +118,11 @@ Top, Btm, Left, Right = 11, 13, 11, 11
 # ==================================================
 # 3. 建立分頁 (Tabs)
 # ==================================================
+# 順序：輸入 -> 數據 -> 圖表
 tab_input, tab_data, tab_viz = st.tabs(["📝 元件清單設定", "🔢 詳細計算數據", "📊 視覺化分析結果"])
 
-
 # ==================================================
-# Tab 1: 輸入介面 (已恢復詳細 Tooltip)
+# Tab 1: 輸入介面
 # ==================================================
 with tab_input:
     st.subheader("🔥 元件熱源清單設定")
@@ -149,7 +145,7 @@ with tab_input:
 
     df_input = pd.DataFrame(input_data)
 
-    # 2. 顯示編輯器 (詳細版 help)
+    # 2. 顯示編輯器 (詳細版 Tooltip)
     edited_df = st.data_editor(
         df_input,
         column_config={
@@ -313,7 +309,7 @@ else:
 
 
 # ==================================================
-# Tab 2: 詳細數據 (唯讀表) - [已恢復詳細 Tooltip]
+# Tab 2: 詳細數據 (唯讀表) - 詳細 Tooltip
 # ==================================================
 with tab_data:
     st.subheader("🔢 詳細計算數據 (唯讀)")
