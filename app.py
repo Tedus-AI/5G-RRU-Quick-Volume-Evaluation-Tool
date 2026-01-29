@@ -21,14 +21,14 @@ with st.sidebar.expander("1. 環境與係數", expanded=True):
     Eff = st.number_input("鰭片效率 (Eff)", value=0.95, step=0.01)
 
 # 機構參數
-with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True): # 展開此區塊以便設定銅塊
+with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
     L_pcb = st.number_input("PCB 長度 (mm)", value=350)
     W_pcb = st.number_input("PCB 寬度 (mm)", value=250)
     t_base = st.number_input("散熱器基板厚 (mm)", value=7)
     H_shield = st.number_input("HSK內腔深度 (mm)", value=20)
     H_filter = st.number_input("Cavity Filter 厚度 (mm)", value=42)
     
-    # [新增功能] Final PA 銅塊尺寸設定
+    # Final PA 銅塊尺寸設定
     st.markdown("---")
     st.caption("Final PA 專用銅塊尺寸")
     c_coin_1, c_coin_2 = st.columns(2)
@@ -128,14 +128,12 @@ tim_props = {
 }
 
 def apply_excel_formulas(row):
-    # A. Base L/W (幾何計算)
-    # [修改重點] 改為讀取側邊欄變數，不再寫死 55/35
+    # A. Base L/W (讀取側邊欄 Final PA 設定)
     if row['Component'] == "Final PA":
         base_l, base_w = Coin_L_Setting, Coin_W_Setting
     elif row['Power(W)'] == 0 or row['Thick(mm)'] == 0:
         base_l, base_w = 0.0, 0.0
     else:
-        # 其他元件依照公式計算
         base_l = row['Pad_L'] + row['Thick(mm)']
         base_w = row['Pad_W'] + row['Thick(mm)']
         
@@ -194,14 +192,49 @@ if not final_df.empty:
     st.dataframe(
         final_df,
         column_config={
-            "Base_L": st.column_config.NumberColumn("Base L", format="%.1f"),
-            "Base_W": st.column_config.NumberColumn("Base W", format="%.1f"),
-            "R_int": st.column_config.NumberColumn("R_int", format="%.5f"),
-            "R_TIM": st.column_config.NumberColumn("R_TIM", format="%.5f"),
-            "Drop": st.column_config.NumberColumn("Drop", format="%.1f"),
-            "Allowed_dT": st.column_config.NumberColumn("Allowed_dT", format="%.2f"),
+            "Base_L": st.column_config.NumberColumn(
+                label="Base 長 (mm)", 
+                help="熱量擴散後的底部有效長度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。",
+                format="%.1f"
+            ),
+            "Base_W": st.column_config.NumberColumn(
+                label="Base 寬 (mm)", 
+                help="熱量擴散後的底部有效寬度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。",
+                format="%.1f"
+            ),
+            "Loc_Amb": st.column_config.NumberColumn(
+                label="局部環溫 (°C)", 
+                help="該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)。",
+                format="%.1f"
+            ),
+            "R_int": st.column_config.NumberColumn(
+                label="基板熱阻 (°C/W)", 
+                help="元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值。",
+                format="%.5f"
+            ),
+            "R_TIM": st.column_config.NumberColumn(
+                label="介面熱阻 (°C/W)", 
+                help="元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)。",
+                format="%.5f"
+            ),
+            "Drop": st.column_config.NumberColumn(
+                label="內部溫降 (°C)", 
+                help="熱量從晶片核心傳導到散熱器表面的溫差。公式：Power × (Rjc + Rint + Rtim)。",
+                format="%.1f"
+            ),
+            "Allowed_dT": st.column_config.NumberColumn(
+                label="允許溫升 (°C)", 
+                help="散熱器剩餘可用的溫升預算。數值越小代表該元件越容易過熱 (瓶頸)。公式：Limit - Loc_Amb - Drop。",
+                format="%.2f"
+            ),
+            "Total_W": st.column_config.NumberColumn(
+                label="總功耗 (W)", 
+                help="該元件的總發熱量 (單顆功耗 × 數量)。",
+                format="%.1f"
+            ),
+            # 隱藏不需要顯示的原始輸入欄位
             "Pad_L": None, "Pad_W": None, "Thick(mm)": None, 
-            "Limit(C)": None, "R_jc": None, "TIM_Type": None, "Board_Type": None, "Height(mm)": None
+            "Limit(C)": None, "R_jc": None, "TIM_Type": None, "Board_Type": None, "Height(mm)": None, "Component": None, "Qty": None, "Power(W)": None
         },
         use_container_width=True,
         hide_index=True
