@@ -4,11 +4,12 @@ import numpy as np
 import plotly.express as px
 
 # ==============================================================================
-# 版本：v3.9 (Functional & Visual Fix)
+# 版本：v3.9.1 (Caption Fix & Header Center)
 # 日期：2026-01-29
-# 狀態：
-# 1. Tab 1: Power 欄位為可編輯數值 (NumberColumn)
-# 2. Tab 2: 熱力圖強制設定 vmin=0, vmax=60 (這是待修正點)
+# 基於：v3.9
+# 更新：
+# 1. 修正 Tab 1 標題下的提示文字 (改回詳細解釋版)。
+# 2. 嘗試加入 CSS 讓表格標題置中 (數值內容因 Streamlit 限制需靠右對齊)。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -46,10 +47,13 @@ if not check_password():
 st.title("📡 5G RRU 體積估算引擎")
 
 # --------------------------------------------------
-# [CSS] 自定義樣式 (Metric Cards)
+# [CSS] 自定義樣式
+# 1. Metric Cards (卡片美化)
+# 2. Table Headers (嘗試將表頭置中)
 # --------------------------------------------------
 st.markdown("""
 <style>
+    /* KPI 卡片樣式 */
     .kpi-card {
         background-color: #ffffff;
         border-radius: 10px;
@@ -62,6 +66,11 @@ st.markdown("""
     .kpi-title { color: #666; font-size: 0.9rem; font-weight: 500; margin-bottom: 5px; }
     .kpi-value { color: #333; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; }
     .kpi-desc { color: #888; font-size: 0.8rem; }
+
+    /* 嘗試強制將表格的表頭置中 */
+    th {
+        text-align: center !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -126,7 +135,8 @@ tab_input, tab_data, tab_viz = st.tabs(["📝 元件清單設定", "🔢 詳細�
 # --- Tab 1: 輸入介面 ---
 with tab_input:
     st.subheader("🔥 元件熱源清單設定")
-    st.caption("💡 **提示：請在此編輯元件參數。Power 欄位為數值輸入，可直接點擊修改。**")
+    # [修正] 恢復原本的詳細提示文字
+    st.caption("💡 **提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。**")
 
     input_data = {
         "Component": ["Final PA", "Driver PA", "Pre Driver", "Circulator", "Cavity Filter", "CPU (FPGA)", "Si5518", "16G DDR", "Power Mod", "SFP"],
@@ -146,8 +156,8 @@ with tab_input:
     edited_df = st.data_editor(
         df_input,
         column_config={
-            "Component": st.column_config.TextColumn(label="元件名稱", help="元件型號或代號", width="medium"),
-            "Qty": st.column_config.NumberColumn(label="數量", min_value=0, step=1, width="small"),
+            "Component": st.column_config.TextColumn(label="元件名稱", help="元件型號或代號 (如 PA, FPGA)", disabled=False),
+            "Qty": st.column_config.NumberColumn(label="數量", help="該元件的使用數量", min_value=0, step=1, width="small"),
             "Power(W)": st.column_config.NumberColumn(
                 label="單顆功耗 (W)", 
                 help="單一顆元件的發熱瓦數 (TDP)", 
@@ -155,14 +165,14 @@ with tab_input:
                 min_value=0.0,
                 step=0.1
             ),
-            "Height(mm)": st.column_config.NumberColumn(label="元件高度 (mm)", help="元件距離 PCB 底部的垂直高度", format="%.1f"),
-            "Pad_L": st.column_config.NumberColumn(label="Pad 長 (mm)", help="元件底部散熱焊盤長度"),
-            "Pad_W": st.column_config.NumberColumn(label="Pad 寬 (mm)", help="元件底部散熱焊盤寬度"),
-            "Thick(mm)": st.column_config.NumberColumn(label="基板厚度 (mm)", help="PCB 或銅塊厚度", format="%.1f"),
-            "Board_Type": st.column_config.SelectboxColumn(label="基板導通", help="PCB 垂直導熱方式", options=["Thermal Via", "Copper Coin", "None"], width="medium"),
-            "TIM_Type": st.column_config.SelectboxColumn(label="介面材料", help="接觸介質類型", options=["Solder", "Grease", "Pad", "Putty", "None"], width="medium"),
-            "R_jc": st.column_config.NumberColumn(label="熱阻 Rjc", help="結點到殼的內部熱阻", format="%.2f"),
-            "Limit(C)": st.column_config.NumberColumn(label="限溫 (°C)", help="元件允許最高運作溫度", format="%.1f")
+            "Height(mm)": st.column_config.NumberColumn(label="元件高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。", format="%.1f"),
+            "Pad_L": st.column_config.NumberColumn(label="Pad 長 (mm)", help="元件底部散熱焊盤 (Thermal Pad) 的長度"),
+            "Pad_W": st.column_config.NumberColumn(label="Pad 寬 (mm)", help="元件底部散熱焊盤 (Thermal Pad) 的寬度"),
+            "Thick(mm)": st.column_config.NumberColumn(label="基板厚度 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
+            "Board_Type": st.column_config.SelectboxColumn(label="基板導通", help="PCB 垂直導熱的方式。Thermal Via (K=30) 或 Copper Coin (K=380)", options=["Thermal Via", "Copper Coin", "None"], width="medium"),
+            "TIM_Type": st.column_config.SelectboxColumn(label="介面材料", help="元件與散熱器之間的接觸介質 (如導熱膏、墊片)", options=["Solder", "Grease", "Pad", "Putty", "None"], width="medium"),
+            "R_jc": st.column_config.NumberColumn(label="熱阻 Rjc", help="結點到殼 (Junction to Case) 的內部熱阻值", format="%.2f"),
+            "Limit(C)": st.column_config.NumberColumn(label="限溫 (°C)", help="元件允許的最高運作溫度 (Tj 或 Tc)", format="%.1f")
         },
         num_rows="dynamic",
         use_container_width=True,
@@ -241,14 +251,13 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
 else:
     R_sa = 0; Area_req = 0; Fin_Height = 0; RRU_Height = 0; Volume_L = 0
 
-# --- Tab 2: 詳細數據 (熱力圖) ---
+# --- Tab 2: 詳細數據 (維持 v3.9 設定) ---
 with tab_data:
     st.subheader("🔢 詳細計算數據 (唯讀)")
     st.caption("💡 **提示：Allowed_dT 欄位使用熱力圖顯示（紅=預度不足/危險，綠=預度充足/安全）。**")
     
     if not final_df.empty:
-        # [注意] 這邊保留 v3.9 的狀態 (有 vmin=0, vmax=60)，雖然您知道這是錯的
-        # 但我們嚴格執行 "回到 v3.9 版本" 的指令。
+        # [保留] v3.9 的設定：vmin=0, vmax=60
         styled_df = final_df.style.background_gradient(
             subset=['Allowed_dT'], 
             cmap='RdYlGn', 
