@@ -4,9 +4,11 @@ import numpy as np
 import plotly.express as px
 
 # ==============================================================================
-# 版本：v3.8 (Visual Upgrade)
+# 版本：v3.9 (Functional & Visual Fix)
 # 日期：2026-01-29
-# 更新：Tab 1 增加功耗能量條，Tab 2 增加熱力圖 (Heatmap) 與條件格式化
+# 更新：
+# 1. Tab 1: 恢復 Power 欄位為可編輯狀態 (移除唯讀的能量條)
+# 2. Tab 2: 修正熱力圖邏輯，強制設定 vmin/vmax 以呈現明顯的紅綠漸層
 # ==============================================================================
 
 # === APP 設定 ===
@@ -121,10 +123,10 @@ Top, Btm, Left, Right = 11, 13, 11, 11
 # ==================================================
 tab_input, tab_data, tab_viz = st.tabs(["📝 元件清單設定", "🔢 詳細計算數據", "📊 視覺化分析結果"])
 
-# --- Tab 1: 輸入介面 (美化版) ---
+# --- Tab 1: 輸入介面 (已修正：恢復可編輯性) ---
 with tab_input:
     st.subheader("🔥 元件熱源清單設定")
-    st.caption("💡 **提示：請在此編輯元件參數。功耗欄位已視覺化，方便快速識別高熱元件。**")
+    st.caption("💡 **提示：請在此編輯元件參數。Power 欄位已恢復為數值輸入，可直接點擊修改。**")
 
     input_data = {
         "Component": ["Final PA", "Driver PA", "Pre Driver", "Circulator", "Cavity Filter", "CPU (FPGA)", "Si5518", "16G DDR", "Power Mod", "SFP"],
@@ -146,13 +148,13 @@ with tab_input:
         column_config={
             "Component": st.column_config.TextColumn(label="元件名稱", help="元件型號或代號", width="medium"),
             "Qty": st.column_config.NumberColumn(label="數量", min_value=0, step=1, width="small"),
-            # [美化] 將功耗變成進度條，最大值設為 100W (可視需求調整)
-            "Power(W)": st.column_config.ProgressColumn(
+            # [修正] 恢復為 NumberColumn 以允許編輯
+            "Power(W)": st.column_config.NumberColumn(
                 label="單顆功耗 (W)", 
                 help="單一顆元件的發熱瓦數 (TDP)", 
-                format="%.2f W", 
-                min_value=0, 
-                max_value=100 
+                format="%.2f", 
+                min_value=0.0,
+                step=0.1
             ),
             "Height(mm)": st.column_config.NumberColumn(label="元件高度 (mm)", help="元件距離 PCB 底部的垂直高度", format="%.1f"),
             "Pad_L": st.column_config.NumberColumn(label="Pad 長 (mm)", help="元件底部散熱焊盤長度"),
@@ -240,17 +242,19 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
 else:
     R_sa = 0; Area_req = 0; Fin_Height = 0; RRU_Height = 0; Volume_L = 0
 
-# --- Tab 2: 詳細數據 (美化版 - 熱力圖) ---
+# --- Tab 2: 詳細數據 (美化版 - 修正熱力圖邏輯) ---
 with tab_data:
     st.subheader("🔢 詳細計算數據 (唯讀)")
-    st.caption("💡 **提示：Allowed_dT 欄位使用熱力圖顯示（紅=低/危險，綠=高/安全）。**")
+    st.caption("💡 **提示：Allowed_dT 欄位使用熱力圖顯示（紅=預度不足/危險，綠=預度充足/安全）。**")
     
     if not final_df.empty:
-        # [美化] 使用 Pandas Styler 製作熱力圖
+        # [修正] 設定 vmin=0, vmax=60 強制固定顏色區間
+        # 這樣即使數據都在 50 左右，也會顯示為綠色；若低於 10 則顯示紅色
         styled_df = final_df.style.background_gradient(
             subset=['Allowed_dT'], 
-            cmap='RdYlGn',  # 紅->黃->綠
-            vmin=0, vmax=50 # 設定顏色範圍，避免極端值破壞漸層
+            cmap='RdYlGn',  # 紅(低) -> 黃(中) -> 綠(高)
+            vmin=0, 
+            vmax=60 
         ).format({
             "Base_L": "{:.1f}", "Base_W": "{:.1f}", "Loc_Amb": "{:.1f}",
             "R_int": "{:.5f}", "R_TIM": "{:.5f}", "Drop": "{:.1f}",
@@ -258,7 +262,7 @@ with tab_data:
         })
 
         st.dataframe(
-            styled_df, # 注意：這裡傳入的是有 Style 的物件
+            styled_df, 
             column_config={
                 "Base_L": st.column_config.NumberColumn(label="Base 長 (mm)", help="熱量擴散後的底部有效長度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。"),
                 "Base_W": st.column_config.NumberColumn(label="Base 寬 (mm)", help="熱量擴散後的底部有效寬度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。"),
@@ -314,12 +318,4 @@ with tab_viz:
     st.markdown("---")
     st.subheader("📏 尺寸與體積估算")
     c5, c6 = st.columns(2)
-    card(c5, "建議鰭片高度", f"{round(Fin_Height, 2)} mm", "Suggested Fin Height", "#2ecc71")
-    card(c6, "RRU 整機尺寸 (LxWxH)", f"{L_hsk} x {W_hsk} x {round(RRU_Height, 1)}", "Estimated Dimensions", "#34495e")
-
-    st.markdown(f"""
-    <div style="background-color: #e6fffa; padding: 30px; margin-top: 20px; border-radius: 15px; border-left: 10px solid #00b894; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center;">
-        <h3 style="color: #006266; margin:0; font-size: 1.4rem; letter-spacing: 1px;">★ RRU 整機估算體積 (Estimated Volume)</h3>
-        <h1 style="color: #00b894; margin:15px 0 0 0; font-size: 4.5rem; font-weight: 800;">{round(Volume_L, 2)} L</h1>
-    </div>
-    """, unsafe_allow_html=True)
+    card(c5, "建議鰭片高度",
