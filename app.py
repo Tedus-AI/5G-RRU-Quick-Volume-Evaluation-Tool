@@ -4,9 +4,8 @@ import numpy as np
 import plotly.express as px
 
 # ==============================================================================
-# 版本：v3.14 (E-pad Fix / Canvas Ready)
+# 版本：v3.14 (Final Fixed)
 # 日期：2026-01-30
-# 基底：v3.14 (Final Fix)
 # 功能：
 # 1. 5G RRU 散熱體積估算
 # 2. UI 優化：高對比頁籤、黑色表格邊框、頁尾版本號
@@ -293,7 +292,7 @@ else:
 # --- Tab 2: 詳細數據 (表二) ---
 with tab_data:
     st.subheader("🔢 詳細計算數據 (唯讀)")
-    # [保留] 僅保留滑鼠懸停提示
+    # [修正] 僅保留滑鼠懸停提示
     st.caption("💡 **提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。**")
     
     if not final_df.empty:
