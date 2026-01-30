@@ -4,12 +4,12 @@ import numpy as np
 import plotly.express as px
 
 # ==============================================================================
-# 版本：v3.14 (Final Fix)
+# 版本：v3.14 (E-pad Fix)
 # 日期：2026-01-30
-# 基底：v3.14 (Hint Update)
+# 基底：v3.14 (Final Fix)
 # 修改內容：
-# 1. 再次確認 Tab 2 的提示文字已移除熱力圖顏色說明，僅保留滑鼠懸停提示。
-# 2. 確保 UI 樣式 (黑框、頁籤、頁尾版本號) 皆正確套用。
+# 1. 修改 Tab 1 輸入表格的 Tooltip：將 "Thermal Pad" 更名為 "E-pad"。
+# 2. 其餘 CSS 樣式與邏輯完全保持原樣。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -202,8 +202,10 @@ with tab_input:
             "Qty": st.column_config.NumberColumn(label="數量", help="該元件的使用數量", min_value=0, step=1, width="small"),
             "Power(W)": st.column_config.NumberColumn(label="單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f", min_value=0.0, step=0.1),
             "Height(mm)": st.column_config.NumberColumn(label="元件高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。", format="%.1f"),
-            "Pad_L": st.column_config.NumberColumn(label="Pad 長 (mm)", help="元件底部散熱焊盤 (Thermal Pad) 的長度"),
-            "Pad_W": st.column_config.NumberColumn(label="Pad 寬 (mm)", help="元件底部散熱焊盤 (Thermal Pad) 的寬度"),
+            # [修改] 將 Thermal Pad 改為 E-pad
+            "Pad_L": st.column_config.NumberColumn(label="Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度"),
+            "Pad_W": st.column_config.NumberColumn(label="Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度"),
+            
             "Thick(mm)": st.column_config.NumberColumn(label="基板厚度 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
             "Board_Type": st.column_config.SelectboxColumn(label="基板導通", help="PCB 垂直導熱方式", options=["Thermal Via", "Copper Coin", "None"], width="medium"),
             "TIM_Type": st.column_config.SelectboxColumn(label="介面材料", help="接觸介質類型", options=["Solder", "Grease", "Pad", "Putty", "None"], width="medium"),
@@ -290,7 +292,7 @@ else:
 # --- Tab 2: 詳細數據 (表二) ---
 with tab_data:
     st.subheader("🔢 詳細計算數據 (唯讀)")
-    # [修正] 僅保留滑鼠懸停提示
+    # [保留] 僅保留滑鼠懸停提示，無熱力圖說明
     st.caption("💡 **提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。**")
     
     if not final_df.empty:
