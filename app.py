@@ -1,5 +1,5 @@
 import streamlit as st
-import streamlit.components.v1 as components  # [新增] 用於製作複製按鈕元件
+import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -7,13 +7,12 @@ import plotly.graph_objects as go
 import time
 
 # ==============================================================================
-# 版本：v3.34 (Smart Copy Button)
-# 日期：2026-02-01
+# 版本：v3.35 (High-Res Download)
+# 日期：2026-02-02
 # 功能總結：
-# 1. Tab 4 AI 提示詞優化：
-#    - 更新為使用者指定的中文描述，並融合動態計算參數 (尺寸/鰭片數)。
-#    - 移除原本佔版面的 st.code 區塊。
-#    - 新增 JavaScript 複製按鈕，直接位於編輯框下方，點擊即可複製。
+# 1. Tab 4 流程優化：在「上傳寫實參考圖」下方新增「下載原始圖檔」按鈕。
+#    - 解決瀏覽器右鍵另存圖片解析度變差的問題。
+#    - 確保使用者下載的檔案與上傳時的原始檔完全一致 (Original Resolution)。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -607,7 +606,17 @@ with tab_3d:
         st.markdown("#### Step 2. 上傳寫實參考圖 (含 I/O)")
         ref_file = st.file_uploader("從本機上傳您的參考圖片 (Reference Image)", type=['png', 'jpg', 'jpeg'])
         if ref_file is not None:
-            st.image(ref_file, caption="已上傳的風格參考圖", width=200)
+            # Show preview
+            st.image(ref_file, caption="已上傳的風格參考圖 (預覽)", width=200)
+            
+            # [新增] 下載按鈕 (For Original File)
+            st.download_button(
+                label="⬇️ 下載原始高解析度圖檔",
+                data=ref_file.getvalue(),
+                file_name=ref_file.name,
+                mime=ref_file.type,
+                key="download_ref_img"
+            )
 
     # 步驟 2 (Prompt 生成)
     st.markdown("#### Step 3. 複製提示詞 (Prompt)")
@@ -708,6 +717,6 @@ with tab_3d:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.34 Smart Copy Button | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.35 High-Res Download | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
