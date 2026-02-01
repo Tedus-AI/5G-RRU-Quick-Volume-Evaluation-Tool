@@ -5,10 +5,11 @@ import plotly.express as px
 import time
 
 # ==============================================================================
-# 版本：v3.23 (Margins in Sidebar)
+# 版本：v3.24 (Margins Renamed)
 # 日期：2026-02-01
 # 修正重點：
-# 1. 將原本寫死的機構邊距 (Top/Btm/Left/Right) 移至側邊欄「2. PCB 與 機構尺寸」中供使用者調整。
+# 1. 側邊欄「2. PCB 與 機構尺寸」：移除分隔線。
+# 2. 側邊欄標題修改：將 "機構預留邊距 (Margins)" 改為 "PCB板離外殼邊距(防水)"。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -134,9 +135,9 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
     H_shield = st.number_input("HSK內腔深度 (mm)", value=20)
     H_filter = st.number_input("Cavity Filter 厚度 (mm)", value=42)
     
-    st.markdown("---")
-    st.caption("📏 機構預留邊距 (Margins)")
-    # [修正] 新增四個邊距設定，取代原本的 Hardcode
+    # [修正] 移除分隔線，並修改標題文字
+    st.caption("📏 PCB板離外殼邊距(防水)")
+    
     m1, m2 = st.columns(2)
     Top = m1.number_input("Top (mm)", value=11, step=1)
     Btm = m2.number_input("Bottom (mm)", value=13, step=1)
@@ -175,8 +176,6 @@ with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=False):
 with st.sidebar.expander("4. 鰭片幾何", expanded=False):
     Gap = st.number_input("鰭片間距 (mm)", value=13.2, step=0.1)
     Fin_t = st.number_input("鰭片厚度 (mm)", value=1.2, step=0.1)
-
-# [已移除] 原本寫死在這邊的 Top, Btm, Left, Right = 11, 13, 11, 11
 
 # ==================================================
 # 3. 分頁與邏輯
@@ -445,6 +444,6 @@ with tab_viz:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.23 Margins in Sidebar | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.24 Margins Renamed | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
