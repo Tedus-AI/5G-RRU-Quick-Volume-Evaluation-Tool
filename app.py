@@ -5,11 +5,11 @@ import plotly.express as px
 import time
 
 # ==============================================================================
-# 版本：v3.17 (Tooltip Restored)
+# 版本：v3.18 (Hybrid Style)
 # 日期：2026-02-01
 # 修正重點：
-# 1. 第二頁 (Tab 2)：全面恢復 v3.1.4 版的 Tooltip (名詞解釋)，滑鼠移到標題會顯示說明。
-# 2. 第二頁 (Tab 2)：保留數值格式化 (%.1f)，解決 20.000000 顯示問題。
+# 1. Tab 3 視覺風格完全還原至 v3.14 (依據截圖：經典紅黃藍紫配色、卡片樣式、底部綠色色塊)
+# 2. 保留新版的 Tab icon 與功能修正 (Tooltip, 數值格式)
 # ==============================================================================
 
 # === APP 設定 ===
@@ -69,12 +69,13 @@ st.markdown("""
     <hr style="margin-top: 0;">
     """, unsafe_allow_html=True)
 
-# CSS 樣式
+# CSS 樣式 (融合 v3.17 的架構 與 v3.14 的卡片風格)
 st.markdown("""
 <style>
     html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
     section[data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #dee2e6; }
     
+    /* Tabs */
     button[data-baseweb="tab"] {
         border-radius: 20px !important; margin: 0 5px !important; padding: 8px 20px !important;
         background-color: #f1f3f5 !important; border: none !important; font-weight: 600 !important;
@@ -85,30 +86,28 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(34, 139, 230, 0.3) !important;
     }
 
+    /* [還原] v3.14 經典卡片樣式 (依據截圖) */
     .kpi-card {
-        background: white; border-radius: 12px; padding: 20px; margin: 10px 0;
-        border: 1px solid #e9ecef; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        transition: transform 0.3s ease, box-shadow 0.3s ease; position: relative; overflow: hidden;
+        background-color: #ffffff;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 10px 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        /* border-left 將由 inline style 控制顏色 */
+        text-align: center;
+        border: 1px solid #ddd;
     }
-    .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); border-color: #228be6; }
-    .kpi-card::before { content: ""; position: absolute; top: 0; left: 0; width: 6px; height: 100%; }
-    .kpi-title { color: #868e96; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-    .kpi-value { color: #212529; font-size: 1.8rem; font-weight: 800; margin: 5px 0; }
-    .kpi-desc { color: #adb5bd; font-size: 0.75rem; }
+    .kpi-title { color: #666; font-size: 0.9rem; font-weight: 500; margin-bottom: 5px; }
+    .kpi-value { color: #333; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; }
+    .kpi-desc { color: #888; font-size: 0.8rem; }
 
+    /* 表格樣式 */
     [data-testid="stDataFrame"], [data-testid="stDataEditor"] {
         border: 1px solid #e9ecef !important; border-radius: 8px !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.02) !important;
     }
     [data-testid="stDataFrame"] thead tr th { background-color: #f8f9fa !important; color: #495057 !important; }
 
-    .result-box {
-        background: linear-gradient(135deg, #e3fafc 0%, #e6fffa 100%); padding: 30px; margin-top: 20px;
-        border-radius: 16px; border: 1px solid #c3fae8; box-shadow: 0 10px 30px -10px rgba(0, 184, 148, 0.3);
-        text-align: center; transition: transform 0.3s;
-    }
-    .result-box:hover { transform: scale(1.02); }
-    
     /* Scale Bar CSS */
     .legend-container { display: flex; flex-direction: column; align-items: center; margin-top: 40px; font-size: 0.85rem; }
     .legend-title { font-weight: bold; margin-bottom: 5px; color: black; }
@@ -202,10 +201,10 @@ with tab_input:
             "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
             "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量", min_value=0, step=1, width="small"),
             "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f", min_value=0.0, step=0.1),
-            "Height(mm)": st.column_config.NumberColumn("元件高度 (mm)", help="元件距離 PCB 底部的垂直高度", format="%.1f"),
-            "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度"),
-            "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度"),
-            "Thick(mm)": st.column_config.NumberColumn("基板厚度 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
+            "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。", format="%.1f"),
+            "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.1f"),
+            "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.1f"),
+            "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
             "Board_Type": st.column_config.SelectboxColumn("基板導通", help="PCB 垂直導熱方式", options=["Thermal Via", "Copper Coin", "None"], width="medium"),
             "TIM_Type": st.column_config.SelectboxColumn("介面材料", help="接觸介質類型", options=["Solder", "Grease", "Pad", "Putty", "None"], width="medium"),
             "R_jc": st.column_config.NumberColumn("熱阻 Rjc", help="結點到殼的內部熱阻", format="%.2f"),
@@ -305,36 +304,29 @@ with tab_data:
                 subset=['Allowed_dT'], 
                 cmap='RdYlGn'
             ).format({
-                # 這裡設定的是 underlying data 的格式，但 dataframe config 優先權更高
                 "R_int": "{:.4f}", "R_TIM": "{:.4f}", "Allowed_dT": "{:.2f}"
             })
             
-            # [修正] 恢復所有欄位的 help 說明，並保持 format="%.1f"
             st.dataframe(
                 styled_df, 
                 column_config={
-                    # --- 輸入欄位 (含 Help + Format) ---
                     "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)"),
                     "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量", format="%d"),
                     "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.1f"),
-                    "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。", format="%.1f"),
+                    "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。", format="%.1f"),
                     "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.1f"),
                     "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.1f"),
                     "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
                     "R_jc": st.column_config.NumberColumn("Rjc", help="結點到殼的內部熱阻", format="%.2f"),
                     "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.1f"),
-                    
-                    # --- 計算欄位 (含 Help + Format) ---
-                    "Base_L": st.column_config.NumberColumn("Base 長 (mm)", help="熱量擴散後的底部有效長度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
-                    "Base_W": st.column_config.NumberColumn("Base 寬 (mm)", help="熱量擴散後的底部有效寬度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
-                    "Loc_Amb": st.column_config.NumberColumn("局部環溫 (°C)", help="該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)。", format="%.1f"),
-                    "Drop": st.column_config.NumberColumn("內部溫降 (°C)", help="熱量從晶片核心傳導到散熱器表面的溫差。公式：Power × (Rjc + Rint + Rtim)。", format="%.1f"),
-                    "Total_W": st.column_config.NumberColumn("總功耗 (W)", help="該元件的總發熱量 (單顆功耗 × 數量)。", format="%.1f"),
-                    "Allowed_dT": st.column_config.NumberColumn("允許溫升 (°C)", help="散熱器剩餘可用的溫升裕度。數值越小代表該元件越容易過熱 (瓶頸)。公式：Limit - Loc_Amb - Drop。", format="%.2f"),
-                    "R_int": st.column_config.NumberColumn("基板熱阻 (°C/W)", help="元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值。", format="%.4f"),
-                    "R_TIM": st.column_config.NumberColumn("介面熱阻 (°C/W)", help="元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)。", format="%.4f"),
-                    
-                    # 隱藏不需要的欄位 (若有)
+                    "Base_L": st.column_config.NumberColumn("Base 長 (mm)", help="熱量擴散後的底部有效長度。", format="%.1f"),
+                    "Base_W": st.column_config.NumberColumn("Base 寬 (mm)", help="熱量擴散後的底部有效寬度。", format="%.1f"),
+                    "Loc_Amb": st.column_config.NumberColumn("局部環溫 (°C)", help="該元件高度處的環境溫度。", format="%.1f"),
+                    "Drop": st.column_config.NumberColumn("內部溫降 (°C)", help="熱量從晶片核心傳導到散熱器表面的溫差。", format="%.1f"),
+                    "Total_W": st.column_config.NumberColumn("總功耗 (W)", help="該元件的總發熱量。", format="%.1f"),
+                    "Allowed_dT": st.column_config.NumberColumn("允許溫升 (°C)", help="散熱器剩餘可用的溫升裕度。", format="%.2f"),
+                    "R_int": st.column_config.NumberColumn("基板熱阻 (°C/W)", help="元件穿過 PCB (Via) 傳導熱阻。", format="%.4f"),
+                    "R_TIM": st.column_config.NumberColumn("介面熱阻 (°C/W)", help="接觸熱阻。", format="%.4f"),
                     "Board_Type": st.column_config.Column("基板導通"),
                     "TIM_Type": st.column_config.Column("介面材料")
                 },
@@ -365,91 +357,71 @@ with tab_data:
 
 # --- Tab 3: 視覺化報告 ---
 with tab_viz:
-    st.subheader("📊 儀表板分析")
+    # [修正] 標題回歸 v3.14
+    st.subheader("📊 熱流分析報告")
     
+    # [修正] Card 函式還原至 v3.14 樣式 (左側邊框顏色，文字置中)
     def card(col, title, value, desc, color="#333"):
         col.markdown(f"""
-        <div class="kpi-card">
-            <style>
-                .kpi-card:nth-child(1)::before {{ background-color: {color}; }}
-            </style>
-            <div class="kpi-title" style="color:{color}">{title}</div>
+        <div class="kpi-card" style="border-left: 5px solid {color};">
+            <div class="kpi-title">{title}</div>
             <div class="kpi-value">{value}</div>
             <div class="kpi-desc">{desc}</div>
         </div>""", unsafe_allow_html=True)
 
+    # [修正] 顏色與數值格式還原至 v3.14 (截圖樣式)
     k1, k2, k3, k4 = st.columns(4)
-    card(k1, "🔥 整機總熱耗", f"{round(Total_Power, 2)} <span style='font-size:1rem'>W</span>", "Total Power Dissipation", "#FF6B6B")
-    card(k2, "⚠️ 系統瓶頸", f"{Bottleneck_Name}", f"dT: {round(Min_dT_Allowed, 2)}°C", "#FFA502")
-    card(k3, "🌊 所需散熱面積", f"{round(Area_req, 3)} <span style='font-size:1rem'>m²</span>", "Required Surface Area", "#2ED573")
-    card(k4, "📏 預估鰭片數", f"{int(Fin_Count)} <span style='font-size:1rem'>pcs</span>", "Estimated Fin Count", "#1E90FF")
+    # Total Power: Red (#e74c3c)
+    card(k1, "整機總熱耗", f"{round(Total_Power, 2)} W", "Total Power", "#e74c3c")
+    # Bottleneck: Orange (#f39c12)
+    card(k2, "系統瓶頸元件", f"{Bottleneck_Name}", f"dT: {round(Min_dT_Allowed, 2)}°C", "#f39c12")
+    # Area: Blue (#3498db)
+    card(k3, "所需散熱面積", f"{round(Area_req, 3)} m²", "Required Area", "#3498db")
+    # Fin Count: Purple (#9b59b6)
+    card(k4, "預估鰭片數量", f"{int(Fin_Count)} Pcs", "Fin Count", "#9b59b6")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
     if not valid_rows.empty:
         c1, c2 = st.columns(2)
         with c1:
+            # [修正] 圖表標題還原 (中英對照)
             fig_pie = px.pie(valid_rows, values='Total_W', names='Component', 
-                             title='<b>各元件功耗佔比</b>', 
-                             hole=0.6,
+                             title='<b>各元件功耗佔比 (Power Breakdown)</b>', 
+                             hole=0.4,
                              color_discrete_sequence=px.colors.qualitative.Pastel)
-            fig_pie.update_layout(showlegend=False, margin=dict(t=40, b=0, l=0, r=0))
-            fig_pie.update_traces(textposition='outside', textinfo='percent+label')
             st.plotly_chart(fig_pie, use_container_width=True)
             
         with c2:
             valid_rows_sorted = valid_rows.sort_values(by="Allowed_dT", ascending=True)
             fig_bar = px.bar(
                 valid_rows_sorted, x='Component', y='Allowed_dT', 
-                title='<b>剩餘溫升裕度 (Thermal Budget)</b>',
+                title='<b>各元件剩餘溫升裕度 (Thermal Budget)</b>',
                 color='Allowed_dT', 
                 color_continuous_scale='RdYlGn',
-                text_auto='.1f'
+                labels={'Allowed_dT': '允許溫升 (°C)'}
             )
-            fig_bar.update_layout(
-                xaxis_title="", 
-                yaxis_title="°C",
-                plot_bgcolor='rgba(0,0,0,0)', 
-                paper_bgcolor='rgba(0,0,0,0)',
-                margin=dict(t=40, b=0, l=0, r=0)
-            )
-            fig_bar.update_yaxes(showgrid=True, gridcolor='#eee')
+            fig_bar.update_layout(xaxis_title="元件名稱", yaxis_title="散熱器允許溫升 (°C)")
             st.plotly_chart(fig_bar, use_container_width=True)
 
     st.markdown("---")
-    
+    st.subheader("📏 尺寸與體積估算")
     c5, c6 = st.columns(2)
-    with c5:
-        st.markdown(f"""
-        <div class="kpi-card" style="border-left: 5px solid #20bf6b;">
-            <div class="kpi-title" style="color:#20bf6b">建議鰭片高度</div>
-            <div class="kpi-value">{round(Fin_Height, 2)} mm</div>
-            <div class="kpi-desc">Based on Area Requirement</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown(f"""
-        <div class="kpi-card" style="border-left: 5px solid #3867d6;">
-            <div class="kpi-title" style="color:#3867d6">機構長寬 (LxW)</div>
-            <div class="kpi-value">{L_hsk} x {W_hsk}</div>
-            <div class="kpi-desc">Unit: mm</div>
-        </div>
-        """, unsafe_allow_html=True)
+    # [修正] 底部卡片顏色與樣式還原
+    card(c5, "建議鰭片高度", f"{round(Fin_Height, 2)} mm", "Suggested Fin Height", "#2ecc71")
+    card(c6, "RRU 整機尺寸 (LxWxH)", f"{L_hsk} x {W_hsk} x {round(RRU_Height, 1)}", "Estimated Dimensions", "#34495e")
 
-    with c6:
-        st.markdown(f"""
-        <div class="result-box">
-            <h3 style="color: #0c8599; margin:0; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 2px;">Estimated Volume</h3>
-            <h1 style="background: -webkit-linear-gradient(45deg, #0984e3, #00b894); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin:10px 0; font-size: 5rem; font-weight: 900;">
-                {round(Volume_L, 2)} <span style="font-size: 2rem; color: #aaa; -webkit-text-fill-color: #aaa;">L</span>
-            </h1>
-            <p style="color: #666; font-weight: 500;">RRU Total Height: {round(RRU_Height, 1)} mm</p>
-        </div>
-        """, unsafe_allow_html=True)
+    # [修正] 體積顯示區塊還原 (綠色色塊)
+    st.markdown(f"""
+    <div style="background-color: #e6fffa; padding: 30px; margin-top: 20px; border-radius: 15px; border-left: 10px solid #00b894; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center;">
+        <h3 style="color: #006266; margin:0; font-size: 1.4rem; letter-spacing: 1px;">★ RRU 整機估算體積 (Estimated Volume)</h3>
+        <h1 style="color: #00b894; margin:15px 0 0 0; font-size: 4.5rem; font-weight: 800;">{round(Volume_L, 2)} L</h1>
+    </div>
+    """, unsafe_allow_html=True)
 
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.17 Tooltip Restored | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.18 Hybrid Style | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
