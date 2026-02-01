@@ -5,11 +5,10 @@ import plotly.express as px
 import time
 
 # ==============================================================================
-# 版本：v3.18 (Hybrid Style)
+# 版本：v3.19 (Pie Chart Update)
 # 日期：2026-02-01
 # 修正重點：
-# 1. Tab 3 視覺風格完全還原至 v3.14 (依據截圖：經典紅黃藍紫配色、卡片樣式、底部綠色色塊)
-# 2. 保留新版的 Tab icon 與功能修正 (Tooltip, 數值格式)
+# 1. Tab 3 圓餅圖：隱藏右側圖例，直接將「元件名稱+百分比」顯示於圓餅圖塊上 (textinfo='label+percent')
 # ==============================================================================
 
 # === APP 設定 ===
@@ -357,10 +356,8 @@ with tab_data:
 
 # --- Tab 3: 視覺化報告 ---
 with tab_viz:
-    # [修正] 標題回歸 v3.14
     st.subheader("📊 熱流分析報告")
     
-    # [修正] Card 函式還原至 v3.14 樣式 (左側邊框顏色，文字置中)
     def card(col, title, value, desc, color="#333"):
         col.markdown(f"""
         <div class="kpi-card" style="border-left: 5px solid {color};">
@@ -369,7 +366,6 @@ with tab_viz:
             <div class="kpi-desc">{desc}</div>
         </div>""", unsafe_allow_html=True)
 
-    # [修正] 顏色與數值格式還原至 v3.14 (截圖樣式)
     k1, k2, k3, k4 = st.columns(4)
     # Total Power: Red (#e74c3c)
     card(k1, "整機總熱耗", f"{round(Total_Power, 2)} W", "Total Power", "#e74c3c")
@@ -385,11 +381,13 @@ with tab_viz:
     if not valid_rows.empty:
         c1, c2 = st.columns(2)
         with c1:
-            # [修正] 圖表標題還原 (中英對照)
+            # [修正] 圓餅圖：標籤與百分比直接顯示於圖上，隱藏圖例
             fig_pie = px.pie(valid_rows, values='Total_W', names='Component', 
                              title='<b>各元件功耗佔比 (Power Breakdown)</b>', 
                              hole=0.4,
                              color_discrete_sequence=px.colors.qualitative.Pastel)
+            fig_pie.update_traces(textinfo='label+percent', textposition='inside')
+            fig_pie.update_layout(showlegend=False, margin=dict(t=40, b=0, l=0, r=0))
             st.plotly_chart(fig_pie, use_container_width=True)
             
         with c2:
@@ -407,11 +405,9 @@ with tab_viz:
     st.markdown("---")
     st.subheader("📏 尺寸與體積估算")
     c5, c6 = st.columns(2)
-    # [修正] 底部卡片顏色與樣式還原
     card(c5, "建議鰭片高度", f"{round(Fin_Height, 2)} mm", "Suggested Fin Height", "#2ecc71")
     card(c6, "RRU 整機尺寸 (LxWxH)", f"{L_hsk} x {W_hsk} x {round(RRU_Height, 1)}", "Estimated Dimensions", "#34495e")
 
-    # [修正] 體積顯示區塊還原 (綠色色塊)
     st.markdown(f"""
     <div style="background-color: #e6fffa; padding: 30px; margin-top: 20px; border-radius: 15px; border-left: 10px solid #00b894; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center;">
         <h3 style="color: #006266; margin:0; font-size: 1.4rem; letter-spacing: 1px;">★ RRU 整機估算體積 (Estimated Volume)</h3>
@@ -422,6 +418,6 @@ with tab_viz:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.18 Hybrid Style | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.19 Pie Chart Update | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
