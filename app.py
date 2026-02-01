@@ -5,14 +5,14 @@ import plotly.express as px
 import time
 
 # ==============================================================================
-# 版本：v3.15 (UI Revamp - Fixed)
+# 版本：v3.16 (Formatting Fix)
 # 日期：2026-02-01
-# 說明：
-# 1. 核心計算邏輯與 v3.14 完全一致
-# 2. UI 優化：Tab 1 & Tab 2 已依照使用者需求復原文字說明與功能元件
+# 修正重點：
+# 1. 第二頁：強制所有數值欄位 (含輸入項) 顯示為一位小數 (%.1f)，解決 20.000000 問題
+# 2. 第二頁：標題下方的提示文字完全復原
 # ==============================================================================
 
-# === APP 設定 (增加頁面圖示) ===
+# === APP 設定 ===
 st.set_page_config(
     page_title="5G RRU Thermal Engine", 
     page_icon="📡", 
@@ -21,7 +21,7 @@ st.set_page_config(
 )
 
 # ==================================================
-# 🔐 密碼保護功能 (增加登入動畫)
+# 🔐 密碼保護
 # ==================================================
 def check_password():
     ACTUAL_PASSWORD = "tedus"
@@ -33,12 +33,7 @@ def check_password():
             st.session_state["password_correct"] = False
 
     if "password_correct" not in st.session_state:
-        # 使用卡片式登入介面
-        st.markdown("""
-        <style>
-        .stTextInput > div > div > input {text-align: center;}
-        </style>
-        """, unsafe_allow_html=True)
+        st.markdown("""<style>.stTextInput > div > div > input {text-align: center;}</style>""", unsafe_allow_html=True)
         c1, c2, c3 = st.columns([1,2,1])
         with c2:
             st.markdown("<h2 style='text-align: center;'>🔐 系統鎖定</h2>", unsafe_allow_html=True)
@@ -57,16 +52,15 @@ def check_password():
 if not check_password():
     st.stop()
 
-# 第一次載入時播放氣球動畫 (增加儀式感)
 if "welcome_shown" not in st.session_state:
     st.toast('🎉 登入成功！歡迎回到熱流運算引擎', icon="✅")
     st.session_state["welcome_shown"] = True
 
 # ==================================================
-# 👇 主程式開始
+# 👇 主程式
 # ==================================================
 
-# 標題 (使用漸層色 CSS)
+# 標題
 st.markdown("""
     <h1 style='text-align: center; background: -webkit-linear-gradient(45deg, #007CF0, #00DFD8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 900;'>
     📡 5G RRU 體積估算引擎 <span style='font-size: 20px; color: #888; -webkit-text-fill-color: #888;'>Pro</span>
@@ -75,91 +69,47 @@ st.markdown("""
     <hr style="margin-top: 0;">
     """, unsafe_allow_html=True)
 
-# --------------------------------------------------
-# [CSS] 視覺優化核心 (The Magic Sauce)
-# --------------------------------------------------
+# CSS 樣式
 st.markdown("""
 <style>
-    /* 1. 全域字體與背景微調 */
-    html, body, [class*="css"] {
-        font-family: "Microsoft JhengHei", "Roboto", sans-serif;
-    }
+    html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
+    section[data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #dee2e6; }
     
-    /* 2. 側邊欄優化 */
-    section[data-testid="stSidebar"] {
-        background-color: #f8f9fa;
-        border-right: 1px solid #dee2e6;
-    }
-
-    /* 3. 頁籤 (Tabs) - 現代化膠囊樣式 */
     button[data-baseweb="tab"] {
-        border-radius: 20px !important;
-        margin: 0 5px !important;
-        padding: 8px 20px !important;
-        background-color: #f1f3f5 !important;
-        border: none !important;
-        font-weight: 600 !important;
+        border-radius: 20px !important; margin: 0 5px !important; padding: 8px 20px !important;
+        background-color: #f1f3f5 !important; border: none !important; font-weight: 600 !important;
         transition: all 0.3s ease !important;
     }
     button[data-baseweb="tab"][aria-selected="true"] {
-        background-color: #228be6 !important;
-        color: white !important;
+        background-color: #228be6 !important; color: white !important;
         box-shadow: 0 4px 6px rgba(34, 139, 230, 0.3) !important;
     }
 
-    /* 4. KPI 卡片 - 懸浮特效 (Hover Effect) */
     .kpi-card {
-        background: white;
-        border-radius: 12px;
-        padding: 20px;
-        margin: 10px 0;
-        border: 1px solid #e9ecef;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        position: relative;
-        overflow: hidden;
+        background: white; border-radius: 12px; padding: 20px; margin: 10px 0;
+        border: 1px solid #e9ecef; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        transition: transform 0.3s ease, box-shadow 0.3s ease; position: relative; overflow: hidden;
     }
-    .kpi-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-        border-color: #228be6;
-    }
-    .kpi-card::before {
-        content: "";
-        position: absolute;
-        top: 0; left: 0; width: 6px; height: 100%;
-    }
+    .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); border-color: #228be6; }
+    .kpi-card::before { content: ""; position: absolute; top: 0; left: 0; width: 6px; height: 100%; }
     .kpi-title { color: #868e96; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
     .kpi-value { color: #212529; font-size: 1.8rem; font-weight: 800; margin: 5px 0; }
     .kpi-desc { color: #adb5bd; font-size: 0.75rem; }
 
-    /* 5. 表格優化 - 簡潔風格 */
     [data-testid="stDataFrame"], [data-testid="stDataEditor"] {
-        border: 1px solid #e9ecef !important;
-        border-radius: 8px !important;
+        border: 1px solid #e9ecef !important; border-radius: 8px !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.02) !important;
     }
-    [data-testid="stDataFrame"] thead tr th {
-        background-color: #f8f9fa !important;
-        color: #495057 !important;
-    }
+    [data-testid="stDataFrame"] thead tr th { background-color: #f8f9fa !important; color: #495057 !important; }
 
-    /* 6. 特殊結果區塊 - 玻璃擬態 */
     .result-box {
-        background: linear-gradient(135deg, #e3fafc 0%, #e6fffa 100%);
-        padding: 30px;
-        margin-top: 20px;
-        border-radius: 16px;
-        border: 1px solid #c3fae8;
-        box-shadow: 0 10px 30px -10px rgba(0, 184, 148, 0.3);
-        text-align: center;
-        transition: transform 0.3s;
+        background: linear-gradient(135deg, #e3fafc 0%, #e6fffa 100%); padding: 30px; margin-top: 20px;
+        border-radius: 16px; border: 1px solid #c3fae8; box-shadow: 0 10px 30px -10px rgba(0, 184, 148, 0.3);
+        text-align: center; transition: transform 0.3s;
     }
-    .result-box:hover {
-        transform: scale(1.02);
-    }
+    .result-box:hover { transform: scale(1.02); }
     
-    /* 7. Scale Bar CSS (恢復舊版功能) */
+    /* Scale Bar CSS */
     .legend-container { display: flex; flex-direction: column; align-items: center; margin-top: 40px; font-size: 0.85rem; }
     .legend-title { font-weight: bold; margin-bottom: 5px; color: black; }
     .legend-body { display: flex; align-items: stretch; height: 200px; }
@@ -169,7 +119,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==================================================
-# 1. 側邊欄：全域參數
+# 1. 側邊欄
 # ==================================================
 st.sidebar.header("🛠️ 參數控制台")
 
@@ -229,10 +179,8 @@ tab_input, tab_data, tab_viz = st.tabs(["📝 元件清單", "🔢 詳細數據"
 # --- Tab 1: 輸入介面 ---
 with tab_input:
     st.subheader("🔥 元件熱源清單設定")
-    # [已修正] 恢復原本的詳細操作提示
     st.caption("💡 **提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。**")
 
-    # 這裡的 Data 完全不動
     input_data = {
         "Component": ["Final PA", "Driver PA", "Pre Driver", "Circulator", "Cavity Filter", "CPU (FPGA)", "Si5518", "16G DDR", "Power Mod", "SFP"],
         "Qty": [4, 4, 4, 4, 1, 1, 1, 2, 1, 1],
@@ -248,21 +196,20 @@ with tab_input:
     }
     df_input = pd.DataFrame(input_data)
 
-    # [已修正] 恢復原本詳細的欄位設定
     edited_df = st.data_editor(
         df_input,
         column_config={
-            "Component": st.column_config.TextColumn(label="元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
-            "Qty": st.column_config.NumberColumn(label="數量", help="該元件的使用數量", min_value=0, step=1, width="small"),
-            "Power(W)": st.column_config.NumberColumn(label="單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f", min_value=0.0, step=0.1),
-            "Height(mm)": st.column_config.NumberColumn(label="元件高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。", format="%.1f"),
-            "Pad_L": st.column_config.NumberColumn(label="Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度"),
-            "Pad_W": st.column_config.NumberColumn(label="Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度"),
-            "Thick(mm)": st.column_config.NumberColumn(label="基板厚度 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
-            "Board_Type": st.column_config.SelectboxColumn(label="基板導通", help="PCB 垂直導熱方式", options=["Thermal Via", "Copper Coin", "None"], width="medium"),
-            "TIM_Type": st.column_config.SelectboxColumn(label="介面材料", help="接觸介質類型", options=["Solder", "Grease", "Pad", "Putty", "None"], width="medium"),
-            "R_jc": st.column_config.NumberColumn(label="熱阻 Rjc", help="結點到殼的內部熱阻", format="%.2f"),
-            "Limit(C)": st.column_config.NumberColumn(label="限溫 (°C)", help="元件允許最高運作溫度", format="%.1f")
+            "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
+            "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量", min_value=0, step=1, width="small"),
+            "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f", min_value=0.0, step=0.1),
+            "Height(mm)": st.column_config.NumberColumn("元件高度 (mm)", help="元件距離 PCB 底部的垂直高度", format="%.1f"),
+            "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度"),
+            "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度"),
+            "Thick(mm)": st.column_config.NumberColumn("基板厚度 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
+            "Board_Type": st.column_config.SelectboxColumn("基板導通", help="PCB 垂直導熱方式", options=["Thermal Via", "Copper Coin", "None"], width="medium"),
+            "TIM_Type": st.column_config.SelectboxColumn("介面材料", help="接觸介質類型", options=["Solder", "Grease", "Pad", "Putty", "None"], width="medium"),
+            "R_jc": st.column_config.NumberColumn("熱阻 Rjc", help="結點到殼的內部熱阻", format="%.2f"),
+            "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.1f")
         },
         num_rows="dynamic",
         use_container_width=True,
@@ -279,7 +226,6 @@ tim_props = {
 }
 
 def apply_excel_formulas(row):
-    # Logic remains EXACTLY as requested
     if row['Component'] == "Final PA": base_l, base_w = Coin_L_Setting, Coin_W_Setting
     elif row['Power(W)'] == 0 or row['Thick(mm)'] == 0: base_l, base_w = 0.0, 0.0
     else: base_l, base_w = row['Pad_L'] + row['Thick(mm)'], row['Pad_W'] + row['Thick(mm)']
@@ -344,47 +290,58 @@ else:
 
 # --- Tab 2: 詳細數據 (表二) ---
 with tab_data:
-    # [修正] 標題還原
     st.subheader("🔢 詳細計算數據 (唯讀)")
-    # [修正] 恢復提示
+    # [修正] 標題提示復原
     st.caption("💡 **提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。**")
     
     if not final_df.empty:
-        # 計算 Gradient Bar 數值
         min_val = final_df['Allowed_dT'].min()
         max_val = final_df['Allowed_dT'].max()
         mid_val = (min_val + max_val) / 2
         
-        # [修正] 恢復左右佈局 (Scale Bar)
         col_table, col_legend = st.columns([0.9, 0.1])
         
         with col_table:
-            # 使用 Streamlit 內建的 metric color 邏輯增強視覺
             styled_df = final_df.style.background_gradient(
                 subset=['Allowed_dT'], 
                 cmap='RdYlGn'
             ).format({
-                "Base_L": "{:.1f}", "Base_W": "{:.1f}", "Loc_Amb": "{:.1f}",
-                "R_int": "{:.4f}", "R_TIM": "{:.4f}", "Drop": "{:.1f}",
-                "Allowed_dT": "{:.2f}", "Total_W": "{:.1f}"
+                # 這裡設定的是 underlying data 的格式，但 dataframe config 優先權更高
+                "R_int": "{:.4f}", "R_TIM": "{:.4f}", "Allowed_dT": "{:.2f}"
             })
             
-            # [修正] 格式化設定 (確保整數顯示小數點)
+            # [修正] 強制所有數值欄位使用 %.1f，解決 20.000000 問題
             st.dataframe(
                 styled_df, 
                 column_config={
-                    "Base_L": st.column_config.NumberColumn(format="%.1f"),
-                    "Base_W": st.column_config.NumberColumn(format="%.1f"),
-                    "Loc_Amb": st.column_config.NumberColumn(format="%.1f"),
-                    "Drop": st.column_config.NumberColumn(format="%.1f"),
-                    "Total_W": st.column_config.NumberColumn(format="%.1f")
+                    # 輸入欄位 Formatting Check
+                    "Component": st.column_config.TextColumn("元件名稱"),
+                    "Qty": st.column_config.NumberColumn("數量", format="%d"),
+                    "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", format="%.1f"),
+                    "Height(mm)": st.column_config.NumberColumn("高度 (mm)", format="%.1f"),
+                    "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", format="%.1f"),
+                    "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", format="%.1f"),
+                    "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", format="%.1f"),
+                    "R_jc": st.column_config.NumberColumn("Rjc", format="%.2f"),
+                    "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", format="%.1f"),
+                    
+                    # 計算欄位 Formatting Check
+                    "Base_L": st.column_config.NumberColumn("Base 長 (mm)", format="%.1f"),
+                    "Base_W": st.column_config.NumberColumn("Base 寬 (mm)", format="%.1f"),
+                    "Loc_Amb": st.column_config.NumberColumn("局部環溫 (°C)", format="%.1f"),
+                    "Drop": st.column_config.NumberColumn("內部溫降 (°C)", format="%.1f"),
+                    "Total_W": st.column_config.NumberColumn("總功耗 (W)", format="%.1f"),
+                    "Allowed_dT": st.column_config.NumberColumn("允許溫升 (°C)", format="%.2f"),
+                    
+                    # 隱藏不需要的欄位 (若有)
+                    "Board_Type": st.column_config.Column("基板導通"),
+                    "TIM_Type": st.column_config.Column("介面材料")
                 },
                 use_container_width=True, 
                 hide_index=True
             )
         
         with col_legend:
-            # [修正] 恢復右側漸層條 HTML
             st.markdown(f"""
             <div class="legend-container">
                 <div class="legend-title">允許溫升<br>(°C)</div>
@@ -399,7 +356,6 @@ with tab_data:
             </div>
             """, unsafe_allow_html=True)
         
-        # [修正] 恢復底部名詞解釋
         st.info("""
         ℹ️ **名詞解釋 - 允許溫升 (Allowed dT)** 此數值代表 **「散熱器可用的溫升裕度」** (Limit - Local Ambient - Drop)。
         * 🟩 **綠色 (數值高)**：代表散熱裕度充足，該元件不易過熱。
@@ -410,9 +366,7 @@ with tab_data:
 with tab_viz:
     st.subheader("📊 儀表板分析")
     
-    # 使用新版 CSS Card 函數
     def card(col, title, value, desc, color="#333"):
-        # 利用 CSS ::before 屬性製作顏色側邊條
         col.markdown(f"""
         <div class="kpi-card">
             <style>
@@ -423,9 +377,7 @@ with tab_viz:
             <div class="kpi-desc">{desc}</div>
         </div>""", unsafe_allow_html=True)
 
-    # 第一排 KPI
     k1, k2, k3, k4 = st.columns(4)
-    # 使用更鮮豔的顏色代碼
     card(k1, "🔥 整機總熱耗", f"{round(Total_Power, 2)} <span style='font-size:1rem'>W</span>", "Total Power Dissipation", "#FF6B6B")
     card(k2, "⚠️ 系統瓶頸", f"{Bottleneck_Name}", f"dT: {round(Min_dT_Allowed, 2)}°C", "#FFA502")
     card(k3, "🌊 所需散熱面積", f"{round(Area_req, 3)} <span style='font-size:1rem'>m²</span>", "Required Surface Area", "#2ED573")
@@ -436,18 +388,15 @@ with tab_viz:
     if not valid_rows.empty:
         c1, c2 = st.columns(2)
         with c1:
-            # 優化 Plotly 圓餅圖：中空設計、現代配色
             fig_pie = px.pie(valid_rows, values='Total_W', names='Component', 
                              title='<b>各元件功耗佔比</b>', 
                              hole=0.6,
                              color_discrete_sequence=px.colors.qualitative.Pastel)
             fig_pie.update_layout(showlegend=False, margin=dict(t=40, b=0, l=0, r=0))
-            # 增加圖表 hover 資訊
             fig_pie.update_traces(textposition='outside', textinfo='percent+label')
             st.plotly_chart(fig_pie, use_container_width=True)
             
         with c2:
-            # 優化 Plotly 長條圖：去除背景網格
             valid_rows_sorted = valid_rows.sort_values(by="Allowed_dT", ascending=True)
             fig_bar = px.bar(
                 valid_rows_sorted, x='Component', y='Allowed_dT', 
@@ -459,7 +408,7 @@ with tab_viz:
             fig_bar.update_layout(
                 xaxis_title="", 
                 yaxis_title="°C",
-                plot_bgcolor='rgba(0,0,0,0)', # 透明背景
+                plot_bgcolor='rgba(0,0,0,0)', 
                 paper_bgcolor='rgba(0,0,0,0)',
                 margin=dict(t=40, b=0, l=0, r=0)
             )
@@ -468,7 +417,6 @@ with tab_viz:
 
     st.markdown("---")
     
-    # 尺寸結果區塊
     c5, c6 = st.columns(2)
     with c5:
         st.markdown(f"""
@@ -488,7 +436,6 @@ with tab_viz:
         """, unsafe_allow_html=True)
 
     with c6:
-        # 大大的結果方塊 (Result Box)
         st.markdown(f"""
         <div class="result-box">
             <h3 style="color: #0c8599; margin:0; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 2px;">Estimated Volume</h3>
@@ -499,10 +446,9 @@ with tab_viz:
         </div>
         """, unsafe_allow_html=True)
 
-# 頁尾
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.15 UI Revamp | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.16 UI Fix | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
