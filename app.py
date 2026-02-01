@@ -7,12 +7,13 @@ import plotly.graph_objects as go
 import time
 
 # ==============================================================================
-# 版本：v3.35 (High-Res Download)
+# 版本：v3.36 (Persistent Upload Fix)
 # 日期：2026-02-02
-# 功能總結：
-# 1. Tab 4 流程優化：在「上傳寫實參考圖」下方新增「下載原始圖檔」按鈕。
-#    - 解決瀏覽器右鍵另存圖片解析度變差的問題。
-#    - 確保使用者下載的檔案與上傳時的原始檔完全一致 (Original Resolution)。
+# 修正重點：
+# 1. Tab 4 上傳功能修復：
+#    - 引入 Session State 機制，將上傳的圖片資料 (Bytes) 強制暫存。
+#    - 解決「按下下載按鈕後，頁面圖片消失」的重置問題。
+#    - 解決「程式重跑 (Rerun) 後圖片消失」的問題。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -604,17 +605,34 @@ with tab_3d:
     
     with col_step1_2:
         st.markdown("#### Step 2. 上傳寫實參考圖 (含 I/O)")
-        ref_file = st.file_uploader("從本機上傳您的參考圖片 (Reference Image)", type=['png', 'jpg', 'jpeg'])
+        
+        # [修正] 增加 key='ref_uploader' 以避免互動時重置
+        ref_file = st.file_uploader("從本機上傳您的參考圖片 (Reference Image)", type=['png', 'jpg', 'jpeg'], key='ref_uploader')
+        
+        # [修正] 使用 Session State 進行圖片資料快取 (Persistence)
         if ref_file is not None:
-            # Show preview
-            st.image(ref_file, caption="已上傳的風格參考圖 (預覽)", width=200)
+            # 當有新檔案上傳時，更新 Session State
+            st.session_state['ref_img_bytes'] = ref_file.getvalue()
+            st.session_state['ref_img_name'] = ref_file.name
+            st.session_state['ref_img_type'] = ref_file.type
+        elif 'ref_uploader' in st.session_state and not st.session_state['ref_uploader']:
+            # 如果使用者手動清除了上傳器 (點擊 X)，則清除 Session State
+            if 'ref_img_bytes' in st.session_state:
+                del st.session_state['ref_img_bytes']
+                del st.session_state['ref_img_name']
+                del st.session_state['ref_img_type']
+
+        # [修正] 優先從 Session State 讀取資料來顯示與下載
+        if 'ref_img_bytes' in st.session_state:
+            # 顯示預覽圖
+            st.image(st.session_state['ref_img_bytes'], caption="已上傳的風格參考圖 (預覽)", width=200)
             
-            # [新增] 下載按鈕 (For Original File)
+            # 下載按鈕 (使用快取的 Bytes 資料)
             st.download_button(
                 label="⬇️ 下載原始高解析度圖檔",
-                data=ref_file.getvalue(),
-                file_name=ref_file.name,
-                mime=ref_file.type,
+                data=st.session_state['ref_img_bytes'],
+                file_name=st.session_state['ref_img_name'],
+                mime=st.session_state['ref_img_type'],
                 key="download_ref_img"
             )
 
@@ -717,6 +735,6 @@ with tab_3d:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.35 High-Res Download | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.36 Persistent Upload Fix | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
