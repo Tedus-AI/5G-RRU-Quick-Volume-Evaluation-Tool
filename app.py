@@ -5,15 +5,16 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import time
+import os  # [新增] 用於讀取 GitHub 上的預設圖片
 
 # ==============================================================================
-# 版本：v3.36 (Persistent Upload Fix)
+# 版本：v3.37 (Default Asset Support)
 # 日期：2026-02-02
 # 修正重點：
-# 1. Tab 4 上傳功能修復：
-#    - 引入 Session State 機制，將上傳的圖片資料 (Bytes) 強制暫存。
-#    - 解決「按下下載按鈕後，頁面圖片消失」的重置問題。
-#    - 解決「程式重跑 (Rerun) 後圖片消失」的問題。
+# 1. Tab 4 圖片載入邏輯升級：
+#    - 啟動時自動尋找同目錄下的 'reference_style.png' (或 .jpg)。
+#    - 若找到，自動載入為預設圖，讓所有使用者打開 App 都能直接看到並下載。
+#    - 解決「分享連結給他人時，圖片無法保留」的問題。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -606,35 +607,71 @@ with tab_3d:
     with col_step1_2:
         st.markdown("#### Step 2. 上傳寫實參考圖 (含 I/O)")
         
-        # [修正] 增加 key='ref_uploader' 以避免互動時重置
-        ref_file = st.file_uploader("從本機上傳您的參考圖片 (Reference Image)", type=['png', 'jpg', 'jpeg'], key='ref_uploader')
+        # 1. 嘗試自動載入 GitHub 上的預設圖片
+        default_ref_bytes = None
+        default_ref_name = None
+        default_ref_type = None
         
-        # [修正] 使用 Session State 進行圖片資料快取 (Persistence)
+        # 預設檔名清單 (依優先順序)
+        default_files = ['reference_style.png', 'reference_style.jpg', 'reference_style.jpeg']
+        for filename in default_files:
+            if os.path.exists(filename):
+                with open(filename, "rb") as f:
+                    default_ref_bytes = f.read()
+                    default_ref_name = filename
+                    # 簡易判斷 mime type
+                    ext = filename.split('.')[-1].lower()
+                    if ext == 'png': default_ref_type = 'image/png'
+                    elif ext in ['jpg', 'jpeg']: default_ref_type = 'image/jpeg'
+                break
+        
+        # 2. 處理使用者上傳 (優先權高於預設圖)
+        # key='ref_uploader' 以避免互動時重置
+        ref_file = st.file_uploader("從本機上傳您的參考圖片 (Reference Image) [若無上傳將使用系統預設圖]", type=['png', 'jpg', 'jpeg'], key='ref_uploader')
+        
+        # 3. 決定最終要顯示的圖片
+        final_img_bytes = None
+        final_img_name = None
+        final_img_type = None
+
+        # 如果使用者有上傳 -> 用使用者的
         if ref_file is not None:
-            # 當有新檔案上傳時，更新 Session State
+            # 更新 Session State (Persistent Upload)
             st.session_state['ref_img_bytes'] = ref_file.getvalue()
             st.session_state['ref_img_name'] = ref_file.name
             st.session_state['ref_img_type'] = ref_file.type
-        elif 'ref_uploader' in st.session_state and not st.session_state['ref_uploader']:
-            # 如果使用者手動清除了上傳器 (點擊 X)，則清除 Session State
-            if 'ref_img_bytes' in st.session_state:
-                del st.session_state['ref_img_bytes']
-                del st.session_state['ref_img_name']
-                del st.session_state['ref_img_type']
-
-        # [修正] 優先從 Session State 讀取資料來顯示與下載
-        if 'ref_img_bytes' in st.session_state:
-            # 顯示預覽圖
-            st.image(st.session_state['ref_img_bytes'], caption="已上傳的風格參考圖 (預覽)", width=200)
             
-            # 下載按鈕 (使用快取的 Bytes 資料)
+            final_img_bytes = st.session_state['ref_img_bytes']
+            final_img_name = st.session_state['ref_img_name']
+            final_img_type = st.session_state['ref_img_type']
+            
+        # 如果使用者沒上傳，但 Session State 裡有舊的 -> 用 Session State 的 (防止重整消失)
+        elif 'ref_img_bytes' in st.session_state:
+            final_img_bytes = st.session_state['ref_img_bytes']
+            final_img_name = st.session_state['ref_img_name']
+            final_img_type = st.session_state['ref_img_type']
+            
+        # 如果都沒有，但有預設圖 -> 用預設圖
+        elif default_ref_bytes is not None:
+            final_img_bytes = default_ref_bytes
+            final_img_name = default_ref_name
+            final_img_type = default_ref_type
+
+        # 4. 顯示與下載按鈕
+        if final_img_bytes is not None:
+            # 顯示預覽圖
+            st.image(final_img_bytes, caption=f"目前使用的參考圖: {final_img_name}", width=200)
+            
+            # 下載按鈕
             st.download_button(
                 label="⬇️ 下載原始高解析度圖檔",
-                data=st.session_state['ref_img_bytes'],
-                file_name=st.session_state['ref_img_name'],
-                mime=st.session_state['ref_img_type'],
+                data=final_img_bytes,
+                file_name=final_img_name,
+                mime=final_img_type,
                 key="download_ref_img"
             )
+        else:
+            st.info("尚未上傳圖片，且系統中無預設參考圖 (reference_style.png)。")
 
     # 步驟 2 (Prompt 生成)
     st.markdown("#### Step 3. 複製提示詞 (Prompt)")
@@ -735,6 +772,6 @@ with tab_3d:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.36 Persistent Upload Fix | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.37 Default Asset Support | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
