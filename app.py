@@ -6,13 +6,12 @@ import plotly.graph_objects as go
 import time
 
 # ==============================================================================
-# 版本：v3.29 (CAD Style Rendering)
+# 版本：v3.30 (Unified Color Scheme)
 # 日期：2026-02-01
 # 功能總結：
-# 1. Tab 4 3D 視圖材質升級：
-#    - 加入 Lighting 參數 (Specular/Roughness) 模擬鋁合金金屬質感。
-#    - 調整配色為工業設計風格 (Industrial Grey/Silver)。
-#    - 這張圖現在更適合截圖下來，作為 AI 渲染的精準底圖 (Control Image)。
+# 1. Tab 4 3D 視圖配色調整：
+#    - 將底部電子艙 (Electronics Body) 顏色改為與散熱鰭片 (Fins) 相同的鋁原色。
+#    - 創造一體成形的金屬質感視覺效果。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -452,8 +451,8 @@ with tab_3d:
         fig_3d = go.Figure()
         
         # --- 定義材質顏色 (CAD 風格) ---
-        COLOR_BODY = '#2C3E50'  # 深灰藍 (Dark Slate)
         COLOR_FINS = '#E5E7E9'  # 鋁原色 (Aluminum Light Grey)
+        COLOR_BODY = COLOR_FINS # [修正] 底座改為與鰭片同色 (統一鋁質感)
         
         # --- 定義光照參數 (Metallic Look) ---
         LIGHTING_METAL = dict(
@@ -590,6 +589,6 @@ with tab_3d:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.29 CAD Style Rendering | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.30 Unified Color Scheme | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
