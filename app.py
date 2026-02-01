@@ -5,13 +5,10 @@ import plotly.express as px
 import time
 
 # ==============================================================================
-# 版本：v3.22 (Layout Optimization)
+# 版本：v3.23 (Margins in Sidebar)
 # 日期：2026-02-01
 # 修正重點：
-# 1. Tab 3 圓餅圖佈局修正：
-#    - 大幅增加圖表四週邊距 (Margins)，特別是下方(Bottom)與左右(Left/Right)。
-#    - 強制騰出空間，讓 Plotly 自動將擁擠的標籤往左右兩側拉開，形成橫向引線。
-#    - 解決下方小數值元件標籤 (如 16G DDR) 被切掉的問題。
+# 1. 將原本寫死的機構邊距 (Top/Btm/Left/Right) 移至側邊欄「2. PCB 與 機構尺寸」中供使用者調整。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -71,7 +68,7 @@ st.markdown("""
     <hr style="margin-top: 0;">
     """, unsafe_allow_html=True)
 
-# CSS 樣式 (融合 v3.17 的架構 與 v3.14 的卡片風格)
+# CSS 樣式
 st.markdown("""
 <style>
     html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
@@ -88,14 +85,13 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(34, 139, 230, 0.3) !important;
     }
 
-    /* [還原] v3.14 經典卡片樣式 (依據截圖) */
+    /* v3.14 經典卡片樣式 */
     .kpi-card {
         background-color: #ffffff;
         border-radius: 10px;
         padding: 20px;
         margin: 10px 0;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        /* border-left 將由 inline style 控制顏色 */
         text-align: center;
         border: 1px solid #ddd;
     }
@@ -139,6 +135,16 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
     H_filter = st.number_input("Cavity Filter 厚度 (mm)", value=42)
     
     st.markdown("---")
+    st.caption("📏 機構預留邊距 (Margins)")
+    # [修正] 新增四個邊距設定，取代原本的 Hardcode
+    m1, m2 = st.columns(2)
+    Top = m1.number_input("Top (mm)", value=11, step=1)
+    Btm = m2.number_input("Bottom (mm)", value=13, step=1)
+    m3, m4 = st.columns(2)
+    Left = m3.number_input("Left (mm)", value=11, step=1)
+    Right = m4.number_input("Right (mm)", value=11, step=1)
+    
+    st.markdown("---")
     st.caption("🔶 Final PA 銅塊設定")
     c1, c2 = st.columns(2)
     Coin_L_Setting = c1.number_input("銅塊長 (mm)", value=55.0, step=1.0)
@@ -170,7 +176,7 @@ with st.sidebar.expander("4. 鰭片幾何", expanded=False):
     Gap = st.number_input("鰭片間距 (mm)", value=13.2, step=0.1)
     Fin_t = st.number_input("鰭片厚度 (mm)", value=1.2, step=0.1)
 
-Top, Btm, Left, Right = 11, 13, 11, 11
+# [已移除] 原本寫死在這邊的 Top, Btm, Left, Right = 11, 13, 11, 11
 
 # ==================================================
 # 3. 分頁與邏輯
@@ -384,7 +390,7 @@ with tab_viz:
     if not valid_rows.empty:
         c1, c2 = st.columns(2)
         with c1:
-            # [修正] 圓餅圖：大幅增加 Margin，強制讓 Plotly 拉出長引線
+            # 圓餅圖：大幅增加 Margin，強制讓 Plotly 拉出長引線
             fig_pie = px.pie(valid_rows, values='Total_W', names='Component', 
                              title='<b>各元件功耗佔比 (Power Breakdown)</b>', 
                              hole=0.5,
@@ -396,10 +402,10 @@ with tab_viz:
                 marker=dict(line=dict(color='#ffffff', width=2))
             )
             
-            # [關鍵] 設定超大 Margin，強迫標籤往左右空白處延伸
+            # 設定超大 Margin，強迫標籤往左右空白處延伸
             fig_pie.update_layout(
                 showlegend=False, 
-                margin=dict(t=40, b=150, l=100, r=100), # Bottom 增加到 150，L/R 增加到 100
+                margin=dict(t=40, b=150, l=100, r=100),
                 annotations=[
                     dict(
                         text=f"<b>{round(Total_Power, 2)} W</b><br><span style='font-size:14px; color:#888'>Total</span>", 
@@ -439,6 +445,6 @@ with tab_viz:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.22 Layout Optimized | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.23 Margins in Sidebar | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
