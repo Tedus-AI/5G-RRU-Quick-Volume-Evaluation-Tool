@@ -6,13 +6,13 @@ import plotly.graph_objects as go
 import time
 
 # ==============================================================================
-# 版本：v3.28 (Centered Fins)
+# 版本：v3.29 (CAD Style Rendering)
 # 日期：2026-02-01
 # 功能總結：
-# 1. Tab 4 3D 視圖優化：加入鰭片置中演算邏輯 (Center Alignment)。
-#    - 計算鰭片陣列總寬度。
-#    - 計算起始偏移量 (Offset)。
-#    - 繪製時自動加上偏移量，確保鰭片位於散熱器正中央。
+# 1. Tab 4 3D 視圖材質升級：
+#    - 加入 Lighting 參數 (Specular/Roughness) 模擬鋁合金金屬質感。
+#    - 調整配色為工業設計風格 (Industrial Grey/Silver)。
+#    - 這張圖現在更適合截圖下來，作為 AI 渲染的精準底圖 (Control Image)。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -443,14 +443,33 @@ with tab_viz:
     </div>
     """, unsafe_allow_html=True)
 
-# --- Tab 4: 3D 模擬視圖 (新增 + Fin Structure + Centered) ---
+# --- Tab 4: 3D 模擬視圖 (新增 + Fin Structure + Centered + Improved Style) ---
 with tab_3d:
-    st.subheader("🧊 RRU 3D 產品模擬圖 (詳細鰭片結構)")
+    st.subheader("🧊 RRU 3D 產品模擬圖 (Pro/E Style)")
     st.caption("模型展示：底部電子艙 (深色) + 中間散熱底板 (銀色) + 頂部散熱鰭片 (銀色)。鰭片數量與間距為真實比例，並自動置中排列。")
     
     if L_hsk > 0 and W_hsk > 0 and RRU_Height > 0 and Fin_Height > 0:
         fig_3d = go.Figure()
         
+        # --- 定義材質顏色 (CAD 風格) ---
+        COLOR_BODY = '#2C3E50'  # 深灰藍 (Dark Slate)
+        COLOR_FINS = '#E5E7E9'  # 鋁原色 (Aluminum Light Grey)
+        
+        # --- 定義光照參數 (Metallic Look) ---
+        LIGHTING_METAL = dict(
+            ambient=0.5,
+            diffuse=0.8,
+            specular=0.5,  # 高反光
+            roughness=0.1  # 低粗糙度 (光滑)
+        )
+        
+        LIGHTING_MATTE = dict(
+            ambient=0.6,
+            diffuse=0.8,
+            specular=0.1,  # 低反光
+            roughness=0.8  # 高粗糙度 (霧面)
+        )
+
         # --- 1. 繪製底部電子艙 (Body: Shield + Filter) ---
         h_body = H_shield + H_filter
         
@@ -461,7 +480,8 @@ with tab_3d:
             i=[7, 0, 0, 0, 4, 4, 6, 6, 4, 0, 3, 2],
             j=[3, 4, 1, 2, 5, 6, 5, 2, 0, 1, 6, 3],
             k=[0, 7, 2, 3, 6, 7, 1, 1, 5, 5, 7, 6],
-            color='#2d3436', 
+            color=COLOR_BODY,
+            lighting=LIGHTING_MATTE,
             flatshading=True,
             name='Electronics Body'
         ))
@@ -477,7 +497,8 @@ with tab_3d:
             i=[7, 0, 0, 0, 4, 4, 6, 6, 4, 0, 3, 2],
             j=[3, 4, 1, 2, 5, 6, 5, 2, 0, 1, 6, 3],
             k=[0, 7, 2, 3, 6, 7, 1, 1, 5, 5, 7, 6],
-            color='#b2bec3', 
+            color=COLOR_FINS,
+            lighting=LIGHTING_METAL, # 金屬質感
             flatshading=True,
             name='Heatsink Base'
         ))
@@ -494,7 +515,7 @@ with tab_3d:
         z_fin_end = z_base_end + Fin_Height
         num_fins_int = int(Fin_Count)
         
-        # [關鍵] 計算鰭片陣列總寬度 與 起始偏移量
+        # 計算鰭片陣列總寬度 與 起始偏移量
         if num_fins_int > 0:
             total_fin_array_width = (num_fins_int * Fin_t) + ((num_fins_int - 1) * Gap)
             y_offset = (W_hsk - total_fin_array_width) / 2
@@ -506,7 +527,6 @@ with tab_3d:
         base_k = [0, 7, 2, 3, 6, 7, 1, 1, 5, 5, 7, 6]
         
         for idx in range(num_fins_int):
-            # [修正] 加上 y_offset 進行置中
             y_start = y_offset + idx * (Fin_t + Gap)
             y_end = y_start + Fin_t
             
@@ -527,7 +547,8 @@ with tab_3d:
         fig_3d.add_trace(go.Mesh3d(
             x=fin_x, y=fin_y, z=fin_z,
             i=fin_i, j=fin_j, k=fin_k,
-            color='#b2bec3', 
+            color=COLOR_FINS,
+            lighting=LIGHTING_METAL, # 金屬質感
             flatshading=True,
             name='Fins'
         ))
@@ -550,7 +571,8 @@ with tab_3d:
                 yaxis=dict(title='Width (mm)', range=[0, max(L_hsk, W_hsk)*1.2]),
                 zaxis=dict(title='Height (mm)', range=[0, max(L_hsk, W_hsk)*0.8]), 
                 aspectmode='data', 
-                camera=dict(eye=dict(x=1.5, y=1.5, z=1.5))
+                camera=dict(eye=dict(x=1.5, y=1.5, z=1.5)),
+                bgcolor='white' # 背景改為純白，更像 CAD
             ),
             margin=dict(l=0, r=0, b=0, t=0),
             height=600
@@ -568,6 +590,6 @@ with tab_3d:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.28 Centered Fins | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.29 CAD Style Rendering | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
