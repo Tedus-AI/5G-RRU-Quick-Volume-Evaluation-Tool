@@ -5,11 +5,12 @@ import plotly.express as px
 import time
 
 # ==============================================================================
-# 版本：v3.20 (Leader Lines Update)
+# 版本：v3.21 (Donut Chart & Leader Lines)
 # 日期：2026-02-01
 # 修正重點：
-# 1. Tab 3 圓餅圖：改用引導線 (Leader Lines) 將標籤拉出，解決小數值元件文字被遮蔽的問題。
-#    (設定 textposition='outside')
+# 1. Tab 3 圓餅圖優化：
+#    - 增加引導線 (Leader Lines) 確保每個元件都有標籤 (textposition='outside')
+#    - 圓餅圖中心加入「整機總熱耗」數值顯示 (Annotations)
 # ==============================================================================
 
 # === APP 設定 ===
@@ -382,15 +383,32 @@ with tab_viz:
     if not valid_rows.empty:
         c1, c2 = st.columns(2)
         with c1:
-            # [修正] 圓餅圖：改為外部標籤 + 引導線 (Callout)，解決小數值看不見的問題
+            # [修正] 圓餅圖：外部標籤 + 引導線 (Callout) + 中間瓦數
             fig_pie = px.pie(valid_rows, values='Total_W', names='Component', 
                              title='<b>各元件功耗佔比 (Power Breakdown)</b>', 
-                             hole=0.4,
+                             hole=0.5, # 加大中空區域
                              color_discrete_sequence=px.colors.qualitative.Pastel)
-            # 使用 textposition='outside' 讓標籤顯示在圓餅外，Plotly 會自動繪製引導線
-            fig_pie.update_traces(textposition='outside', textinfo='label+percent')
-            # 隱藏圖例 (showlegend=False)，並增加 layout 邊距以容納外部標籤
-            fig_pie.update_layout(showlegend=False, margin=dict(t=40, b=20, l=20, r=20))
+            
+            # 使用 textposition='outside' 讓標籤顯示在圓餅外
+            fig_pie.update_traces(
+                textposition='outside', 
+                textinfo='label+percent',
+                marker=dict(line=dict(color='#ffffff', width=2))
+            )
+            
+            # 隱藏圖例，增加邊距以容納外部標籤，加入中間的瓦數顯示
+            fig_pie.update_layout(
+                showlegend=False, 
+                margin=dict(t=60, b=60, l=60, r=60),
+                annotations=[
+                    dict(
+                        text=f"<b>{round(Total_Power, 2)} W</b><br><span style='font-size:14px; color:#888'>Total</span>", 
+                        x=0.5, y=0.5, 
+                        font_size=24, 
+                        showarrow=False
+                    )
+                ]
+            )
             st.plotly_chart(fig_pie, use_container_width=True)
             
         with c2:
@@ -421,6 +439,6 @@ with tab_viz:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.20 Leader Lines Update | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.21 Donut Chart & Leader Lines | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
