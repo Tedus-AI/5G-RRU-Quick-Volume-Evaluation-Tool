@@ -6,12 +6,12 @@ import plotly.graph_objects as go
 import time
 
 # ==============================================================================
-# 版本：v3.32 (Editable Prompt)
+# 版本：v3.33 (Chinese Prompt & Copy Feature)
 # 日期：2026-02-01
 # 功能總結：
 # 1. Tab 4 AI 流程優化：
-#    - 將 Prompt 顯示區塊由唯讀代碼改為可編輯的文本框 (st.text_area)。
-#    - 新增「儲存提示詞」按鈕，可將編輯後的 Prompt 下載為 .txt 檔。
+#    - 提示詞模板更新為使用者指定的中文版本，並整合動態尺寸參數。
+#    - 移除下載按鈕，改用 st.code 區塊實現「一鍵複製」功能。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -610,34 +610,27 @@ with tab_3d:
     # 步驟 2 (Prompt 生成)
     st.markdown("#### Step 3. 複製提示詞 (Prompt)")
     
-    # 自動生成 Prompt
+    # 自動生成 Prompt (Chinese)
     prompt_template = f"""
-Industrial design rendering of a 5G Radio Remote Unit (RRU).
-**Input Image 1 (Structure):** Please strictly follow the blockout geometry in the first image. The object has dimensions approx {L_hsk:.0f}x{W_hsk:.0f}x{RRU_Height:.0f}mm. Note the vertical heatsink fins (count: {num_fins_int}).
-**Input Image 2 (Style):** Use the second image as a reference for realistic materials, I/O connectors, and surface finish.
-**Material:** Die-cast aluminum body with a silver matte finish.
-**View:** Isometric view, studio lighting, photorealistic 8k.
+5G RRU 無線射頻單元的工業設計渲染圖。請基於第一張參考圖的幾何結構生成照片級真實影像。
+**結構參數：** 整體尺寸約 {L_hsk:.0f}x{W_hsk:.0f}x{RRU_Height:.0f}mm，包含 {num_fins_int} 片垂直散熱鰭片。
+**材質：** 壓鑄鋁散熱鰭片（銀色霧面質感），底部為和散熱鰭片同色的粉體塗裝電子艙。
+**細節：** 邊緣銳利，具有真實金屬紋理與倒角。底部 I/O 圖片可參考第二張樣式。
+**光線：** 專業攝影棚打光，柔和陰影，邊緣光強調散熱片線條。
+**視角：** 等角視圖，純白背景，8k 高解析度。
     """.strip()
-    
+
     # [修正] 改為 text_area 讓使用者編輯
     user_prompt = st.text_area(
-        label="您可以在此直接修改提示詞：",
+        label="您可以在此直接修改提示詞 (編輯後下方區塊會同步更新)：",
         value=prompt_template,
         height=250,
         help="此欄位已預填入當前模型的尺寸參數，您可以自由修改材質或風格描述。"
     )
     
-    # [新增] 儲存按鈕
-    c_copy, c_save = st.columns([1, 1])
-    with c_save:
-        st.download_button(
-            label="💾 儲存提示詞 (.txt)",
-            data=user_prompt,
-            file_name="prompt.txt",
-            mime="text/plain"
-        )
-    with c_copy:
-        st.info("👆 編輯完成後，可直接全選複製 (Ctrl+A, Ctrl+C) 或點擊右側按鈕下載存檔。")
+    # [修正] 改為顯示 st.code 以供複製
+    st.markdown("👇 **點擊下方代碼區塊右上角的複製按鈕 (Copy to clipboard) 即可：**")
+    st.code(user_prompt, language="text")
 
     # 步驟 3 (Gemini 操作)
     st.markdown("#### Step 4. 執行 AI 生成")
@@ -653,6 +646,6 @@ Industrial design rendering of a 5G Radio Remote Unit (RRU).
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.32 Editable Prompt | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.33 Chinese Prompt & Copy | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
