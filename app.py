@@ -586,9 +586,56 @@ with tab_3d:
     else:
         st.warning("⚠️ 無法繪製 3D 圖形，因為計算出的尺寸無效 (為 0)。請檢查元件清單與參數設定。")
 
+    # --- 新增：AI 寫實渲染生成流程 ---
+    st.markdown("---")
+    st.subheader("🎨 AI 寫實渲染生成流程")
+    st.markdown("""
+    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; border: 1px solid #e9ecef;">
+        <h4 style="margin-top:0;">準備工作</h4>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 步驟 1
+    col_step1_1, col_step1_2 = st.columns([1, 1])
+    with col_step1_1:
+        st.markdown("#### Step 1. 下載 3D 模擬圖")
+        st.info("請將滑鼠移至上方 3D 圖表的右上角，點擊相機圖示 **(Download plot as a png)** 下載目前的模型底圖。")
+    
+    with col_step1_2:
+        st.markdown("#### Step 2. 上傳寫實參考圖 (含 I/O)")
+        ref_file = st.file_uploader("從本機上傳您的參考圖片 (Reference Image)", type=['png', 'jpg', 'jpeg'])
+        if ref_file is not None:
+            st.image(ref_file, caption="已上傳的風格參考圖", width=200)
+
+    # 步驟 2 (Prompt 生成)
+    st.markdown("#### Step 3. 複製提示詞 (Prompt)")
+    
+    # 自動生成 Prompt
+    prompt_text = f"""
+Industrial design rendering of a 5G Radio Remote Unit (RRU).
+**Input Image 1 (Structure):** Please strictly follow the blockout geometry in the first image. The object has dimensions approx {L_hsk:.0f}x{W_hsk:.0f}x{RRU_Height:.0f}mm. Note the vertical heatsink fins (count: {num_fins_int}).
+**Input Image 2 (Style):** Use the second image as a reference for realistic materials, I/O connectors, and surface finish.
+**Material:** Die-cast aluminum body with a silver matte finish.
+**View:** Isometric view, studio lighting, photorealistic 8k.
+    """.strip()
+    
+    st.code(prompt_text, language="text")
+    st.caption("👆 點擊右上角按鈕即可複製。此 Prompt 已包含當前模型的尺寸與鰭片參數。")
+
+    # 步驟 3 (Gemini 操作)
+    st.markdown("#### Step 4. 執行 AI 生成")
+    st.success("""
+    1. 開啟 **Gemini** 對話視窗。
+    2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。
+    3. 依序上傳兩張圖片：
+       - **第 1 張**：您剛剛下載的 **3D 模擬圖** (作為結構控制)。
+       - **第 2 張**：您準備的 **寫實參考圖** (作為風格控制)。
+    4. 貼上上方複製的 **提示詞 (Prompt)** 並送出。
+    """)
+
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.30 Unified Color Scheme | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.31 AI Workflow Integration | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
