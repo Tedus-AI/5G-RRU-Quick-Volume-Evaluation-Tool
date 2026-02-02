@@ -5,16 +5,14 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import time
-import os  # [新增] 用於讀取 GitHub 上的預設圖片
+import os
 
 # ==============================================================================
-# 版本：v3.37 (Default Asset Support)
+# 版本：v3.38 (Unified Geometry Settings)
 # 日期：2026-02-02
 # 修正重點：
-# 1. Tab 4 圖片載入邏輯升級：
-#    - 啟動時自動尋找同目錄下的 'reference_style.png' (或 .jpg)。
-#    - 若找到，自動載入為預設圖，讓所有使用者打開 App 都能直接看到並下載。
-#    - 解決「分享連結給他人時，圖片無法保留」的問題。
+# 1. 側邊欄 UI 優化：將原本獨立的「鰭片幾何」設定併入「2. PCB 與 機構尺寸」區塊中。
+#    - 讓所有機構相關尺寸 (PCB, 外殼, 銅塊, 鰭片) 集中管理，操作更直觀。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -155,6 +153,13 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
     Coin_L_Setting = c1.number_input("銅塊長 (mm)", value=55.0, step=1.0)
     Coin_W_Setting = c2.number_input("銅塊寬 (mm)", value=35.0, step=1.0)
 
+    # [修正] 將原本在 Expander 4 的鰭片設定移到這裡
+    st.markdown("---")
+    st.caption("🌊 鰭片幾何")
+    c_fin1, c_fin2 = st.columns(2)
+    Gap = c_fin1.number_input("鰭片間距 (mm)", value=13.2, step=0.1)
+    Fin_t = c_fin2.number_input("鰭片厚度 (mm)", value=1.2, step=0.1)
+
 with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=False):
     c1, c2 = st.columns(2)
     K_Via = c1.number_input("Via 等效 K值", value=30.0)
@@ -177,9 +182,7 @@ with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=False):
     t_Solder = c10.number_input("t (錫片)", value=0.3)
     Voiding = st.number_input("錫片空洞率 (Voiding)", value=0.75)
 
-with st.sidebar.expander("4. 鰭片幾何", expanded=False):
-    Gap = st.number_input("鰭片間距 (mm)", value=13.2, step=0.1)
-    Fin_t = st.number_input("鰭片厚度 (mm)", value=1.2, step=0.1)
+# [修正] 移除原本獨立的 Expander 4 (鰭片幾何已併入上方)
 
 # ==================================================
 # 3. 分頁與邏輯
@@ -772,6 +775,6 @@ with tab_3d:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.37 Default Asset Support | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.38 Unified Geometry Settings | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
