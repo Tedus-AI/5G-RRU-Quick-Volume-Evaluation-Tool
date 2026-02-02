@@ -8,13 +8,13 @@ import time
 import os
 
 # ==============================================================================
-# 版本：v3.42 (True Scale Fix)
+# 版本：v3.43 (Orthographic View)
 # 日期：2026-02-02
 # 修正重點：
-# 1. Tab 4 3D 視圖比例修正：
-#    - 計算最大尺寸 (max_dim)。
-#    - 強制 X/Y/Z 三軸使用相同的 Range ([0, max_dim*1.2])。
-#    - 確保 3D 視圖呈現嚴格的 1:1:1 物理比例，避免視覺壓縮或拉伸。
+# 1. Tab 4 3D 視圖比例終極修正：
+#    - 啟用「正交投影 (Orthographic Projection)」：消除透視變形，確保視圖如工程圖般精準。
+#    - 設定 aspectmode='manual' 且 x:y:z = 1:1:1，強制三軸單位長度在螢幕上完全等長。
+#    - 解決俯視時長寬刻度視覺比例不一致的問題。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -569,17 +569,26 @@ with tab_3d:
             showlegend=False
         ))
 
-        # [修正] 計算最大尺寸，統一所有軸的 Range
-        max_dim = max(L_hsk, W_hsk, RRU_Height)
+        # [修正] 計算最大尺寸，作為統一的軸距基準
+        # 為了避免邊緣貼太死，乘上 1.1 倍
+        max_dim = max(L_hsk, W_hsk, RRU_Height) * 1.1
 
         fig_3d.update_layout(
             scene=dict(
-                # 強制三個軸使用相同的範圍，確保 1:1:1 比例
-                xaxis=dict(title='Length (mm)', range=[0, max_dim*1.2]),
-                yaxis=dict(title='Width (mm)', range=[0, max_dim*1.2]),
-                zaxis=dict(title='Height (mm)', range=[0, max_dim*1.2]), 
-                aspectmode='data', 
-                camera=dict(eye=dict(x=1.5, y=1.5, z=1.5)),
+                # 強制三個軸的數值範圍完全相同
+                xaxis=dict(title='Length (mm)', range=[0, max_dim], dtick=50), # 加 dtick 固定刻度方便檢查
+                yaxis=dict(title='Width (mm)', range=[0, max_dim], dtick=50),
+                zaxis=dict(title='Height (mm)', range=[0, max_dim], dtick=50), 
+                
+                # 強制 3D 盒子的長寬高顯示比例為 1:1:1 (正立方體)
+                aspectmode='manual', 
+                aspectratio=dict(x=1, y=1, z=1),
+                
+                # [新增] 使用「正交投影 (Orthographic)」消除透視變形，讓工程視圖更精準
+                camera=dict(
+                    projection=dict(type="orthographic"),
+                    eye=dict(x=1.2, y=1.2, z=1.2)
+                ),
                 bgcolor='white'
             ),
             margin=dict(l=0, r=0, b=0, t=0),
@@ -740,6 +749,6 @@ with tab_3d:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.42 True Scale Fix | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.43 Orthographic View | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
