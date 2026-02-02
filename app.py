@@ -8,14 +8,11 @@ import time
 import os
 
 # ==============================================================================
-# 版本：v3.46 (Strict Geometry Prompt)
+# 版本：v3.47 (Refined UI Text)
 # 日期：2026-02-02
 # 修正重點：
-# 1. Tab 4 提示詞更新：
-#    - 採用使用者指定的「極其嚴格」幾何結構描述。
-#    - 強調鰭片必須是「平直、互相平行且垂直於底面」的長方形薄板。
-#    - 視覺規格指定為「和第一張模擬圖角度相同」的等角視圖。
-#    - 保留動態參數 (尺寸、鰭片數) 連動。
+# 1. Tab 4 UI 文字微調：
+#    - Step 2 標題修改為 "下載I/O寫實參考圖"。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -621,7 +618,7 @@ with tab_3d:
         st.info("請將滑鼠移至上方 3D 圖表的右上角，點擊相機圖示 **(Download plot as a png)** 下載目前的模型底圖。")
     
     with col_step1_2:
-        st.markdown("#### Step 2. 下載寫實參考圖 (含 I/O)")
+        st.markdown("#### Step 2. 下載I/O寫實參考圖")
         
         # 自動載入預設圖片
         default_ref_bytes = None
@@ -760,6 +757,6 @@ with tab_3d:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.46 Strict Geometry Prompt | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.47 Refined UI Text | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
