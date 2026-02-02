@@ -8,12 +8,22 @@ import time
 import os
 
 # ==============================================================================
-# 版本：v3.50 (C_decay Reverted to 7.0)
+# 版本：v3.48 (Final Fixed - Reverted)
 # 日期：2026-02-02
-# 修正重點：
-# 1. 物理運算邏輯調整：
-#    - 對流 (h_conv) 的衰減常數 (C_decay) 改回 7.0。
-#    - 這會讓 h 值對間距變化更敏感，即便在 13mm 左右也會有微幅衰減。
+# 狀態：正式發布版 (還原至自動 h 計算前的版本)
+# 
+# 功能總結：
+# 1. [核心] 5G RRU 熱流與體積估算邏輯。
+#    - h 值為手動輸入 (位於 Expander 1)。
+# 2. [UI] 側邊欄整合：鰭片幾何併入機構尺寸區塊。
+# 3. [3D] 產品模擬圖：
+#    - 採用正交投影 (Orthographic) 確保工程視圖 1:1:1 比例不失真。
+#    - 包含：底部電子艙、散熱底板、自動陣列與置中的散熱鰭片。
+#    - 材質配色：統一為鋁原色 (銀灰) 搭配不同光澤度。
+# 4. [AI] 渲染工作流 (Tab 4)：
+#    - Step 1: 下載精準 3D 結構圖。
+#    - Step 2: 下載 I/O 參考圖 (讀取 repo 內 reference_style.png)。
+#    - Step 3: 自動生成詳細 Prompt，連動實際計算尺寸與鰭片數，並提供一鍵複製。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -127,7 +137,8 @@ st.sidebar.header("🛠️ 參數控制台")
 
 with st.sidebar.expander("1. 環境與係數", expanded=True):
     T_amb = st.number_input("環境溫度 (°C)", value=45.0, step=1.0)
-    # [自動計算] h_value 已移除手動輸入
+    # [還原] 手動輸入 h 值
+    h_value = st.number_input("自然對流係數 h (W/m2K)", value=8.8, step=0.1)
     Margin = st.number_input("設計安全係數 (Margin)", value=1.0, step=0.1)
     Slope = 0.03 
     Eff = st.number_input("鰭片效率 (Eff)", value=0.95, step=0.01)
@@ -159,23 +170,6 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
     c_fin1, c_fin2 = st.columns(2)
     Gap = c_fin1.number_input("鰭片間距 (mm)", value=13.2, step=0.1)
     Fin_t = c_fin2.number_input("鰭片厚度 (mm)", value=1.2, step=0.1)
-
-    # [新增] h 值自動計算邏輯 (物理模型)
-    # 1. 對流 (Convection): 使用 tanh 模擬邊界層干涉，C_decay 改為 7.0
-    h_conv = 6.4 * np.tanh(Gap / 7.0)
-    
-    # 2. 輻射 (Radiation): 使用視因子修正，臨界 Gap=10mm
-    if Gap >= 10.0:
-        rad_factor = 1.0
-    else:
-        rad_factor = np.sqrt(Gap / 10.0)
-    h_rad = 2.4 * rad_factor
-    
-    # 3. 總和
-    h_value = h_conv + h_rad
-    
-    # [新增] 顯示計算結果
-    st.info(f"🔥 **自動計算熱對流係數 h: {h_value:.2f}**\n\n(對流 {h_conv:.2f} + 輻射 {h_rad:.2f})")
 
 with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=False):
     c1, c2 = st.columns(2)
@@ -775,6 +769,6 @@ with tab_3d:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.50 C_decay Reverted to 7.0 | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.48 Final Fixed (Reverted) | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
