@@ -8,11 +8,12 @@ import time
 import os
 
 # ==============================================================================
-# 版本：v3.38 (Unified Geometry Settings)
+# 版本：v3.39 (Dynamic Prompt Update)
 # 日期：2026-02-02
 # 修正重點：
-# 1. 側邊欄 UI 優化：將原本獨立的「鰭片幾何」設定併入「2. PCB 與 機構尺寸」區塊中。
-#    - 讓所有機構相關尺寸 (PCB, 外殼, 銅塊, 鰭片) 集中管理，操作更直觀。
+# 1. Tab 4 提示詞更新：
+#    - 內容替換為使用者指定的中文版本 (白色粉體烤漆材質)。
+#    - 結構參數 (長寬高、鰭片數) 與 Tab 3 計算結果完全連動。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -683,7 +684,7 @@ with tab_3d:
     prompt_template = f"""
 5G RRU 無線射頻單元的工業設計渲染圖。請基於此參考圖生成照片級真實影像。
 **結構參數：** 整體尺寸約 {L_hsk:.0f}x{W_hsk:.0f}x{RRU_Height:.0f}mm，包含 {num_fins_int} 片垂直散熱鰭片。
-**材質：** 壓鑄鋁散熱鰭片（銀色霧面質感），底部為和散熱鰭片同色的粉體塗裝電子艙。
+**材質：** 壓鑄鋁散熱鰭片（白色粉體烤漆霧面質感），底部為和散熱鰭片同色的粉體塗裝電子艙。
 **細節：** 邊緣銳利，具有真實金屬紋理與倒角。底部 I/O 圖片可參考第二張樣式。
 **光線：** 專業攝影棚打光，柔和陰影，邊緣光強調散熱片線條。
 **視角：** 等角視圖，純白背景，8k 高解析度。
@@ -775,6 +776,6 @@ with tab_3d:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.38 Unified Geometry Settings | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.39 Dynamic Prompt Update | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
