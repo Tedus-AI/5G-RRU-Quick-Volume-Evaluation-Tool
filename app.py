@@ -8,12 +8,14 @@ import time
 import os
 
 # ==============================================================================
-# 版本：v3.44 (Prompt Content Update)
+# 版本：v3.45 (Detailed Prompt Update)
 # 日期：2026-02-02
 # 修正重點：
-# 1. Tab 4 提示詞微調：
-#    - 將 "底部 I/O 圖片可參考..." 移至 "結構參數" 段落。
-#    - 新增 "嚴格遵守第一張3D模擬圖的比例" 指令。
+# 1. Tab 4 提示詞大幅優化：
+#    - 採用使用者指定的詳細結構化提示詞。
+#    - 強調鰭片數量、密度與分佈的嚴格對應。
+#    - 指定白色粉體烤漆材質與邊緣光設定。
+#    - 當然，所有尺寸與數量參數依然與 Tab 3 的運算結果保持動態連動。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -652,21 +654,22 @@ with tab_3d:
     # 步驟 2 (Prompt 生成)
     st.markdown("#### Step 3. 複製提示詞 (Prompt)")
     
-    # 自動生成 Prompt (Chinese) - [修正] 使用者指定內容 + 動態參數
+    # 自動生成 Prompt (Chinese) - [修正] 使用者指定詳細內容 + 動態參數
     prompt_template = f"""
-5G RRU 無線射頻單元的工業設計渲染圖。請基於此參考圖生成照片級真實影像。
-**結構參數：** 整體尺寸約 {L_hsk:.0f}x{W_hsk:.0f}x{RRU_Height:.0f}mm，包含 {num_fins_int} 片垂直散熱鰭片，底部 I/O 圖片可參考第二張樣式，嚴格遵守第一張3D模擬圖的比例。
-**材質：** 壓鑄鋁散熱鰭片（白色粉體烤漆霧面質感），底部為和散熱鰭片同色的粉體塗裝電子艙。
-**細節：** 邊緣銳利，具有真實金屬紋理與倒角。
-**光線：** 專業攝影棚打光，柔和陰影，邊緣光強調散熱片線條。
-**視角：** 等角視圖，純白背景，8k 高解析度。
+5G RRU 無線射頻單元工業設計渲染圖
+
+核心結構（極其嚴格參照圖 1）： 請務必精確生成 {int(num_fins_int)} 片垂直散熱鰭片。這些鰭片必須以極高密度、線性陣列且完全等距的方式緊密排列。鰭片的數量與分佈密度是此圖的最優先要求，請嚴格遵守第一張 3D 模擬圖的結構比例。
+外觀細節與材質（參考圖 2）： 材質採用白色粉體烤漆壓鑄鋁（霧面質感）。僅在底部的 I/O 接口佈局（如連接器、插槽樣式）上參考圖 2 的設計細節。
+技術規格： 整體尺寸約 {L_hsk:.0f}x{W_hsk:.0f}x{RRU_Height:.0f}mm。邊緣需呈現銳利的工業感，具備真實的金屬紋理與精細的倒角（Chamfer）。
+光線設定： 專業攝影棚打光，強調對比與柔和陰影。使用邊緣光（Rim Lighting）來勾勒並凸顯每一片散熱鰭片的俐落線條與間隔。
+視覺規格： 等角視圖（Isometric view），純白背景，8k 高解析度，照片級真實影像渲染。
     """.strip()
 
     # [修正] text_area 讓使用者編輯
     user_prompt = st.text_area(
         label="您可以在此直接修改提示詞 (編輯後請點擊下方按鈕複製)：",
         value=prompt_template,
-        height=250,
+        height=300,
         help="此欄位已預填入當前模型的尺寸參數，您可以自由修改材質或風格描述。"
     )
     
@@ -748,6 +751,6 @@ with tab_3d:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.43 Orthographic View | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.45 Detailed Prompt Update | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
