@@ -8,12 +8,15 @@ import time
 import os
 
 # ==============================================================================
-# 版本：v3.50 (C_decay Reverted to 7.0)
+# 版本：v3.51 (Physics Guardrails)
 # 日期：2026-02-02
 # 修正重點：
-# 1. 物理運算邏輯調整：
-#    - 對流 (h_conv) 的衰減常數 (C_decay) 改回 7.0。
-#    - 這會讓 h 值對間距變化更敏感，即便在 13mm 左右也會有微幅衰減。
+# 1. 新增「物理合理性檢查 (Physics Check)」機制：
+#    - 當 Gap 過小 (如 1mm) 時，強制對 h 值進行物理衰減 (Penalty)，反映風阻效應。
+#    - 避免出現 "Gap 越小、鰭片越多、散熱越好" 的錯誤線性推論。
+# 2. 新增「防呆警示」：
+#    - Gap < 4mm: 顯示紅色 Error，警告自然對流失效。
+#    - Gap < 8mm: 顯示黃色 Warning，提示效率降低。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -127,7 +130,8 @@ st.sidebar.header("🛠️ 參數控制台")
 
 with st.sidebar.expander("1. 環境與係數", expanded=True):
     T_amb = st.number_input("環境溫度 (°C)", value=45.0, step=1.0)
-    # [自動計算] h_value 已移除手動輸入
+    # [保留手動輸入] 但會在後台進行物理修正
+    h_value_input = st.number_input("自然對流係數 h (W/m2K)", value=8.8, step=0.1, help="這是理想狀況下的 h 值。若下方鰭片間距過小，系統會自動對此值進行衰減修正。")
     Margin = st.number_input("設計安全係數 (Margin)", value=1.0, step=0.1)
     Slope = 0.03 
     Eff = st.number_input("鰭片效率 (Eff)", value=0.95, step=0.01)
@@ -160,23 +164,6 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
     Gap = c_fin1.number_input("鰭片間距 (mm)", value=13.2, step=0.1)
     Fin_t = c_fin2.number_input("鰭片厚度 (mm)", value=1.2, step=0.1)
 
-    # [新增] h 值自動計算邏輯 (物理模型)
-    # 1. 對流 (Convection): 使用 tanh 模擬邊界層干涉，C_decay 改為 7.0
-    h_conv = 6.4 * np.tanh(Gap / 7.0)
-    
-    # 2. 輻射 (Radiation): 使用視因子修正，臨界 Gap=10mm
-    if Gap >= 10.0:
-        rad_factor = 1.0
-    else:
-        rad_factor = np.sqrt(Gap / 10.0)
-    h_rad = 2.4 * rad_factor
-    
-    # 3. 總和
-    h_value = h_conv + h_rad
-    
-    # [新增] 顯示計算結果
-    st.info(f"🔥 **自動計算熱對流係數 h: {h_value:.2f}**\n\n(對流 {h_conv:.2f} + 輻射 {h_rad:.2f})")
-
 with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=False):
     c1, c2 = st.columns(2)
     K_Via = c1.number_input("Via 等效 K值", value=30.0)
@@ -198,6 +185,22 @@ with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=False):
     K_Solder = c9.number_input("K (錫片)", value=58.0)
     t_Solder = c10.number_input("t (錫片)", value=0.3)
     Voiding = st.number_input("錫片空洞率 (Voiding)", value=0.75)
+
+# ==================================================
+# [新增] 物理邏輯檢查與警示模組
+# ==================================================
+# 計算物理衰減因子 (Penalty Factor)
+# 使用 tanh 函數模擬自然對流隨間距縮小的衰減，特徵長度設為 7.0mm
+penalty_factor = np.tanh(Gap / 7.0)
+
+# 計算有效 h 值 (Effective h)
+h_value_effective = h_value_input * penalty_factor
+
+# 顯示警示訊息 (如果在不合理的範圍)
+if Gap < 4.0:
+    st.error(f"⚠️ **嚴重警告：** 鰭片間距 {Gap}mm 過小！空氣無法有效流動，自然對流將完全失效。\n\n有效 h 值已強制修正為 **{h_value_effective:.2f}** (原設定 {h_value_input})。請增大間距 (建議 > 8mm)。")
+elif Gap < 8.0:
+    st.warning(f"⚠️ **注意：** 鰭片間距 {Gap}mm 偏小，邊界層干涉導致散熱效率降低。\n\n有效 h 值已修正為 **{h_value_effective:.2f}** (原設定 {h_value_input})。")
 
 # ==================================================
 # 3. 分頁與邏輯
@@ -307,7 +310,8 @@ Fin_Count = W_hsk / (Gap + Fin_t)
 Total_Power = Total_Watts_Sum * Margin
 if Total_Power > 0 and Min_dT_Allowed > 0:
     R_sa = Min_dT_Allowed / Total_Power
-    Area_req = 1 / (h_value * R_sa * Eff)
+    # [修正] 使用 h_value_effective (經過物理修正後的 h) 進行計算
+    Area_req = 1 / (h_value_effective * R_sa * Eff)
     Base_Area_m2 = (L_hsk * W_hsk) / 1e6
     try: Fin_Height = ((Area_req - Base_Area_m2) * 1e6) / (2 * Fin_Count * L_hsk)
     except: Fin_Height = 0
@@ -775,6 +779,6 @@ with tab_3d:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.48 Final Fixed (Reverted) | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.51 Physics Guardrails | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
