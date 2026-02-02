@@ -8,11 +8,12 @@ import time
 import os
 
 # ==============================================================================
-# 版本：v3.47 (Refined UI Text)
+# 版本：v3.50 (C_decay Reverted to 7.0)
 # 日期：2026-02-02
 # 修正重點：
-# 1. Tab 4 UI 文字微調：
-#    - Step 2 標題修改為 "下載I/O寫實參考圖"。
+# 1. 物理運算邏輯調整：
+#    - 對流 (h_conv) 的衰減常數 (C_decay) 改回 7.0。
+#    - 這會讓 h 值對間距變化更敏感，即便在 13mm 左右也會有微幅衰減。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -126,7 +127,7 @@ st.sidebar.header("🛠️ 參數控制台")
 
 with st.sidebar.expander("1. 環境與係數", expanded=True):
     T_amb = st.number_input("環境溫度 (°C)", value=45.0, step=1.0)
-    h_value = st.number_input("自然對流係數 h (W/m2K)", value=8.8, step=0.1)
+    # [自動計算] h_value 已移除手動輸入
     Margin = st.number_input("設計安全係數 (Margin)", value=1.0, step=0.1)
     Slope = 0.03 
     Eff = st.number_input("鰭片效率 (Eff)", value=0.95, step=0.01)
@@ -158,6 +159,23 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
     c_fin1, c_fin2 = st.columns(2)
     Gap = c_fin1.number_input("鰭片間距 (mm)", value=13.2, step=0.1)
     Fin_t = c_fin2.number_input("鰭片厚度 (mm)", value=1.2, step=0.1)
+
+    # [新增] h 值自動計算邏輯 (物理模型)
+    # 1. 對流 (Convection): 使用 tanh 模擬邊界層干涉，C_decay 改為 7.0
+    h_conv = 6.4 * np.tanh(Gap / 7.0)
+    
+    # 2. 輻射 (Radiation): 使用視因子修正，臨界 Gap=10mm
+    if Gap >= 10.0:
+        rad_factor = 1.0
+    else:
+        rad_factor = np.sqrt(Gap / 10.0)
+    h_rad = 2.4 * rad_factor
+    
+    # 3. 總和
+    h_value = h_conv + h_rad
+    
+    # [新增] 顯示計算結果
+    st.info(f"🔥 **自動計算熱對流係數 h: {h_value:.2f}**\n\n(對流 {h_conv:.2f} + 輻射 {h_rad:.2f})")
 
 with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=False):
     c1, c2 = st.columns(2)
@@ -656,9 +674,9 @@ with tab_3d:
 5G RRU 無線射頻單元工業設計渲染圖
 
 核心結構（極其嚴格參照圖 1 的幾何形狀）：
-請務必精確生成 {int(num_fins_int)} 片散熱鰭片。關鍵要求：這些鰭片必須是「平直、互相平行且垂直於底面」的長方形薄板結構。嚴禁生成尖刺狀、錐形或任何斜向角度的鰭片。它們必須以極高密度、線性陣列且完全等距的方式緊密排列，其形態必須與圖 1 的線框圖完全一致。鰭片的數量、形狀與分佈密度是此圖的最優先要求。
+請務必精確生成 {int(num_fins_int)} 片散熱鰭片。關鍵要求：這些鰭片必須是「平直、互相平行且垂直於底面」的長方形薄板結構。嚴禁生成尖刺狀、錐形或任何斜向角度的鰭片。它們必須以極高密度、線性陣列且完全等距的方式緊密排列，其形態必須與圖 1 的線框圖完全一致。鰭片的數量、形狀與分佈密度是此圖的最優先要求，請嚴格遵守第一張 3D 模擬圖的結構比例。
 
-外觀細節與材質：
+外觀細節與材質（參考圖 2）：
 材質採用白色粉體烤漆壓鑄鋁（霧面質感）。僅在底部的 I/O 接口佈局（參考如圖二的I/O布局）或上網參考5G RRU I/O介面。
 
 技術規格：
@@ -757,6 +775,6 @@ with tab_3d:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.47 Refined UI Text | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.50 C_decay Reverted to 7.0 | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
