@@ -8,18 +8,18 @@ import time
 import os
 
 # ==============================================================================
-# 版本：v3.50 (C_decay Reverted to 7.0)
+# 版本：v3.50 (Restored Final)
 # 日期：2026-02-02
-# 狀態：正式發布版 (含自動 h 計算)
+# 狀態：正式發布版 (還原至 v3.50)
 # 
-# 功能總結：
-# 1. [核心] 5G RRU 熱流與體積估算邏輯。
-#    - h 值由物理公式自動計算 (取代手動輸入)。
+# 功能確認：
+# 1. [核心] 自動計算熱對流係數 h。
 #    - 對流 (h_conv): 6.4 * tanh(Gap / 7.0)。
 #    - 輻射 (h_rad): 視因子修正。
+#    - 無 DRC 阻擋 (Gap=1mm 仍可計算)。
 # 2. [UI] 側邊欄整合：鰭片幾何併入機構尺寸區塊，即時顯示計算出的 h 值。
-# 3. [3D] 產品模擬圖：正交投影、1:1:1 真實比例、鋁原色材質。
-# 4. [AI] 渲染工作流 (Tab 4)：下載結構圖/參考圖、複製連動提示詞。
+# 3. [3D] 產品模擬圖：正交投影 (Orthographic)、1:1:1 真實比例、鋁原色材質。
+# 4. [AI] 渲染工作流：下載結構圖/參考圖、複製連動提示詞。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -166,8 +166,8 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
     Gap = c_fin1.number_input("鰭片間距 (mm)", value=13.2, step=0.1)
     Fin_t = c_fin2.number_input("鰭片厚度 (mm)", value=1.2, step=0.1)
 
-    # [新增] h 值自動計算邏輯 (物理模型)
-    # 1. 對流 (Convection): 使用 tanh 模擬邊界層干涉，C_decay 改為 7.0
+    # [v3.50] h 值自動計算邏輯 (物理模型)
+    # 1. 對流 (Convection): 使用 tanh 模擬邊界層干涉，C_decay = 7.0
     h_conv = 6.4 * np.tanh(Gap / 7.0)
     
     # 2. 輻射 (Radiation): 使用視因子修正，臨界 Gap=10mm
@@ -313,7 +313,7 @@ Fin_Count = W_hsk / (Gap + Fin_t)
 Total_Power = Total_Watts_Sum * Margin
 if Total_Power > 0 and Min_dT_Allowed > 0:
     R_sa = Min_dT_Allowed / Total_Power
-    # [修正] 使用自動計算的 h_value
+    # [v3.50] 使用自動計算的 h_value
     Area_req = 1 / (h_value * R_sa * Eff)
     Base_Area_m2 = (L_hsk * W_hsk) / 1e6
     try: Fin_Height = ((Area_req - Base_Area_m2) * 1e6) / (2 * Fin_Count * L_hsk)
@@ -782,6 +782,6 @@ with tab_3d:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>
-    5G RRU Thermal Engine | v3.50 C_decay Reverted to 7.0 | Designed for High Efficiency
+    5G RRU Thermal Engine | v3.50 Restored Final | Designed for High Efficiency
 </div>
 """, unsafe_allow_html=True)
