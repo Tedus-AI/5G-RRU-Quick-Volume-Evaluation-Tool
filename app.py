@@ -172,8 +172,8 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
     h_value = h_conv + h_rad
     
     # [UI 優化] 顯示計算結果 & 建議值
-    if h_value < 5.0:
-        st.error(f"🔥 **h 值過低警告: {h_value:.2f}** (對流受阻)")
+    if h_conv < 4.0:
+        st.error(f"🔥 **h_conv 過低警告: {h_conv:.2f}** (對流受阻，建議 ≥ 4.0)")
     else:
         st.info(f"🔥 **自動計算 h: {h_value:.2f}**\n\n(h_conv: {h_conv:.2f} + h_rad: {h_rad:.2f})")
     
