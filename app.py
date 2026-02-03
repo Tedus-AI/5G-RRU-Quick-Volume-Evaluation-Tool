@@ -8,12 +8,12 @@ import time
 import os
 
 # ==============================================================================
-# 版本：v3.60 (Debug Edition)
-# 日期：2026-02-03
+# 版本：v3.62 (Fin Efficiency Selectbox)
+# 日期：2026-02-04
 # 修正重點：
-# 1. [核心] 再次確保「植樹原理」邏輯正確植入。
-# 2. [Debug] 在 Tab 3 新增「運算驗證」區塊，顯示詳細的鰭片數量計算過程，
-#    方便使用者確認 W_hsk, Gap, Fin_t 的實際數值。
+# 1. [UI] 側邊欄「鰭片效率」改為下拉式選單：
+#    - Embedded Fin (埋入式) -> 自動帶入 0.95
+#    - Die-casting Fin (壓鑄式) -> 自動帶入 0.90
 # ==============================================================================
 
 # === APP 設定 ===
@@ -130,7 +130,16 @@ with st.sidebar.expander("1. 環境與係數", expanded=True):
     # [自動計算] h_value 已移除手動輸入
     Margin = st.number_input("設計安全係數 (Margin)", value=1.0, step=0.1)
     Slope = 0.03 
-    Eff = st.number_input("鰭片效率 (Eff)", value=0.95, step=0.01)
+    
+    # [修正] 鰭片效率改為下拉選單
+    fin_tech = st.selectbox(
+        "鰭片製程 (Fin Efficiency)", 
+        ["Embedded Fin (0.95)", "Die-casting Fin (0.90)"]
+    )
+    if "Embedded" in fin_tech:
+        Eff = 0.95
+    else:
+        Eff = 0.90
 
 with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
     L_pcb = st.number_input("PCB 長度 (mm)", value=350)
@@ -307,8 +316,8 @@ else:
 L_hsk, W_hsk = L_pcb + Top + Btm, W_pcb + Left + Right
 
 # [修正] 精確計算鰭片數量 (植樹原理 + 邊界檢查)
-# 邏輯：(總寬 + 間距) / (間距 + 鰭片厚度) 取整數，代表最大可容納的鰭片數
 if Gap + Fin_t > 0:
+    # 理論最大數量
     num_fins_float = (W_hsk + Gap) / (Gap + Fin_t)
     num_fins_int = int(num_fins_float)
     
@@ -327,7 +336,7 @@ Fin_Count = num_fins_int # 更新計算用變數
 Total_Power = Total_Watts_Sum * Margin
 if Total_Power > 0 and Min_dT_Allowed > 0:
     R_sa = Min_dT_Allowed / Total_Power
-    # [修正] 使用自動計算的 h_value
+    # [修正] 使用自動計算的 h_value (Effective h)
     Area_req = 1 / (h_value * R_sa * Eff)
     Base_Area_m2 = (L_hsk * W_hsk) / 1e6
     try: Fin_Height = ((Area_req - Base_Area_m2) * 1e6) / (2 * Fin_Count * L_hsk)
@@ -526,8 +535,6 @@ with tab_viz:
     # [修正] 根據 DRC 結果決定顯示內容
     if drc_failed:
         st.error(drc_msg)
-        
-        # 灰色佔位卡片
         st.markdown(f"""
         <div style="display:flex; gap:20px;">
             <div style="flex:1; background:#eee; padding:20px; border-radius:10px; text-align:center; color:#999;">
@@ -538,14 +545,10 @@ with tab_viz:
             </div>
         </div>
         """, unsafe_allow_html=True)
-        
-        # 紅色 N/A 體積區塊
         vol_bg = "#ffebee"; vol_border = "#e74c3c"; vol_title = "#c0392b"; vol_text = "N/A"
     else:
-        # 正常卡片
         card(c5, "建議鰭片高度", f"{round(Fin_Height, 2)} mm", "Suggested Fin Height", "#2ecc71")
         card(c6, "RRU 整機尺寸 (LxWxH)", f"{L_hsk} x {W_hsk} x {round(RRU_Height, 1)}", "Estimated Dimensions", "#34495e")
-        # 正常綠色體積區塊
         vol_bg = "#e6fffa"; vol_border = "#00b894"; vol_title = "#006266"; vol_text = f"{round(Volume_L, 2)} L"
 
     st.markdown(f"""
@@ -675,4 +678,4 @@ with tab_3d:
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 st.markdown("---")
-st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.60 Debug Edition | Designed for High Efficiency</div>""", unsafe_allow_html=True)
+st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.62 Fin Efficiency Selectbox | Designed for High Efficiency</div>""", unsafe_allow_html=True)
