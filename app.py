@@ -8,14 +8,12 @@ import time
 import os
 
 # ==============================================================================
-# 版本：v3.55 (Sidebar UI Enhanced)
+# 版本：v3.56 (Optimal AR Suggestion)
 # 日期：2026-02-03
 # 修正重點：
-# 1. [UI] 側邊欄 h 值顯示優化：格式改為 (h_conv: ... + h_rad: ...)，並加註建議值。
-# 2. [UI] 側邊欄新增 Aspect Ratio 即時顯示：
-#    - 使用 st.empty() 佔位符技術。
-#    - 當主程式算出高度後，自動回填流阻比至側邊欄，並提供紅/綠燈與設計建議 (< 12)。
-# 3. [Core] 保留 v3.54 的所有 DRC 邏輯與 AI 生成流程。
+# 1. [UI] 側邊欄流阻比 (Aspect Ratio) 建議文字更新：
+#    - 由 "< 12.0" 修改為 "5.0 ~ 6.5" (綜合考量 h_conv + h_rad 的最佳區間)。
+#    - 實際紅燈阻擋門檻維持 > 12.0 (物理極限)，保留設計彈性。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -335,6 +333,7 @@ else:
     aspect_ratio = 0
 
 # [UI 優化] 更新側邊欄的 Aspect Ratio 資訊 (回填)
+# 修正建議值為 5.0 ~ 6.5
 if aspect_ratio > 12.0:
     ar_color = "#e74c3c" # Red
     ar_msg = "過高 (High)"
@@ -348,7 +347,7 @@ if Fin_Height > 0:
         <small style="color: #666;">📐 流阻比 (Aspect Ratio)</small><br>
         <strong style="color: {ar_color}; font-size: 1.2rem;">{aspect_ratio:.1f}</strong> 
         <span style="color: {ar_color};">({ar_msg})</span><br>
-        <small style="color: #888;">✅ 設計建議： < 12.0</small>
+        <small style="color: #888;">✅ 最佳建議： 5.0 ~ 6.5</small>
     </div>
     """, unsafe_allow_html=True)
 else:
@@ -512,6 +511,8 @@ with tab_viz:
     # [修正] 根據 DRC 結果決定顯示內容
     if drc_failed:
         st.error(drc_msg)
+        
+        # 灰色佔位卡片
         st.markdown(f"""
         <div style="display:flex; gap:20px;">
             <div style="flex:1; background:#eee; padding:20px; border-radius:10px; text-align:center; color:#999;">
@@ -522,10 +523,14 @@ with tab_viz:
             </div>
         </div>
         """, unsafe_allow_html=True)
+        
+        # 紅色 N/A 體積區塊
         vol_bg = "#ffebee"; vol_border = "#e74c3c"; vol_title = "#c0392b"; vol_text = "N/A"
     else:
+        # 正常卡片
         card(c5, "建議鰭片高度", f"{round(Fin_Height, 2)} mm", "Suggested Fin Height", "#2ecc71")
         card(c6, "RRU 整機尺寸 (LxWxH)", f"{L_hsk} x {W_hsk} x {round(RRU_Height, 1)}", "Estimated Dimensions", "#34495e")
+        # 正常綠色體積區塊
         vol_bg = "#e6fffa"; vol_border = "#00b894"; vol_title = "#006266"; vol_text = f"{round(Volume_L, 2)} L"
 
     st.markdown(f"""
@@ -540,6 +545,7 @@ with tab_3d:
     st.subheader("🧊 RRU 3D 產品模擬圖")
     st.caption("模型展示：底部電子艙 + 頂部散熱鰭片、鰭片數量與間距皆為真實比例。模擬圖右上角有小功能可使用。")
     
+    # [修正] 3D 圖也受 DRC 控制
     if not drc_failed and L_hsk > 0 and W_hsk > 0 and RRU_Height > 0 and Fin_Height > 0:
         fig_3d = go.Figure()
         COLOR_FINS = '#E5E7E9'; COLOR_BODY = COLOR_FINS
@@ -654,4 +660,4 @@ with tab_3d:
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 st.markdown("---")
-st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.55 Sidebar UI Enhanced | Designed for High Efficiency</div>""", unsafe_allow_html=True)
+st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.56 Optimal AR Suggestion | Designed for High Efficiency</div>""", unsafe_allow_html=True)
