@@ -396,7 +396,7 @@ elif Gap < 4.0:
 # [新增] 檢查 4 (製程): Embedded Fin 高度限制 (> 100mm)
 elif "Embedded" in fin_tech and Fin_Height > 100.0:
     drc_failed = True
-    drc_msg = f"⛔ **製程限制 (Process Limit)：** Embedded Fin (埋入式鰭片) 製程高度限制需 < 100mm (目前計算值: {Fin_Height:.1f}mm)。\n此高度已超過製程極限，請增加散熱面積、降低功耗或改選 Die-casting Fin。"
+    drc_msg = f"⛔ **製程限制 (Process Limit)：** Embedded Fin (埋入式鰭片) 製程高度限制需 < 100mm (目前計算值: {Fin_Height:.1f}mm)。\n此高度已超過製程極限，建議增加設備的X/Y方向面積來讓Z方向面積增加。"
 
 # --- Tab 2: 詳細數據 (表二) ---
 with tab_data:
