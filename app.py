@@ -595,9 +595,12 @@ with tab_viz:
                 marker=dict(line=dict(color='#ffffff', width=2))
             )
             
+            # 設定超大 Margin，強迫標籤往左右空白處延伸
             fig_pie.update_layout(
                 showlegend=False, 
-                margin=dict(t=40, b=150, l=100, r=100),
+                # [修正] 增加頂部邊距 (t=40 -> t=90) 以對齊右圖標題；增加標題下方留白 (pad=20) 解決重疊
+                margin=dict(t=90, b=150, l=100, r=100),
+                title=dict(pad=dict(b=20)),
                 annotations=[
                     dict(
                         text=f"<b>{round(Total_Power, 2)} W</b><br><span style='font-size:14px; color:#888'>Total</span>", 
