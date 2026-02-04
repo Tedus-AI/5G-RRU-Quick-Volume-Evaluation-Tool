@@ -8,15 +8,15 @@ import time
 import os
 import json
 
-# ==================================================
-# 版本：v3.73 (Two-Step Save)
+# ==============================================================================
+# 版本：v3.74 (Save Button Fix)
 # 日期：2026-02-04
 # 修正重點：
-# 1. [Fix] 解決下載舊資料問題 (State Sync Lag)。
-#    - 實作「兩段式存檔」：先按「產生」，再按「下載」。
-#    - 利用 st.rerun() 確保在下載前，所有數據(含表格)都已強制同步至最新狀態。
-# 2. [UI] 專案存取區塊優化，加入狀態提示。
-# ==================================================
+# 1. [Fix] 修復「下載按鈕」未顯示的問題。
+#    - 補上 "if trigger_generation:" 的處理邏輯。
+#    - 確保點擊「更新並產生」後，系統會正確打包資料並寫入 json_ready_to_download，
+#      最後再次 Rerun 以顯示下載按鈕。
+# ==============================================================================
 
 # === APP 設定 ===
 st.set_page_config(
@@ -64,6 +64,7 @@ default_component_data = {
     "TIM_Type": ["Solder", "Grease", "Grease", "Grease", "None", "Putty", "Pad", "Grease", "Grease", "Grease"]
 }
 
+# 初始化 Dataframe State
 if 'df_initial' not in st.session_state:
     st.session_state['df_initial'] = pd.DataFrame(default_component_data)
 
@@ -76,7 +77,7 @@ if 'editor_key' not in st.session_state:
 if 'last_loaded_file' not in st.session_state:
     st.session_state['last_loaded_file'] = None
 
-# [v3.73] 新增存檔相關狀態
+# 初始化存檔相關狀態
 if 'json_ready_to_download' not in st.session_state:
     st.session_state['json_ready_to_download'] = None
 if 'json_file_name' not in st.session_state:
@@ -189,6 +190,7 @@ st.sidebar.header("🛠️ 參數控制台")
 with st.sidebar.expander("📁 專案存取 (Project I/O)", expanded=False):
     # 1. 載入
     uploaded_proj = st.file_uploader("📂 載入專案設定 (.json)", type=["json"], key="project_loader")
+    
     if uploaded_proj is not None:
         if uploaded_proj != st.session_state['last_loaded_file']:
             try:
@@ -211,16 +213,42 @@ with st.sidebar.expander("📁 專案存取 (Project I/O)", expanded=False):
             except Exception as e:
                 st.error(f"❌ 檔案讀取失敗: {e}")
 
+    # 2. 儲存功能 (準備資料函數)
+    def get_current_state_json():
+        params_to_save = list(DEFAULT_GLOBALS.keys())
+        saved_params = {}
+        for k in params_to_save:
+            if k in st.session_state:
+                saved_params[k] = st.session_state[k]
+        
+        # 儲存 df_current (最新的編輯結果)
+        components_data = st.session_state['df_current'].to_dict('records')
+        
+        export_data = {
+            "meta": {"version": "v3.74", "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
+            "global_params": saved_params,
+            "components_data": components_data
+        }
+        return json.dumps(export_data, indent=4)
+
+    # [修正] 處理觸發訊號並生成檔案
+    # 這是之前遺漏的關鍵邏輯，確保 Rerun 後能執行打包
+    if st.session_state.get('trigger_generation', False):
+        json_data = get_current_state_json()
+        st.session_state['json_ready_to_download'] = json_data
+        st.session_state['json_file_name'] = f"RRU_Project_{time.strftime('%Y%m%d_%H%M%S')}.json"
+        st.session_state['trigger_generation'] = False # 重置觸發器
+        st.rerun() # 再次 Rerun 以更新 UI 顯示下載按鈕
+
     st.markdown("---")
     
-    # [修正] 兩段式存檔機制
-    # Step 1: 點擊按鈕 -> 觸發 Rerun -> 強制同步所有資料
+    # [按鈕] 觸發生成
     if st.button("🔄 1. 更新並產生專案檔 (Generate)"):
         st.session_state['trigger_generation'] = True
         st.rerun()
 
-    # Step 2: 顯示下載按鈕 (如果已生成)
-    if st.session_state['json_ready_to_download'] is not None:
+    # [按鈕] 顯示下載 (如果已生成)
+    if st.session_state.get('json_ready_to_download'):
         st.download_button(
             label="💾 2. 下載專案設定 (.json)",
             data=st.session_state['json_ready_to_download'],
@@ -233,6 +261,7 @@ with st.sidebar.expander("📁 專案存取 (Project I/O)", expanded=False):
 # --- 參數設定區 ---
 
 with st.sidebar.expander("1. 環境與係數", expanded=True):
+    # [修正] 移除 value，避免載入時衝突
     T_amb = st.number_input("環境溫度 (°C)", step=1.0, key="T_amb")
     Margin = st.number_input("設計安全係數 (Margin)", step=0.1, key="Margin")
     Slope = 0.03 
@@ -338,6 +367,7 @@ with tab_input:
             "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.1f"),
             "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
             "Board_Type": st.column_config.SelectboxColumn("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)", options=["Thermal Via", "Copper Coin", "None"], width="medium"),
+            # [修正] 移除 Solder 選項
             "TIM_Type": st.column_config.SelectboxColumn("介面材料", help="元件或銅塊底部與散熱器之間的TIM", options=["Grease", "Pad", "Putty", "None"], width="medium"),
             "R_jc": st.column_config.NumberColumn("熱阻 Rjc", help="結點到殼的內部熱阻", format="%.2f"),
             "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.1f")
@@ -521,6 +551,7 @@ with tab_data:
                 "R_int": st.column_config.NumberColumn("基板熱阻 (°C/W)", help="元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值。", format="%.4f"),
                 "R_TIM": st.column_config.NumberColumn("介面熱阻 (°C/W)", help="元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)。", format="%.4f"),
                 
+                # [修正 v3.67] 名詞一致化
                 "Board_Type": st.column_config.Column("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)"),
                 "TIM_Type": st.column_config.Column("介面材料", help="元件或銅塊底部與散熱器之間的TIM")
             },
@@ -762,4 +793,4 @@ with tab_3d:
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 st.markdown("---")
-st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.73 Two-Step Save | Designed for High Efficiency</div>""", unsafe_allow_html=True)
+st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.74 Save Button Fix | Designed for High Efficiency</div>""", unsafe_allow_html=True)
