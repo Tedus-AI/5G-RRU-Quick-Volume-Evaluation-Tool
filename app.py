@@ -8,15 +8,15 @@ import time
 import os
 import json
 
-# ==============================================================================
-# 版本：v3.72 (Data Loop Fix)
+# ==================================================
+# 版本：v3.73 (Two-Step Save)
 # 日期：2026-02-04
 # 修正重點：
-# 1. [Fix] 解決表格編輯回彈問題 (Data Loop Issue)。
-#    - 實作「輸入/輸出分離」策略。
-#    - 新增 'df_initial' 作為 data_editor 的穩定輸入源 (只在載入/重置時更新)。
-#    - 保留 'df_current' 作為最新編輯結果的儲存容器 (供存檔使用)。
-# ==============================================================================
+# 1. [Fix] 解決下載舊資料問題 (State Sync Lag)。
+#    - 實作「兩段式存檔」：先按「產生」，再按「下載」。
+#    - 利用 st.rerun() 確保在下載前，所有數據(含表格)都已強制同步至最新狀態。
+# 2. [UI] 專案存取區塊優化，加入狀態提示。
+# ==================================================
 
 # === APP 設定 ===
 st.set_page_config(
@@ -64,9 +64,6 @@ default_component_data = {
     "TIM_Type": ["Solder", "Grease", "Grease", "Grease", "None", "Putty", "Pad", "Grease", "Grease", "Grease"]
 }
 
-# [重要修正] 初始化兩個 Dataframe State
-# df_initial: 給 data_editor 當作穩定的輸入源 (Input)
-# df_current: 儲存 data_editor 編輯後的最新結果 (Output)，供下載用
 if 'df_initial' not in st.session_state:
     st.session_state['df_initial'] = pd.DataFrame(default_component_data)
 
@@ -78,6 +75,14 @@ if 'editor_key' not in st.session_state:
 
 if 'last_loaded_file' not in st.session_state:
     st.session_state['last_loaded_file'] = None
+
+# [v3.73] 新增存檔相關狀態
+if 'json_ready_to_download' not in st.session_state:
+    st.session_state['json_ready_to_download'] = None
+if 'json_file_name' not in st.session_state:
+    st.session_state['json_file_name'] = ""
+if 'trigger_generation' not in st.session_state:
+    st.session_state['trigger_generation'] = False
 
 # ==================================================
 # 🔐 密碼保護
@@ -182,24 +187,22 @@ st.sidebar.header("🛠️ 參數控制台")
 
 # --- [Project I/O] ---
 with st.sidebar.expander("📁 專案存取 (Project I/O)", expanded=False):
+    # 1. 載入
     uploaded_proj = st.file_uploader("📂 載入專案設定 (.json)", type=["json"], key="project_loader")
-    
     if uploaded_proj is not None:
         if uploaded_proj != st.session_state['last_loaded_file']:
             try:
                 data = json.load(uploaded_proj)
-                
-                # 載入全域參數
+                # 還原全域
                 if 'global_params' in data:
                     for k, v in data['global_params'].items():
                         st.session_state[k] = v
-                
-                # [修正] 載入表格資料到 df_initial，並更新 df_current
+                # 還原表格
                 if 'components_data' in data:
                     new_df = pd.DataFrame(data['components_data'])
-                    st.session_state['df_initial'] = new_df # 更新 Input
-                    st.session_state['df_current'] = new_df.copy() # 更新 Output
-                    st.session_state['editor_key'] += 1 # 強制重繪
+                    st.session_state['df_initial'] = new_df
+                    st.session_state['df_current'] = new_df.copy()
+                    st.session_state['editor_key'] += 1
                 
                 st.session_state['last_loaded_file'] = uploaded_proj
                 st.toast("✅ 專案載入成功！", icon="📂")
@@ -208,30 +211,24 @@ with st.sidebar.expander("📁 專案存取 (Project I/O)", expanded=False):
             except Exception as e:
                 st.error(f"❌ 檔案讀取失敗: {e}")
 
-    def get_current_state_json():
-        params_to_save = list(DEFAULT_GLOBALS.keys())
-        saved_params = {}
-        for k in params_to_save:
-            if k in st.session_state:
-                saved_params[k] = st.session_state[k]
-        
-        # 儲存 df_current (最新的編輯結果)
-        components_data = st.session_state['df_current'].to_dict('records')
-        
-        export_data = {
-            "meta": {"version": "v3.72", "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
-            "global_params": saved_params,
-            "components_data": components_data
-        }
-        return json.dumps(export_data, indent=4)
+    st.markdown("---")
+    
+    # [修正] 兩段式存檔機制
+    # Step 1: 點擊按鈕 -> 觸發 Rerun -> 強制同步所有資料
+    if st.button("🔄 1. 更新並產生專案檔 (Generate)"):
+        st.session_state['trigger_generation'] = True
+        st.rerun()
 
-    json_str = get_current_state_json()
-    st.download_button(
-        label="💾 下載專案設定 (.json)",
-        data=json_str,
-        file_name=f"RRU_Project_{time.strftime('%Y%m%d')}.json",
-        mime="application/json"
-    )
+    # Step 2: 顯示下載按鈕 (如果已生成)
+    if st.session_state['json_ready_to_download'] is not None:
+        st.download_button(
+            label="💾 2. 下載專案設定 (.json)",
+            data=st.session_state['json_ready_to_download'],
+            file_name=st.session_state['json_file_name'],
+            mime="application/json"
+        )
+    else:
+        st.caption("ℹ️ 請先點擊上方按鈕以產生最新檔案")
 
 # --- 參數設定區 ---
 
@@ -329,10 +326,9 @@ with tab_input:
     st.subheader("🔥 元件熱源清單設定")
     st.caption("💡 **提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。**")
 
-    # [修正重點] 將 data_editor 的輸入源改為 st.session_state['df_initial']
-    # 這樣每次 Rerun 時，Input 都是穩定的，不會被上一次的 Output 汙染。
+    # [Fix] 使用 df_initial (穩定源)
     edited_df = st.data_editor(
-        st.session_state['df_initial'], # Input
+        st.session_state['df_initial'],
         column_config={
             "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
             "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量", min_value=0, step=1, width="small"),
@@ -351,10 +347,10 @@ with tab_input:
         key=f"editor_{st.session_state['editor_key']}" 
     )
     
-    # [修正重點] 將編輯後的結果存入 df_current (供存檔使用)，但不要寫回 df_initial
+    # [Fix] 實時更新 df_current
     st.session_state['df_current'] = edited_df
 
-# --- 後台運算 (使用 edited_df 進行即時計算) ---
+# --- 後台運算 ---
 tim_props = {
     "Solder": {"k": K_Solder, "t": t_Solder},
     "Grease": {"k": K_Grease, "t": t_Grease},
@@ -515,7 +511,7 @@ with tab_data:
                 "R_jc": st.column_config.NumberColumn("Rjc", help="結點到殼的內部熱阻", format="%.2f"),
                 "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.1f"),
                 
-                # 計算欄位
+                # 計算欄位 - 完整公式說明
                 "Base_L": st.column_config.NumberColumn("Base 長 (mm)", help="熱量擴散後的底部有效長度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
                 "Base_W": st.column_config.NumberColumn("Base 寬 (mm)", help="熱量擴散後的底部有效寬度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
                 "Loc_Amb": st.column_config.NumberColumn("局部環溫 (°C)", help="該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)。", format="%.1f"),
@@ -620,6 +616,7 @@ with tab_viz:
     st.subheader("📏 尺寸與體積估算")
     c5, c6 = st.columns(2)
     
+    # [修正] 根據 DRC 結果決定顯示內容
     if drc_failed:
         st.error(drc_msg)
         st.markdown(f"""
@@ -650,6 +647,7 @@ with tab_3d:
     st.subheader("🧊 RRU 3D 產品模擬圖")
     st.caption("模型展示：底部電子艙 + 頂部散熱鰭片、鰭片數量與間距皆為真實比例。模擬圖右上角有小功能可使用。")
     
+    # [修正] 3D 圖也受 DRC 控制
     if not drc_failed and L_hsk > 0 and W_hsk > 0 and RRU_Height > 0 and Fin_Height > 0:
         fig_3d = go.Figure()
         COLOR_FINS = '#E5E7E9'; COLOR_BODY = COLOR_FINS
@@ -764,4 +762,4 @@ with tab_3d:
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 st.markdown("---")
-st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.72 Data Loop Fix | Designed for High Efficiency</div>""", unsafe_allow_html=True)
+st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.73 Two-Step Save | Designed for High Efficiency</div>""", unsafe_allow_html=True)
