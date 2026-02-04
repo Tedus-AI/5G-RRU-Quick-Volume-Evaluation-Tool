@@ -8,12 +8,10 @@ import time
 import os
 
 # ==============================================================================
-# 版本：v3.68 (Process Check Added)
+# 版本：v3.69 (Restore Specific Tooltips)
 # 日期：2026-02-04
 # 修正重點：
-# 1. [DRC] 新增製程限制檢查：
-#    - 若選擇 Embedded Fin 且 Fin_Height > 100mm，觸發錯誤。
-#    - 提示使用者增加 X/Y 面積以降低 Z 高度需求。
+# 1. [UI] Tab 2 表格中 "元件導熱方式" 與 "介面材料" 補回遺失的名詞解釋 (Tooltip)。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -440,9 +438,9 @@ with tab_data:
                 "R_int": st.column_config.NumberColumn("基板熱阻 (°C/W)", help="元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值。", format="%.4f"),
                 "R_TIM": st.column_config.NumberColumn("介面熱阻 (°C/W)", help="元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)。", format="%.4f"),
                 
-                # [修正 v3.67] 名詞一致化
-                "Board_Type": st.column_config.Column("元件導熱方式"),
-                "TIM_Type": st.column_config.Column("介面材料")
+                # [修正 v3.69] 補回完整名詞解釋
+                "Board_Type": st.column_config.Column("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)"),
+                "TIM_Type": st.column_config.Column("介面材料", help="元件或銅塊底部與散熱器之間的TIM")
             },
             use_container_width=True, 
             hide_index=True
