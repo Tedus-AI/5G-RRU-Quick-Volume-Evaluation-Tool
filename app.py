@@ -9,12 +9,14 @@ import os
 import json
 
 # ==============================================================================
-# 版本：v3.78 (Save Logic Moved to Bottom)
+# 版本：v3.79 (UI Layout Optimization)
 # 日期：2026-02-05
 # 修正重點：
-# 1. [Fix] 解決存檔數值未更新問題：將「產生專案檔」與「下載按鈕」的邏輯移至側邊欄最底部。
-#    確保在打包 JSON 時，所有的輸入元件都已經執行完畢並確認了最新的 Session State。
-# 2. [UI] 新增「預設設定檔載入狀態」指示燈：讓使用者知道是用 GitHub 檔案還是硬編碼預設值。
+# 1. [UI] 調整「預設檔案載入」顯示樣式：改為精簡標題+燈號。
+# 2. [UI] 解決存檔按鈕位置問題：
+#    - 使用 st.empty() 佔位符技術。
+#    - 讓按鈕在視覺上回到側邊欄上方的「專案存取」區塊內。
+#    - 邏輯上依然維持在程式末端執行，確保資料更新無誤。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -29,7 +31,7 @@ st.set_page_config(
 # 0. 初始化 Session State
 # ==================================================
 
-# 1. 全域參數預設值 (Hardcoded Fallback)
+# 1. 全域參數預設值
 DEFAULT_GLOBALS = {
     "T_amb": 45.0, "Margin": 1.0, 
     "L_pcb": 350.0, "W_pcb": 250.0, "t_base": 7.0, "H_shield": 20.0, "H_filter": 42.0,
@@ -44,9 +46,9 @@ DEFAULT_GLOBALS = {
     "fin_tech_selector_v2": "Embedded Fin (0.95)"
 }
 
-# [重要] 嘗試載入 GitHub 上的預設設定檔 (若有)
+# 載入預設設定檔
 config_path = "default_config.json"
-config_loaded_status = "Not Found" # 用於 UI 顯示狀態
+config_loaded_msg = "🟡 使用內建預設值" # 預設訊息
 
 if os.path.exists(config_path):
     try:
@@ -54,15 +56,15 @@ if os.path.exists(config_path):
             custom_config = json.load(f)
             if 'global_params' in custom_config:
                 DEFAULT_GLOBALS.update(custom_config['global_params'])
-                config_loaded_status = "Success"
+                config_loaded_msg = "🟢 載入成功 (default_config.json)"
             else:
-                config_loaded_status = "Invalid Format"
+                config_loaded_msg = "🔴 格式錯誤 (Format Invalid)"
     except Exception as e:
-        config_loaded_status = f"Error: {str(e)}"
+        config_loaded_msg = f"🔴 讀取錯誤: {str(e)}"
 else:
-    config_loaded_status = "Using Internal Defaults"
+    config_loaded_msg = "🟡 使用內建預設值 (No Config File)"
 
-# 初始化 Session State 中的參數
+# 初始化 Session State
 for k, v in DEFAULT_GLOBALS.items():
     if k not in st.session_state:
         st.session_state[k] = v
@@ -82,7 +84,6 @@ default_component_data = {
     "TIM_Type": ["Solder", "Grease", "Grease", "Grease", "None", "Putty", "Pad", "Grease", "Grease", "Grease"]
 }
 
-# 初始化 Dataframe State
 if 'df_initial' not in st.session_state:
     st.session_state['df_initial'] = pd.DataFrame(default_component_data)
 
@@ -95,7 +96,6 @@ if 'editor_key' not in st.session_state:
 if 'last_loaded_file' not in st.session_state:
     st.session_state['last_loaded_file'] = None
 
-# 初始化存檔相關狀態
 if 'json_ready_to_download' not in st.session_state:
     st.session_state['json_ready_to_download'] = None
 if 'json_file_name' not in st.session_state:
@@ -103,7 +103,6 @@ if 'json_file_name' not in st.session_state:
 if 'trigger_generation' not in st.session_state:
     st.session_state['trigger_generation'] = False
 
-# [核心] 狀態重置函數 (當任何參數變動時呼叫，強制隱藏下載按鈕)
 def reset_download_state():
     st.session_state['json_ready_to_download'] = None
 
@@ -208,18 +207,16 @@ st.markdown("""
 # ==================================================
 st.sidebar.header("🛠️ 參數控制台")
 
-# --- [Project I/O - Load Only] ---
+# --- [Project I/O] ---
 with st.sidebar.expander("📁 專案存取 (Project I/O)", expanded=False):
-    # 顯示設定檔載入狀態 (Debug 資訊)
-    if config_loaded_status == "Success":
-        st.success(f"✅ 設定檔載入成功 (default_config.json)")
-    elif config_loaded_status == "Using Internal Defaults":
-        st.warning(f"⚠️ 無設定檔，使用系統預設值")
-    else:
-        st.error(f"❌ 設定檔載入失敗: {config_loaded_status}")
-
-    st.markdown("---")
-
+    # [UI] 預設設定檔狀態 (精簡版)
+    st.markdown(f"""
+    <div style='margin-bottom: 10px; font-size: 0.9rem;'>
+        <b>預設檔案載入</b><br>
+        <span style='font-size: 0.85rem;'>{config_loaded_msg}</span>
+    </div>
+    """, unsafe_allow_html=True)
+    
     # 1. 載入
     uploaded_proj = st.file_uploader("📂 載入專案設定 (.json)", type=["json"], key="project_loader")
     
@@ -231,7 +228,6 @@ with st.sidebar.expander("📁 專案存取 (Project I/O)", expanded=False):
                 if 'global_params' in data:
                     for k, v in data['global_params'].items():
                         st.session_state[k] = v
-                
                 # 還原表格
                 if 'components_data' in data:
                     new_df = pd.DataFrame(data['components_data'])
@@ -246,11 +242,16 @@ with st.sidebar.expander("📁 專案存取 (Project I/O)", expanded=False):
             except Exception as e:
                 st.error(f"❌ 檔案讀取失敗: {e}")
 
-# --- 參數設定區 (加入 value=st.session_state[...] 以解決 0 值問題) ---
+    st.markdown("---")
+    
+    # [修正] 預留一個「按鈕區」的空位
+    # 我們稍後會在程式最末端，把按鈕「填」進這個空位
+    save_ui_placeholder = st.empty()
 
+# --- 參數設定區 (綁定 on_change=reset_download_state) ---
 with st.sidebar.expander("1. 環境與係數", expanded=True):
-    T_amb = st.number_input("環境溫度 (°C)", value=st.session_state['T_amb'], step=1.0, key="T_amb", on_change=reset_download_state)
-    Margin = st.number_input("設計安全係數 (Margin)", value=st.session_state['Margin'], step=0.1, key="Margin", on_change=reset_download_state)
+    T_amb = st.number_input("環境溫度 (°C)", step=1.0, key="T_amb", value=st.session_state['T_amb'], on_change=reset_download_state)
+    Margin = st.number_input("設計安全係數 (Margin)", step=0.1, key="Margin", value=st.session_state['Margin'], on_change=reset_download_state)
     Slope = 0.03 
     
     fin_tech = st.selectbox(
@@ -267,32 +268,32 @@ with st.sidebar.expander("1. 環境與係數", expanded=True):
     st.caption(f"目前設定效率 (Eff): **{Eff}**")
 
 with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
-    L_pcb = st.number_input("PCB 長度 (mm)", value=st.session_state['L_pcb'], key="L_pcb", on_change=reset_download_state)
-    W_pcb = st.number_input("PCB 寬度 (mm)", value=st.session_state['W_pcb'], key="W_pcb", on_change=reset_download_state)
-    t_base = st.number_input("散熱器基板厚 (mm)", value=st.session_state['t_base'], key="t_base", on_change=reset_download_state)
-    H_shield = st.number_input("HSK內腔深度 (mm)", value=st.session_state['H_shield'], key="H_shield", on_change=reset_download_state)
-    H_filter = st.number_input("Cavity Filter 厚度 (mm)", value=st.session_state['H_filter'], key="H_filter", on_change=reset_download_state)
+    L_pcb = st.number_input("PCB 長度 (mm)", key="L_pcb", value=st.session_state['L_pcb'], on_change=reset_download_state)
+    W_pcb = st.number_input("PCB 寬度 (mm)", key="W_pcb", value=st.session_state['W_pcb'], on_change=reset_download_state)
+    t_base = st.number_input("散熱器基板厚 (mm)", key="t_base", value=st.session_state['t_base'], on_change=reset_download_state)
+    H_shield = st.number_input("HSK內腔深度 (mm)", key="H_shield", value=st.session_state['H_shield'], on_change=reset_download_state)
+    H_filter = st.number_input("Cavity Filter 厚度 (mm)", key="H_filter", value=st.session_state['H_filter'], on_change=reset_download_state)
     
     st.caption("📏 PCB板離外殼邊距(防水)")
     
     m1, m2 = st.columns(2)
-    Top = m1.number_input("Top (mm)", value=st.session_state['Top'], step=1.0, key="Top", on_change=reset_download_state)
-    Btm = m2.number_input("Bottom (mm)", value=st.session_state['Btm'], step=1.0, key="Btm", on_change=reset_download_state)
+    Top = m1.number_input("Top (mm)", step=1.0, key="Top", value=st.session_state['Top'], on_change=reset_download_state)
+    Btm = m2.number_input("Bottom (mm)", step=1.0, key="Btm", value=st.session_state['Btm'], on_change=reset_download_state)
     m3, m4 = st.columns(2)
-    Left = m3.number_input("Left (mm)", value=st.session_state['Left'], step=1.0, key="Left", on_change=reset_download_state)
-    Right = m4.number_input("Right (mm)", value=st.session_state['Right'], step=1.0, key="Right", on_change=reset_download_state)
+    Left = m3.number_input("Left (mm)", step=1.0, key="Left", value=st.session_state['Left'], on_change=reset_download_state)
+    Right = m4.number_input("Right (mm)", step=1.0, key="Right", value=st.session_state['Right'], on_change=reset_download_state)
     
     st.markdown("---")
     st.caption("🔶 Final PA 銅塊設定")
     c1, c2 = st.columns(2)
-    Coin_L_Setting = c1.number_input("銅塊長 (mm)", value=st.session_state['Coin_L_Setting'], step=1.0, key="Coin_L_Setting", on_change=reset_download_state)
-    Coin_W_Setting = c2.number_input("銅塊寬 (mm)", value=st.session_state['Coin_W_Setting'], step=1.0, key="Coin_W_Setting", on_change=reset_download_state)
+    Coin_L_Setting = c1.number_input("銅塊長 (mm)", step=1.0, key="Coin_L_Setting", value=st.session_state['Coin_L_Setting'], on_change=reset_download_state)
+    Coin_W_Setting = c2.number_input("銅塊寬 (mm)", step=1.0, key="Coin_W_Setting", value=st.session_state['Coin_W_Setting'], on_change=reset_download_state)
 
     st.markdown("---")
     st.caption("🌊 鰭片幾何")
     c_fin1, c_fin2 = st.columns(2)
-    Gap = c_fin1.number_input("鰭片air gap (mm)", value=st.session_state['Gap'], step=0.1, key="Gap", on_change=reset_download_state)
-    Fin_t = c_fin2.number_input("鰭片厚度 (mm)", value=st.session_state['Fin_t'], step=0.1, key="Fin_t", on_change=reset_download_state)
+    Gap = c_fin1.number_input("鰭片air gap (mm)", step=0.1, key="Gap", value=st.session_state['Gap'], on_change=reset_download_state)
+    Fin_t = c_fin2.number_input("鰭片厚度 (mm)", step=0.1, key="Fin_t", value=st.session_state['Fin_t'], on_change=reset_download_state)
 
     # [Core] h 值自動計算
     h_conv = 6.4 * np.tanh(Gap / 7.0)
@@ -313,72 +314,25 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
 
 with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=False):
     c1, c2 = st.columns(2)
-    K_Via = c1.number_input("Via 等效 K值", value=st.session_state['K_Via'], key="K_Via", on_change=reset_download_state)
-    Via_Eff = c2.number_input("Via 製程係數", value=st.session_state['Via_Eff'], key="Via_Eff", on_change=reset_download_state)
+    K_Via = c1.number_input("Via 等效 K值", key="K_Via", value=st.session_state['K_Via'], on_change=reset_download_state)
+    Via_Eff = c2.number_input("Via 製程係數", key="Via_Eff", value=st.session_state['Via_Eff'], on_change=reset_download_state)
     st.markdown("---") 
     st.caption("🔷 熱介面材料 (TIM)")
     c3, c4 = st.columns(2)
-    K_Putty = c3.number_input("K (Putty)", value=st.session_state['K_Putty'], key="K_Putty", on_change=reset_download_state)
-    t_Putty = c4.number_input("t (Putty)", value=st.session_state['t_Putty'], key="t_Putty", on_change=reset_download_state)
+    K_Putty = c3.number_input("K (Putty)", key="K_Putty", value=st.session_state['K_Putty'], on_change=reset_download_state)
+    t_Putty = c4.number_input("t (Putty)", key="t_Putty", value=st.session_state['t_Putty'], on_change=reset_download_state)
     c5, c6 = st.columns(2)
-    K_Pad = c5.number_input("K (Pad)", value=st.session_state['K_Pad'], key="K_Pad", on_change=reset_download_state)
-    t_Pad = c6.number_input("t (Pad)", value=st.session_state['t_Pad'], key="t_Pad", on_change=reset_download_state)
+    K_Pad = c5.number_input("K (Pad)", key="K_Pad", value=st.session_state['K_Pad'], on_change=reset_download_state)
+    t_Pad = c6.number_input("t (Pad)", key="t_Pad", value=st.session_state['t_Pad'], on_change=reset_download_state)
     c7, c8 = st.columns(2)
-    K_Grease = c7.number_input("K (Grease)", value=st.session_state['K_Grease'], key="K_Grease", on_change=reset_download_state)
-    t_Grease = c8.number_input("t (Grease)", value=st.session_state['t_Grease'], format="%.3f", key="t_Grease", on_change=reset_download_state)
+    K_Grease = c7.number_input("K (Grease)", key="K_Grease", value=st.session_state['K_Grease'], on_change=reset_download_state)
+    t_Grease = c8.number_input("t (Grease)", format="%.3f", key="t_Grease", value=st.session_state['t_Grease'], on_change=reset_download_state)
     st.markdown("---") 
     st.markdown("**🔘 Solder (錫片)**") 
     c9, c10 = st.columns(2)
-    K_Solder = c9.number_input("K (錫片)", value=st.session_state['K_Solder'], key="K_Solder", on_change=reset_download_state)
-    t_Solder = c10.number_input("t (錫片)", value=st.session_state['t_Solder'], key="t_Solder", on_change=reset_download_state)
-    Voiding = st.number_input("錫片空洞率 (Voiding)", value=st.session_state['Voiding'], key="Voiding", on_change=reset_download_state)
-
-# --- [Project I/O - Save] 移到最底部 ---
-# 確保在所有參數都已經渲染且 session_state 已更新後才執行儲存邏輯
-st.sidebar.markdown("---")
-st.sidebar.subheader("💾 專案存檔")
-
-# 2. 儲存功能 (準備資料函數)
-def get_current_state_json():
-    params_to_save = list(DEFAULT_GLOBALS.keys())
-    saved_params = {}
-    for k in params_to_save:
-        if k in st.session_state:
-            saved_params[k] = st.session_state[k]
-    
-    # 儲存 df_current (最新的編輯結果)
-    components_data = st.session_state['df_current'].to_dict('records')
-    
-    export_data = {
-        "meta": {"version": "v3.78", "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
-        "global_params": saved_params,
-        "components_data": components_data
-    }
-    return json.dumps(export_data, indent=4)
-
-# 處理觸發訊號並生成檔案
-if st.session_state.get('trigger_generation', False):
-    json_data = get_current_state_json()
-    st.session_state['json_ready_to_download'] = json_data
-    st.session_state['json_file_name'] = f"RRU_Project_{time.strftime('%Y%m%d_%H%M%S')}.json"
-    st.session_state['trigger_generation'] = False # 重置觸發器
-    st.rerun() 
-
-# [按鈕] 觸發生成
-if st.sidebar.button("🔄 1. 更新並產生專案檔 (Generate)"):
-    st.session_state['trigger_generation'] = True
-    st.rerun()
-
-# [按鈕] 顯示下載 (如果已生成)
-if st.session_state.get('json_ready_to_download'):
-    st.sidebar.download_button(
-        label="💾 2. 下載專案設定 (.json)",
-        data=st.session_state['json_ready_to_download'],
-        file_name=st.session_state['json_file_name'],
-        mime="application/json"
-    )
-else:
-    st.sidebar.caption("ℹ️ 請先點擊上方按鈕以產生最新檔案")
+    K_Solder = c9.number_input("K (錫片)", key="K_Solder", value=st.session_state['K_Solder'], on_change=reset_download_state)
+    t_Solder = c10.number_input("t (錫片)", key="t_Solder", value=st.session_state['t_Solder'], on_change=reset_download_state)
+    Voiding = st.number_input("錫片空洞率 (Voiding)", key="Voiding", value=st.session_state['Voiding'], on_change=reset_download_state)
 
 # ==================================================
 # 3. 分頁與邏輯
@@ -402,7 +356,6 @@ with tab_input:
             "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.1f"),
             "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
             "Board_Type": st.column_config.SelectboxColumn("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)", options=["Thermal Via", "Copper Coin", "None"], width="medium"),
-            # [修正] 移除 Solder 選項
             "TIM_Type": st.column_config.SelectboxColumn("介面材料", help="元件或銅塊底部與散熱器之間的TIM", options=["Grease", "Pad", "Putty", "None"], width="medium"),
             "R_jc": st.column_config.NumberColumn("熱阻 Rjc", help="結點到殼的內部熱阻", format="%.2f"),
             "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.1f")
@@ -595,6 +548,7 @@ with tab_data:
             hide_index=True
         )
         
+        # [UI Update] 將 Scale Bar 移至下方，並改為橫式
         st.markdown(f"""
         <div style="display: flex; flex-direction: column; align-items: center; margin: 15px 0;">
             <div style="font-weight: bold; margin-bottom: 5px; color: #555; font-size: 0.9rem;">允許溫升 (Allowed dT) 色階參考</div>
@@ -829,4 +783,42 @@ with tab_3d:
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 st.markdown("---")
-st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.78 Save Logic Moved to Bottom | Designed for High Efficiency</div>""", unsafe_allow_html=True)
+st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.79 UI Layout Optimization | Designed for High Efficiency</div>""", unsafe_allow_html=True)
+# --- [Project I/O - Save] 邏輯與按鈕填入 ---
+with save_ui_placeholder.container():
+    def get_current_state_json():
+        params_to_save = list(DEFAULT_GLOBALS.keys())
+        saved_params = {}
+        for k in params_to_save:
+            if k in st.session_state:
+                saved_params[k] = st.session_state[k]
+        
+        components_data = st.session_state['df_current'].to_dict('records')
+        
+        export_data = {
+            "meta": {"version": "v3.79", "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
+            "global_params": saved_params,
+            "components_data": components_data
+        }
+        return json.dumps(export_data, indent=4)
+
+    if st.session_state.get('trigger_generation', False):
+        json_data = get_current_state_json()
+        st.session_state['json_ready_to_download'] = json_data
+        st.session_state['json_file_name'] = f"RRU_Project_{time.strftime('%Y%m%d_%H%M%S')}.json"
+        st.session_state['trigger_generation'] = False 
+        st.rerun() 
+
+    if st.button("🔄 1. 更新並產生專案檔 (Generate)"):
+        st.session_state['trigger_generation'] = True
+        st.rerun()
+
+    if st.session_state.get('json_ready_to_download'):
+        st.download_button(
+            label="💾 2. 下載專案設定 (.json)",
+            data=st.session_state['json_ready_to_download'],
+            file_name=st.session_state['json_file_name'],
+            mime="application/json"
+        )
+    else:
+        st.caption("ℹ️ 請先點擊上方按鈕以產生最新檔案")
