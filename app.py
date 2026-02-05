@@ -9,12 +9,12 @@ import os
 import json
 
 # ==============================================================================
-# 版本：v3.77 (Zero Value Fix)
-# 日期：2026-02-04
+# 版本：v3.78 (Save Logic Moved to Bottom)
+# 日期：2026-02-05
 # 修正重點：
-# 1. [Fix] 解決側邊欄數值顯示為 0 的問題：
-#    - 將所有 st.number_input 補上 `value=st.session_state['KEY']`。
-#    - 這確保了元件初始化時會強制讀取 Session State 中的正確數值 (預設值或載入值)。
+# 1. [Fix] 解決存檔數值未更新問題：將「產生專案檔」與「下載按鈕」的邏輯移至側邊欄最底部。
+#    確保在打包 JSON 時，所有的輸入元件都已經執行完畢並確認了最新的 Session State。
+# 2. [UI] 新增「預設設定檔載入狀態」指示燈：讓使用者知道是用 GitHub 檔案還是硬編碼預設值。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -29,7 +29,7 @@ st.set_page_config(
 # 0. 初始化 Session State
 # ==================================================
 
-# 1. 全域參數預設值
+# 1. 全域參數預設值 (Hardcoded Fallback)
 DEFAULT_GLOBALS = {
     "T_amb": 45.0, "Margin": 1.0, 
     "L_pcb": 350.0, "W_pcb": 250.0, "t_base": 7.0, "H_shield": 20.0, "H_filter": 42.0,
@@ -46,15 +46,23 @@ DEFAULT_GLOBALS = {
 
 # [重要] 嘗試載入 GitHub 上的預設設定檔 (若有)
 config_path = "default_config.json"
+config_loaded_status = "Not Found" # 用於 UI 顯示狀態
+
 if os.path.exists(config_path):
     try:
         with open(config_path, "r", encoding='utf-8') as f:
             custom_config = json.load(f)
             if 'global_params' in custom_config:
                 DEFAULT_GLOBALS.update(custom_config['global_params'])
-    except:
-        pass # 若讀取失敗則使用硬編碼預設值
+                config_loaded_status = "Success"
+            else:
+                config_loaded_status = "Invalid Format"
+    except Exception as e:
+        config_loaded_status = f"Error: {str(e)}"
+else:
+    config_loaded_status = "Using Internal Defaults"
 
+# 初始化 Session State 中的參數
 for k, v in DEFAULT_GLOBALS.items():
     if k not in st.session_state:
         st.session_state[k] = v
@@ -200,8 +208,18 @@ st.markdown("""
 # ==================================================
 st.sidebar.header("🛠️ 參數控制台")
 
-# --- [Project I/O] ---
+# --- [Project I/O - Load Only] ---
 with st.sidebar.expander("📁 專案存取 (Project I/O)", expanded=False):
+    # 顯示設定檔載入狀態 (Debug 資訊)
+    if config_loaded_status == "Success":
+        st.success(f"✅ 設定檔載入成功 (default_config.json)")
+    elif config_loaded_status == "Using Internal Defaults":
+        st.warning(f"⚠️ 無設定檔，使用系統預設值")
+    else:
+        st.error(f"❌ 設定檔載入失敗: {config_loaded_status}")
+
+    st.markdown("---")
+
     # 1. 載入
     uploaded_proj = st.file_uploader("📂 載入專案設定 (.json)", type=["json"], key="project_loader")
     
@@ -228,50 +246,6 @@ with st.sidebar.expander("📁 專案存取 (Project I/O)", expanded=False):
             except Exception as e:
                 st.error(f"❌ 檔案讀取失敗: {e}")
 
-    # 2. 儲存功能 (準備資料函數)
-    def get_current_state_json():
-        params_to_save = list(DEFAULT_GLOBALS.keys())
-        saved_params = {}
-        for k in params_to_save:
-            if k in st.session_state:
-                saved_params[k] = st.session_state[k]
-        
-        # 儲存 df_current (最新的編輯結果)
-        components_data = st.session_state['df_current'].to_dict('records')
-        
-        export_data = {
-            "meta": {"version": "v3.77", "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
-            "global_params": saved_params,
-            "components_data": components_data
-        }
-        return json.dumps(export_data, indent=4)
-
-    # 處理觸發訊號並生成檔案
-    if st.session_state.get('trigger_generation', False):
-        json_data = get_current_state_json()
-        st.session_state['json_ready_to_download'] = json_data
-        st.session_state['json_file_name'] = f"RRU_Project_{time.strftime('%Y%m%d_%H%M%S')}.json"
-        st.session_state['trigger_generation'] = False # 重置觸發器
-        st.rerun() 
-
-    st.markdown("---")
-    
-    # [按鈕] 觸發生成
-    if st.button("🔄 1. 更新並產生專案檔 (Generate)"):
-        st.session_state['trigger_generation'] = True
-        st.rerun()
-
-    # [按鈕] 顯示下載 (如果已生成)
-    if st.session_state.get('json_ready_to_download'):
-        st.download_button(
-            label="💾 2. 下載專案設定 (.json)",
-            data=st.session_state['json_ready_to_download'],
-            file_name=st.session_state['json_file_name'],
-            mime="application/json"
-        )
-    else:
-        st.caption("ℹ️ 請先點擊上方按鈕以產生最新檔案")
-
 # --- 參數設定區 (加入 value=st.session_state[...] 以解決 0 值問題) ---
 
 with st.sidebar.expander("1. 環境與係數", expanded=True):
@@ -279,18 +253,9 @@ with st.sidebar.expander("1. 環境與係數", expanded=True):
     Margin = st.number_input("設計安全係數 (Margin)", value=st.session_state['Margin'], step=0.1, key="Margin", on_change=reset_download_state)
     Slope = 0.03 
     
-    # [Selectbox] 用 key 綁定即可，若需 index 亦可加入
-    options = ["Embedded Fin (0.95)", "Die-casting Fin (0.90)"]
-    # 找出當前值的 index
-    try:
-        curr_idx = options.index(st.session_state['fin_tech_selector_v2'])
-    except:
-        curr_idx = 0
-
     fin_tech = st.selectbox(
         "🔨 鰭片製程 (Fin Tech)", 
-        options,
-        index=curr_idx,
+        ["Embedded Fin (0.95)", "Die-casting Fin (0.90)"],
         key="fin_tech_selector_v2",
         on_change=reset_download_state
     )
@@ -367,6 +332,53 @@ with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=False):
     K_Solder = c9.number_input("K (錫片)", value=st.session_state['K_Solder'], key="K_Solder", on_change=reset_download_state)
     t_Solder = c10.number_input("t (錫片)", value=st.session_state['t_Solder'], key="t_Solder", on_change=reset_download_state)
     Voiding = st.number_input("錫片空洞率 (Voiding)", value=st.session_state['Voiding'], key="Voiding", on_change=reset_download_state)
+
+# --- [Project I/O - Save] 移到最底部 ---
+# 確保在所有參數都已經渲染且 session_state 已更新後才執行儲存邏輯
+st.sidebar.markdown("---")
+st.sidebar.subheader("💾 專案存檔")
+
+# 2. 儲存功能 (準備資料函數)
+def get_current_state_json():
+    params_to_save = list(DEFAULT_GLOBALS.keys())
+    saved_params = {}
+    for k in params_to_save:
+        if k in st.session_state:
+            saved_params[k] = st.session_state[k]
+    
+    # 儲存 df_current (最新的編輯結果)
+    components_data = st.session_state['df_current'].to_dict('records')
+    
+    export_data = {
+        "meta": {"version": "v3.78", "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
+        "global_params": saved_params,
+        "components_data": components_data
+    }
+    return json.dumps(export_data, indent=4)
+
+# 處理觸發訊號並生成檔案
+if st.session_state.get('trigger_generation', False):
+    json_data = get_current_state_json()
+    st.session_state['json_ready_to_download'] = json_data
+    st.session_state['json_file_name'] = f"RRU_Project_{time.strftime('%Y%m%d_%H%M%S')}.json"
+    st.session_state['trigger_generation'] = False # 重置觸發器
+    st.rerun() 
+
+# [按鈕] 觸發生成
+if st.sidebar.button("🔄 1. 更新並產生專案檔 (Generate)"):
+    st.session_state['trigger_generation'] = True
+    st.rerun()
+
+# [按鈕] 顯示下載 (如果已生成)
+if st.session_state.get('json_ready_to_download'):
+    st.sidebar.download_button(
+        label="💾 2. 下載專案設定 (.json)",
+        data=st.session_state['json_ready_to_download'],
+        file_name=st.session_state['json_file_name'],
+        mime="application/json"
+    )
+else:
+    st.sidebar.caption("ℹ️ 請先點擊上方按鈕以產生最新檔案")
 
 # ==================================================
 # 3. 分頁與邏輯
@@ -817,4 +829,4 @@ with tab_3d:
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 st.markdown("---")
-st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.77 Zero Value Fix | Designed for High Efficiency</div>""", unsafe_allow_html=True)
+st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.78 Save Logic Moved to Bottom | Designed for High Efficiency</div>""", unsafe_allow_html=True)
