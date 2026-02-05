@@ -9,12 +9,15 @@ import os
 import json
 
 # ==============================================================================
-# 版本：v3.80 (Default Config Fix)
+# 版本：v3.81 (Final Stable Release)
 # 日期：2026-02-05
-# 修正重點：
-# 1. [Fix] 修復預設設定檔載入不完全的問題：
-#    - 現在啟動時除了載入 global_params (側邊欄)，也會同步載入 components_data (Tab 1 表格)。
-#    - 確保 default_config.json 能完整覆蓋所有預設值。
+# 狀態：正式發布版 (Production Ready)
+# 
+# [系統架構摘要]
+# 1. 核心計算：自動 h 值 (C=7.0)、植樹原理鰭片數、三階段 DRC 防呆。
+# 2. 檔案存取：JSON 專案檔 Save/Load，支援全域變數與表格資料完整還原。
+# 3. 資料安全：參數變動自動重置下載按鈕；載入時使用 Session State 強制覆寫 UI 預設值。
+# 4. 介面邏輯：使用 Placeholder 技術，將存檔按鈕置於頂部，但邏輯於底部執行以確保數據最新。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -44,7 +47,7 @@ DEFAULT_GLOBALS = {
     "fin_tech_selector_v2": "Embedded Fin (0.95)"
 }
 
-# 2. 預設元件清單 (Hardcoded Fallback) - [移至讀取 JSON 之前定義]
+# 2. 預設元件清單 (Hardcoded Fallback)
 default_component_data = {
     "Component": ["Final PA", "Driver PA", "Pre Driver", "Circulator", "Cavity Filter", "CPU (FPGA)", "Si5518", "16G DDR", "Power Mod", "SFP"],
     "Qty": [4, 4, 4, 4, 1, 1, 1, 2, 1, 1],
@@ -68,14 +71,15 @@ if os.path.exists(config_path):
         with open(config_path, "r", encoding='utf-8') as f:
             custom_config = json.load(f)
             
-            # [修正] 同步載入全域變數與表格資料
             loaded_globals = False
             loaded_components = False
             
+            # 更新全域變數
             if 'global_params' in custom_config:
                 DEFAULT_GLOBALS.update(custom_config['global_params'])
                 loaded_globals = True
             
+            # 更新元件清單
             if 'components_data' in custom_config:
                 default_component_data = custom_config['components_data']
                 loaded_components = True
@@ -97,7 +101,7 @@ for k, v in DEFAULT_GLOBALS.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# 初始化 Session State (表格資料) - 使用剛才可能被 JSON 覆蓋過的 default_component_data
+# 初始化 Session State (表格資料) - 使用最終確認的 default_component_data
 if 'df_initial' not in st.session_state:
     st.session_state['df_initial'] = pd.DataFrame(default_component_data)
 
@@ -117,6 +121,7 @@ if 'json_file_name' not in st.session_state:
 if 'trigger_generation' not in st.session_state:
     st.session_state['trigger_generation'] = False
 
+# [核心] 狀態重置函數 (當任何參數變動時呼叫，強制隱藏下載按鈕)
 def reset_download_state():
     st.session_state['json_ready_to_download'] = None
 
@@ -223,7 +228,7 @@ st.sidebar.header("🛠️ 參數控制台")
 
 # --- [Project I/O] ---
 with st.sidebar.expander("📁 專案存取 (Project I/O)", expanded=False):
-    # [UI] 預設設定檔狀態 (精簡版)
+    # [UI] 預設設定檔狀態
     st.markdown(f"""
     <div style='margin-bottom: 10px; font-size: 0.9rem;'>
         <b>預設檔案載入</b><br>
@@ -259,10 +264,10 @@ with st.sidebar.expander("📁 專案存取 (Project I/O)", expanded=False):
 
     st.markdown("---")
     
-    # 預留按鈕區空位
+    # 預留按鈕區空位 (為了將按鈕顯示在上方，但邏輯在下方執行)
     save_ui_placeholder = st.empty()
 
-# --- 參數設定區 (綁定 on_change=reset_download_state) ---
+# --- 參數設定區 (綁定 on_change=reset_download_state + 讀取 value) ---
 with st.sidebar.expander("1. 環境與係數", expanded=True):
     T_amb = st.number_input("環境溫度 (°C)", step=1.0, key="T_amb", value=st.session_state['T_amb'], on_change=reset_download_state)
     Margin = st.number_input("設計安全係數 (Margin)", step=0.1, key="Margin", value=st.session_state['Margin'], on_change=reset_download_state)
@@ -543,8 +548,6 @@ with tab_data:
                 "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
                 "R_jc": st.column_config.NumberColumn("Rjc", help="結點到殼的內部熱阻", format="%.2f"),
                 "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.1f"),
-                
-                # 計算欄位 - 完整公式說明
                 "Base_L": st.column_config.NumberColumn("Base 長 (mm)", help="熱量擴散後的底部有效長度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
                 "Base_W": st.column_config.NumberColumn("Base 寬 (mm)", help="熱量擴散後的底部有效寬度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
                 "Loc_Amb": st.column_config.NumberColumn("局部環溫 (°C)", help="該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)。", format="%.1f"),
@@ -793,7 +796,7 @@ with tab_3d:
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 st.markdown("---")
-st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.80 Default Config Fix | Designed for High Efficiency</div>""", unsafe_allow_html=True)
+st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.81 Final Stable Release | Designed for High Efficiency</div>""", unsafe_allow_html=True)
 # --- [Project I/O - Save] 邏輯與按鈕填入 ---
 with save_ui_placeholder.container():
     def get_current_state_json():
@@ -806,7 +809,7 @@ with save_ui_placeholder.container():
         components_data = st.session_state['df_current'].to_dict('records')
         
         export_data = {
-            "meta": {"version": "v3.80", "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
+            "meta": {"version": "v3.81", "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
             "global_params": saved_params,
             "components_data": components_data
         }
