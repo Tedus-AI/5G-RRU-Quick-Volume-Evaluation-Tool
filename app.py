@@ -32,8 +32,8 @@ st.set_page_config(
 # 0. 初始化 Session State
 # ==================================================
 
-# 1. 全域參數預設值
-DEFAULT_GLOBALS = {
+# 1. 定義硬編碼預設值 (Hardcoded Fallback) - 當找不到設定檔時使用
+HARDCODED_GLOBALS = {
     "T_amb": 45.0, "Margin": 1.0, 
     "L_pcb": 350.0, "W_pcb": 250.0, "t_base": 7.0, "H_shield": 20.0, "H_filter": 42.0,
     "Top": 11.0, "Btm": 13.0, "Left": 11.0, "Right": 11.0,
@@ -47,12 +47,7 @@ DEFAULT_GLOBALS = {
     "fin_tech_selector_v2": "Embedded Fin (0.95)"
 }
 
-for k, v in DEFAULT_GLOBALS.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
-
-# 2. 預設元件清單
-default_component_data = {
+HARDCODED_COMPONENTS = {
     "Component": ["Final PA", "Driver PA", "Pre Driver", "Circulator", "Cavity Filter", "CPU (FPGA)", "Si5518", "16G DDR", "Power Mod", "SFP"],
     "Qty": [4, 4, 4, 4, 1, 1, 1, 2, 1, 1],
     "Power(W)": [52.13, 9.54, 0.37, 2.76, 31.07, 35.00, 2.00, 0.40, 29.00, 0.50],
@@ -65,6 +60,32 @@ default_component_data = {
     "R_jc": [1.50, 1.70, 50.0, 0.0, 0.0, 0.16, 0.50, 0.0, 0.0, 0.0],
     "TIM_Type": ["Solder", "Grease", "Grease", "Grease", "None", "Putty", "Pad", "Grease", "Grease", "Grease"]
 }
+
+# 2. 嘗試載入 "default_config.json" 並覆蓋預設值
+DEFAULT_GLOBALS = HARDCODED_GLOBALS.copy()
+default_component_data = HARDCODED_COMPONENTS.copy()
+config_path = "default_config.json"
+
+if os.path.exists(config_path):
+    try:
+        with open(config_path, "r", encoding='utf-8') as f:
+            custom_config = json.load(f)
+            
+            # 更新全域變數
+            if 'global_params' in custom_config:
+                DEFAULT_GLOBALS.update(custom_config['global_params'])
+            
+            # 更新元件清單 (注意：JSON 存的是 Records List，DataFrame 可以直接讀)
+            if 'components_data' in custom_config:
+                default_component_data = custom_config['components_data']
+                
+    except Exception as e:
+        print(f"⚠️ Warning: Failed to load default_config.json. Using hardcoded defaults. Error: {e}")
+
+# 3. 將最終決定的預設值寫入 Session State
+for k, v in DEFAULT_GLOBALS.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
 
 # 初始化 Dataframe State
 if 'df_initial' not in st.session_state:
