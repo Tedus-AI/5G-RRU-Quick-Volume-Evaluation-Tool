@@ -9,16 +9,16 @@ import os
 import json
 
 # ==============================================================================
-# 版本：v3.82 (Refactored Calculation)
+# 版本：v3.83 (Code Refactoring)
 # 日期：2026-02-06
 # 狀態：正式發布版 (Production Ready)
 # 
 # [系統架構摘要]
 # 1. 核心計算：自動 h 值 (C=7.0)、植樹原理鰭片數、三階段 DRC 防呆。
-# 2. 檔案存取：JSON 專案檔 Save/Load，支援全域變數與表格資料完整還原。
-# 3. 資料安全：參數變動自動重置下載按鈕；載入時使用 Session State 強制覆寫 UI 預設值。
-# 4. 介面邏輯：使用 Placeholder 技術，將存檔按鈕置於頂部，但邏輯於底部執行以確保數據最新。
-# 5. 程式碼優化：運算邏輯封裝為獨立函數，提升維護性。
+# 2. 程式碼結構：運算邏輯模組化 (Refactored)，提升可維護性。
+# 3. 檔案存取：JSON 專案檔 Save/Load，支援全域變數與表格資料完整還原。
+# 4. 資料安全：參數變動自動重置下載按鈕；載入時使用 Session State 強制覆寫 UI 預設值。
+# 5. 介面邏輯：使用 Placeholder 技術，將存檔按鈕置於頂部。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -102,7 +102,7 @@ for k, v in DEFAULT_GLOBALS.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# 初始化 Session State (表格資料) - 使用最終確認的 default_component_data
+# 初始化 Session State (表格資料)
 if 'df_initial' not in st.session_state:
     st.session_state['df_initial'] = pd.DataFrame(default_component_data)
 
@@ -229,7 +229,7 @@ st.sidebar.header("🛠️ 參數控制台")
 
 # --- [Project I/O] ---
 with st.sidebar.expander("📁 專案存取 (Project I/O)", expanded=False):
-    # [UI] 預設設定檔狀態 (精簡版)
+    # [UI] 預設設定檔狀態
     st.markdown(f"""
     <div style='margin-bottom: 10px; font-size: 0.9rem;'>
         <b>預設檔案載入</b><br>
@@ -265,7 +265,7 @@ with st.sidebar.expander("📁 專案存取 (Project I/O)", expanded=False):
 
     st.markdown("---")
     
-    # 預留按鈕區空位 (為了將按鈕顯示在上方，但邏輯在下方執行)
+    # 預留按鈕區空位
     save_ui_placeholder = st.empty()
 
 # --- 參數設定區 (綁定 on_change=reset_download_state + 讀取 value) ---
@@ -315,19 +315,20 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
     Gap = c_fin1.number_input("鰭片air gap (mm)", step=0.1, key="Gap", value=st.session_state['Gap'], on_change=reset_download_state)
     Fin_t = c_fin2.number_input("鰭片厚度 (mm)", step=0.1, key="Fin_t", value=st.session_state['Fin_t'], on_change=reset_download_state)
 
-    # [Core] h 值自動計算
-    h_conv = 6.4 * np.tanh(Gap / 7.0)
+    # [Core] h 值自動計算 (使用新函數 calc_h_value)
+    # 這裡的邏輯改由下方統一呼叫，僅做顯示用途
+    h_conv_temp = 6.4 * np.tanh(Gap / 7.0)
     if Gap >= 10.0:
         rad_factor = 1.0
     else:
         rad_factor = np.sqrt(Gap / 10.0)
-    h_rad = 2.4 * rad_factor
-    h_value = h_conv + h_rad
+    h_rad_temp = 2.4 * rad_factor
+    h_value_temp = h_conv_temp + h_rad_temp
     
-    if h_conv < 4.0:
-        st.error(f"🔥 **h_conv 過低警告: {h_conv:.2f}** (對流受阻，建議 ≥ 4.0)")
+    if h_conv_temp < 4.0:
+        st.error(f"🔥 **h_conv 過低警告: {h_conv_temp:.2f}** (對流受阻，建議 ≥ 4.0)")
     else:
-        st.info(f"🔥 **自動計算 h: {h_value:.2f}**\n\n(h_conv: {h_conv:.2f} + h_rad: {h_rad:.2f})")
+        st.info(f"🔥 **自動計算 h: {h_value_temp:.2f}**\n\n(h_conv: {h_conv_temp:.2f} + h_rad: {h_rad_temp:.2f})")
     
     st.caption("✅ **設計建議：** h_conv 應 ≥ 4.0")
     ar_status_box = st.empty()
@@ -418,31 +419,22 @@ def calc_fin_count(W_hsk, Gap, Fin_t):
         num_fins_int = 0
     return num_fins_int
 
-def calc_thermal_resistance(row, globals_dict):
+def calc_thermal_resistance(row, g):
     """單行元件熱阻計算 (取代原本 apply_excel_formulas)"""
-    # 從 globals_dict 取出需要的全域變數
-    Coin_L_Setting = globals_dict['Coin_L_Setting']
-    Coin_W_Setting = globals_dict['Coin_W_Setting']
-    K_Via = globals_dict['K_Via']
-    Via_Eff = globals_dict['Via_Eff']
-    K_Solder = globals_dict['K_Solder']
-    t_Solder = globals_dict['t_Solder']
-    Voiding = globals_dict['Voiding']
-    tim_props = globals_dict['tim_props']  # 會在主程式傳入
-    
+    # 從 g (globals_dict) 取出需要的全域變數
     if row['Component'] == "Final PA":
-        base_l, base_w = Coin_L_Setting, Coin_W_Setting
+        base_l, base_w = g['Coin_L_Setting'], g['Coin_W_Setting']
     elif row['Power(W)'] == 0 or row['Thick(mm)'] == 0:
         base_l, base_w = 0.0, 0.0
     else:
         base_l, base_w = row['Pad_L'] + row['Thick(mm)'], row['Pad_W'] + row['Thick(mm)']
         
-    loc_amb = globals_dict['T_amb'] + (row['Height(mm)'] * globals_dict['Slope'])
+    loc_amb = g['T_amb'] + (row['Height(mm)'] * g['Slope'])
     
     if row['Board_Type'] == "Copper Coin":
         k_board = 380.0
     elif row['Board_Type'] == "Thermal Via":
-        k_board = K_Via
+        k_board = g['K_Via']
     else:
         k_board = 0.0
 
@@ -453,15 +445,15 @@ def calc_thermal_resistance(row, globals_dict):
         eff_area = np.sqrt(pad_area * base_area) if base_area > 0 else pad_area
         r_int_val = (row['Thick(mm)']/1000) / (k_board * eff_area)
         if row['Component'] == "Final PA":
-            r_int = r_int_val + ((t_Solder/1000) / (K_Solder * pad_area * Voiding))
+            r_int = r_int_val + ((g['t_Solder']/1000) / (g['K_Solder'] * pad_area * g['Voiding']))
         elif row['Board_Type'] == "Thermal Via":
-            r_int = r_int_val / Via_Eff
+            r_int = r_int_val / g['Via_Eff']
         else:
             r_int = r_int_val
     else:
         r_int = 0
         
-    tim = tim_props.get(row['TIM_Type'], {"k":1, "t":0})
+    tim = g['tim_props'].get(row['TIM_Type'], {"k":1, "t":0})
     target_area = base_area if base_area > 0 else pad_area
     if target_area > 0 and tim['t'] > 0:
         r_tim = (tim['t']/1000) / (tim['k'] * target_area)
@@ -474,20 +466,12 @@ def calc_thermal_resistance(row, globals_dict):
     return pd.Series([base_l, base_w, loc_amb, r_int, r_tim, total_w, drop, allowed_dt])
 
 # --- 後台運算 (Refactored) ---
-# 建立全域字典傳給函數用（避免 global 變數亂用）
 globals_dict = {
-    'T_amb': T_amb,
-    'Slope': Slope,
-    'Coin_L_Setting': Coin_L_Setting,
-    'Coin_W_Setting': Coin_W_Setting,
-    'K_Via': K_Via,
-    'Via_Eff': Via_Eff,
-    'K_Solder': K_Solder,
-    't_Solder': t_Solder,
-    'Voiding': Voiding,
-    'tim_props': {}  # 先佔位，下面定義
+    'T_amb': T_amb, 'Slope': Slope,
+    'Coin_L_Setting': Coin_L_Setting, 'Coin_W_Setting': Coin_W_Setting,
+    'K_Via': K_Via, 'Via_Eff': Via_Eff,
+    'K_Solder': K_Solder, 't_Solder': t_Solder, 'Voiding': Voiding,
 }
-
 tim_props = {
     "Solder": {"k": K_Solder, "t": t_Solder},
     "Grease": {"k": K_Grease, "t": t_Grease},
@@ -495,9 +479,9 @@ tim_props = {
     "Putty": {"k": K_Putty, "t": t_Putty},
     "None": {"k": 1, "t": 0}
 }
-globals_dict['tim_props'] = tim_props  # 更新進去
+globals_dict['tim_props'] = tim_props
 
-# 表格熱阻計算
+# 元件熱阻計算
 if not edited_df.empty:
     calc_results = edited_df.apply(lambda row: calc_thermal_resistance(row, globals_dict), axis=1)
     calc_results.columns = ['Base_L', 'Base_W', 'Loc_Amb', 'R_int', 'R_TIM', 'Total_W', 'Drop', 'Allowed_dT']
@@ -505,7 +489,7 @@ if not edited_df.empty:
 else:
     final_df = pd.DataFrame()
 
-# 變數計算
+# 總功耗與瓶頸
 valid_rows = final_df[final_df['Total_W'] > 0].copy()
 if not valid_rows.empty:
     Total_Watts_Sum = valid_rows['Total_W'].sum()
@@ -516,7 +500,7 @@ else:
 
 L_hsk, W_hsk = L_pcb + Top + Btm, W_pcb + Left + Right
 
-# 呼叫重構函數
+# 核心計算呼叫
 h_value, h_conv, h_rad = calc_h_value(Gap)
 num_fins_int = calc_fin_count(W_hsk, Gap, Fin_t)
 Fin_Count = num_fins_int
@@ -690,6 +674,7 @@ with tab_viz:
                 marker=dict(line=dict(color='#ffffff', width=2))
             )
             
+            # 設定超大 Margin，強迫標籤往左右空白處延伸
             fig_pie.update_layout(
                 showlegend=False, 
                 margin=dict(t=90, b=150, l=100, r=100),
@@ -867,7 +852,7 @@ with tab_3d:
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 st.markdown("---")
-st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.82 Refactored Calculation | Designed for High Efficiency</div>""", unsafe_allow_html=True)
+st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.83 Refactored Calculation | Designed for High Efficiency</div>""", unsafe_allow_html=True)
 # --- [Project I/O - Save] 邏輯與按鈕填入 ---
 with save_ui_placeholder.container():
     def get_current_state_json():
@@ -880,7 +865,7 @@ with save_ui_placeholder.container():
         components_data = st.session_state['df_current'].to_dict('records')
         
         export_data = {
-            "meta": {"version": "v3.82", "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
+            "meta": {"version": "v3.83", "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
             "global_params": saved_params,
             "components_data": components_data
         }
