@@ -9,8 +9,8 @@ import os
 import json
 
 # ==============================================================================
-# 版本：v3.81 (Final Stable Release)
-# 日期：2026-02-05
+# 版本：v3.82 (Refactored Calculation)
+# 日期：2026-02-06
 # 狀態：正式發布版 (Production Ready)
 # 
 # [系統架構摘要]
@@ -18,6 +18,7 @@ import json
 # 2. 檔案存取：JSON 專案檔 Save/Load，支援全域變數與表格資料完整還原。
 # 3. 資料安全：參數變動自動重置下載按鈕；載入時使用 Session State 強制覆寫 UI 預設值。
 # 4. 介面邏輯：使用 Placeholder 技術，將存檔按鈕置於頂部，但邏輯於底部執行以確保數據最新。
+# 5. 程式碼優化：運算邏輯封裝為獨立函數，提升維護性。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -228,7 +229,7 @@ st.sidebar.header("🛠️ 參數控制台")
 
 # --- [Project I/O] ---
 with st.sidebar.expander("📁 專案存取 (Project I/O)", expanded=False):
-    # [UI] 預設設定檔狀態
+    # [UI] 預設設定檔狀態 (精簡版)
     st.markdown(f"""
     <div style='margin-bottom: 10px; font-size: 0.9rem;'>
         <b>預設檔案載入</b><br>
@@ -389,25 +390,61 @@ with tab_input:
     # [Fix] 實時更新 df_current
     st.session_state['df_current'] = edited_df
 
-# --- 後台運算 ---
-tim_props = {
-    "Solder": {"k": K_Solder, "t": t_Solder},
-    "Grease": {"k": K_Grease, "t": t_Grease},
-    "Pad":    {"k": K_Pad,    "t": t_Pad},
-    "Putty":  {"k": K_Putty,  "t": t_Putty},
-    "None":   {"k": 1,        "t": 0}
-}
+# ==================================================
+# # 核心計算函數 (Refactored for Maintainability)
+# ==================================================
+def calc_h_value(Gap):
+    """計算 h_conv, h_rad, h_value"""
+    h_conv = 6.4 * np.tanh(Gap / 7.0)
+    if Gap >= 10.0:
+        rad_factor = 1.0
+    else:
+        rad_factor = np.sqrt(Gap / 10.0)
+    h_rad = 2.4 * rad_factor
+    h_value = h_conv + h_rad
+    return h_value, h_conv, h_rad
 
-def apply_excel_formulas(row):
-    if row['Component'] == "Final PA": base_l, base_w = Coin_L_Setting, Coin_W_Setting
-    elif row['Power(W)'] == 0 or row['Thick(mm)'] == 0: base_l, base_w = 0.0, 0.0
-    else: base_l, base_w = row['Pad_L'] + row['Thick(mm)'], row['Pad_W'] + row['Thick(mm)']
-        
-    loc_amb = T_amb + (row['Height(mm)'] * Slope)
+def calc_fin_count(W_hsk, Gap, Fin_t):
+    """植樹原理計算最大鰭片數"""
+    if Gap + Fin_t > 0:
+        num_fins_float = (W_hsk + Gap) / (Gap + Fin_t)
+        num_fins_int = int(num_fins_float)
+        if num_fins_int > 0:
+            total_width = num_fins_int * Fin_t + (num_fins_int - 1) * Gap
+            while total_width > W_hsk and num_fins_int > 0:
+                num_fins_int -= 1
+                total_width = num_fins_int * Fin_t + (num_fins_int - 1) * Gap
+    else:
+        num_fins_int = 0
+    return num_fins_int
+
+def calc_thermal_resistance(row, globals_dict):
+    """單行元件熱阻計算 (取代原本 apply_excel_formulas)"""
+    # 從 globals_dict 取出需要的全域變數
+    Coin_L_Setting = globals_dict['Coin_L_Setting']
+    Coin_W_Setting = globals_dict['Coin_W_Setting']
+    K_Via = globals_dict['K_Via']
+    Via_Eff = globals_dict['Via_Eff']
+    K_Solder = globals_dict['K_Solder']
+    t_Solder = globals_dict['t_Solder']
+    Voiding = globals_dict['Voiding']
+    tim_props = globals_dict['tim_props']  # 會在主程式傳入
     
-    if row['Board_Type'] == "Copper Coin": k_board = 380.0
-    elif row['Board_Type'] == "Thermal Via": k_board = K_Via
-    else: k_board = 0.0
+    if row['Component'] == "Final PA":
+        base_l, base_w = Coin_L_Setting, Coin_W_Setting
+    elif row['Power(W)'] == 0 or row['Thick(mm)'] == 0:
+        base_l, base_w = 0.0, 0.0
+    else:
+        base_l, base_w = row['Pad_L'] + row['Thick(mm)'], row['Pad_W'] + row['Thick(mm)']
+        
+    loc_amb = globals_dict['T_amb'] + (row['Height(mm)'] * globals_dict['Slope'])
+    
+    if row['Board_Type'] == "Copper Coin":
+        k_board = 380.0
+    elif row['Board_Type'] == "Thermal Via":
+        k_board = K_Via
+    else:
+        k_board = 0.0
 
     pad_area = (row['Pad_L'] * row['Pad_W']) / 1e6
     base_area = (base_l * base_w) / 1e6
@@ -415,23 +452,54 @@ def apply_excel_formulas(row):
     if k_board > 0 and pad_area > 0:
         eff_area = np.sqrt(pad_area * base_area) if base_area > 0 else pad_area
         r_int_val = (row['Thick(mm)']/1000) / (k_board * eff_area)
-        if row['Component'] == "Final PA": r_int = r_int_val + ((t_Solder/1000) / (K_Solder * pad_area * Voiding))
-        elif row['Board_Type'] == "Thermal Via": r_int = r_int_val / Via_Eff
-        else: r_int = r_int_val
-    else: r_int = 0
+        if row['Component'] == "Final PA":
+            r_int = r_int_val + ((t_Solder/1000) / (K_Solder * pad_area * Voiding))
+        elif row['Board_Type'] == "Thermal Via":
+            r_int = r_int_val / Via_Eff
+        else:
+            r_int = r_int_val
+    else:
+        r_int = 0
         
     tim = tim_props.get(row['TIM_Type'], {"k":1, "t":0})
     target_area = base_area if base_area > 0 else pad_area
-    if target_area > 0 and tim['t'] > 0: r_tim = (tim['t']/1000) / (tim['k'] * target_area)
-    else: r_tim = 0
+    if target_area > 0 and tim['t'] > 0:
+        r_tim = (tim['t']/1000) / (tim['k'] * target_area)
+    else:
+        r_tim = 0
         
     total_w = row['Qty'] * row['Power(W)']
     drop = row['Power(W)'] * (row['R_jc'] + r_int + r_tim)
     allowed_dt = row['Limit(C)'] - drop - loc_amb
     return pd.Series([base_l, base_w, loc_amb, r_int, r_tim, total_w, drop, allowed_dt])
 
+# --- 後台運算 (Refactored) ---
+# 建立全域字典傳給函數用（避免 global 變數亂用）
+globals_dict = {
+    'T_amb': T_amb,
+    'Slope': Slope,
+    'Coin_L_Setting': Coin_L_Setting,
+    'Coin_W_Setting': Coin_W_Setting,
+    'K_Via': K_Via,
+    'Via_Eff': Via_Eff,
+    'K_Solder': K_Solder,
+    't_Solder': t_Solder,
+    'Voiding': Voiding,
+    'tim_props': {}  # 先佔位，下面定義
+}
+
+tim_props = {
+    "Solder": {"k": K_Solder, "t": t_Solder},
+    "Grease": {"k": K_Grease, "t": t_Grease},
+    "Pad": {"k": K_Pad, "t": t_Pad},
+    "Putty": {"k": K_Putty, "t": t_Putty},
+    "None": {"k": 1, "t": 0}
+}
+globals_dict['tim_props'] = tim_props  # 更新進去
+
+# 表格熱阻計算
 if not edited_df.empty:
-    calc_results = edited_df.apply(apply_excel_formulas, axis=1)
+    calc_results = edited_df.apply(lambda row: calc_thermal_resistance(row, globals_dict), axis=1)
     calc_results.columns = ['Base_L', 'Base_W', 'Loc_Amb', 'R_int', 'R_TIM', 'Total_W', 'Drop', 'Allowed_dT']
     final_df = pd.concat([edited_df, calc_results], axis=1)
 else:
@@ -448,39 +516,39 @@ else:
 
 L_hsk, W_hsk = L_pcb + Top + Btm, W_pcb + Left + Right
 
-# [Core] 精確計算鰭片數量 (植樹原理)
-if Gap + Fin_t > 0:
-    num_fins_float = (W_hsk + Gap) / (Gap + Fin_t)
-    num_fins_int = int(num_fins_float)
-    if num_fins_int > 0:
-        total_width = num_fins_int * Fin_t + (num_fins_int - 1) * Gap
-        while total_width > W_hsk and num_fins_int > 0:
-            num_fins_int -= 1
-            total_width = num_fins_int * Fin_t + (num_fins_int - 1) * Gap
-else:
-    num_fins_int = 0
-
-Fin_Count = num_fins_int 
+# 呼叫重構函數
+h_value, h_conv, h_rad = calc_h_value(Gap)
+num_fins_int = calc_fin_count(W_hsk, Gap, Fin_t)
+Fin_Count = num_fins_int
 
 Total_Power = Total_Watts_Sum * Margin
 if Total_Power > 0 and Min_dT_Allowed > 0:
     R_sa = Min_dT_Allowed / Total_Power
-    # 使用自動計算的 h_value
     Area_req = 1 / (h_value * R_sa * Eff)
     Base_Area_m2 = (L_hsk * W_hsk) / 1e6
-    try: Fin_Height = ((Area_req - Base_Area_m2) * 1e6) / (2 * Fin_Count * L_hsk)
-    except: Fin_Height = 0
+    try:
+        Fin_Height = ((Area_req - Base_Area_m2) * 1e6) / (2 * Fin_Count * L_hsk)
+    except:
+        Fin_Height = 0
     RRU_Height = t_base + Fin_Height + H_shield + H_filter
     Volume_L = (L_hsk * W_hsk * RRU_Height) / 1e6
 else:
     R_sa = 0; Area_req = 0; Fin_Height = 0; RRU_Height = 0; Volume_L = 0
 
-# [UI] 計算並回填 Aspect Ratio 至側邊欄
+# ==================================================
+# [DRC] 設計規則檢查
+# ==================================================
+drc_failed = False
+drc_msg = ""
+
+# 計算流阻比 (Aspect Ratio)
 if Gap > 0 and Fin_Height > 0:
     aspect_ratio = Fin_Height / Gap
 else:
     aspect_ratio = 0
 
+# [UI] 更新側邊欄的 Aspect Ratio 資訊 (回填)
+# 修正建議值為 4.5 ~ 6.5
 if aspect_ratio > 12.0:
     ar_color = "#e74c3c" # Red
     ar_msg = "過高 (High)"
@@ -500,12 +568,6 @@ if Fin_Height > 0:
     """, unsafe_allow_html=True)
 else:
     ar_status_box.info("等待計算 Aspect Ratio...")
-
-# ==================================================
-# [DRC] 設計規則檢查
-# ==================================================
-drc_failed = False
-drc_msg = ""
 
 if aspect_ratio > 12.0:
     drc_failed = True
@@ -530,6 +592,7 @@ with tab_data:
         max_val = final_df['Allowed_dT'].max()
         mid_val = (min_val + max_val) / 2
         
+        # [修改] 移除原本的左右分欄 (col_table, col_legend)，改為全寬顯示
         styled_df = final_df.style.background_gradient(
             subset=['Allowed_dT'], 
             cmap='RdYlGn'
@@ -537,6 +600,7 @@ with tab_data:
             "R_int": "{:.4f}", "R_TIM": "{:.4f}", "Allowed_dT": "{:.2f}"
         })
         
+        # [修正 v3.66] 還原完整的 Help 說明 (包含物理公式)
         st.dataframe(
             styled_df, 
             column_config={
@@ -549,6 +613,8 @@ with tab_data:
                 "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
                 "R_jc": st.column_config.NumberColumn("Rjc", help="結點到殼的內部熱阻", format="%.2f"),
                 "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.1f"),
+                
+                # 計算欄位 - 完整公式說明
                 "Base_L": st.column_config.NumberColumn("Base 長 (mm)", help="熱量擴散後的底部有效長度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
                 "Base_W": st.column_config.NumberColumn("Base 寬 (mm)", help="熱量擴散後的底部有效寬度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
                 "Loc_Amb": st.column_config.NumberColumn("局部環溫 (°C)", help="該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)。", format="%.1f"),
@@ -558,6 +624,7 @@ with tab_data:
                 "R_int": st.column_config.NumberColumn("基板熱阻 (°C/W)", help="元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值。", format="%.4f"),
                 "R_TIM": st.column_config.NumberColumn("介面熱阻 (°C/W)", help="元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)。", format="%.4f"),
                 
+                # [修正 v3.67] 名詞一致化
                 "Board_Type": st.column_config.Column("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)"),
                 "TIM_Type": st.column_config.Column("介面材料", help="元件或銅塊底部與散熱器之間的TIM")
             },
@@ -565,6 +632,7 @@ with tab_data:
             hide_index=True
         )
         
+        # [UI Update] 將 Scale Bar 移至下方，並改為橫式
         st.markdown(f"""
         <div style="display: flex; flex-direction: column; align-items: center; margin: 15px 0;">
             <div style="font-weight: bold; margin-bottom: 5px; color: #555; font-size: 0.9rem;">允許溫升 (Allowed dT) 色階參考</div>
@@ -653,6 +721,7 @@ with tab_viz:
     st.subheader("📏 尺寸與體積估算")
     c5, c6 = st.columns(2)
     
+    # [修正] 根據 DRC 結果決定顯示內容
     if drc_failed:
         st.error(drc_msg)
         st.markdown(f"""
@@ -683,6 +752,7 @@ with tab_3d:
     st.subheader("🧊 RRU 3D 產品模擬圖")
     st.caption("模型展示：底部電子艙 + 頂部散熱鰭片、鰭片數量與間距皆為真實比例。模擬圖右上角有小功能可使用。")
     
+    # [修正] 3D 圖也受 DRC 控制
     if not drc_failed and L_hsk > 0 and W_hsk > 0 and RRU_Height > 0 and Fin_Height > 0:
         fig_3d = go.Figure()
         COLOR_FINS = '#E5E7E9'; COLOR_BODY = COLOR_FINS
@@ -797,7 +867,7 @@ with tab_3d:
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 st.markdown("---")
-st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.81 Final Stable Release | Designed for High Efficiency</div>""", unsafe_allow_html=True)
+st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.82 Refactored Calculation | Designed for High Efficiency</div>""", unsafe_allow_html=True)
 # --- [Project I/O - Save] 邏輯與按鈕填入 ---
 with save_ui_placeholder.container():
     def get_current_state_json():
@@ -810,7 +880,7 @@ with save_ui_placeholder.container():
         components_data = st.session_state['df_current'].to_dict('records')
         
         export_data = {
-            "meta": {"version": "v3.81", "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
+            "meta": {"version": "v3.82", "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
             "global_params": saved_params,
             "components_data": components_data
         }
