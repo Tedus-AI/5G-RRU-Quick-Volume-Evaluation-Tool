@@ -9,15 +9,12 @@ import os
 import json
 
 # ==============================================================================
-# 版本：v3.84 (Weight Estimation Added)
+# 版本：v3.85 (Robust Weight Feature)
 # 日期：2026-02-08
 # 修正重點：
-# 1. [Feature] 新增整機重量估算功能：
-#    - 側邊欄新增材質密度輸入 (鋁、Filter、Shielding、PCB)。
-#    - 後台計算各部件重量 (Heatsink, Shield, Filter, Shielding Case, PCB)。
-# 2. [UI] Tab 3 新增重量顯示區塊：
-#    - 顯示總重與詳細部件重量拆分。
-#    - 整合至 Session State 與 Save/Load 系統。
+# 1. [Fix] 修復 NameError 崩潰：在運算 else 區塊中完整初始化所有重量細項變數。
+#    確保即使沒有算出熱流結果，顯示卡片也不會因為找不到變數而報錯。
+# 2. [UI] 調整重量參數位置：移出 Expander 2，暫置於側邊欄主層級，確保可見性。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -32,7 +29,7 @@ st.set_page_config(
 # 0. 初始化 Session State
 # ==================================================
 
-# 1. 全域參數預設值 (Hardcoded Fallback)
+# 1. 全域參數預設值
 DEFAULT_GLOBALS = {
     "T_amb": 45.0, "Margin": 1.0, 
     "L_pcb": 350.0, "W_pcb": 250.0, "t_base": 7.0, "H_shield": 20.0, "H_filter": 42.0,
@@ -45,16 +42,35 @@ DEFAULT_GLOBALS = {
     "K_Grease": 3.0, "t_Grease": 0.05,
     "K_Solder": 58.0, "t_Solder": 0.3, "Voiding": 0.75,
     "fin_tech_selector_v2": "Embedded Fin (0.95)",
-    # [v3.84] 新增重量參數
+    # 重量估算參數 (新增)
     "al_density": 2.70, "filter_density": 1.00, 
     "shielding_density": 0.76, "pcb_surface_density": 0.95
 }
 
+# 嘗試載入設定檔
+config_path = "default_config.json"
+config_loaded_msg = "🟡 使用內建預設值" 
+
+if os.path.exists(config_path):
+    try:
+        with open(config_path, "r", encoding='utf-8') as f:
+            custom_config = json.load(f)
+            if 'global_params' in custom_config:
+                DEFAULT_GLOBALS.update(custom_config['global_params'])
+                config_loaded_msg = "🟢 載入成功 (default_config.json)"
+            else:
+                config_loaded_msg = "🔴 格式異常 (Key Missing)"
+    except Exception as e:
+        config_loaded_msg = f"🔴 讀取錯誤: {str(e)}"
+else:
+    config_loaded_msg = "🟡 使用內建預設值 (No Config File)"
+
+# 寫入 Session State
 for k, v in DEFAULT_GLOBALS.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# 2. 預設元件清單 (Hardcoded Fallback)
+# 2. 預設元件清單
 default_component_data = {
     "Component": ["Final PA", "Driver PA", "Pre Driver", "Circulator", "Cavity Filter", "CPU (FPGA)", "Si5518", "16G DDR", "Power Mod", "SFP"],
     "Qty": [4, 4, 4, 4, 1, 1, 1, 2, 1, 1],
@@ -69,46 +85,6 @@ default_component_data = {
     "TIM_Type": ["Solder", "Grease", "Grease", "Grease", "None", "Putty", "Pad", "Grease", "Grease", "Grease"]
 }
 
-# 3. 嘗試載入預設設定檔並覆蓋上述預設值
-config_path = "default_config.json"
-config_loaded_msg = "🟡 使用內建預設值" 
-
-if os.path.exists(config_path):
-    try:
-        with open(config_path, "r", encoding='utf-8') as f:
-            custom_config = json.load(f)
-            
-            loaded_globals = False
-            loaded_components = False
-            
-            # 更新全域變數
-            if 'global_params' in custom_config:
-                DEFAULT_GLOBALS.update(custom_config['global_params'])
-                loaded_globals = True
-            
-            # 更新元件清單
-            if 'components_data' in custom_config:
-                default_component_data = custom_config['components_data']
-                loaded_components = True
-            
-            if loaded_globals and loaded_components:
-                config_loaded_msg = "🟢 完整載入成功 (default_config.json)"
-            elif loaded_globals:
-                config_loaded_msg = "🟢 參數載入成功 (表格使用內建值)"
-            else:
-                config_loaded_msg = "🔴 格式異常 (Key Missing)"
-
-    except Exception as e:
-        config_loaded_msg = f"🔴 讀取錯誤: {str(e)}"
-else:
-    config_loaded_msg = "🟡 使用內建預設值 (No Config File)"
-
-# 初始化 Session State (全域參數)
-for k, v in DEFAULT_GLOBALS.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
-
-# 初始化 Session State (表格資料)
 if 'df_initial' not in st.session_state:
     st.session_state['df_initial'] = pd.DataFrame(default_component_data)
 
@@ -128,7 +104,6 @@ if 'json_file_name' not in st.session_state:
 if 'trigger_generation' not in st.session_state:
     st.session_state['trigger_generation'] = False
 
-# [核心] 狀態重置函數 (當任何參數變動時呼叫，強制隱藏下載按鈕)
 def reset_download_state():
     st.session_state['json_ready_to_download'] = None
 
@@ -164,10 +139,9 @@ def check_password():
 if not check_password():
     st.stop()
 
-# 版本更新提示
-if "v3.84_shown" not in st.session_state:
-    st.toast('🚀 系統已更新至 v3.84！新增重量估算功能。', icon="✅")
-    st.session_state["v3.84_shown"] = True
+if "welcome_shown" not in st.session_state:
+    st.toast('🎉 登入成功！歡迎回到熱流運算引擎 (v3.85)', icon="✅")
+    st.session_state["welcome_shown"] = True
 
 # ==================================================
 # 👇 主程式開始
@@ -272,10 +246,11 @@ with st.sidebar.expander("📁 專案存取 (Project I/O)", expanded=False):
 
     st.markdown("---")
     
-    # 預留按鈕區空位
+    # 預留按鈕區空位 (為了將按鈕顯示在上方，但邏輯在下方執行)
     save_ui_placeholder = st.empty()
 
-# --- 參數設定區 (綁定 on_change=reset_download_state + 讀取 value) ---
+# --- 參數設定區 ---
+
 with st.sidebar.expander("1. 環境與係數", expanded=True):
     T_amb = st.number_input("環境溫度 (°C)", step=1.0, key="T_amb", value=st.session_state['T_amb'], on_change=reset_download_state)
     Margin = st.number_input("設計安全係數 (Margin)", step=0.1, key="Margin", value=st.session_state['Margin'], on_change=reset_download_state)
@@ -301,15 +276,15 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
     H_shield = st.number_input("HSK內腔深度 (mm)", key="H_shield", value=st.session_state['H_shield'], on_change=reset_download_state)
     H_filter = st.number_input("Cavity Filter 厚度 (mm)", key="H_filter", value=st.session_state['H_filter'], on_change=reset_download_state)
     
-    # [v3.84] 新增重量估算參數
-    st.caption("⚖️ 重量估算參數 (保守估計)")
-    al_density = st.number_input("鋁材密度 (g/cm³)", step=0.01, key="al_density", value=st.session_state['al_density'], on_change=reset_download_state, help="Heatsink + Shield 用；壓鑄略調低")
-    filter_density = st.number_input("Cavity Filter 密度 (g/cm³)", step=0.05, key="filter_density", value=st.session_state['filter_density'], on_change=reset_download_state, help="實測校正 ≈0.97–1.05")
-    shielding_density = st.number_input("Shielding Case 密度 (g/cm³)", step=0.05, key="shielding_density", value=st.session_state['shielding_density'], on_change=reset_download_state, help="實測 0.758；固定高度 12 mm")
-    pcb_surface_density = st.number_input("電子板面密度 (g/cm²)", step=0.05, key="pcb_surface_density", value=st.session_state['pcb_surface_density'], on_change=reset_download_state, help="含 SMT；實測 0.965 保守調低")
+    # [UI Update] 重量參數
+    st.caption("⚖️ 重量估算參數")
+    al_density = st.number_input("鋁材密度 (g/cm³)", step=0.01, key="al_density", value=st.session_state['al_density'], on_change=reset_download_state)
+    filter_density = st.number_input("Cavity Filter (g/cm³)", step=0.05, key="filter_density", value=st.session_state['filter_density'], on_change=reset_download_state)
+    shielding_density = st.number_input("Shielding (g/cm³)", step=0.05, key="shielding_density", value=st.session_state['shielding_density'], on_change=reset_download_state)
+    pcb_surface_density = st.number_input("PCB 面密度 (g/cm²)", step=0.05, key="pcb_surface_density", value=st.session_state['pcb_surface_density'], on_change=reset_download_state)
 
+    st.markdown("---")
     st.caption("📏 PCB板離外殼邊距(防水)")
-    
     m1, m2 = st.columns(2)
     Top = m1.number_input("Top (mm)", step=1.0, key="Top", value=st.session_state['Top'], on_change=reset_download_state)
     Btm = m2.number_input("Bottom (mm)", step=1.0, key="Btm", value=st.session_state['Btm'], on_change=reset_download_state)
@@ -380,7 +355,7 @@ with save_ui_placeholder.container():
         components_data = st.session_state['df_current'].to_dict('records')
         
         export_data = {
-            "meta": {"version": "v3.84", "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
+            "meta": {"version": "v3.85", "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
             "global_params": saved_params,
             "components_data": components_data
         }
@@ -429,7 +404,6 @@ with tab_input:
             "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.2f"),
             "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.2f"),
             "Board_Type": st.column_config.SelectboxColumn("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)", options=["Thermal Via", "Copper Coin", "None"], width="medium"),
-            # [修正] 移除 Solder 選項
             "TIM_Type": st.column_config.SelectboxColumn("介面材料", help="元件或銅塊底部與散熱器之間的TIM", options=["Grease", "Pad", "Putty", "None"], width="medium"),
             "R_jc": st.column_config.NumberColumn("熱阻 Rjc", help="結點到殼的內部熱阻", format="%.2f"),
             "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.2f")
@@ -569,7 +543,7 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
     RRU_Height = t_base + Fin_Height + H_shield + H_filter
     Volume_L = (L_hsk * W_hsk * RRU_Height) / 1e6
     
-    # [v3.84] 重量計算
+    # [v3.84/85 Fix] 重量計算 (確保變數存在)
     base_vol_cm3 = L_hsk * W_hsk * t_base / 1000
     fins_vol_cm3 = num_fins_int * Fin_t * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * al_density / 1000
@@ -595,7 +569,9 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
 
 else:
     R_sa = 0; Area_req = 0; Fin_Height = 0; RRU_Height = 0; Volume_L = 0
-    total_weight_kg = 0
+    # [Fix NameError] 必須初始化重量變數，否則下方卡片顯示會崩潰
+    total_weight_kg = 0; hs_weight_kg = 0; shield_weight_kg = 0
+    filter_weight_kg = 0; shielding_weight_kg = 0; pcb_weight_kg = 0
 
 # ==================================================
 # [DRC] 設計規則檢查
@@ -661,6 +637,7 @@ with tab_data:
             "R_int": "{:.4f}", "R_TIM": "{:.4f}", "Allowed_dT": "{:.2f}"
         })
         
+        # [修正 v3.66] 還原完整的 Help 說明 (包含物理公式)
         st.dataframe(
             styled_df, 
             column_config={
@@ -692,6 +669,7 @@ with tab_data:
             hide_index=True
         )
         
+        # [UI Update] 將 Scale Bar 移至下方，並改為橫式
         st.markdown(f"""
         <div style="display: flex; flex-direction: column; align-items: center; margin: 15px 0;">
             <div style="font-weight: bold; margin-bottom: 5px; color: #555; font-size: 0.9rem;">允許溫升 (Allowed dT) 色階參考</div>
@@ -780,6 +758,7 @@ with tab_viz:
     st.subheader("📏 尺寸與體積估算")
     c5, c6 = st.columns(2)
     
+    # [修正] 根據 DRC 結果決定顯示內容
     if drc_failed:
         st.error(drc_msg)
         st.markdown(f"""
@@ -805,7 +784,7 @@ with tab_viz:
     </div>
     """, unsafe_allow_html=True)
 
-    # [v3.84] 新增重量顯示區塊
+    # [v3.84/85 Fix] 重量顯示區塊 (僅在 DRC 通過時顯示，並確保變數安全)
     if not drc_failed:
         st.markdown(f"""
         <div style="background-color: #ecf0f1; padding: 30px; margin-top: 20px; border-radius: 15px; border-left: 10px solid #34495e; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center;">
@@ -938,4 +917,4 @@ with tab_3d:
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 st.markdown("---")
-st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.84 Weight Estimation Added | Designed for High Efficiency</div>""", unsafe_allow_html=True)
+st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.85 Robust Weight Feature | Designed for High Efficiency</div>""", unsafe_allow_html=True)
