@@ -9,16 +9,15 @@ import os
 import json
 
 # ==============================================================================
-# 版本：v3.83 (Code Refactoring)
-# 日期：2026-02-06
-# 狀態：正式發布版 (Production Ready)
-# 
-# [系統架構摘要]
-# 1. 核心計算：自動 h 值 (C=7.0)、植樹原理鰭片數、三階段 DRC 防呆。
-# 2. 程式碼結構：運算邏輯模組化 (Refactored)，提升可維護性。
-# 3. 檔案存取：JSON 專案檔 Save/Load，支援全域變數與表格資料完整還原。
-# 4. 資料安全：參數變動自動重置下載按鈕；載入時使用 Session State 強制覆寫 UI 預設值。
-# 5. 介面邏輯：使用 Placeholder 技術，將存檔按鈕置於頂部。
+# 版本：v3.84 (Weight Estimation Added)
+# 日期：2026-02-08
+# 修正重點：
+# 1. [Feature] 新增整機重量估算功能：
+#    - 側邊欄新增材質密度輸入 (鋁、Filter、Shielding、PCB)。
+#    - 後台計算各部件重量 (Heatsink, Shield, Filter, Shielding Case, PCB)。
+# 2. [UI] Tab 3 新增重量顯示區塊：
+#    - 顯示總重與詳細部件重量拆分。
+#    - 整合至 Session State 與 Save/Load 系統。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -45,8 +44,15 @@ DEFAULT_GLOBALS = {
     "K_Pad": 7.5, "t_Pad": 1.7,
     "K_Grease": 3.0, "t_Grease": 0.05,
     "K_Solder": 58.0, "t_Solder": 0.3, "Voiding": 0.75,
-    "fin_tech_selector_v2": "Embedded Fin (0.95)"
+    "fin_tech_selector_v2": "Embedded Fin (0.95)",
+    # [v3.84] 新增重量參數
+    "al_density": 2.70, "filter_density": 1.00, 
+    "shielding_density": 0.76, "pcb_surface_density": 0.95
 }
+
+for k, v in DEFAULT_GLOBALS.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
 
 # 2. 預設元件清單 (Hardcoded Fallback)
 default_component_data = {
@@ -158,9 +164,10 @@ def check_password():
 if not check_password():
     st.stop()
 
-if "welcome_shown" not in st.session_state:
-    st.toast('🎉 登入成功！歡迎回到熱流運算引擎', icon="✅")
-    st.session_state["welcome_shown"] = True
+# 版本更新提示
+if "v3.84_shown" not in st.session_state:
+    st.toast('🚀 系統已更新至 v3.84！新增重量估算功能。', icon="✅")
+    st.session_state["v3.84_shown"] = True
 
 # ==================================================
 # 👇 主程式開始
@@ -229,7 +236,7 @@ st.sidebar.header("🛠️ 參數控制台")
 
 # --- [Project I/O] ---
 with st.sidebar.expander("📁 專案存取 (Project I/O)", expanded=False):
-    # [UI] 預設設定檔狀態
+    # [UI] 預設設定檔狀態 (精簡版)
     st.markdown(f"""
     <div style='margin-bottom: 10px; font-size: 0.9rem;'>
         <b>預設檔案載入</b><br>
@@ -294,6 +301,13 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
     H_shield = st.number_input("HSK內腔深度 (mm)", key="H_shield", value=st.session_state['H_shield'], on_change=reset_download_state)
     H_filter = st.number_input("Cavity Filter 厚度 (mm)", key="H_filter", value=st.session_state['H_filter'], on_change=reset_download_state)
     
+    # [v3.84] 新增重量估算參數
+    st.caption("⚖️ 重量估算參數 (保守估計)")
+    al_density = st.number_input("鋁材密度 (g/cm³)", step=0.01, key="al_density", value=st.session_state['al_density'], on_change=reset_download_state, help="Heatsink + Shield 用；壓鑄略調低")
+    filter_density = st.number_input("Cavity Filter 密度 (g/cm³)", step=0.05, key="filter_density", value=st.session_state['filter_density'], on_change=reset_download_state, help="實測校正 ≈0.97–1.05")
+    shielding_density = st.number_input("Shielding Case 密度 (g/cm³)", step=0.05, key="shielding_density", value=st.session_state['shielding_density'], on_change=reset_download_state, help="實測 0.758；固定高度 12 mm")
+    pcb_surface_density = st.number_input("電子板面密度 (g/cm²)", step=0.05, key="pcb_surface_density", value=st.session_state['pcb_surface_density'], on_change=reset_download_state, help="含 SMT；實測 0.965 保守調低")
+
     st.caption("📏 PCB板離外殼邊距(防水)")
     
     m1, m2 = st.columns(2)
@@ -315,20 +329,19 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
     Gap = c_fin1.number_input("鰭片air gap (mm)", step=0.1, key="Gap", value=st.session_state['Gap'], on_change=reset_download_state)
     Fin_t = c_fin2.number_input("鰭片厚度 (mm)", step=0.1, key="Fin_t", value=st.session_state['Fin_t'], on_change=reset_download_state)
 
-    # [Core] h 值自動計算 (使用新函數 calc_h_value)
-    # 這裡的邏輯改由下方統一呼叫，僅做顯示用途
-    h_conv_temp = 6.4 * np.tanh(Gap / 7.0)
+    # [Core] h 值自動計算
+    h_conv = 6.4 * np.tanh(Gap / 7.0)
     if Gap >= 10.0:
         rad_factor = 1.0
     else:
         rad_factor = np.sqrt(Gap / 10.0)
-    h_rad_temp = 2.4 * rad_factor
-    h_value_temp = h_conv_temp + h_rad_temp
+    h_rad = 2.4 * rad_factor
+    h_value = h_conv + h_rad
     
-    if h_conv_temp < 4.0:
-        st.error(f"🔥 **h_conv 過低警告: {h_conv_temp:.2f}** (對流受阻，建議 ≥ 4.0)")
+    if h_conv < 4.0:
+        st.error(f"🔥 **h_conv 過低警告: {h_conv:.2f}** (對流受阻，建議 ≥ 4.0)")
     else:
-        st.info(f"🔥 **自動計算 h: {h_value_temp:.2f}**\n\n(h_conv: {h_conv_temp:.2f} + h_rad: {h_rad_temp:.2f})")
+        st.info(f"🔥 **自動計算 h: {h_value:.2f}**\n\n(h_conv: {h_conv:.2f} + h_rad: {h_rad:.2f})")
     
     st.caption("✅ **設計建議：** h_conv 應 ≥ 4.0")
     ar_status_box = st.empty()
@@ -354,6 +367,45 @@ with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=False):
     K_Solder = c9.number_input("K (錫片)", key="K_Solder", value=st.session_state['K_Solder'], on_change=reset_download_state)
     t_Solder = c10.number_input("t (錫片)", key="t_Solder", value=st.session_state['t_Solder'], on_change=reset_download_state)
     Voiding = st.number_input("錫片空洞率 (Voiding)", key="Voiding", value=st.session_state['Voiding'], on_change=reset_download_state)
+
+# --- [Project I/O - Save] 邏輯與按鈕填入 ---
+with save_ui_placeholder.container():
+    def get_current_state_json():
+        params_to_save = list(DEFAULT_GLOBALS.keys())
+        saved_params = {}
+        for k in params_to_save:
+            if k in st.session_state:
+                saved_params[k] = st.session_state[k]
+        
+        components_data = st.session_state['df_current'].to_dict('records')
+        
+        export_data = {
+            "meta": {"version": "v3.84", "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
+            "global_params": saved_params,
+            "components_data": components_data
+        }
+        return json.dumps(export_data, indent=4)
+
+    if st.session_state.get('trigger_generation', False):
+        json_data = get_current_state_json()
+        st.session_state['json_ready_to_download'] = json_data
+        st.session_state['json_file_name'] = f"RRU_Project_{time.strftime('%Y%m%d_%H%M%S')}.json"
+        st.session_state['trigger_generation'] = False 
+        st.rerun() 
+
+    if st.button("🔄 1. 更新並產生專案檔 (Generate)"):
+        st.session_state['trigger_generation'] = True
+        st.rerun()
+
+    if st.session_state.get('json_ready_to_download'):
+        st.download_button(
+            label="💾 2. 下載專案設定 (.json)",
+            data=st.session_state['json_ready_to_download'],
+            file_name=st.session_state['json_file_name'],
+            mime="application/json"
+        )
+    else:
+        st.caption("ℹ️ 請先點擊上方按鈕以產生最新檔案")
 
 # ==================================================
 # 3. 分頁與邏輯
@@ -516,8 +568,34 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
         Fin_Height = 0
     RRU_Height = t_base + Fin_Height + H_shield + H_filter
     Volume_L = (L_hsk * W_hsk * RRU_Height) / 1e6
+    
+    # [v3.84] 重量計算
+    base_vol_cm3 = L_hsk * W_hsk * t_base / 1000
+    fins_vol_cm3 = num_fins_int * Fin_t * Fin_Height * L_hsk / 1000
+    hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * al_density / 1000
+    
+    shield_outer_vol_cm3 = L_hsk * W_hsk * H_shield / 1000
+    shield_inner_vol_cm3 = L_pcb * W_pcb * H_shield / 1000
+    shield_vol_cm3 = max(shield_outer_vol_cm3 - shield_inner_vol_cm3, 0)
+    shield_weight_kg = shield_vol_cm3 * al_density / 1000
+    
+    filter_vol_cm3 = L_hsk * W_hsk * H_filter / 1000
+    filter_weight_kg = filter_vol_cm3 * filter_density / 1000
+    
+    shielding_height_cm = 1.2
+    shielding_area_cm2 = L_pcb * W_pcb / 100
+    shielding_vol_cm3 = shielding_area_cm2 * shielding_height_cm
+    shielding_weight_kg = shielding_vol_cm3 * shielding_density / 1000
+    
+    pcb_area_cm2 = L_pcb * W_pcb / 100
+    pcb_weight_kg = pcb_area_cm2 * pcb_surface_density / 1000
+    
+    cavity_weight_kg = filter_weight_kg + shield_weight_kg + shielding_weight_kg + pcb_weight_kg
+    total_weight_kg = hs_weight_kg + cavity_weight_kg
+
 else:
     R_sa = 0; Area_req = 0; Fin_Height = 0; RRU_Height = 0; Volume_L = 0
+    total_weight_kg = 0
 
 # ==================================================
 # [DRC] 設計規則檢查
@@ -576,7 +654,6 @@ with tab_data:
         max_val = final_df['Allowed_dT'].max()
         mid_val = (min_val + max_val) / 2
         
-        # [修改] 移除原本的左右分欄 (col_table, col_legend)，改為全寬顯示
         styled_df = final_df.style.background_gradient(
             subset=['Allowed_dT'], 
             cmap='RdYlGn'
@@ -584,7 +661,6 @@ with tab_data:
             "R_int": "{:.4f}", "R_TIM": "{:.4f}", "Allowed_dT": "{:.2f}"
         })
         
-        # [修正 v3.66] 還原完整的 Help 說明 (包含物理公式)
         st.dataframe(
             styled_df, 
             column_config={
@@ -616,7 +692,6 @@ with tab_data:
             hide_index=True
         )
         
-        # [UI Update] 將 Scale Bar 移至下方，並改為橫式
         st.markdown(f"""
         <div style="display: flex; flex-direction: column; align-items: center; margin: 15px 0;">
             <div style="font-weight: bold; margin-bottom: 5px; color: #555; font-size: 0.9rem;">允許溫升 (Allowed dT) 色階參考</div>
@@ -674,7 +749,6 @@ with tab_viz:
                 marker=dict(line=dict(color='#ffffff', width=2))
             )
             
-            # 設定超大 Margin，強迫標籤往左右空白處延伸
             fig_pie.update_layout(
                 showlegend=False, 
                 margin=dict(t=90, b=150, l=100, r=100),
@@ -706,7 +780,6 @@ with tab_viz:
     st.subheader("📏 尺寸與體積估算")
     c5, c6 = st.columns(2)
     
-    # [修正] 根據 DRC 結果決定顯示內容
     if drc_failed:
         st.error(drc_msg)
         st.markdown(f"""
@@ -731,6 +804,19 @@ with tab_viz:
         <h1 style="color: {vol_border}; margin:15px 0 0 0; font-size: 4.5rem; font-weight: 800;">{vol_text}</h1>
     </div>
     """, unsafe_allow_html=True)
+
+    # [v3.84] 新增重量顯示區塊
+    if not drc_failed:
+        st.markdown(f"""
+        <div style="background-color: #ecf0f1; padding: 30px; margin-top: 20px; border-radius: 15px; border-left: 10px solid #34495e; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center;">
+            <h3 style="color: #2c3e50; margin:0; font-size: 1.4rem; letter-spacing: 1px;">⚖️ 整機估算重量 (Estimated Weight)</h3>
+            <h1 style="color: #34495e; margin:15px 0 10px 0; font-size: 3.5rem; font-weight: 800;">{round(total_weight_kg, 1)} kg</h1>
+            <small style="color: #7f8c8d; line-height: 1.6;">
+                Heatsink ≈ {round(hs_weight_kg, 1)} kg | Shield ≈ {round(shield_weight_kg, 1)} kg<br>
+                Filter ≈ {round(filter_weight_kg, 1)} kg | Shielding Case ≈ {round(shielding_weight_kg, 1)} kg | PCB ≈ {round(pcb_weight_kg, 2)} kg
+            </small>
+        </div>
+        """, unsafe_allow_html=True)
 
 # --- Tab 4: 3D 模擬視圖 ---
 with tab_3d:
@@ -852,42 +938,4 @@ with tab_3d:
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 st.markdown("---")
-st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.83 Refactored Calculation | Designed for High Efficiency</div>""", unsafe_allow_html=True)
-# --- [Project I/O - Save] 邏輯與按鈕填入 ---
-with save_ui_placeholder.container():
-    def get_current_state_json():
-        params_to_save = list(DEFAULT_GLOBALS.keys())
-        saved_params = {}
-        for k in params_to_save:
-            if k in st.session_state:
-                saved_params[k] = st.session_state[k]
-        
-        components_data = st.session_state['df_current'].to_dict('records')
-        
-        export_data = {
-            "meta": {"version": "v3.83", "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
-            "global_params": saved_params,
-            "components_data": components_data
-        }
-        return json.dumps(export_data, indent=4)
-
-    if st.session_state.get('trigger_generation', False):
-        json_data = get_current_state_json()
-        st.session_state['json_ready_to_download'] = json_data
-        st.session_state['json_file_name'] = f"RRU_Project_{time.strftime('%Y%m%d_%H%M%S')}.json"
-        st.session_state['trigger_generation'] = False 
-        st.rerun() 
-
-    if st.button("🔄 1. 更新並產生專案檔 (Generate)"):
-        st.session_state['trigger_generation'] = True
-        st.rerun()
-
-    if st.session_state.get('json_ready_to_download'):
-        st.download_button(
-            label="💾 2. 下載專案設定 (.json)",
-            data=st.session_state['json_ready_to_download'],
-            file_name=st.session_state['json_file_name'],
-            mime="application/json"
-        )
-    else:
-        st.caption("ℹ️ 請先點擊上方按鈕以產生最新檔案")
+st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.84 Weight Estimation Added | Designed for High Efficiency</div>""", unsafe_allow_html=True)
