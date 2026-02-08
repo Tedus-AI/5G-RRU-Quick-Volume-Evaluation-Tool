@@ -9,19 +9,20 @@ import os
 import json
 
 # ==============================================================================
-# 版本：v3.93 (Pixel-Perfect UI)
-# 日期：2026-02-08
+# 版本：v3.94 (Fixed & Polished)
+# 日期：2026-02-09
 # 修正重點：
-# 1. [UI] Header 右側控制台「像素級」仿造：
-#    - 左右標題字體樣式統一 (font-size: 0.9rem, bold, #333)。
-#    - 上傳區塊：僅保留 Browse 按鈕，隱藏拖曳文字，高度最小化。
-#    - 按鈕區塊：文字簡化為 "1. 更新並產生", "2. 下載專案"。
-# 2. [CSS] 進階 CSS 注入：精準控制 File Uploader 的外觀與間距。
+# 1. [Critical Fix] 修復 NameError: 確保頂部與底部的 Placeholder 變數名稱完全一致 (project_io_save_placeholder)。
+# 2. [UI] 介面佈局完全依照使用者截圖 (image_d1587b.png) 重製：
+#    - 左側：標題 + 狀態燈號。
+#    - 右側：標題 + 上傳按鈕。
+#    - 底部：更新按鈕 + 下載按鈕 (左右並排)。
+# 3. [CSS] 優化 File Uploader 樣式，隱藏多餘文字以節省空間。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v3.93"
-UPDATE_DATE = "2026-02-08"
+APP_VERSION = "v3.94"
+UPDATE_DATE = "2026-02-09"
 
 # === APP 設定 ===
 st.set_page_config(
@@ -54,7 +55,8 @@ DEFAULT_GLOBALS = {
 
 # 嘗試載入設定檔
 config_path = "default_config.json"
-config_loaded_msg = "🟡 內建預設值" 
+config_loaded_msg = "🟡 使用內建預設值" 
+config_status_color = "#f1c40f" # Yellow
 
 if os.path.exists(config_path):
     try:
@@ -73,12 +75,16 @@ if os.path.exists(config_path):
                 
             if loaded_globals:
                 config_loaded_msg = "🟢 設定檔載入成功 (default_config.json)"
+                config_status_color = "#2ecc71" # Green
             else:
                 config_loaded_msg = "🔴 預設檔格式異常"
+                config_status_color = "#e74c3c" # Red
     except Exception as e:
         config_loaded_msg = f"🔴 讀取錯誤: {str(e)}"
+        config_status_color = "#e74c3c"
 else:
     config_loaded_msg = "🟡 無預設檔 (Internal Defaults)"
+    config_status_color = "#f1c40f"
 
 # 寫入 Session State
 for k, v in DEFAULT_GLOBALS.items():
@@ -205,22 +211,22 @@ st.markdown("""
     /* Header Container Style */
     [data-testid="stHeader"] { z-index: 0; }
 
-    /* --- [v3.93 UI Fix] Compact File Uploader --- */
-    /* 隱藏預設的 "Drag and drop..." 與 "Limit..." */
+    /* --- [v3.94 CSS] Compact File Uploader --- */
+    /* 隱藏預設文字 */
     [data-testid="stFileUploader"] section > div > div > span, 
     [data-testid="stFileUploader"] section > div > div > small {
         display: none;
     }
-    /* 縮減容器高度與內距 */
+    /* 調整高度 */
     [data-testid="stFileUploader"] section {
         padding: 0px !important;
         min-height: 0px !important;
+        margin-top: -5px;
     }
-    /* 調整按鈕 */
+    /* 按鈕樣式微調 */
     [data-testid="stFileUploader"] button {
         margin-top: 0px;
-        font-size: 0.8rem;
-        padding: 0.25rem 0.5rem;
+        border-color: #ddd;
     }
     /* -------------------------------------------------- */
 
@@ -246,20 +252,18 @@ with col_header_L:
 with col_header_R:
     # 專案存取控制台 (外框)
     with st.container(border=True):
-        # [UI Fix] 左右分欄布局：標題字體統一
-        c_p1, c_p2 = st.columns([1.3, 1], gap="small")
+        # 標題樣式統一
+        h_style = "font-size: 0.85rem; font-weight: 700; color: #333; margin-bottom: 2px;"
         
-        # 標題樣式 (統一)
-        header_style = "font-size: 0.95rem; font-weight: 700; margin-bottom: 2px; color: #333;"
+        c_p1, c_p2 = st.columns([1.2, 1], gap="medium")
         
         with c_p1:
-            st.markdown(f"<div style='{header_style}'>專案存取 (Project I/O)</div>", unsafe_allow_html=True)
-            # 狀態文字微調
-            st.markdown(f"<div style='font-size: 0.8rem; color: #555; margin-top: 2px;'>{config_loaded_msg}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='{h_style}'>專案存取 (Project I/O)</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='font-size: 0.8rem; color: #555;'>{config_loaded_msg}</div>", unsafe_allow_html=True)
             
         with c_p2:
-            st.markdown(f"<div style='{header_style}'>📂 載入專案設定 (.json)</div>", unsafe_allow_html=True)
-            uploaded_proj = st.file_uploader("Upload", type=["json"], key="project_loader", label_visibility="collapsed")
+            st.markdown(f"<div style='{h_style}'>📂 載入專案設定 (.json)</div>", unsafe_allow_html=True)
+            uploaded_proj = st.file_uploader("Up", type=["json"], key="project_loader", label_visibility="collapsed")
             
         if uploaded_proj is not None:
             if uploaded_proj != st.session_state['last_loaded_file']:
@@ -282,8 +286,8 @@ with col_header_R:
         
         st.markdown("<hr style='margin: 8px 0;'>", unsafe_allow_html=True)
         
-        # 2. 存檔 (Save) - 使用 Placeholder 佔位，等待下方邏輯回填
-        save_header_placeholder = st.empty()
+        # 2. 存檔 (Save) - 使用 Placeholder 佔位 (解決變數名稱問題)
+        project_io_save_placeholder = st.empty()
 
 st.markdown("<hr style='margin-top: 5px; margin-bottom: 20px;'>", unsafe_allow_html=True)
 
@@ -928,6 +932,8 @@ with tab_3d:
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 # --- [Project I/O - Save Logic] 移到底部執行 ---
+# 確保所有輸入參數與計算結果都已更新後，才執行儲存邏輯
+# [Critical Fix] 確保 placeholder 名稱與頂部定義一致 (project_io_save_placeholder)
 with project_io_save_placeholder.container():
     def get_current_state_json():
         params_to_save = list(DEFAULT_GLOBALS.keys())
