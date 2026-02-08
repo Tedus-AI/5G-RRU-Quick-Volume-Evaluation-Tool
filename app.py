@@ -9,12 +9,12 @@ import os
 import json
 
 # ==============================================================================
-# 版本：v3.85 (Robust Weight Feature)
+# 版本：v3.86 (Tab Title Update)
 # 日期：2026-02-08
 # 修正重點：
-# 1. [Fix] 修復 NameError 崩潰：在運算 else 區塊中完整初始化所有重量細項變數。
-#    確保即使沒有算出熱流結果，顯示卡片也不會因為找不到變數而報錯。
-# 2. [UI] 調整重量參數位置：移出 Expander 2，暫置於側邊欄主層級，確保可見性。
+# 1. [UI] 更新 Tab 分頁標題樣式：
+#    - 改為英文為主，中文括號備註的格式 (e.g., "COMPONENT SETUP (元件設定)")。
+#    - 去除 Emoji，提升專業感。
 # ==============================================================================
 
 # === APP 設定 ===
@@ -29,7 +29,7 @@ st.set_page_config(
 # 0. 初始化 Session State
 # ==================================================
 
-# 1. 全域參數預設值
+# 1. 全域參數預設值 (Hardcoded Fallback)
 DEFAULT_GLOBALS = {
     "T_amb": 45.0, "Margin": 1.0, 
     "L_pcb": 350.0, "W_pcb": 250.0, "t_base": 7.0, "H_shield": 20.0, "H_filter": 42.0,
@@ -42,7 +42,6 @@ DEFAULT_GLOBALS = {
     "K_Grease": 3.0, "t_Grease": 0.05,
     "K_Solder": 58.0, "t_Solder": 0.3, "Voiding": 0.75,
     "fin_tech_selector_v2": "Embedded Fin (0.95)",
-    # 重量估算參數 (新增)
     "al_density": 2.70, "filter_density": 1.00, 
     "shielding_density": 0.76, "pcb_surface_density": 0.95
 }
@@ -55,11 +54,27 @@ if os.path.exists(config_path):
     try:
         with open(config_path, "r", encoding='utf-8') as f:
             custom_config = json.load(f)
+            
+            loaded_globals = False
+            loaded_components = False
+            
+            # 更新全域變數
             if 'global_params' in custom_config:
                 DEFAULT_GLOBALS.update(custom_config['global_params'])
-                config_loaded_msg = "🟢 載入成功 (default_config.json)"
+                loaded_globals = True
+            
+            # 更新元件清單 (注意：這裡只是更新預設值變數，尚未寫入 DataFrame)
+            # 真正的 DataFrame 初始化在下方
+            if 'components_data' in custom_config:
+                # 這裡暫存起來，稍後初始化 df_initial 時使用
+                # 但因為 Python 變數作用域特性，我們直接修改下方的 default_component_data 變數會更直觀
+                pass 
+                
+            if loaded_globals:
+                config_loaded_msg = "🟢 設定檔載入成功 (default_config.json)"
             else:
                 config_loaded_msg = "🔴 格式異常 (Key Missing)"
+
     except Exception as e:
         config_loaded_msg = f"🔴 讀取錯誤: {str(e)}"
 else:
@@ -70,7 +85,7 @@ for k, v in DEFAULT_GLOBALS.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# 2. 預設元件清單
+# 2. 預設元件清單 (Hardcoded Fallback)
 default_component_data = {
     "Component": ["Final PA", "Driver PA", "Pre Driver", "Circulator", "Cavity Filter", "CPU (FPGA)", "Si5518", "16G DDR", "Power Mod", "SFP"],
     "Qty": [4, 4, 4, 4, 1, 1, 1, 2, 1, 1],
@@ -84,6 +99,16 @@ default_component_data = {
     "R_jc": [1.50, 1.70, 50.0, 0.0, 0.0, 0.16, 0.50, 0.0, 0.0, 0.0],
     "TIM_Type": ["Solder", "Grease", "Grease", "Grease", "None", "Putty", "Pad", "Grease", "Grease", "Grease"]
 }
+
+# 再次檢查 JSON 是否有元件資料並覆蓋
+if os.path.exists(config_path):
+    try:
+        with open(config_path, "r", encoding='utf-8') as f:
+            custom_config = json.load(f)
+            if 'components_data' in custom_config:
+                default_component_data = custom_config['components_data']
+    except:
+        pass
 
 if 'df_initial' not in st.session_state:
     st.session_state['df_initial'] = pd.DataFrame(default_component_data)
@@ -139,9 +164,10 @@ def check_password():
 if not check_password():
     st.stop()
 
-if "welcome_shown" not in st.session_state:
-    st.toast('🎉 登入成功！歡迎回到熱流運算引擎 (v3.85)', icon="✅")
-    st.session_state["welcome_shown"] = True
+# 版本更新提示
+if "v3.86_shown" not in st.session_state:
+    st.toast('🚀 系統已更新至 v3.86！Tab 標題樣式已更新。', icon="✅")
+    st.session_state["v3.86_shown"] = True
 
 # ==================================================
 # 👇 主程式開始
@@ -246,7 +272,7 @@ with st.sidebar.expander("📁 專案存取 (Project I/O)", expanded=False):
 
     st.markdown("---")
     
-    # 預留按鈕區空位 (為了將按鈕顯示在上方，但邏輯在下方執行)
+    # 預留按鈕區空位
     save_ui_placeholder = st.empty()
 
 # --- 參數設定區 ---
@@ -276,12 +302,12 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
     H_shield = st.number_input("HSK內腔深度 (mm)", key="H_shield", value=st.session_state['H_shield'], on_change=reset_download_state)
     H_filter = st.number_input("Cavity Filter 厚度 (mm)", key="H_filter", value=st.session_state['H_filter'], on_change=reset_download_state)
     
-    # [UI Update] 重量參數
+    # 重量參數
     st.caption("⚖️ 重量估算參數")
-    al_density = st.number_input("鋁材密度 (g/cm³)", step=0.01, key="al_density", value=st.session_state['al_density'], on_change=reset_download_state)
-    filter_density = st.number_input("Cavity Filter (g/cm³)", step=0.05, key="filter_density", value=st.session_state['filter_density'], on_change=reset_download_state)
-    shielding_density = st.number_input("Shielding (g/cm³)", step=0.05, key="shielding_density", value=st.session_state['shielding_density'], on_change=reset_download_state)
-    pcb_surface_density = st.number_input("PCB 面密度 (g/cm²)", step=0.05, key="pcb_surface_density", value=st.session_state['pcb_surface_density'], on_change=reset_download_state)
+    al_density = st.number_input("鋁材密度 (g/cm³)", step=0.01, key="al_density", value=st.session_state['al_density'], on_change=reset_download_state, help="Heatsink + Shield 用；壓鑄略調低")
+    filter_density = st.number_input("Cavity Filter (g/cm³)", step=0.05, key="filter_density", value=st.session_state['filter_density'], on_change=reset_download_state, help="實測校正 ≈0.97–1.05")
+    shielding_density = st.number_input("Shielding (g/cm³)", step=0.05, key="shielding_density", value=st.session_state['shielding_density'], on_change=reset_download_state, help="實測 0.758；固定高度 12 mm")
+    pcb_surface_density = st.number_input("PCB 面密度 (g/cm²)", step=0.05, key="pcb_surface_density", value=st.session_state['pcb_surface_density'], on_change=reset_download_state, help="含 SMT；實測 0.965 保守調低")
 
     st.markdown("---")
     st.caption("📏 PCB板離外殼邊距(防水)")
@@ -343,49 +369,16 @@ with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=False):
     t_Solder = c10.number_input("t (錫片)", key="t_Solder", value=st.session_state['t_Solder'], on_change=reset_download_state)
     Voiding = st.number_input("錫片空洞率 (Voiding)", key="Voiding", value=st.session_state['Voiding'], on_change=reset_download_state)
 
-# --- [Project I/O - Save] 邏輯與按鈕填入 ---
-with save_ui_placeholder.container():
-    def get_current_state_json():
-        params_to_save = list(DEFAULT_GLOBALS.keys())
-        saved_params = {}
-        for k in params_to_save:
-            if k in st.session_state:
-                saved_params[k] = st.session_state[k]
-        
-        components_data = st.session_state['df_current'].to_dict('records')
-        
-        export_data = {
-            "meta": {"version": "v3.85", "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
-            "global_params": saved_params,
-            "components_data": components_data
-        }
-        return json.dumps(export_data, indent=4)
-
-    if st.session_state.get('trigger_generation', False):
-        json_data = get_current_state_json()
-        st.session_state['json_ready_to_download'] = json_data
-        st.session_state['json_file_name'] = f"RRU_Project_{time.strftime('%Y%m%d_%H%M%S')}.json"
-        st.session_state['trigger_generation'] = False 
-        st.rerun() 
-
-    if st.button("🔄 1. 更新並產生專案檔 (Generate)"):
-        st.session_state['trigger_generation'] = True
-        st.rerun()
-
-    if st.session_state.get('json_ready_to_download'):
-        st.download_button(
-            label="💾 2. 下載專案設定 (.json)",
-            data=st.session_state['json_ready_to_download'],
-            file_name=st.session_state['json_file_name'],
-            mime="application/json"
-        )
-    else:
-        st.caption("ℹ️ 請先點擊上方按鈕以產生最新檔案")
-
 # ==================================================
 # 3. 分頁與邏輯
 # ==================================================
-tab_input, tab_data, tab_viz, tab_3d = st.tabs(["📝 元件清單", "🔢 詳細數據", "📊 視覺化報告", "🧊 3D 模擬視圖"])
+# [UI Fix] 標題格式統一：英文 (中文)
+tab_input, tab_data, tab_viz, tab_3d = st.tabs([
+    "COMPONENT SETUP (元件設定)", 
+    "DETAILED ANALYSIS (詳細分析)", 
+    "VISUAL REPORT (視覺化報告)", 
+    "3D SIMULATION (3D 模擬視圖)"
+])
 
 # --- Tab 1: 輸入介面 ---
 with tab_input:
@@ -404,6 +397,7 @@ with tab_input:
             "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.2f"),
             "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.2f"),
             "Board_Type": st.column_config.SelectboxColumn("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)", options=["Thermal Via", "Copper Coin", "None"], width="medium"),
+            # [修正] 移除 Solder 選項
             "TIM_Type": st.column_config.SelectboxColumn("介面材料", help="元件或銅塊底部與散熱器之間的TIM", options=["Grease", "Pad", "Putty", "None"], width="medium"),
             "R_jc": st.column_config.NumberColumn("熱阻 Rjc", help="結點到殼的內部熱阻", format="%.2f"),
             "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.2f")
@@ -543,7 +537,7 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
     RRU_Height = t_base + Fin_Height + H_shield + H_filter
     Volume_L = (L_hsk * W_hsk * RRU_Height) / 1e6
     
-    # [v3.84/85 Fix] 重量計算 (確保變數存在)
+    # [v3.84] 重量計算
     base_vol_cm3 = L_hsk * W_hsk * t_base / 1000
     fins_vol_cm3 = num_fins_int * Fin_t * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * al_density / 1000
@@ -569,7 +563,7 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
 
 else:
     R_sa = 0; Area_req = 0; Fin_Height = 0; RRU_Height = 0; Volume_L = 0
-    # [Fix NameError] 必須初始化重量變數，否則下方卡片顯示會崩潰
+    # [Fix NameError] 必須初始化重量變數
     total_weight_kg = 0; hs_weight_kg = 0; shield_weight_kg = 0
     filter_weight_kg = 0; shielding_weight_kg = 0; pcb_weight_kg = 0
 
@@ -630,6 +624,7 @@ with tab_data:
         max_val = final_df['Allowed_dT'].max()
         mid_val = (min_val + max_val) / 2
         
+        # [修改] 移除原本的左右分欄 (col_table, col_legend)，改為全寬顯示
         styled_df = final_df.style.background_gradient(
             subset=['Allowed_dT'], 
             cmap='RdYlGn'
@@ -917,4 +912,42 @@ with tab_3d:
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 st.markdown("---")
-st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.85 Robust Weight Feature | Designed for High Efficiency</div>""", unsafe_allow_html=True)
+st.markdown("""<div style='text-align: center; color: #adb5bd; font-size: 12px; margin-top: 30px;'>5G RRU Thermal Engine | v3.86 Tab Title Update | Designed for High Efficiency</div>""", unsafe_allow_html=True)
+# --- [Project I/O - Save] 邏輯與按鈕填入 ---
+with save_ui_placeholder.container():
+    def get_current_state_json():
+        params_to_save = list(DEFAULT_GLOBALS.keys())
+        saved_params = {}
+        for k in params_to_save:
+            if k in st.session_state:
+                saved_params[k] = st.session_state[k]
+        
+        components_data = st.session_state['df_current'].to_dict('records')
+        
+        export_data = {
+            "meta": {"version": "v3.86", "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
+            "global_params": saved_params,
+            "components_data": components_data
+        }
+        return json.dumps(export_data, indent=4)
+
+    if st.session_state.get('trigger_generation', False):
+        json_data = get_current_state_json()
+        st.session_state['json_ready_to_download'] = json_data
+        st.session_state['json_file_name'] = f"RRU_Project_{time.strftime('%Y%m%d_%H%M%S')}.json"
+        st.session_state['trigger_generation'] = False 
+        st.rerun() 
+
+    if st.button("🔄 1. 更新並產生專案檔 (Generate)"):
+        st.session_state['trigger_generation'] = True
+        st.rerun()
+
+    if st.session_state.get('json_ready_to_download'):
+        st.download_button(
+            label="💾 2. 下載專案設定 (.json)",
+            data=st.session_state['json_ready_to_download'],
+            file_name=st.session_state['json_file_name'],
+            mime="application/json"
+        )
+    else:
+        st.caption("ℹ️ 請先點擊上方按鈕以產生最新檔案")
