@@ -9,19 +9,18 @@ import os
 import json
 
 # ==============================================================================
-# 版本：v3.92 (Compact Uploader UI)
+# 版本：v3.93 (Pixel-Perfect UI)
 # 日期：2026-02-08
 # 修正重點：
-# 1. [UI] 檔案上傳區塊 (File Uploader) 極致瘦身：
-#    - 透過 CSS 隱藏 "Drag and drop" 與 "Limit" 文字。
-#    - 縮減 Padding 與 Min-Height，使其高度僅約一行字。
-#    - 保留雲朵圖示與 Browse 按鈕。
-# 2. [UI] 標題樣式統一：
-#    - 左右兩欄標題 ("專案存取", "載入專案") 使用相同的 HTML/CSS 定義，確保視覺一致。
+# 1. [UI] Header 右側控制台「像素級」仿造：
+#    - 左右標題字體樣式統一 (font-size: 0.9rem, bold, #333)。
+#    - 上傳區塊：僅保留 Browse 按鈕，隱藏拖曳文字，高度最小化。
+#    - 按鈕區塊：文字簡化為 "1. 更新並產生", "2. 下載專案"。
+# 2. [CSS] 進階 CSS 注入：精準控制 File Uploader 的外觀與間距。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v3.92"
+APP_VERSION = "v3.93"
 UPDATE_DATE = "2026-02-08"
 
 # === APP 設定 ===
@@ -55,7 +54,7 @@ DEFAULT_GLOBALS = {
 
 # 嘗試載入設定檔
 config_path = "default_config.json"
-config_loaded_msg = "🟡 使用內建預設值" 
+config_loaded_msg = "🟡 內建預設值" 
 
 if os.path.exists(config_path):
     try:
@@ -206,20 +205,22 @@ st.markdown("""
     /* Header Container Style */
     [data-testid="stHeader"] { z-index: 0; }
 
-    /* --- [v3.92 New] Compact File Uploader CSS Hack --- */
-    /* 隱藏預設的 "Drag and drop..." 與 "Limit..." 文字 */
+    /* --- [v3.93 UI Fix] Compact File Uploader --- */
+    /* 隱藏預設的 "Drag and drop..." 與 "Limit..." */
     [data-testid="stFileUploader"] section > div > div > span, 
     [data-testid="stFileUploader"] section > div > div > small {
         display: none;
     }
-    /* 縮減容器的高度與內距 */
+    /* 縮減容器高度與內距 */
     [data-testid="stFileUploader"] section {
         padding: 0px !important;
         min-height: 0px !important;
     }
-    /* 調整按鈕與圖示的排列，使其緊湊 */
-    [data-testid="stFileUploader"] {
-        margin-bottom: 0px;
+    /* 調整按鈕 */
+    [data-testid="stFileUploader"] button {
+        margin-top: 0px;
+        font-size: 0.8rem;
+        padding: 0.25rem 0.5rem;
     }
     /* -------------------------------------------------- */
 
@@ -245,19 +246,19 @@ with col_header_L:
 with col_header_R:
     # 專案存取控制台 (外框)
     with st.container(border=True):
-        # [UI Fix v3.91/v3.92] 左右分欄布局
-        c_p1, c_p2 = st.columns([1, 1], gap="small")
+        # [UI Fix] 左右分欄布局：標題字體統一
+        c_p1, c_p2 = st.columns([1.3, 1], gap="small")
         
-        # 定義統一的標題樣式 (確保字體一致)
-        header_style = "font-size: 0.9rem; font-weight: 600; margin-bottom: 5px; color: #31333F;"
+        # 標題樣式 (統一)
+        header_style = "font-size: 0.95rem; font-weight: 700; margin-bottom: 2px; color: #333;"
         
         with c_p1:
             st.markdown(f"<div style='{header_style}'>專案存取 (Project I/O)</div>", unsafe_allow_html=True)
-            st.markdown(f"<div style='font-size: 0.8rem; margin-top: 5px; color: #555;'>{config_loaded_msg}</div>", unsafe_allow_html=True)
+            # 狀態文字微調
+            st.markdown(f"<div style='font-size: 0.8rem; color: #555; margin-top: 2px;'>{config_loaded_msg}</div>", unsafe_allow_html=True)
             
         with c_p2:
             st.markdown(f"<div style='{header_style}'>📂 載入專案設定 (.json)</div>", unsafe_allow_html=True)
-            # Uploader (CSS 已將其極致瘦身)
             uploaded_proj = st.file_uploader("Upload", type=["json"], key="project_loader", label_visibility="collapsed")
             
         if uploaded_proj is not None:
@@ -281,8 +282,8 @@ with col_header_R:
         
         st.markdown("<hr style='margin: 8px 0;'>", unsafe_allow_html=True)
         
-        # 2. 存檔 (Save) - 使用 Placeholder 佔位
-        project_io_save_placeholder = st.empty()
+        # 2. 存檔 (Save) - 使用 Placeholder 佔位，等待下方邏輯回填
+        save_header_placeholder = st.empty()
 
 st.markdown("<hr style='margin-top: 5px; margin-bottom: 20px;'>", unsafe_allow_html=True)
 
@@ -927,7 +928,6 @@ with tab_3d:
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 # --- [Project I/O - Save Logic] 移到底部執行 ---
-# 確保所有輸入參數與計算結果都已更新後，才執行儲存邏輯
 with project_io_save_placeholder.container():
     def get_current_state_json():
         params_to_save = list(DEFAULT_GLOBALS.keys())
