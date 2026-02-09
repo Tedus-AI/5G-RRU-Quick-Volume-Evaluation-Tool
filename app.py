@@ -9,18 +9,18 @@ import os
 import json
 
 # ==============================================================================
-# 版本：v3.99 (Final UI Fix)
+# 版本：v3.100 (Pixel-Perfect Uploader)
 # 日期：2026-02-09
 # 修正重點：
-# 1. [CSS Fix] 修正 "載入專案設定 (.json)" 文字超出按鈕邊框的問題：
-#    - 字體大小調整為 14px (與標準按鈕一致)。
-#    - 字體粗細調整為 400 (Normal)。
-#    - 設定 button 寬度為 100% 填滿欄位。
-#    - 設定 min-height 確保與下方下載按鈕高度一致。
+# 1. [CSS Fix] 完美復刻標準按鈕樣式：
+#    - 強制按鈕寬度 100% (width: 100% !important)，解決文字溢出問題。
+#    - 字體樣式完全同步：14px, 400 weight, rgb(49, 51, 63)。
+#    - 移除所有拖曳區背景與邊框，只保留純淨按鈕。
+# 2. [UI] 對齊優化：上下按鈕的間距與高度完全對應。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v3.99"
+APP_VERSION = "v3.100"
 UPDATE_DATE = "2026-02-09"
 
 # === APP 設定 ===
@@ -210,60 +210,63 @@ st.markdown("""
     /* Header Container Style */
     [data-testid="stHeader"] { z-index: 0; }
 
-    /* --- [v3.99 CSS] Final Button Style Fix --- */
+    /* --- [v3.100 CSS] Pixel-Perfect File Uploader Styling --- */
     /* 1. 隱藏預設文字 */
     [data-testid="stFileUploader"] section > div > div > span, 
     [data-testid="stFileUploader"] section > div > div > small {
         display: none !important;
     }
     
-    /* 2. 移除拖曳區背景與邊框 */
+    /* 2. 移除拖曳區背景與邊框，高度歸零 */
     [data-testid="stFileUploader"] section {
         padding: 0px !important;
         min-height: 0px !important;
         background-color: transparent !important;
         border: none !important;
         margin-bottom: 0px !important;
+        margin-top: -2px !important; /* 微調垂直位置 */
     }
     
-    /* 3. 調整 "Browse files" 按鈕本體 */
+    /* 3. 調整 "Browse files" 按鈕本體 - 寬度 100% */
     [data-testid="stFileUploader"] button {
-        width: 100%;             /* 強制填滿欄位 */
+        width: 100% !important;  /* 強制填滿 */
         margin-top: 0px;
         border: 1px solid rgba(49, 51, 63, 0.2);
         border-radius: 0.25rem;
         background-color: white;
-        color: transparent;      /* 隱藏原生文字 */
+        color: transparent !important; /* 隱藏原生文字 */
         position: relative;
-        padding: 0.25rem 0.5rem; /* 調整高度 */
-        min-height: 2.5rem;      /* 確保高度與一般按鈕一致 (約38-40px) */
+        padding: 0.25rem 0.5rem;
+        min-height: 2.5rem;      /* 與標準按鈕等高 */
+        line-height: 1.6;
     }
 
-    /* 4. 植入客製文字 (樣式對齊下方按鈕) */
+    /* 4. 植入客製文字 - 樣式與標準按鈕完全一致 */
     [data-testid="stFileUploader"] button::after {
         content: "📂 載入專案設定 (.json)";
-        color: #31333F;
+        color: rgb(49, 51, 63); /* 標準 Streamlit 文字黑 */
         position: absolute;
-        left: 50%;               /* 水平置中 */
-        top: 50%;                /* 垂直置中 */
+        left: 50%;
+        top: 50%;
         transform: translate(-50%, -50%);
-        font-size: 14px;         /* 修正字體大小 */
-        font-weight: 400;        /* 修正字體粗細 (Normal) */
-        width: 100%;             /* 確保文字能用整個寬度 */
+        font-size: 14px;        /* 標準字體大小 */
+        font-weight: 400;       /* 標準粗細 (Normal) */
+        width: 100%;
         text-align: center;
         pointer-events: none;
     }
 
-    /* 5. 滑鼠懸停效果 */
+    /* 5. 滑鼠懸停與點擊效果 */
     [data-testid="stFileUploader"] button:hover {
         border-color: #ff4b4b;
-        color: transparent;
+        color: transparent !important;
     }
     [data-testid="stFileUploader"] button:hover::after {
         color: #ff4b4b;
     }
     [data-testid="stFileUploader"] button:active {
         background-color: #ff4b4b;
+        border-color: #ff4b4b;
     }
     [data-testid="stFileUploader"] button:active::after {
         color: white;
@@ -292,10 +295,10 @@ with col_header_L:
 with col_header_R:
     # 專案存取控制台 (外框)
     with st.container(border=True):
-        # [UI Fix] 左右分欄布局
+        # [UI Fix] 左右兩大欄
         c_p1, c_p2 = st.columns(2, gap="small")
         
-        # 標題樣式
+        # 標題樣式統一
         header_style = "font-size: 0.9rem; font-weight: 700; color: #333; margin-bottom: 2px;"
 
         with c_p1:
@@ -303,9 +306,7 @@ with col_header_R:
             st.markdown(f"<div style='font-size: 0.8rem; color: #555; margin-top: 5px;'>{config_loaded_msg}</div>", unsafe_allow_html=True)
             
         with c_p2:
-            # [UI Fix] 移除文字標題，直接放置 Uploader (已偽裝成按鈕)
-            # 這裡不放任何 markdown，讓 uploader 直接頂上去，與左邊對齊
-            st.markdown(f"<div style='height: 2px;'></div>", unsafe_allow_html=True) # 微調對齊用
+            # 直接使用 Uploader (標題已隱藏，功能已偽裝)
             uploaded_proj = st.file_uploader(" ", type=["json"], key="project_loader", label_visibility="collapsed")
             
         if uploaded_proj is not None:
@@ -975,7 +976,6 @@ with tab_3d:
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 # --- [Project I/O - Save Logic] 移到底部執行 ---
-# 確保所有輸入參數與計算結果都已更新後，才執行儲存邏輯
 # [Critical Fix] 確保 placeholder 名稱與頂部定義一致 (project_io_save_placeholder)
 with project_io_save_placeholder.container():
     def get_current_state_json():
