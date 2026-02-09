@@ -9,19 +9,19 @@ import os
 import json
 
 # ==============================================================================
-# 版本：v3.110 (UI Restoration & Fix)
+# 版本：v3.111 (Tab 2 Visibility Fix)
 # 日期：2026-02-09
 # 修正重點：
-# 1. [CSS Restore] 還原 v3.107 的完美按鈕樣式：
-#    - 將 File Uploader 的 "Browse files" 按鈕再次偽裝成全寬度、圓角 8px 的 "📂 載入專案"。
-# 2. [CSS Feature] 保留隱藏檔案列表功能：
-#    - 設定 ul { display: none }，上傳後不顯示檔案清單與刪除鈕。
-# 3. [UI] 整合檔名顯示：
-#    - 檔名顯示於左側標題區，右側僅保留乾淨的載入按鈕。
+# 1. [Fix] 修復 Tab 2 欄位顯示控制器失效問題：
+#    - 引入 view_reset_key 狀態變數。
+#    - 當載入新專案時，強制重置 multiselect 回到「全選」狀態。
+# 2. [Fix] 修復欄位加回後不顯示的問題：
+#    - 為 st.dataframe 加入動態 key (相依於顯示欄位數量)。
+#    - 強制觸發表格重新渲染 (Re-mount)，確保欄位正確顯示。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v3.110"
+APP_VERSION = "v3.111"
 UPDATE_DATE = "2026-02-09"
 
 # === APP 設定 ===
@@ -139,6 +139,10 @@ if 'trigger_generation' not in st.session_state:
 if 'current_project_name' not in st.session_state:
     st.session_state['current_project_name'] = None
 
+# [v3.111 Fix] 新增 View Reset Key，用於強制重置多選單狀態
+if 'view_reset_key' not in st.session_state:
+    st.session_state['view_reset_key'] = 0
+
 def reset_download_state():
     st.session_state['json_ready_to_download'] = None
 
@@ -181,7 +185,7 @@ if "welcome_shown" not in st.session_state:
 # ==================================================
 # 👇 主程式開始 - Header 區塊
 # ==================================================
-# CSS 樣式 (v3.110 - 按鈕美化 + 隱藏列表)
+# CSS 樣式 (Pixel-Perfect Fix v6 - 文字直接在按鈕上，完全同步 download_button)
 st.markdown("""
 <style>
     html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
@@ -212,79 +216,77 @@ st.markdown("""
     .kpi-value { color: #333; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; }
     .kpi-desc { color: #888; font-size: 0.8rem; }
     
+    /* 表格樣式 */
+    [data-testid="stDataFrame"], [data-testid="stDataEditor"] {
+        border: 1px solid #e9ecef !important; border-radius: 8px !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.02) !important;
+    }
+    [data-testid="stDataFrame"] thead tr th { background-color: #f8f9fa !important; color: #495057 !important; }
+
+    /* Scale Bar CSS */
+    .legend-container { display: flex; flex-direction: column; align-items: center; margin-top: 40px; font-size: 0.85rem; }
+    .legend-title { font-weight: bold; margin-bottom: 5px; color: black; }
+    .legend-body { display: flex; align-items: stretch; height: 200px; }
+    .gradient-bar { width: 15px; background: linear-gradient(to top, #d73027, #fee08b, #1a9850); border-radius: 3px; margin-right: 8px; border: 1px solid #ccc; }
+    .legend-labels { display: flex; flex-direction: column; justify-content: space-between; color: black; font-weight: bold; }
+    
     /* Header Container Style */
     [data-testid="stHeader"] { z-index: 0; }
 
-    /* ==================== File Uploader 樣式魔改 (v3.110) ==================== */
-    
-    /* 1. 隱藏預設文字與圖示 */
-    [data-testid="stFileUploader"] section > div > div > span, 
-    [data-testid="stFileUploader"] section > div > div > small {
+    /* ==================== File Uploader 完美按鈕化 (Fix Click & Overflow) ==================== */
+    /* 隱藏拖曳區背景與說明文字，但保留 label 可點擊 */
+    div[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] {
+        min-height: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+    }
+    div[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzoneInstructions"] {
         display: none !important;
     }
     
-    /* 2. [v3.108] 隱藏上傳後的檔案列表與刪除按鈕 (紅框區) */
+    /* 強制 label 為標準按鈕樣式 */
+    div[data-testid="stFileUploader"] > div > div > label {
+        width: 100% !important;
+        height: 40px !important;
+        padding: 0 16px !important;
+        margin: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 8px !important;
+        background-color: #ffffff !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 6px !important;
+        font-size: 14px !important;
+        font-weight: 400 !important;
+        color: rgb(49, 51, 63) !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+    }
+
+    /* Hover 效果同步下方按鈕 */
+    div[data-testid="stFileUploader"] > div > div > label:hover {
+        border-color: #ff4b4b !important;
+        color: #ff4b4b !important;
+        box-shadow: 0 4px 6px rgba(255,75,75,0.2) !important;
+    }
+    
+    /* 圖示位置（如果有） */
+    div[data-testid="stFileUploader"] > div > div > label > div {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    /* 隱藏上傳後的檔案列表 */
     [data-testid="stFileUploader"] ul {
         display: none !important;
     }
-    
-    /* 3. 移除 Dropzone 背景與邊框，高度壓縮 */
-    [data-testid="stFileUploader"] section {
-        padding: 0px !important;
-        min-height: 0px !important;
-        background-color: transparent !important;
-        border: none !important;
-        margin-bottom: 0px !important;
-    }
-    
-    /* 4. [v3.107] 改造 "Browse files" 按鈕為目標按鈕 */
-    [data-testid="stFileUploader"] button {
-        width: 100% !important;  /* 強制填滿 */
-        margin-top: 0px;
-        border: 1px solid rgba(49, 51, 63, 0.2);
-        
-        /* 圓角 8px */
-        border-radius: 8px !important;
-        
-        background-color: white;
-        color: transparent !important; /* 隱藏原生 "Browse files" */
-        position: relative;
-        padding: 0.25rem 0.5rem;
-        min-height: 2.5rem;      /* 對齊高度 */
-        line-height: 1.6;
-    }
-
-    /* 5. [v3.107] 植入新文字 "📂 載入專案" (粗體) */
-    [data-testid="stFileUploader"] button::after {
-        content: "📂 載入專案";   /* 這裡修改文字 */
-        color: rgb(49, 51, 63); /* 標準黑 */
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 14px;
-        font-weight: 600 !important; /* 粗體 */
-        width: 100%;
-        text-align: center;
-        pointer-events: none;
-    }
-
-    /* 6. Hover 效果 */
-    [data-testid="stFileUploader"] button:hover {
-        border-color: #ff4b4b !important;
-        color: transparent !important;
-    }
-    [data-testid="stFileUploader"] button:hover::after {
-        color: #ff4b4b !important;
-    }
-    [data-testid="stFileUploader"] button:active {
-        background-color: #ff4b4b !important;
-        border-color: #ff4b4b !important;
-    }
-    [data-testid="stFileUploader"] button:active::after {
-        color: white !important;
-    }
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -328,7 +330,8 @@ with col_header_R:
         with c_p2:
             # 檔案上傳按鈕 (CSS 已偽裝成 "📂 載入專案" 按鈕)
             st.markdown(f"<div style='height: 2px;'></div>", unsafe_allow_html=True)
-            uploaded_proj = st.file_uploader(" ", type=["json"], key="project_loader", label_visibility="collapsed")
+            # Label 修改為 "📂 載入專案" 供 CSS 顯示
+            uploaded_proj = st.file_uploader("📂 載入專案", type=["json"], key="project_loader")
             
         if uploaded_proj is not None:
             if uploaded_proj != st.session_state['last_loaded_file']:
@@ -346,6 +349,9 @@ with col_header_R:
                     st.session_state['last_loaded_file'] = uploaded_proj
                     # [v3.108] 記錄檔名
                     st.session_state['current_project_name'] = uploaded_proj.name
+                    
+                    # [v3.111 Fix] 載入成功後，讓 View Reset Key +1，強制下方的 Multiselect 重置
+                    st.session_state['view_reset_key'] += 1
                     
                     st.toast("✅ 專案載入成功！", icon="📂")
                     time.sleep(0.5)
@@ -709,17 +715,17 @@ with tab_data:
     
     if not final_df.empty:
         # [v3.109 Feature] 欄位顯示控制器
-        # 1. 取得所有欄位名稱
+        # [v3.111 Fix] 加入動態 key 確保載入專案時重置
         all_cols = final_df.columns.tolist()
         
-        # 2. 多選選單 (預設全選)
         show_cols = st.multiselect(
             "👁️ 選擇顯示欄位 (可移除不關注的項目以縮減表格寬度):",
             all_cols,
-            default=all_cols
+            default=all_cols,
+            key=f"cols_select_{st.session_state['view_reset_key']}" # 動態 key
         )
         
-        # 3. 防呆：若全部取消，至少保留 Component，避免報錯
+        # 3. 防呆
         if not show_cols:
             show_cols = ['Component']
             
@@ -730,7 +736,7 @@ with tab_data:
         max_val = final_df['Allowed_dT'].max()
         mid_val = (min_val + max_val) / 2
         
-        # 5. 動態套用樣式 (只針對存在的欄位)
+        # 5. 動態套用樣式
         styler = df_display.style
         
         # 只有當 'Allowed_dT' 在顯示清單中時，才畫漸層
@@ -756,11 +762,12 @@ with tab_data:
             "R_TIM": "{:.4f}"
         }
         
-        # 篩選出有效的格式設定 (避免 format 報錯)
+        # 篩選出有效的格式設定
         valid_formats = {k: v for k, v in format_dict.items() if k in df_display.columns}
         styler = styler.format(valid_formats)
         
         # 6. 顯示表格 (Config 保持完整，Streamlit 會自動忽略不存在的欄位設定)
+        # [v3.111 Fix] 加入 key 以強制重繪
         st.dataframe(
             styler, 
             column_config={
@@ -785,7 +792,8 @@ with tab_data:
                 "R_TIM": st.column_config.NumberColumn("介面熱阻 (°C/W)", help="元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)。", format="%.4f"),
             },
             use_container_width=True, 
-            hide_index=True
+            hide_index=True,
+            key=f"df_tab2_{len(show_cols)}" # 動態 key：欄位數量變動時強制重繪
         )
         
         # 只有當 'Allowed_dT' 有顯示時，才顯示下方的 Scale Bar 與說明
@@ -879,7 +887,6 @@ with tab_viz:
     st.subheader("📏 尺寸與體積估算")
     c5, c6 = st.columns(2)
     
-    # [修正] 根據 DRC 結果決定顯示內容
     if drc_failed:
         st.error(drc_msg)
         st.markdown(f"""
@@ -909,8 +916,8 @@ with tab_viz:
     if not drc_failed:
         st.markdown(f"""
         <div style="background-color: #ecf0f1; padding: 30px; margin-top: 20px; border-radius: 15px; border-left: 10px solid #34495e; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center;">
-            <h3 style="color: {vol_title}; margin:0; font-size: 1.4rem; letter-spacing: 1px;">⚖️ 整機估算重量 (Estimated Weight)</h3>
-            <h1 style="color: {vol_border}; margin:15px 0 10px 0; font-size: 3.5rem; font-weight: 800;">{round(total_weight_kg, 1)} kg</h1>
+            <h3 style="color: #2c3e50; margin:0; font-size: 1.4rem; letter-spacing: 1px;">⚖️ 整機估算重量 (Estimated Weight)</h3>
+            <h1 style="color: #34495e; margin:15px 0 10px 0; font-size: 3.5rem; font-weight: 800;">{round(total_weight_kg, 1)} kg</h1>
             <small style="color: #7f8c8d; line-height: 1.6;">
                 Heatsink ≈ {round(hs_weight_kg, 1)} kg | Shield ≈ {round(shield_weight_kg, 1)} kg<br>
                 Filter ≈ {round(filter_weight_kg, 1)} kg | Shielding Case ≈ {round(shielding_weight_kg, 1)} kg | PCB ≈ {round(pcb_weight_kg, 2)} kg
