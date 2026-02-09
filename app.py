@@ -9,19 +9,16 @@ import os
 import json
 
 # ==============================================================================
-# 版本：v3.111 (Tab 2 Visibility Fix)
+# 版本：v3.112 (Feature Revert & Clean)
 # 日期：2026-02-09
 # 修正重點：
-# 1. [Fix] 修復 Tab 2 欄位顯示控制器失效問題：
-#    - 引入 view_reset_key 狀態變數。
-#    - 當載入新專案時，強制重置 multiselect 回到「全選」狀態。
-# 2. [Fix] 修復欄位加回後不顯示的問題：
-#    - 為 st.dataframe 加入動態 key (相依於顯示欄位數量)。
-#    - 強制觸發表格重新渲染 (Re-mount)，確保欄位正確顯示。
+# 1. [Revert] 移除 Tab 2 欄位篩選功能 (Column Toggle)，恢復為標準表格顯示。
+#    - 解決欄位消失、狀態不同步等 UI 問題，回歸穩定。
+# 2. [Stable] 保留 Header 專案存取介面的完美樣式 (按鈕偽裝 + 隱藏列表)。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v3.111"
+APP_VERSION = "v3.112"
 UPDATE_DATE = "2026-02-09"
 
 # === APP 設定 ===
@@ -138,10 +135,6 @@ if 'trigger_generation' not in st.session_state:
 # [v3.108] 新增記錄目前載入專案名稱的狀態
 if 'current_project_name' not in st.session_state:
     st.session_state['current_project_name'] = None
-
-# [v3.111 Fix] 新增 View Reset Key，用於強制重置多選單狀態
-if 'view_reset_key' not in st.session_state:
-    st.session_state['view_reset_key'] = 0
 
 def reset_download_state():
     st.session_state['json_ready_to_download'] = None
@@ -331,7 +324,7 @@ with col_header_R:
             # 檔案上傳按鈕 (CSS 已偽裝成 "📂 載入專案" 按鈕)
             st.markdown(f"<div style='height: 2px;'></div>", unsafe_allow_html=True)
             # Label 修改為 "📂 載入專案" 供 CSS 顯示
-            uploaded_proj = st.file_uploader("📂 載入專案", type=["json"], key="project_loader")
+            uploaded_proj = st.file_uploader("📂 載入專案", type=["json"], key="project_loader", label_visibility="collapsed")
             
         if uploaded_proj is not None:
             if uploaded_proj != st.session_state['last_loaded_file']:
@@ -349,9 +342,6 @@ with col_header_R:
                     st.session_state['last_loaded_file'] = uploaded_proj
                     # [v3.108] 記錄檔名
                     st.session_state['current_project_name'] = uploaded_proj.name
-                    
-                    # [v3.111 Fix] 載入成功後，讓 View Reset Key +1，強制下方的 Multiselect 重置
-                    st.session_state['view_reset_key'] += 1
                     
                     st.toast("✅ 專案載入成功！", icon="📂")
                     time.sleep(0.5)
@@ -712,76 +702,36 @@ elif "Embedded" in fin_tech and Fin_Height > 100.0:
 # --- Tab 2: 詳細數據 (表二) ---
 with tab_data:
     st.subheader("🔢 DETAILED ANALYSIS (詳細分析)")
+    st.caption("💡 **提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。**")
     
     if not final_df.empty:
-        # [v3.109 Feature] 欄位顯示控制器
-        # [v3.111 Fix] 加入動態 key 確保載入專案時重置
-        all_cols = final_df.columns.tolist()
-        
-        show_cols = st.multiselect(
-            "👁️ 選擇顯示欄位 (可移除不關注的項目以縮減表格寬度):",
-            all_cols,
-            default=all_cols,
-            key=f"cols_select_{st.session_state['view_reset_key']}" # 動態 key
-        )
-        
-        # 3. 防呆
-        if not show_cols:
-            show_cols = ['Component']
-            
-        # 4. 篩選 DataFrame
-        df_display = final_df[show_cols]
-
         min_val = final_df['Allowed_dT'].min()
         max_val = final_df['Allowed_dT'].max()
         mid_val = (min_val + max_val) / 2
         
-        # 5. 動態套用樣式
-        styler = df_display.style
+        # [修改] 移除原本的左右分欄 (col_table, col_legend)，改為全寬顯示
+        styled_df = final_df.style.background_gradient(
+            subset=['Allowed_dT'], 
+            cmap='RdYlGn'
+        ).format({
+            "R_int": "{:.4f}", "R_TIM": "{:.4f}", "Allowed_dT": "{:.2f}"
+        })
         
-        # 只有當 'Allowed_dT' 在顯示清單中時，才畫漸層
-        if 'Allowed_dT' in df_display.columns:
-            styler = styler.background_gradient(subset=['Allowed_dT'], cmap='RdYlGn')
-        
-        # 定義格式對照表
-        format_dict = {
-            "Power(W)": "{:.2f}",
-            "Height(mm)": "{:.2f}",
-            "Pad_L": "{:.2f}",
-            "Pad_W": "{:.2f}",
-            "Thick(mm)": "{:.2f}",
-            "R_jc": "{:.2f}",
-            "Limit(C)": "{:.2f}",
-            "Base_L": "{:.1f}",
-            "Base_W": "{:.1f}",
-            "Loc_Amb": "{:.1f}",
-            "Drop": "{:.1f}",
-            "Total_W": "{:.1f}",
-            "Allowed_dT": "{:.2f}",
-            "R_int": "{:.4f}",
-            "R_TIM": "{:.4f}"
-        }
-        
-        # 篩選出有效的格式設定
-        valid_formats = {k: v for k, v in format_dict.items() if k in df_display.columns}
-        styler = styler.format(valid_formats)
-        
-        # 6. 顯示表格 (Config 保持完整，Streamlit 會自動忽略不存在的欄位設定)
-        # [v3.111 Fix] 加入 key 以強制重繪
+        # [修正 v3.66] 還原完整的 Help 說明 (包含物理公式)
         st.dataframe(
-            styler, 
+            styled_df, 
             column_config={
                 "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
                 "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量"),
-                "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f"),
-                "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.2f"),
-                "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.2f"),
-                "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.2f"),
-                "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.2f"),
-                "Board_Type": st.column_config.Column("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)"),
-                "TIM_Type": st.column_config.Column("介面材料", help="元件或銅塊底部與散熱器之間的TIM"),
+                "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.1f"),
+                "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.1f"),
+                "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.1f"),
+                "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.1f"),
+                "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
                 "R_jc": st.column_config.NumberColumn("Rjc", help="結點到殼的內部熱阻", format="%.2f"),
-                "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.2f"),
+                "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.1f"),
+                
+                # 計算欄位 - 完整公式說明
                 "Base_L": st.column_config.NumberColumn("Base 長 (mm)", help="熱量擴散後的底部有效長度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
                 "Base_W": st.column_config.NumberColumn("Base 寬 (mm)", help="熱量擴散後的底部有效寬度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
                 "Loc_Amb": st.column_config.NumberColumn("局部環溫 (°C)", help="該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)。", format="%.1f"),
@@ -790,31 +740,33 @@ with tab_data:
                 "Allowed_dT": st.column_config.NumberColumn("允許溫升 (°C)", help="散熱器剩餘可用的溫升裕度。數值越小代表該元件越容易過熱 (瓶頸)。公式：Limit - Loc_Amb - Drop。", format="%.2f"),
                 "R_int": st.column_config.NumberColumn("基板熱阻 (°C/W)", help="元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值。", format="%.4f"),
                 "R_TIM": st.column_config.NumberColumn("介面熱阻 (°C/W)", help="元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)。", format="%.4f"),
+                
+                # [修正 v3.67] 名詞一致化
+                "Board_Type": st.column_config.Column("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)"),
+                "TIM_Type": st.column_config.Column("介面材料", help="元件或銅塊底部與散熱器之間的TIM")
             },
             use_container_width=True, 
-            hide_index=True,
-            key=f"df_tab2_{len(show_cols)}" # 動態 key：欄位數量變動時強制重繪
+            hide_index=True
         )
         
-        # 只有當 'Allowed_dT' 有顯示時，才顯示下方的 Scale Bar 與說明
-        if 'Allowed_dT' in df_display.columns:
-            st.markdown(f"""
-            <div style="display: flex; flex-direction: column; align-items: center; margin: 15px 0;">
-                <div style="font-weight: bold; margin-bottom: 5px; color: #555; font-size: 0.9rem;">允許溫升 (Allowed dT) 色階參考</div>
-                <div style="width: 100%; max-width: 600px; height: 12px; background: linear-gradient(to right, #d73027, #fee08b, #1a9850); border-radius: 6px; border: 1px solid #ddd;"></div>
-                <div style="display: flex; justify-content: space-between; width: 100%; max-width: 600px; color: #555; font-weight: bold; font-size: 0.8rem; margin-top: 4px;">
-                    <span>{min_val:.0f}°C (Risk)</span>
-                    <span>{mid_val:.0f}°C</span>
-                    <span>{max_val:.0f}°C (Safe)</span>
-                </div>
+        # [UI Update] 將 Scale Bar 移至下方，並改為橫式
+        st.markdown(f"""
+        <div style="display: flex; flex-direction: column; align-items: center; margin: 15px 0;">
+            <div style="font-weight: bold; margin-bottom: 5px; color: #555; font-size: 0.9rem;">允許溫升 (Allowed dT) 色階參考</div>
+            <div style="width: 100%; max-width: 600px; height: 12px; background: linear-gradient(to right, #d73027, #fee08b, #1a9850); border-radius: 6px; border: 1px solid #ddd;"></div>
+            <div style="display: flex; justify-content: space-between; width: 100%; max-width: 600px; color: #555; font-weight: bold; font-size: 0.8rem; margin-top: 4px;">
+                <span>{min_val:.0f}°C (Risk)</span>
+                <span>{mid_val:.0f}°C</span>
+                <span>{max_val:.0f}°C (Safe)</span>
             </div>
-            """, unsafe_allow_html=True)
-            
-            st.info("""
-            ℹ️ **名詞解釋 - 允許溫升 (Allowed dT)** 此數值代表 **「散熱器可用的溫升裕度」** (Limit - Local Ambient - Drop)。
-            * 🟩 **綠色 (數值高)**：代表散熱裕度充足，該元件不易過熱。
-            * 🟥 **紅色 (數值低)**：代表散熱裕度極低，該元件是系統的熱瓶頸。
-            """)
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.info("""
+        ℹ️ **名詞解釋 - 允許溫升 (Allowed dT)** 此數值代表 **「散熱器可用的溫升裕度」** (Limit - Local Ambient - Drop)。
+        * 🟩 **綠色 (數值高)**：代表散熱裕度充足，該元件不易過熱。
+        * 🟥 **紅色 (數值低)**：代表散熱裕度極低，該元件是系統的熱瓶頸。
+        """)
 
 # --- Tab 3: 視覺化報告 ---
 with tab_viz:
