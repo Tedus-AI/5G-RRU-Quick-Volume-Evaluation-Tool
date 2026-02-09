@@ -9,17 +9,17 @@ import os
 import json
 
 # ==============================================================================
-# 版本：v3.102 (CSS Click Fix)
+# 版本：v3.103 (User CSS Fix v6)
 # 日期：2026-02-09
 # 修正重點：
-# 1. [CSS Fix] 套用使用者提供的 "Pixel-Perfect Fix v3" CSS 樣式。
-#    - 修復按鈕點擊判定問題。
-#    - 優化文字溢出處理 (ellipsis)。
-#    - 隱藏 Dropzone 背景，僅保留美化後的 Label 作為按鈕。
+# 1. [CSS Replace] 替換為使用者提供的 "Pixel-Perfect Fix v6" 樣式。
+#    - 完全隱藏 Dropzone 與內建按鈕。
+#    - 直接將 Label 樣式化為 100% 寬度的按鈕，文字置中，解決溢出問題。
+#    - 視覺上與下方的 st.download_button 完全同步。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v3.102"
+APP_VERSION = "v3.103"
 UPDATE_DATE = "2026-02-09"
 
 # === APP 設定 ===
@@ -175,7 +175,7 @@ if "welcome_shown" not in st.session_state:
 # ==================================================
 # 👇 主程式開始 - Header 區塊
 # ==================================================
-# CSS 樣式 (Pixel-Perfect Fix v3 - 修復點擊消失)
+# CSS 樣式 (Pixel-Perfect Fix v6 - 文字直接在按鈕上，完全同步 download_button)
 st.markdown("""
 <style>
     html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
@@ -220,50 +220,56 @@ st.markdown("""
     .gradient-bar { width: 15px; background: linear-gradient(to top, #d73027, #fee08b, #1a9850); border-radius: 3px; margin-right: 8px; border: 1px solid #ccc; }
     .legend-labels { display: flex; flex-direction: column; justify-content: space-between; color: black; font-weight: bold; }
     
-    /* Header Container Style */
-    [data-testid="stHeader"] { z-index: 0; }
-
-    /* ==================== File Uploader 完美按鈕化 (Fix Click & Overflow) ==================== */
-    /* 隱藏拖曳區背景與說明文字，但保留 label 可點擊 */
+    /* ==================== File Uploader 完全變成純按鈕 (文字直接在按鈕上) ==================== */
+    /* 完全隱藏所有預設元素 */
     div[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] {
-        min-height: 0 !important;
-        padding: 0 !important;
-        border: none !important;
-        background: transparent !important;
+        display: none !important;
     }
     div[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzoneInstructions"] {
         display: none !important;
     }
+    div[data-testid="stFileUploader"] button {
+        display: none !important;
+    }
+    div[data-testid="stFileUploader"] + hr {
+        display: none !important;
+    }
     
-    /* 強制 label 為標準按鈕樣式 */
+    /* 強制 label 變成唯一按鈕，文字完美居中 */
     div[data-testid="stFileUploader"] > div > div > label {
         width: 100% !important;
         height: 40px !important;
-        padding: 0 16px !important;
+        padding: 0 !important;
         margin: 0 !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        gap: 8px !important;
         background-color: #ffffff !important;
         border: 1px solid #d1d5db !important;
         border-radius: 6px !important;
         font-size: 14px !important;
         font-weight: 400 !important;
         color: rgb(49, 51, 63) !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
         cursor: pointer !important;
         transition: all 0.2s ease !important;
         box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
     }
 
-    /* Hover 效果同步下方按鈕 */
+    /* Hover 完全同步下方按鈕 */
     div[data-testid="stFileUploader"] > div > div > label:hover {
         border-color: #ff4b4b !important;
         color: #ff4b4b !important;
         box-shadow: 0 4px 6px rgba(255,75,75,0.2) !important;
+    }
+    
+    /* 圖示位置（如果有） */
+    div[data-testid="stFileUploader"] > div > div > label > div {
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
 </style>
 """, unsafe_allow_html=True)
