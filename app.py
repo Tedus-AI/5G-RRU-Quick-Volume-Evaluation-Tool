@@ -186,8 +186,8 @@ def check_password():
 
         # === 3. 功能說明區塊（往下滾才看到）===
         st.markdown("""
-        <div style="background: #ffffff; padding: 25px; border-radius: 12px; border: 1px solid #e0e0e0; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.08);">
-            <h3 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px;">🛠️ 主要功能一覽</h3>
+        <div style="background: #e9f7ef; padding: 25px; border-radius: 12px; border-left: 6px solid #2ecc71; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.08);">
+            <h3 style="color: #27ae60; margin-top: 0; padding-bottom: 8px;">🛠️ 主要功能一覽</h3>
             <ul style="font-size: 1.05rem; line-height: 1.8; color: #34495e;">
                 <li><strong>元件熱源管理</strong>：動態新增/編輯元件清單，支援 Copper Coin、Thermal Via、多種 TIM</li>
                 <li><strong>精準熱阻計算</strong>：自動計算 Rjc + Rint + Rtim，並考慮局部環溫與高度效應</li>
