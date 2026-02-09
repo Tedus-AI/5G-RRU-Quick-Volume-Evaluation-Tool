@@ -200,18 +200,7 @@ def check_password():
             </ul>
         </div>
 
-        <div style="background: #fffacd; padding: 20px; border-radius: 12px; border-left: 6px solid #f39c12; margin-bottom: 30px;">
-            <h3 style="color: #d35400; margin-top: 0;">⚠️ 使用注意事項</h3>
-            <ul style="line-height: 1.7; color: #34495e;">
-                <li>本工具為<strong>快速概念設計與尺寸評估</strong>用途，非最終驗證級熱模擬</li>
-                <li>計算結果高度依賴輸入參數準確度，請使用實際量測或 Datasheet 數值</li>
-                <li>自然對流模型基於垂直鰭片、無風環境，室外高風速情境需另行評估</li>
-                <li>Embedded Fin 高度限制預設 < 100mm，超過將觸發 DRC 警告</li>
-                <li>建議將計算結果與 CFD 或實測進行交叉驗證，尤其在高功耗或極端環境下</li>
-            </ul>
-        </div>
-
-        <div style="background: #e8f4fd; padding: 20px; border-radius: 12px; border-left: 6px solid #3498db;">
+        <div style="background: #e8f4fd; padding: 20px; border-radius: 12px; border-left: 6px solid #3498db; margin-bottom: 30px;">
             <h3 style="color: #2980b9; margin-top: 0;">🔥 綜合傳熱係數 h 的計算原理</h3>
             <p style="line-height: 1.7; color: #2c3e50;">
             本工具的 h 值採用<strong>半經驗模型</strong>，經多款實際 RRU 產品的 CFD 模擬結果校正而得，具有高度可信度：<br><br>
@@ -221,6 +210,17 @@ def check_password():
             該模型已在多個專案中與 FloTHERM 結果比對，誤差通常在 <strong>±8%</strong> 以內。<br><br>
             當 Gap 過小時會自動提示 h_conv 過低；當流阻比（Aspect Ratio）過高時也會觸發設計風險警告，提醒避免空氣滯留與散熱效率下降。
             </p>
+        </div>
+
+        <div style="background: #fffacd; padding: 20px; border-radius: 12px; border-left: 6px solid #f39c12;">
+            <h3 style="color: #d35400; margin-top: 0;">⚠️ 使用注意事項</h3>
+            <ul style="line-height: 1.7; color: #34495e;">
+                <li>本工具為<strong>快速概念設計與尺寸評估</strong>用途，非最終驗證級熱模擬</li>
+                <li>計算結果高度依賴輸入參數準確度，請使用實際量測或 Datasheet 數值</li>
+                <li>自然對流模型基於垂直鰭片、無風環境，室外高風速情境需另行評估</li>
+                <li>Embedded Fin 高度限制預設 < 100mm，超過將觸發 DRC 警告</li>
+                <li>建議將計算結果與 CFD 或實測進行交叉驗證，尤其在高功耗或極端環境下</li>
+            </ul>
         </div>
         """, unsafe_allow_html=True)
         return False
