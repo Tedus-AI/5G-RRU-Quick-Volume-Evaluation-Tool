@@ -143,6 +143,84 @@ def reset_download_state():
     st.session_state['json_ready_to_download'] = None
 
 # ==================================================
+# 🛑 [UI LOCK] 專案存取介面 (請勿修改此函數)
+# ==================================================
+def render_locked_header_ui(config_msg):
+    """
+    渲染主畫面的 Header 區域，包含標題與專案存取控制台。
+    此區域樣式已定案，請勿隨意更動 CSS 或排版。
+    """
+    # [UI] 頂部布局
+    col_header_L, col_header_R = st.columns([1.8, 1.2])
+
+    with col_header_L:
+        st.markdown(f"""
+            <div style="padding-top: 10px;">
+                <h1 style='margin:0; background: -webkit-linear-gradient(45deg, #007CF0, #00DFD8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 900; font-size: 2.5rem;'>
+                📡 5G RRU 體積估算引擎 <span style='font-size: 20px; color: #888; -webkit-text-fill-color: #888;'>Pro</span>
+                </h1>
+                <div style='color: #666; font-size: 14px; margin-top: 5px;'>
+                    High-Performance Thermal Calculation System 
+                    <span style="color: #bbb; margin-left: 10px;">| {APP_VERSION} ({UPDATE_DATE})</span>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with col_header_R:
+        # 專案存取控制台 (外框)
+        with st.container(border=True):
+            # 左右兩大欄
+            c_p1, c_p2 = st.columns(2, gap="small")
+            
+            # 標題樣式
+            header_style = "font-size: 0.9rem; font-weight: 700; color: #333; margin-bottom: 2px;"
+
+            with c_p1:
+                st.markdown(f"<div style='{header_style}'>專案存取 (Project I/O)</div>", unsafe_allow_html=True)
+                
+                # 判斷是否載入專案檔，顯示對應訊息
+                if st.session_state.get('current_project_name'):
+                    # 藍色粗體顯示載入的檔名
+                    file_display = f"📄 {st.session_state['current_project_name']}"
+                    st.markdown(f"<div style='font-size: 0.8rem; color: #007CF0; font-weight: 600; margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;' title='{file_display}'>{file_display}</div>", unsafe_allow_html=True)
+                else:
+                    # 顯示預設設定檔狀態
+                    st.markdown(f"<div style='font-size: 0.8rem; color: #555; margin-top: 5px;'>{config_msg}</div>", unsafe_allow_html=True)
+                
+            with c_p2:
+                # 檔案上傳按鈕 (CSS 已偽裝成 "📂 載入專案" 按鈕)
+                st.markdown(f"<div style='height: 2px;'></div>", unsafe_allow_html=True)
+                uploaded_proj = st.file_uploader("📂 載入專案", type=["json"], key="project_loader", label_visibility="collapsed")
+                
+            if uploaded_proj is not None:
+                if uploaded_proj != st.session_state['last_loaded_file']:
+                    try:
+                        data = json.load(uploaded_proj)
+                        if 'global_params' in data:
+                            for k, v in data['global_params'].items():
+                                st.session_state[k] = v
+                        if 'components_data' in data:
+                            new_df = pd.DataFrame(data['components_data'])
+                            st.session_state['df_initial'] = new_df
+                            st.session_state['df_current'] = new_df.copy()
+                            st.session_state['editor_key'] += 1
+                        
+                        st.session_state['last_loaded_file'] = uploaded_proj
+                        # 記錄檔名
+                        st.session_state['current_project_name'] = uploaded_proj.name
+                        
+                        st.toast("✅ 專案載入成功！", icon="📂")
+                        time.sleep(0.5)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+            
+            st.markdown("<hr style='margin: 8px 0;'>", unsafe_allow_html=True)
+            
+            # 2. 存檔 (Save) - 使用 Placeholder 佔位
+            return st.empty()
+
+# ==================================================
 # 🔐 密碼保護
 # ==================================================
 def check_password():
@@ -288,75 +366,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# [UI] 頂部布局
-col_header_L, col_header_R = st.columns([1.8, 1.2])
-
-with col_header_L:
-    st.markdown(f"""
-        <div style="padding-top: 10px;">
-            <h1 style='margin:0; background: -webkit-linear-gradient(45deg, #007CF0, #00DFD8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 900; font-size: 2.5rem;'>
-            📡 5G RRU 體積估算引擎 <span style='font-size: 20px; color: #888; -webkit-text-fill-color: #888;'>Pro</span>
-            </h1>
-            <div style='color: #666; font-size: 14px; margin-top: 5px;'>
-                High-Performance Thermal Calculation System 
-                <span style="color: #bbb; margin-left: 10px;">| {APP_VERSION} ({UPDATE_DATE})</span>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-
-with col_header_R:
-    # 專案存取控制台 (外框)
-    with st.container(border=True):
-        # 左右兩大欄
-        c_p1, c_p2 = st.columns(2, gap="small")
-        
-        # 標題樣式
-        header_style = "font-size: 0.9rem; font-weight: 700; color: #333; margin-bottom: 2px;"
-
-        with c_p1:
-            st.markdown(f"<div style='{header_style}'>專案存取 (Project I/O)</div>", unsafe_allow_html=True)
-            
-            # [UI Update] 判斷是否載入專案檔，顯示對應訊息
-            if st.session_state.get('current_project_name'):
-                # 藍色粗體顯示載入的檔名
-                file_display = f"📄 {st.session_state['current_project_name']}"
-                st.markdown(f"<div style='font-size: 0.8rem; color: #007CF0; font-weight: 600; margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;' title='{file_display}'>{file_display}</div>", unsafe_allow_html=True)
-            else:
-                # 顯示預設設定檔狀態
-                st.markdown(f"<div style='font-size: 0.8rem; color: #555; margin-top: 5px;'>{config_loaded_msg}</div>", unsafe_allow_html=True)
-            
-        with c_p2:
-            # 檔案上傳按鈕 (CSS 已偽裝成 "📂 載入專案" 按鈕)
-            st.markdown(f"<div style='height: 2px;'></div>", unsafe_allow_html=True)
-            uploaded_proj = st.file_uploader("📂 載入專案", type=["json"], key="project_loader", label_visibility="collapsed")
-            
-        if uploaded_proj is not None:
-            if uploaded_proj != st.session_state['last_loaded_file']:
-                try:
-                    data = json.load(uploaded_proj)
-                    if 'global_params' in data:
-                        for k, v in data['global_params'].items():
-                            st.session_state[k] = v
-                    if 'components_data' in data:
-                        new_df = pd.DataFrame(data['components_data'])
-                        st.session_state['df_initial'] = new_df
-                        st.session_state['df_current'] = new_df.copy()
-                        st.session_state['editor_key'] += 1
-                    
-                    st.session_state['last_loaded_file'] = uploaded_proj
-                    # 記錄檔名
-                    st.session_state['current_project_name'] = uploaded_proj.name
-                    
-                    st.toast("✅ 專案載入成功！", icon="📂")
-                    time.sleep(0.5)
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error: {e}")
-        
-        st.markdown("<hr style='margin: 8px 0;'>", unsafe_allow_html=True)
-        
-        # 2. 存檔 (Save) - 使用 Placeholder 佔位
-        project_io_save_placeholder = st.empty()
+# [UI] 呼叫鎖定的 Header 函數
+# 這樣做可以避免未來修改主程式時意外動到 Header 的排版邏輯
+project_io_save_placeholder = render_locked_header_ui(config_loaded_msg)
 
 st.markdown("<hr style='margin-top: 5px; margin-bottom: 20px;'>", unsafe_allow_html=True)
 
