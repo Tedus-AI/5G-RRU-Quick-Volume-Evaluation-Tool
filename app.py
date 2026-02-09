@@ -18,7 +18,7 @@ import copy
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.07"
+APP_VERSION = "v4.08"
 UPDATE_DATE = "2026-02-09"
 
 # === APP 設定 ===
@@ -1237,6 +1237,7 @@ with tab_sensitivity:
     if st.button("🚀 執行敏感度分析", type="primary"):
         # 取得目前狀態
         current_params = {k: st.session_state[k] for k in DEFAULT_GLOBALS.keys()}
+        current_params['Slope'] = 0.03 # [Fix] 補上 Slope 參數，避免計算熱阻時發生 KeyError
         current_df = st.session_state['df_current'].copy()
         
         # 產生變化點
