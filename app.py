@@ -9,18 +9,17 @@ import os
 import json
 
 # ==============================================================================
-# 版本：v3.101 (CSS Pixel-Perfect v2)
+# 版本：v3.102 (CSS Click Fix)
 # 日期：2026-02-09
 # 修正重點：
-# 1. [CSS Fix] 套用使用者提供的 "Pixel-Perfect Fix v2" CSS 樣式。
-#    - 隱藏 Dropzone，直接將 Widget Label 樣式化為按鈕。
-#    - 調整高度、邊框、陰影與 Hover 效果，確保視覺一致性。
-# 2. [UI Update] 同步更新 st.file_uploader 的 label 文字為 "📂 載入專案設定 (.json)"，
-#    以便新 CSS 能正確顯示按鈕文字。
+# 1. [CSS Fix] 套用使用者提供的 "Pixel-Perfect Fix v3" CSS 樣式。
+#    - 修復按鈕點擊判定問題。
+#    - 優化文字溢出處理 (ellipsis)。
+#    - 隱藏 Dropzone 背景，僅保留美化後的 Label 作為按鈕。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v3.101"
+APP_VERSION = "v3.102"
 UPDATE_DATE = "2026-02-09"
 
 # === APP 設定 ===
@@ -176,7 +175,7 @@ if "welcome_shown" not in st.session_state:
 # ==================================================
 # 👇 主程式開始 - Header 區塊
 # ==================================================
-# CSS 樣式 (Pixel-Perfect Fix v2)
+# CSS 樣式 (Pixel-Perfect Fix v3 - 修復點擊消失)
 st.markdown("""
 <style>
     html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
@@ -206,7 +205,7 @@ st.markdown("""
     .kpi-title { color: #666; font-size: 0.9rem; font-weight: 500; margin-bottom: 5px; }
     .kpi-value { color: #333; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; }
     .kpi-desc { color: #888; font-size: 0.8rem; }
-
+    
     /* 表格樣式 */
     [data-testid="stDataFrame"], [data-testid="stDataEditor"] {
         border: 1px solid #e9ecef !important; border-radius: 8px !important;
@@ -220,17 +219,23 @@ st.markdown("""
     .legend-body { display: flex; align-items: stretch; height: 200px; }
     .gradient-bar { width: 15px; background: linear-gradient(to top, #d73027, #fee08b, #1a9850); border-radius: 3px; margin-right: 8px; border: 1px solid #ccc; }
     .legend-labels { display: flex; flex-direction: column; justify-content: space-between; color: black; font-weight: bold; }
+    
+    /* Header Container Style */
+    [data-testid="stHeader"] { z-index: 0; }
 
-    /* ==================== File Uploader 完美按鈕化 (Pixel-Perfect) ==================== */
-    /* 隱藏拖曳區與說明文字，只留按鈕 */
-    div[data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] {
-        display: none !important;
+    /* ==================== File Uploader 完美按鈕化 (Fix Click & Overflow) ==================== */
+    /* 隱藏拖曳區背景與說明文字，但保留 label 可點擊 */
+    div[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] {
+        min-height: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
     }
     div[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzoneInstructions"] {
         display: none !important;
     }
     
-    /* 強制按鈕樣式：寬度 100%、高度固定、文字不換行但自動縮小 */
+    /* 強制 label 為標準按鈕樣式 */
     div[data-testid="stFileUploader"] > div > div > label {
         width: 100% !important;
         height: 40px !important;
@@ -239,32 +244,26 @@ st.markdown("""
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
+        gap: 8px !important;
         background-color: #ffffff !important;
         border: 1px solid #d1d5db !important;
         border-radius: 6px !important;
         font-size: 14px !important;
         font-weight: 400 !important;
         color: rgb(49, 51, 63) !important;
-        line-height: 1.4 !important;
-        white-space: nowrap !important; /* 防止換行 */
+        white-space: nowrap !important;
         overflow: hidden !important;
-        text-overflow: ellipsis !important; /* 太長顯示 ... */
+        text-overflow: ellipsis !important;
+        cursor: pointer !important;
         transition: all 0.2s ease !important;
         box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
     }
 
-    /* Hover 效果同步標準按鈕 */
+    /* Hover 效果同步下方按鈕 */
     div[data-testid="stFileUploader"] > div > div > label:hover {
         border-color: #ff4b4b !important;
         color: #ff4b4b !important;
         box-shadow: 0 4px 6px rgba(255,75,75,0.2) !important;
-    }
-
-    /* 圖示與文字間距 */
-    div[data-testid="stFileUploader"] > div > div > label > div {
-        display: flex;
-        align-items: center;
-        gap: 8px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -970,7 +969,6 @@ with tab_3d:
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 # --- [Project I/O - Save Logic] 移到底部執行 ---
-# 確保所有輸入參數與計算結果都已更新後，才執行儲存邏輯
 # [Critical Fix] 確保 placeholder 名稱與頂部定義一致 (project_io_save_placeholder)
 with project_io_save_placeholder.container():
     def get_current_state_json():
