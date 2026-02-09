@@ -9,17 +9,19 @@ import os
 import json
 
 # ==============================================================================
-# 版本：v3.85 (Robust Weight Fix)
+# 版本：v4.00 (Final Baseline)
 # 日期：2026-02-09
-# 修正重點：
-# 1. [Fix] 修復 NameError 崩潰：
-#    - 在運算邏輯的 else 區塊中，強制初始化所有重量變數 (hs_weight_kg, total_weight_kg 等) 為 0。
-#    - 確保即使沒有運算結果，Tab 3 的卡片顯示邏輯也能正常執行，不會讓程式中斷。
-# 2. [UI] 確保重量參數輸入框位置正確顯示於側邊欄 Expander 2 底部。
+# 狀態：最終定案版 (Golden Master) - 還原至使用者指定的穩定版本
+# 
+# [系統架構摘要 - The Stable Build]
+# 1. UI: Header 區域採用最穩定的 File Uploader 樣式 (隱藏列表與文字，保留原生按鈕)。
+# 2. Logic: 檔名顯示於左側狀態區 (藍色文字)，載入邏輯置頂，存檔邏輯置底 (Placeholder)。
+# 3. Core: 熱流計算 (h=6.4*tanh)、植樹原理鰭片數、重量估算、3D 模擬功能完整保留。
+# 4. Data: Tab 2 回歸標準 Dataframe 顯示，確保數據呈現穩定不跑版。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v3.85"
+APP_VERSION = "v4.00"
 UPDATE_DATE = "2026-02-09"
 
 # === APP 設定 ===
@@ -179,7 +181,7 @@ if "welcome_shown" not in st.session_state:
 # ==================================================
 # 👇 主程式開始 - Header 區塊
 # ==================================================
-# CSS 樣式 (Pixel-Perfect Fix v6 - 文字直接在按鈕上，完全同步 download_button)
+# CSS 樣式 (v4.00 Stable Style)
 st.markdown("""
 <style>
     html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
@@ -210,77 +212,79 @@ st.markdown("""
     .kpi-value { color: #333; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; }
     .kpi-desc { color: #888; font-size: 0.8rem; }
     
-    /* 表格樣式 */
-    [data-testid="stDataFrame"], [data-testid="stDataEditor"] {
-        border: 1px solid #e9ecef !important; border-radius: 8px !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.02) !important;
-    }
-    [data-testid="stDataFrame"] thead tr th { background-color: #f8f9fa !important; color: #495057 !important; }
-
-    /* Scale Bar CSS */
-    .legend-container { display: flex; flex-direction: column; align-items: center; margin-top: 40px; font-size: 0.85rem; }
-    .legend-title { font-weight: bold; margin-bottom: 5px; color: black; }
-    .legend-body { display: flex; align-items: stretch; height: 200px; }
-    .gradient-bar { width: 15px; background: linear-gradient(to top, #d73027, #fee08b, #1a9850); border-radius: 3px; margin-right: 8px; border: 1px solid #ccc; }
-    .legend-labels { display: flex; flex-direction: column; justify-content: space-between; color: black; font-weight: bold; }
-    
     /* Header Container Style */
     [data-testid="stHeader"] { z-index: 0; }
 
-    /* ==================== File Uploader 完美按鈕化 (Fix Click & Overflow) ==================== */
-    /* 隱藏拖曳區背景與說明文字，但保留 label 可點擊 */
-    div[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] {
-        min-height: 0 !important;
-        padding: 0 !important;
-        border: none !important;
-        background: transparent !important;
-    }
-    div[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzoneInstructions"] {
+    /* ==================== File Uploader Clean UI (v4.00 Stable) ==================== */
+    /* 1. 隱藏預設文字與圖示 (Drag & Drop, Limits...) */
+    [data-testid="stFileUploader"] section > div > div > span, 
+    [data-testid="stFileUploader"] section > div > div > small {
         display: none !important;
     }
     
-    /* 強制 label 為標準按鈕樣式 */
-    div[data-testid="stFileUploader"] > div > div > label {
-        width: 100% !important;
-        height: 40px !important;
-        padding: 0 16px !important;
-        margin: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 8px !important;
-        background-color: #ffffff !important;
-        border: 1px solid #d1d5db !important;
-        border-radius: 6px !important;
-        font-size: 14px !important;
-        font-weight: 400 !important;
-        color: rgb(49, 51, 63) !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        cursor: pointer !important;
-        transition: all 0.2s ease !important;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
-    }
-
-    /* Hover 效果同步下方按鈕 */
-    div[data-testid="stFileUploader"] > div > div > label:hover {
-        border-color: #ff4b4b !important;
-        color: #ff4b4b !important;
-        box-shadow: 0 4px 6px rgba(255,75,75,0.2) !important;
-    }
-    
-    /* 圖示位置（如果有） */
-    div[data-testid="stFileUploader"] > div > div > label > div {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    /* 隱藏上傳後的檔案列表 */
+    /* 2. 關鍵：隱藏上傳後顯示的檔案列表與刪除按鈕 */
     [data-testid="stFileUploader"] ul {
         display: none !important;
     }
+    
+    /* 3. 移除拖曳區背景與邊框，高度壓縮，只留按鈕 */
+    [data-testid="stFileUploader"] section {
+        padding: 0px !important;
+        min-height: 0px !important;
+        background-color: transparent !important;
+        border: none !important;
+        margin-bottom: 0px !important;
+    }
+    
+    /* 4. 調整 "Browse files" 按鈕為滿版 */
+    [data-testid="stFileUploader"] button {
+        width: 100% !important;
+        margin-top: 0px;
+        border: 1px solid rgba(49, 51, 63, 0.2);
+        border-radius: 8px !important;
+        background-color: white;
+        position: relative;
+        padding: 0.25rem 0.5rem;
+        min-height: 2.5rem;
+        line-height: 1.6;
+    }
+
+    /* 5. 植入新文字 "📂 載入專案" (偽裝) */
+    [data-testid="stFileUploader"] button::after {
+        content: "📂 載入專案";
+        color: rgb(49, 51, 63);
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 14px;
+        font-weight: 600 !important;
+        width: 100%;
+        text-align: center;
+        pointer-events: none;
+    }
+    
+    /* 隱藏原生文字 */
+    [data-testid="stFileUploader"] button {
+        color: transparent !important;
+    }
+
+    /* 6. Hover 效果 */
+    [data-testid="stFileUploader"] button:hover {
+        border-color: #ff4b4b !important;
+        color: transparent !important;
+    }
+    [data-testid="stFileUploader"] button:hover::after {
+        color: #ff4b4b !important;
+    }
+    [data-testid="stFileUploader"] button:active {
+        background-color: #ff4b4b !important;
+        border-color: #ff4b4b !important;
+    }
+    [data-testid="stFileUploader"] button:active::after {
+        color: white !important;
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -312,7 +316,7 @@ with col_header_R:
         with c_p1:
             st.markdown(f"<div style='{header_style}'>專案存取 (Project I/O)</div>", unsafe_allow_html=True)
             
-            # [UI Update v3.108] 判斷是否載入專案檔，顯示對應訊息
+            # [UI Update] 判斷是否載入專案檔，顯示對應訊息
             if st.session_state.get('current_project_name'):
                 # 藍色粗體顯示載入的檔名
                 file_display = f"📄 {st.session_state['current_project_name']}"
@@ -340,7 +344,7 @@ with col_header_R:
                         st.session_state['editor_key'] += 1
                     
                     st.session_state['last_loaded_file'] = uploaded_proj
-                    # [v3.108] 記錄檔名
+                    # 記錄檔名
                     st.session_state['current_project_name'] = uploaded_proj.name
                     
                     st.toast("✅ 專案載入成功！", icon="📂")
@@ -388,7 +392,7 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
     H_shield = st.number_input("HSK內腔深度 (mm)", key="H_shield", value=st.session_state['H_shield'], on_change=reset_download_state)
     H_filter = st.number_input("Cavity Filter 厚度 (mm)", key="H_filter", value=st.session_state['H_filter'], on_change=reset_download_state)
     
-    # [v3.85 Fix] 重量參數 (放回 Expander 2)
+    # 重量參數
     st.caption("⚖️ 重量估算參數")
     al_density = st.number_input("鋁材密度 (g/cm³)", step=0.01, key="al_density", value=st.session_state['al_density'], on_change=reset_download_state, help="Heatsink + Shield 用；壓鑄略調低")
     filter_density = st.number_input("Cavity Filter (g/cm³)", step=0.05, key="filter_density", value=st.session_state['filter_density'], on_change=reset_download_state, help="實測校正 ≈0.97–1.05")
@@ -622,7 +626,7 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
     RRU_Height = t_base + Fin_Height + H_shield + H_filter
     Volume_L = (L_hsk * W_hsk * RRU_Height) / 1e6
     
-    # [v3.85 Fix] 重量計算 (確保變數存在)
+    # [v3.84] 重量計算
     base_vol_cm3 = L_hsk * W_hsk * t_base / 1000
     fins_vol_cm3 = num_fins_int * Fin_t * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * al_density / 1000
@@ -721,29 +725,18 @@ with tab_data:
         st.dataframe(
             styled_df, 
             column_config={
-                "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)"),
+                "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
                 "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量"),
-                "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.1f"),
-                "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.1f"),
-                "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.1f"),
-                "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.1f"),
-                "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
-                "R_jc": st.column_config.NumberColumn("Rjc", help="結點到殼的內部熱阻", format="%.2f"),
-                "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.1f"),
-                
-                # 計算欄位 - 完整公式說明
-                "Base_L": st.column_config.NumberColumn("Base 長 (mm)", help="熱量擴散後的底部有效長度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
-                "Base_W": st.column_config.NumberColumn("Base 寬 (mm)", help="熱量擴散後的底部有效寬度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
-                "Loc_Amb": st.column_config.NumberColumn("局部環溫 (°C)", help="該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)。", format="%.1f"),
-                "Drop": st.column_config.NumberColumn("內部溫降 (°C)", help="熱量從晶片核心傳導到散熱器表面的溫差。公式：Power × (Rjc + Rint + Rtim)。", format="%.1f"),
-                "Total_W": st.column_config.NumberColumn("總功耗 (W)", help="該元件的總發熱量 (單顆功耗 × 數量)。", format="%.1f"),
-                "Allowed_dT": st.column_config.NumberColumn("允許溫升 (°C)", help="散熱器剩餘可用的溫升裕度。數值越小代表該元件越容易過熱 (瓶頸)。公式：Limit - Loc_Amb - Drop。", format="%.2f"),
-                "R_int": st.column_config.NumberColumn("基板熱阻 (°C/W)", help="元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值。", format="%.4f"),
-                "R_TIM": st.column_config.NumberColumn("介面熱阻 (°C/W)", help="元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)。", format="%.4f"),
-                
-                # [修正 v3.67] 名詞一致化
-                "Board_Type": st.column_config.Column("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)"),
-                "TIM_Type": st.column_config.Column("介面材料", help="元件或銅塊底部與散熱器之間的TIM")
+                "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f", min_value=0.0, step=0.01),
+                "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.2f"),
+                "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.2f"),
+                "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.2f"),
+                "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.2f"),
+                "Board_Type": st.column_config.SelectboxColumn("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)", options=["Thermal Via", "Copper Coin", "None"], width="medium"),
+                # [修正] 移除 Solder 選項
+                "TIM_Type": st.column_config.SelectboxColumn("介面材料", help="元件或銅塊底部與散熱器之間的TIM", options=["Grease", "Pad", "Putty", "None"], width="medium"),
+                "R_jc": st.column_config.NumberColumn("熱阻 Rjc", help="結點到殼的內部熱阻", format="%.2f"),
+                "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.2f")
             },
             use_container_width=True, 
             hide_index=True
@@ -864,7 +857,7 @@ with tab_viz:
     </div>
     """, unsafe_allow_html=True)
 
-    # [v3.85 Fix] 重量顯示區塊 (僅在 DRC 通過時顯示，並確保變數安全)
+    # [v3.84/85 Fix] 重量顯示區塊 (僅在 DRC 通過時顯示，並確保變數安全)
     if not drc_failed:
         st.markdown(f"""
         <div style="background-color: #ecf0f1; padding: 30px; margin-top: 20px; border-radius: 15px; border-left: 10px solid #34495e; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center;">
