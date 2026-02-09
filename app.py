@@ -10,16 +10,15 @@ import json
 import copy
 
 # ==============================================================================
-# 版本：v4.06 (UI Restore & Tab Fix)
+# 版本：v4.07 (Duplicate Tabs Removed)
 # 日期：2026-02-09
 # 修正重點：
-# 1. [Fix] 移除重複的 st.tabs() 呼叫，解決頁面下方出現第二排頁籤的問題。
-# 2. [UI Restore] 還原 v4.00 的 Header UI 設計 (右上角按鈕化 File Uploader)。
-# 3. [Feature] 保留 v4.05 的敏感度分析與 v4.04 的登入說明頁。
+# 1. [Fix] 移除程式末端重複呼叫 st.tabs() 的代碼，解決頁面底部出現第二排頁籤的問題。
+# 2. [Stable] 保持 Header UI、檔案存取邏輯與 CSS 樣式與 v4.06 完全一致。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.06"
+APP_VERSION = "v4.07"
 UPDATE_DATE = "2026-02-09"
 
 # === APP 設定 ===
@@ -239,8 +238,9 @@ if "welcome_shown" not in st.session_state:
     st.session_state["welcome_shown"] = True
 
 # ==================================================
-# 👇 主程式開始 - Header 區塊 (Restore v4.00 Layout)
+# 👇 主程式開始 - Header 區塊
 # ==================================================
+# CSS 樣式 (v4.00 Stable Style - Pixel Perfect Uploader)
 st.markdown("""
 <style>
     html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
@@ -275,18 +275,18 @@ st.markdown("""
     [data-testid="stHeader"] { z-index: 0; }
 
     /* ==================== File Uploader Clean UI (v4.00 Stable) ==================== */
-    /* 1. 隱藏預設文字與圖示 */
+    /* 1. 隱藏預設文字與圖示 (Drag & Drop, Limits...) */
     [data-testid="stFileUploader"] section > div > div > span, 
     [data-testid="stFileUploader"] section > div > div > small {
         display: none !important;
     }
     
-    /* 2. 隱藏上傳後顯示的檔案列表與刪除按鈕 */
+    /* 2. 關鍵：隱藏上傳後顯示的檔案列表與刪除按鈕 */
     [data-testid="stFileUploader"] ul {
         display: none !important;
     }
     
-    /* 3. 移除拖曳區背景與邊框 */
+    /* 3. 移除拖曳區背景與邊框，高度壓縮，只留按鈕 */
     [data-testid="stFileUploader"] section {
         padding: 0px !important;
         min-height: 0px !important;
@@ -375,7 +375,7 @@ with col_header_R:
         with c_p1:
             st.markdown(f"<div style='{header_style}'>專案存取 (Project I/O)</div>", unsafe_allow_html=True)
             
-            # [UI v4.00] 判斷是否載入專案檔，顯示對應訊息
+            # [UI Update v3.108] 判斷是否載入專案檔，顯示對應訊息
             if st.session_state.get('current_project_name'):
                 # 藍色粗體顯示載入的檔名
                 file_display = f"📄 {st.session_state['current_project_name']}"
@@ -897,7 +897,7 @@ with tab_data:
                 
                 # 計算欄位 - 完整公式說明
                 "Base_L": st.column_config.NumberColumn("Base 長 (mm)", help="熱量擴散後的底部有效長度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
-                "Base_W": st.column_config.NumberColumn("Base寬 (mm)", help="熱量擴散後的底部有效寬度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
+                "Base_W": st.column_config.NumberColumn("Base 寬 (mm)", help="熱量擴散後的底部有效寬度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
                 "Loc_Amb": st.column_config.NumberColumn("局部環溫 (°C)", help="該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)。", format="%.1f"),
                 "Drop": st.column_config.NumberColumn("內部溫降 (°C)", help="熱量從晶片核心傳導到散熱器表面的溫差。公式：Power × (Rjc + Rint + Rtim)。", format="%.1f"),
                 "Total_W": st.column_config.NumberColumn("總功耗 (W)", help="該元件的總發熱量 (單顆功耗 × 數量)。", format="%.1f"),
@@ -1202,101 +1202,3 @@ with project_io_save_placeholder.container():
             )
         else:
             st.caption("ℹ️ 待更新")
-
-# --- Tab 5: 敏感度分析 ---
-tab_sensitivity = st.tabs([
-    "📝 COMPONENT SETUP (元件設定)", 
-    "🔢 DETAILED ANALYSIS (詳細分析)", 
-    "📊 VISUAL REPORT (視覺化報告)", 
-    "🧊 3D SIMULATION (3D 模擬視圖)",
-    "📈 SENSITIVITY ANALYSIS (敏感度分析)"
-])[4]
-
-with tab_sensitivity:
-    st.subheader("📈 敏感度分析 (Sensitivity Analysis)")
-    st.markdown("""
-    此功能讓您快速評估單一參數變化對整機體積、重量與熱裕度的影響。<br>
-    選擇一個變數，設定變化範圍後點擊執行，即可看到趨勢圖。
-    """, unsafe_allow_html=True)
-    
-    col1, col2 = st.columns([1, 1])
-    with col1:
-        var_type = st.selectbox("變數類型", ["全局參數", "元件功率"])
-    with col2:
-        if var_type == "全局參數":
-            var_name = st.selectbox("選擇變數", ["T_amb", "Gap", "Fin_t", "Margin"])
-        else:
-            var_name = st.selectbox("選擇元件", ["Final PA Power(W)"])  # 未來可擴充
-            
-    col_range1, col_range2, col_range3 = st.columns([1, 1, 1])
-    with col_range1:
-        # 取得基準值
-        if var_type == "全局參數":
-            base_val_display = float(st.session_state.get(var_name, 0))
-        else:
-            base_val_display = float(st.session_state['df_current'].loc[st.session_state['df_current']["Component"] == "Final PA", "Power(W)"].iloc[0])
-        st.number_input("基準值 (自動帶入目前值)", value=base_val_display, disabled=True)
-        
-    with col_range2:
-        pct_range = st.number_input("變化範圍 (±%)", min_value=5.0, max_value=100.0, value=20.0, step=5.0)
-    with col_range3:
-        num_points = st.selectbox("計算點數", [5, 7, 9, 11], index=1)
-        
-    if st.button("🚀 執行敏感度分析", type="primary"):
-        # 取得目前狀態
-        current_params = {k: st.session_state[k] for k in DEFAULT_GLOBALS.keys()}
-        current_df = st.session_state['df_current'].copy()
-        
-        # 產生變化點
-        if var_type == "全局參數":
-            base_val = current_params[var_name]
-        else:  # 元件功率
-            base_val = current_df.loc[current_df["Component"] == "Final PA", "Power(W)"].iloc[0]
-            
-        delta = base_val * (pct_range / 100)
-        values = np.linspace(base_val - delta, base_val + delta, num_points)
-        
-        # 儲存結果
-        results = {"var_values": [], "volume": [], "weight": [], "min_dt": []}
-        
-        for val in values:
-            # 深拷貝
-            params_copy = copy.deepcopy(current_params)
-            df_copy = current_df.copy()
-            
-            # 修改變數
-            if var_type == "全局參數":
-                params_copy[var_name] = val
-            else:
-                df_copy.loc[df_copy["Component"] == "Final PA", "Power(W)"] = val
-                
-            # 計算
-            res = compute_key_results(params_copy, df_copy)
-            
-            results["var_values"].append(round(val, 2))
-            results["volume"].append(res["Volume_L"])
-            results["weight"].append(res["total_weight_kg"])
-            results["min_dt"].append(res["Min_dT_Allowed"])
-        
-        # 畫圖
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=results["var_values"], y=results["volume"], mode='lines+markers', name='體積 (L)', line=dict(color='#00b894')))
-        fig.add_trace(go.Scatter(x=results["var_values"], y=results["weight"], mode='lines+markers', name='重量 (kg)', line=dict(color='#34495e'), yaxis='y2'))
-        fig.add_trace(go.Scatter(x=results["var_values"], y=results["min_dt"], mode='lines+markers', name='瓶頸允許溫升 (°C)', line=dict(color='#e74c3c', dash='dot'), yaxis='y3'))
-        
-        fig.update_layout(
-            title=f"<b>{var_name} 敏感度分析 (基準 {base_val:.2f})</b>",
-            xaxis_title=var_name,
-            yaxis=dict(title="體積 (L)", side="left"),
-            yaxis2=dict(title="重量 (kg)", side="right", overlaying="y", position=0.95, showgrid=False), # 微調位置避免重疊
-            yaxis3=dict(title="瓶頸允許溫升 (°C)", side="right", overlaying="y", position=1.0, showgrid=False),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            height=600
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # 表格顯示
-        df_sens = pd.DataFrame(results)
-        df_sens.columns = [var_name, "體積 (L)", "重量 (kg)", "瓶頸允許溫升 (°C)"]
-        st.dataframe(df_sens, use_container_width=True)
