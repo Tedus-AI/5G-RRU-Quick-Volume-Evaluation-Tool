@@ -1202,3 +1202,93 @@ with project_io_save_placeholder.container():
             )
         else:
             st.caption("ℹ️ 待更新")
+
+# --- Tab 5: 敏感度分析 (Restored Content) ---
+with tab_sensitivity:
+    st.subheader("📈 敏感度分析 (Sensitivity Analysis)")
+    st.markdown("""
+    此功能讓您快速評估單一參數變化對整機體積、重量與熱裕度的影響。<br>
+    選擇一個變數，設定變化範圍後點擊執行，即可看到趨勢圖。
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        var_type = st.selectbox("變數類型", ["全局參數", "元件功率"])
+    with col2:
+        if var_type == "全局參數":
+            var_name = st.selectbox("選擇變數", ["T_amb", "Gap", "Fin_t", "Margin"])
+        else:
+            var_name = st.selectbox("選擇元件", ["Final PA Power(W)"])  # 未來可擴充
+            
+    col_range1, col_range2, col_range3 = st.columns([1, 1, 1])
+    with col_range1:
+        # 取得基準值
+        if var_type == "全局參數":
+            base_val_display = float(st.session_state.get(var_name, 0))
+        else:
+            base_val_display = float(st.session_state['df_current'].loc[st.session_state['df_current']["Component"] == "Final PA", "Power(W)"].iloc[0])
+        st.number_input("基準值 (自動帶入目前值)", value=base_val_display, disabled=True)
+        
+    with col_range2:
+        pct_range = st.number_input("變化範圍 (±%)", min_value=5.0, max_value=100.0, value=20.0, step=5.0)
+    with col_range3:
+        num_points = st.selectbox("計算點數", [5, 7, 9, 11], index=1)
+        
+    if st.button("🚀 執行敏感度分析", type="primary"):
+        # 取得目前狀態
+        current_params = {k: st.session_state[k] for k in DEFAULT_GLOBALS.keys()}
+        current_df = st.session_state['df_current'].copy()
+        
+        # 產生變化點
+        if var_type == "全局參數":
+            base_val = current_params[var_name]
+        else:  # 元件功率
+            base_val = current_df.loc[current_df["Component"] == "Final PA", "Power(W)"].iloc[0]
+            
+        delta = base_val * (pct_range / 100)
+        values = np.linspace(base_val - delta, base_val + delta, num_points)
+        
+        # 儲存結果
+        results = {"var_values": [], "volume": [], "weight": [], "min_dt": []}
+        
+        for val in values:
+            # 深拷貝
+            params_copy = copy.deepcopy(current_params)
+            df_copy = current_df.copy()
+            
+            # 修改變數
+            if var_type == "全局參數":
+                params_copy[var_name] = val
+            else:
+                df_copy.loc[df_copy["Component"] == "Final PA", "Power(W)"] = val
+                
+            # 計算
+            res = compute_key_results(params_copy, df_copy)
+            
+            results["var_values"].append(round(val, 2))
+            results["volume"].append(res["Volume_L"])
+            results["weight"].append(res["total_weight_kg"])
+            results["min_dt"].append(res["Min_dT_Allowed"])
+        
+        # 畫圖
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=results["var_values"], y=results["volume"], mode='lines+markers', name='體積 (L)', line=dict(color='#00b894')))
+        fig.add_trace(go.Scatter(x=results["var_values"], y=results["weight"], mode='lines+markers', name='重量 (kg)', line=dict(color='#34495e'), yaxis='y2'))
+        fig.add_trace(go.Scatter(x=results["var_values"], y=results["min_dt"], mode='lines+markers', name='瓶頸允許溫升 (°C)', line=dict(color='#e74c3c', dash='dot'), yaxis='y3'))
+        
+        fig.update_layout(
+            title=f"<b>{var_name} 敏感度分析 (基準 {base_val:.2f})</b>",
+            xaxis_title=var_name,
+            yaxis=dict(title="體積 (L)", side="left"),
+            yaxis2=dict(title="重量 (kg)", side="right", overlaying="y", position=0.95, showgrid=False), # 微調位置避免重疊
+            yaxis3=dict(title="瓶頸允許溫升 (°C)", side="right", overlaying="y", position=1.0, showgrid=False),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            height=600
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # 表格顯示
+        df_sens = pd.DataFrame(results)
+        df_sens.columns = [var_name, "體積 (L)", "重量 (kg)", "瓶頸允許溫升 (°C)"]
+        st.dataframe(df_sens, use_container_width=True)
