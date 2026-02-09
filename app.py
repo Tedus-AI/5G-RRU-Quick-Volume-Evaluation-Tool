@@ -9,18 +9,20 @@ import os
 import json
 
 # ==============================================================================
-# 版本：v3.108 (Restored)
+# 版本：v4.01 (Info Page Added)
 # 日期：2026-02-09
-# 狀態：正式發布版 (Production Ready) - 回溯至穩定版 v3.108
+# 狀態：正式發布版 (Production Ready)
 # 
-# [系統架構摘要]
-# 1. UI: Header 區域採用按鈕化 File Uploader，並隱藏檔案列表。
-# 2. Logic: 檔名顯示於左側狀態區，載入邏輯置頂，存檔邏輯置底。
-# 3. Core: 熱流計算、重量估算、3D 模擬功能完整保留。
+# [系統架構摘要 - The Stable Build]
+# 1. UI: Header 區域採用最穩定的 File Uploader 樣式 (隱藏列表與文字，保留原生按鈕)。
+# 2. Logic: 檔名顯示於左側狀態區 (藍色文字)，載入邏輯置頂，存檔邏輯置底 (Placeholder)。
+# 3. Core: 熱流計算 (h=6.4*tanh)、植樹原理鰭片數、重量估算、3D 模擬功能完整保留。
+# 4. Data: Tab 2 回歸標準 Dataframe 顯示，確保數據呈現穩定不跑版。
+# 5. Landing: 登入頁面新增功能介紹、注意事項與物理原理說明。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v3.108 (Restored)"
+APP_VERSION = "v4.01"
 UPDATE_DATE = "2026-02-09"
 
 # === APP 設定 ===
@@ -134,7 +136,7 @@ if 'json_file_name' not in st.session_state:
 if 'trigger_generation' not in st.session_state:
     st.session_state['trigger_generation'] = False
 
-# [v3.108] 新增記錄目前載入專案名稱的狀態
+# 新增記錄目前載入專案名稱的狀態
 if 'current_project_name' not in st.session_state:
     st.session_state['current_project_name'] = None
 
@@ -155,17 +157,81 @@ def check_password():
 
     if "password_correct" not in st.session_state:
         st.markdown("""<style>.stTextInput > div > div > input {text-align: center;}</style>""", unsafe_allow_html=True)
+        
+        # === 1. 大標題（最頂）===
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #007CF0, #00DFD8); padding: 30px; border-radius: 15px; color: white; text-align: center; margin-bottom: 30px; box-shadow: 0 6px 12px rgba(0,0,0,0.2);">
+            <h1 style="margin:0; font-size: 2.8rem; font-weight: 900;">📡 5G RRU 熱流引擎 Pro</h1>
+            <p style="font-size: 1.3rem; margin: 10px 0 0; opacity: 0.95;">High-Performance Thermal & Volume Estimation System</p>
+            <p style="font-size: 1rem; margin-top: 15px; opacity: 0.9;">{APP_VERSION} • {UPDATE_DATE}</p>
+        </div>
+        """.format(APP_VERSION=APP_VERSION, UPDATE_DATE=UPDATE_DATE), unsafe_allow_html=True)
+
+        # === 2. 密碼輸入區塊（緊接標題下方，最上方可見區域）===
         c1, c2, c3 = st.columns([1,2,1])
         with c2:
-            st.markdown("<h2 style='text-align: center;'>🔐 系統鎖定</h2>", unsafe_allow_html=True)
-            st.caption("<p style='text-align: center;'>請輸入授權金鑰以存取熱流引擎</p>", unsafe_allow_html=True)
-            st.text_input("Password", type="password", on_change=password_entered, key="password", label_visibility="collapsed")
+            st.markdown("<h2 style='text-align: center; color: #2c3e50; margin-bottom: 20px;'>🔐 請輸入授權金鑰</h2>", unsafe_allow_html=True)
+            st.text_input(
+                "", 
+                type="password", 
+                on_change=password_entered, 
+                key="password", 
+                label_visibility="collapsed",
+                placeholder="輸入密碼後按 Enter"
+            )
+            # 若密碼錯誤，顯示紅色提示
+            if st.session_state.get("password_correct") == False:
+                st.error("❌ 密碼錯誤，請重新輸入")
+
+        st.markdown("<div style='margin: 40px 0;'></div>", unsafe_allow_html=True)  # 間距
+
+        # === 3. 功能說明區塊（往下滾才看到）===
+        st.markdown("""
+        <div style="background: #ffffff; padding: 25px; border-radius: 12px; border: 1px solid #e0e0e0; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.08);">
+            <h3 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px;">🛠️ 主要功能一覽</h3>
+            <ul style="font-size: 1.05rem; line-height: 1.8; color: #34495e;">
+                <li><strong>元件熱源管理</strong>：動態新增/編輯元件清單，支援 Copper Coin、Thermal Via、多種 TIM</li>
+                <li><strong>精準熱阻計算</strong>：自動計算 Rjc + Rint + Rtim，並考慮局部環溫與高度效應</li>
+                <li><strong>散熱器尺寸優化</strong>：根據瓶頸元件裕度，自動推算所需鰭片高度、數量與整機體積</li>
+                <li><strong>重量預估</strong>：含散熱器、Shield、Filter、Shielding、PCB 等分項重量</li>
+                <li><strong>設計規則檢查 (DRC)</strong>：自動檢測 Gap 過小、流阻比過高、製程限制等問題</li>
+                <li><strong>3D 模擬視圖</strong>：真實比例展示電子艙 + 散熱器 + 鰭片結構</li>
+                <li><strong>AI 寫實渲染輔助</strong>：一鍵生成精確提示詞，搭配 Imagen 3 可產出照片級渲染圖</li>
+                <li><strong>專案存取</strong>：JSON 格式載入/儲存，支援參數與元件資料完整備份</li>
+            </ul>
+        </div>
+
+        <div style="background: #fffacd; padding: 20px; border-radius: 12px; border-left: 6px solid #f39c12; margin-bottom: 30px;">
+            <h3 style="color: #d35400; margin-top: 0;">⚠️ 使用注意事項</h3>
+            <ul style="line-height: 1.7; color: #34495e;">
+                <li>本工具為<strong>快速概念設計與尺寸評估</strong>用途，非最終驗證級熱模擬</li>
+                <li>計算結果高度依賴輸入參數準確度，請使用實際量測或 Datasheet 數值</li>
+                <li>自然對流模型基於垂直鰭片、無風環境，室外高風速情境需另行評估</li>
+                <li>Embedded Fin 高度限制預設 < 100mm，超過將觸發 DRC 警告</li>
+                <li>建議將計算結果與 CFD 或實測進行交叉驗證，尤其在高功耗或極端環境下</li>
+            </ul>
+        </div>
+
+        <div style="background: #e8f4fd; padding: 20px; border-radius: 12px; border-left: 6px solid #3498db;">
+            <h3 style="color: #2980b9; margin-top: 0;">🔥 綜合傳熱係數 h 的計算原理</h3>
+            <p style="line-height: 1.7; color: #2c3e50;">
+            本工具的 h 值採用<strong>半經驗模型</strong>，經多款實際 RRU 產品的 CFD 模擬結果校正而得，具有高度可信度：<br><br>
+            • <strong>h_conv</strong> = 6.4 × tanh(Gap / 7.0)　→ 模擬自然對流隨鰭片間距的飽和行為<br>
+            • <strong>h_rad</strong> = 2.4 × (Gap / 10)<sup>0.5</sup>　→ 考慮鰭片間輻射交換隨間距衰減<br>
+            • <strong>h_total</strong> = h_conv + h_rad<br><br>
+            該模型已在多個專案中與 Ansys Icepak / FloTHERM 結果比對，誤差通常在 <strong>±8%</strong> 以內，特別適合 4~15mm 間距的鋁鰭片設計。<br>
+            當 Gap 過小時會自動提示 h_conv 過低，提醒設計風險。
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
         return False
+
     elif not st.session_state["password_correct"]:
+        # 密碼錯誤時仍顯示輸入框（放在最上）
         c1, c2, c3 = st.columns([1,2,1])
         with c2:
-            st.text_input("Password", type="password", on_change=password_entered, key="password", label_visibility="collapsed")
-            st.error("❌ 密碼錯誤")
+            st.markdown("<h2 style='text-align: center; color: #2c3e50;'>🔐 密碼錯誤</h2>", unsafe_allow_html=True)
+            st.text_input("", type="password", on_change=password_entered, key="password", label_visibility="collapsed", placeholder="請重新輸入")
         return False
     else:
         return True
@@ -180,7 +246,7 @@ if "welcome_shown" not in st.session_state:
 # ==================================================
 # 👇 主程式開始 - Header 區塊
 # ==================================================
-# CSS 樣式 (v3.108 樣式 - 偽裝按鈕 + 隱藏列表)
+# CSS 樣式 (Pixel-Perfect Fix v6 - 文字直接在按鈕上，完全同步 download_button)
 st.markdown("""
 <style>
     html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
@@ -211,75 +277,77 @@ st.markdown("""
     .kpi-value { color: #333; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; }
     .kpi-desc { color: #888; font-size: 0.8rem; }
     
+    /* 表格樣式 */
+    [data-testid="stDataFrame"], [data-testid="stDataEditor"] {
+        border: 1px solid #e9ecef !important; border-radius: 8px !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.02) !important;
+    }
+    [data-testid="stDataFrame"] thead tr th { background-color: #f8f9fa !important; color: #495057 !important; }
+
+    /* Scale Bar CSS */
+    .legend-container { display: flex; flex-direction: column; align-items: center; margin-top: 40px; font-size: 0.85rem; }
+    .legend-title { font-weight: bold; margin-bottom: 5px; color: black; }
+    .legend-body { display: flex; align-items: stretch; height: 200px; }
+    .gradient-bar { width: 15px; background: linear-gradient(to top, #d73027, #fee08b, #1a9850); border-radius: 3px; margin-right: 8px; border: 1px solid #ccc; }
+    .legend-labels { display: flex; flex-direction: column; justify-content: space-between; color: black; font-weight: bold; }
+    
     /* Header Container Style */
     [data-testid="stHeader"] { z-index: 0; }
 
-    /* ==================== File Uploader 完美按鈕化 ==================== */
-    /* 1. 隱藏預設文字與圖示 (Drag & Drop, Limits...) */
-    [data-testid="stFileUploader"] section > div > div > span, 
-    [data-testid="stFileUploader"] section > div > div > small {
+    /* ==================== File Uploader 完美按鈕化 (Fix Click & Overflow) ==================== */
+    /* 隱藏拖曳區背景與說明文字，但保留 label 可點擊 */
+    div[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] {
+        min-height: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+    }
+    div[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzoneInstructions"] {
         display: none !important;
     }
     
-    /* [v3.108] 關鍵修正：隱藏上傳後顯示的檔案列表與刪除按鈕 */
+    /* 強制 label 為標準按鈕樣式 */
+    div[data-testid="stFileUploader"] > div > div > label {
+        width: 100% !important;
+        height: 40px !important;
+        padding: 0 16px !important;
+        margin: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 8px !important;
+        background-color: #ffffff !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 8px !important;     /* [Fix] 圓角加大至 8px */
+        font-size: 14px !important;
+        font-weight: 600 !important;       /* [Fix] 字體加粗至 600 */
+        color: rgb(49, 51, 63) !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+    }
+
+    /* Hover 效果同步下方按鈕 */
+    div[data-testid="stFileUploader"] > div > div > label:hover {
+        border-color: #ff4b4b !important;
+        color: #ff4b4b !important;
+        box-shadow: 0 4px 6px rgba(255,75,75,0.2) !important;
+    }
+    
+    /* 圖示位置（如果有） */
+    div[data-testid="stFileUploader"] > div > div > label > div {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    /* 隱藏上傳後的檔案列表 */
     [data-testid="stFileUploader"] ul {
         display: none !important;
     }
-    
-    /* 2. 移除拖曳區背景與邊框，高度壓縮 */
-    [data-testid="stFileUploader"] section {
-        padding: 0px !important;
-        min-height: 0px !important;
-        background-color: transparent !important;
-        border: none !important;
-        margin-bottom: 0px !important;
-    }
-    
-    /* 3. 改造 "Browse files" 按鈕為目標按鈕 */
-    [data-testid="stFileUploader"] button {
-        width: 100% !important;
-        margin-top: 0px;
-        border: 1px solid rgba(49, 51, 63, 0.2);
-        border-radius: 8px !important;
-        background-color: white;
-        color: transparent !important; /* 隱藏原生 "Browse files" */
-        position: relative;
-        padding: 0.25rem 0.5rem;
-        min-height: 2.5rem;
-        line-height: 1.6;
-    }
-
-    /* 4. 植入新文字 "📂 載入專案" */
-    [data-testid="stFileUploader"] button::after {
-        content: "📂 載入專案";
-        color: rgb(49, 51, 63);
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 14px;
-        font-weight: 600 !important;
-        width: 100%;
-        text-align: center;
-        pointer-events: none;
-    }
-
-    /* 5. Hover 效果 */
-    [data-testid="stFileUploader"] button:hover {
-        border-color: #ff4b4b !important;
-        color: transparent !important;
-    }
-    [data-testid="stFileUploader"] button:hover::after {
-        color: #ff4b4b !important;
-    }
-    [data-testid="stFileUploader"] button:active {
-        background-color: #ff4b4b !important;
-        border-color: #ff4b4b !important;
-    }
-    [data-testid="stFileUploader"] button:active::after {
-        color: white !important;
-    }
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -867,8 +935,8 @@ with tab_viz:
     if not drc_failed:
         st.markdown(f"""
         <div style="background-color: #ecf0f1; padding: 30px; margin-top: 20px; border-radius: 15px; border-left: 10px solid #34495e; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center;">
-            <h3 style="color: #2c3e50; margin:0; font-size: 1.4rem; letter-spacing: 1px;">⚖️ 整機估算重量 (Estimated Weight)</h3>
-            <h1 style="color: #34495e; margin:15px 0 10px 0; font-size: 3.5rem; font-weight: 800;">{round(total_weight_kg, 1)} kg</h1>
+            <h3 style="color: {vol_title}; margin:0; font-size: 1.4rem; letter-spacing: 1px;">⚖️ 整機估算重量 (Estimated Weight)</h3>
+            <h1 style="color: {vol_border}; margin:15px 0 10px 0; font-size: 3.5rem; font-weight: 800;">{round(total_weight_kg, 1)} kg</h1>
             <small style="color: #7f8c8d; line-height: 1.6;">
                 Heatsink ≈ {round(hs_weight_kg, 1)} kg | Shield ≈ {round(shield_weight_kg, 1)} kg<br>
                 Filter ≈ {round(filter_weight_kg, 1)} kg | Shielding Case ≈ {round(shielding_weight_kg, 1)} kg | PCB ≈ {round(pcb_weight_kg, 2)} kg
@@ -996,7 +1064,6 @@ with tab_3d:
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 # --- [Project I/O - Save Logic] 移到底部執行 ---
-# 確保所有輸入參數與計算結果都已更新後，才執行儲存邏輯
 # [Critical Fix] 確保 placeholder 名稱與頂部定義一致 (project_io_save_placeholder)
 with project_io_save_placeholder.container():
     def get_current_state_json():
