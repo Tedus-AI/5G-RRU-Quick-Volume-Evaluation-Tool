@@ -9,17 +9,19 @@ import os
 import json
 
 # ==============================================================================
-# 版本：v3.105 (UI Detail Polish)
+# 版本：v3.106 (Final Perfect Match)
 # 日期：2026-02-09
 # 修正重點：
-# 1. [CSS Fix] 微調偽裝按鈕樣式以匹配原生按鈕：
-#    - 圓角 (Border Radius) 加大至 8px。
-#    - 字體粗細 (Font Weight) 加粗至 600 (Semi-bold)。
-#    - 保持文字為簡化後的 "📂 載入專案"。
+# 1. [CSS Fix] 針對 "載入專案" 按鈕進行像素級調校：
+#    - 文字內容：簡化為 "📂 載入專案" 以確保不溢出。
+#    - 圓角：設定 border-radius: 8px !important (對齊下方按鈕)。
+#    - 字體：設定 font-weight: 600 !important (加粗，對齊下方按鈕)。
+#    - 尺寸：設定 width: 100% 且 min-height: 2.5rem。
+#    - 清潔：移除所有原本 File Uploader 的背景與多餘元素。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v3.105"
+APP_VERSION = "v3.106"
 UPDATE_DATE = "2026-02-09"
 
 # === APP 設定 ===
@@ -175,7 +177,7 @@ if "welcome_shown" not in st.session_state:
 # ==================================================
 # 👇 主程式開始 - Header 區塊
 # ==================================================
-# CSS 樣式 (Pixel-Perfect Fix v7 - 圓角8px, 粗體600)
+# CSS 樣式 (Fix v3.106)
 st.markdown("""
 <style>
     html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
@@ -206,78 +208,76 @@ st.markdown("""
     .kpi-value { color: #333; font-size: 1.8rem; font-weight: 700; margin-bottom: 5px; }
     .kpi-desc { color: #888; font-size: 0.8rem; }
     
-    /* 表格樣式 */
-    [data-testid="stDataFrame"], [data-testid="stDataEditor"] {
-        border: 1px solid #e9ecef !important; border-radius: 8px !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.02) !important;
-    }
-    [data-testid="stDataFrame"] thead tr th { background-color: #f8f9fa !important; color: #495057 !important; }
-
-    /* Scale Bar CSS */
-    .legend-container { display: flex; flex-direction: column; align-items: center; margin-top: 40px; font-size: 0.85rem; }
-    .legend-title { font-weight: bold; margin-bottom: 5px; color: black; }
-    .legend-body { display: flex; align-items: stretch; height: 200px; }
-    .gradient-bar { width: 15px; background: linear-gradient(to top, #d73027, #fee08b, #1a9850); border-radius: 3px; margin-right: 8px; border: 1px solid #ccc; }
-    .legend-labels { display: flex; flex-direction: column; justify-content: space-between; color: black; font-weight: bold; }
-    
     /* Header Container Style */
     [data-testid="stHeader"] { z-index: 0; }
 
-    /* ==================== File Uploader 完美按鈕化 (Fix Radius & Weight) ==================== */
-    /* 隱藏拖曳區背景與說明文字 */
-    div[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzone"] {
-        min-height: 0 !important;
-        padding: 0 !important;
-        border: none !important;
-        background: transparent !important;
-    }
-    div[data-testid="stFileUploader"] div[data-testid="stFileUploaderDropzoneInstructions"] {
+    /* ==================== File Uploader 按鈕完美化 ==================== */
+    /* 1. 隱藏預設文字與圖示 */
+    [data-testid="stFileUploader"] section > div > div > span, 
+    [data-testid="stFileUploader"] section > div > div > small {
         display: none !important;
     }
     
-    /* 強制 label 為標準按鈕樣式 */
-    div[data-testid="stFileUploader"] > div > div > label {
-        width: 100% !important;
-        height: 40px !important;
-        padding: 0 16px !important;
-        margin: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 8px !important;
-        background-color: #ffffff !important;
-        border: 1px solid #d1d5db !important;
-        
-        /* [修正重點 1] 圓角加大至 8px，對齊原生按鈕 */
-        border-radius: 8px !important;
-        
-        font-size: 14px !important;
-        
-        /* [修正重點 2] 字體加粗至 600，解決看起來太細的問題 */
-        font-weight: 600 !important;
-        
-        color: rgb(49, 51, 63) !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        cursor: pointer !important;
-        transition: all 0.2s ease !important;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
-    }
-
-    /* Hover 效果 */
-    div[data-testid="stFileUploader"] > div > div > label:hover {
-        border-color: #ff4b4b !important;
-        color: #ff4b4b !important;
-        box-shadow: 0 4px 6px rgba(255,75,75,0.2) !important;
+    /* 2. 移除所有拖曳區的背景、邊框、padding，讓它"消失" */
+    [data-testid="stFileUploader"] section {
+        padding: 0px !important;
+        min-height: 0px !important;
+        background-color: transparent !important;
+        border: none !important;
+        margin-bottom: 0px !important;
     }
     
-    /* 圖示位置 */
-    div[data-testid="stFileUploader"] > div > div > label > div {
-        display: flex;
-        align-items: center;
-        gap: 8px;
+    /* 3. 改造 "Browse files" 按鈕，使其完全填滿欄位並模仿標準按鈕 */
+    [data-testid="stFileUploader"] button {
+        width: 100% !important;
+        margin-top: 0px;
+        border: 1px solid rgba(49, 51, 63, 0.2);
+        
+        /* [User Req] 圓角改為 8px */
+        border-radius: 8px !important;
+        
+        background-color: white;
+        color: transparent !important; /* 隱藏原生 "Browse files" */
+        position: relative;
+        padding: 0.25rem 0.5rem;
+        min-height: 2.5rem; /* 對齊高度 */
+        line-height: 1.6;
     }
+
+    /* 4. 插入客製文字 "📂 載入專案" (短版) */
+    [data-testid="stFileUploader"] button::after {
+        content: "📂 載入專案"; /* [User Req] 簡化文字 */
+        color: rgb(49, 51, 63);
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 1rem;
+        
+        /* [User Req] 字體加粗 */
+        font-weight: 600 !important;
+        
+        width: 100%;
+        text-align: center;
+        pointer-events: none;
+    }
+
+    /* 5. Hover 效果 */
+    [data-testid="stFileUploader"] button:hover {
+        border-color: #ff4b4b !important;
+        color: transparent !important;
+    }
+    [data-testid="stFileUploader"] button:hover::after {
+        color: #ff4b4b !important;
+    }
+    [data-testid="stFileUploader"] button:active {
+        background-color: #ff4b4b !important;
+        border-color: #ff4b4b !important;
+    }
+    [data-testid="stFileUploader"] button:active::after {
+        color: white !important;
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -311,9 +311,9 @@ with col_header_R:
             st.markdown(f"<div style='font-size: 0.8rem; color: #555; margin-top: 5px;'>{config_loaded_msg}</div>", unsafe_allow_html=True)
             
         with c_p2:
-            # [UI Update] 直接放置 Uploader，文字由 label 參數提供，CSS 負責樣式
-            st.markdown(f"<div style='height: 2px;'></div>", unsafe_allow_html=True) # 微調對齊
-            uploaded_proj = st.file_uploader("📂 載入專案", type=["json"], key="project_loader")
+            # [UI Update] 直接放置 Uploader (標題移除，文字已用 CSS 偽裝成按鈕)
+            st.markdown(f"<div style='height: 2px;'></div>", unsafe_allow_html=True) # 對齊微調
+            uploaded_proj = st.file_uploader(" ", type=["json"], key="project_loader", label_visibility="collapsed")
             
         if uploaded_proj is not None:
             if uploaded_proj != st.session_state['last_loaded_file']:
