@@ -10,21 +10,16 @@ import json
 import copy
 
 # ==============================================================================
-# 版本：v4.05 (Sensitivity Analysis Added)
+# 版本：v4.06 (UI Restore & Tab Fix)
 # 日期：2026-02-09
-# 狀態：正式發布版 (Production Ready)
-# 
-# [新增功能]
-# 1. 新增 "敏感度分析" Tab：
-#    - 允許針對全局參數 (T_amb, Gap, Fin_t, Margin) 或元件功率 (Final PA) 進行掃描。
-#    - 自動產生 體積、重量、允許溫升 的趨勢圖表。
-# 2. 核心重構：
-#    - 新增 compute_key_results() 函數，將熱流、尺寸、重量計算邏輯封裝，
-#      支援完整的重量估算邏輯 (同主程式)，供敏感度分析重複呼叫。
+# 修正重點：
+# 1. [Fix] 移除重複的 st.tabs() 呼叫，解決頁面下方出現第二排頁籤的問題。
+# 2. [UI Restore] 還原 v4.00 的 Header UI 設計 (右上角按鈕化 File Uploader)。
+# 3. [Feature] 保留 v4.05 的敏感度分析與 v4.04 的登入說明頁。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.05"
+APP_VERSION = "v4.06"
 UPDATE_DATE = "2026-02-09"
 
 # === APP 設定 ===
@@ -146,7 +141,7 @@ def reset_download_state():
     st.session_state['json_ready_to_download'] = None
 
 # ==================================================
-# 🔐 密碼保護
+# 🔐 密碼保護 (v4.05 Info Page Style)
 # ==================================================
 def check_password():
     ACTUAL_PASSWORD = "tedus"
@@ -160,7 +155,7 @@ def check_password():
     if "password_correct" not in st.session_state:
         st.markdown("""<style>.stTextInput > div > div > input {text-align: center;}</style>""", unsafe_allow_html=True)
         
-        # === 1. 大標題（最頂）===
+        # === 1. 大標題 ===
         st.markdown("""
         <div style="background: linear-gradient(135deg, #007CF0, #00DFD8); padding: 30px; border-radius: 15px; color: white; text-align: center; margin-bottom: 30px; box-shadow: 0 6px 12px rgba(0,0,0,0.2);">
             <h1 style="margin:0; font-size: 2.8rem; font-weight: 900;">📡 5G RRU 熱流引擎 Pro</h1>
@@ -169,7 +164,7 @@ def check_password():
         </div>
         """.format(APP_VERSION=APP_VERSION, UPDATE_DATE=UPDATE_DATE), unsafe_allow_html=True)
 
-        # === 2. 密碼輸入區塊（緊接標題下方，最上方可見區域）===
+        # === 2. 密碼輸入區塊 ===
         c1, c2, c3 = st.columns([1,2,1])
         with c2:
             st.markdown("<h2 style='text-align: center; color: #2c3e50; margin-bottom: 20px;'>🔐 請輸入授權金鑰</h2>", unsafe_allow_html=True)
@@ -181,13 +176,12 @@ def check_password():
                 label_visibility="collapsed",
                 placeholder="輸入密碼後按 Enter"
             )
-            # 若密碼錯誤，顯示紅色提示
             if st.session_state.get("password_correct") == False:
                 st.error("❌ 密碼錯誤，請重新輸入")
 
-        st.markdown("<div style='margin: 40px 0;'></div>", unsafe_allow_html=True)  # 間距
+        st.markdown("<div style='margin: 40px 0;'></div>", unsafe_allow_html=True)
 
-        # === 3. 功能說明區塊（往下滾才看到）===
+        # === 3. 功能說明區塊 (Green Card) ===
         st.markdown("""
         <div style="background: #e9f7ef; padding: 25px; border-radius: 12px; border-left: 6px solid #2ecc71; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.08);">
             <h3 style="color: #27ae60; margin-top: 0; padding-bottom: 8px;">🛠️ 主要功能一覽</h3>
@@ -245,9 +239,8 @@ if "welcome_shown" not in st.session_state:
     st.session_state["welcome_shown"] = True
 
 # ==================================================
-# 👇 主程式開始 - Header 區塊
+# 👇 主程式開始 - Header 區塊 (Restore v4.00 Layout)
 # ==================================================
-# CSS 樣式 (v4.00 Stable Style - Pixel Perfect Uploader)
 st.markdown("""
 <style>
     html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
@@ -282,18 +275,18 @@ st.markdown("""
     [data-testid="stHeader"] { z-index: 0; }
 
     /* ==================== File Uploader Clean UI (v4.00 Stable) ==================== */
-    /* 1. 隱藏預設文字與圖示 (Drag & Drop, Limits...) */
+    /* 1. 隱藏預設文字與圖示 */
     [data-testid="stFileUploader"] section > div > div > span, 
     [data-testid="stFileUploader"] section > div > div > small {
         display: none !important;
     }
     
-    /* 2. 關鍵：隱藏上傳後顯示的檔案列表與刪除按鈕 */
+    /* 2. 隱藏上傳後顯示的檔案列表與刪除按鈕 */
     [data-testid="stFileUploader"] ul {
         display: none !important;
     }
     
-    /* 3. 移除拖曳區背景與邊框，高度壓縮，只留按鈕 */
+    /* 3. 移除拖曳區背景與邊框 */
     [data-testid="stFileUploader"] section {
         padding: 0px !important;
         min-height: 0px !important;
@@ -528,6 +521,7 @@ with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=False):
 # ==================================================
 # 3. 分頁與邏輯
 # ==================================================
+# [Restore] Tabs 回歸 5 頁籤設計 (包含敏感度分析)
 tab_input, tab_data, tab_viz, tab_3d, tab_sensitivity = st.tabs([
     "📝 COMPONENT SETUP (元件設定)", 
     "🔢 DETAILED ANALYSIS (詳細分析)", 
@@ -535,6 +529,37 @@ tab_input, tab_data, tab_viz, tab_3d, tab_sensitivity = st.tabs([
     "🧊 3D SIMULATION (3D 模擬視圖)",
     "📈 SENSITIVITY ANALYSIS (敏感度分析)"
 ])
+
+# --- Tab 1: 輸入介面 ---
+with tab_input:
+    st.subheader("🔥 元件熱源清單設定")
+    st.caption("💡 **提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。**")
+
+    # [Fix] 使用 df_initial (穩定源)
+    edited_df = st.data_editor(
+        st.session_state['df_initial'],
+        column_config={
+            "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
+            "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量", min_value=0, step=1, width="small"),
+            "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f", min_value=0.0, step=0.01),
+            "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。", format="%.2f"),
+            "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.2f"),
+            "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.2f"),
+            "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.2f"),
+            "Board_Type": st.column_config.SelectboxColumn("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)", options=["Thermal Via", "Copper Coin", "None"], width="medium"),
+            # [修正] 移除 Solder 選項
+            "TIM_Type": st.column_config.SelectboxColumn("介面材料", help="元件或銅塊底部與散熱器之間的TIM", options=["Grease", "Pad", "Putty", "None"], width="medium"),
+            "R_jc": st.column_config.NumberColumn("熱阻 Rjc", help="結點到殼的內部熱阻", format="%.2f"),
+            "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.2f")
+        },
+        num_rows="dynamic",
+        use_container_width=True,
+        key=f"editor_{st.session_state['editor_key']}",
+        on_change=reset_download_state # [Fix] 表格變動也會觸發下載按鈕重置
+    )
+    
+    # [Fix] 實時更新 df_current
+    st.session_state['df_current'] = edited_df
 
 # ==================================================
 # # 核心計算函數 (Refactored for Maintainability)
@@ -709,37 +734,6 @@ def compute_key_results(global_params, df_components):
         "h_value": round(h_value, 2)
     }
 
-# --- Tab 1: 輸入介面 ---
-with tab_input:
-    st.subheader("🔥 元件熱源清單設定")
-    st.caption("💡 **提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。**")
-
-    # [Fix] 使用 df_initial (穩定源)
-    edited_df = st.data_editor(
-        st.session_state['df_initial'],
-        column_config={
-            "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
-            "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量", min_value=0, step=1, width="small"),
-            "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f", min_value=0.0, step=0.01),
-            "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。", format="%.2f"),
-            "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.2f"),
-            "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.2f"),
-            "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.2f"),
-            "Board_Type": st.column_config.SelectboxColumn("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)", options=["Thermal Via", "Copper Coin", "None"], width="medium"),
-            # [修正] 移除 Solder 選項
-            "TIM_Type": st.column_config.SelectboxColumn("介面材料", help="元件或銅塊底部與散熱器之間的TIM", options=["Grease", "Pad", "Putty", "None"], width="medium"),
-            "R_jc": st.column_config.NumberColumn("熱阻 Rjc", help="結點到殼的內部熱阻", format="%.2f"),
-            "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.2f")
-        },
-        num_rows="dynamic",
-        use_container_width=True,
-        key=f"editor_{st.session_state['editor_key']}",
-        on_change=reset_download_state # [Fix] 表格變動也會觸發下載按鈕重置
-    )
-    
-    # [Fix] 實時更新 df_current
-    st.session_state['df_current'] = edited_df
-
 # --- 後台運算 (Refactored) ---
 globals_dict = {
     'T_amb': T_amb, 'Slope': Slope,
@@ -893,17 +887,17 @@ with tab_data:
             column_config={
                 "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
                 "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量"),
-                "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f"),
-                "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.2f"),
-                "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.2f"),
-                "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.2f"),
-                "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.2f"),
+                "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.1f"),
+                "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.1f"),
+                "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.1f"),
+                "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.1f"),
+                "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
                 "R_jc": st.column_config.NumberColumn("Rjc", help="結點到殼的內部熱阻", format="%.2f"),
-                "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.2f"),
+                "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.1f"),
                 
                 # 計算欄位 - 完整公式說明
                 "Base_L": st.column_config.NumberColumn("Base 長 (mm)", help="熱量擴散後的底部有效長度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
-                "Base_W": st.column_config.NumberColumn("Base 寬 (mm)", help="熱量擴散後的底部有效寬度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
+                "Base_W": st.column_config.NumberColumn("Base寬 (mm)", help="熱量擴散後的底部有效寬度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
                 "Loc_Amb": st.column_config.NumberColumn("局部環溫 (°C)", help="該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)。", format="%.1f"),
                 "Drop": st.column_config.NumberColumn("內部溫降 (°C)", help="熱量從晶片核心傳導到散熱器表面的溫差。公式：Power × (Rjc + Rint + Rtim)。", format="%.1f"),
                 "Total_W": st.column_config.NumberColumn("總功耗 (W)", help="該元件的總發熱量 (單顆功耗 × 數量)。", format="%.1f"),
@@ -1039,7 +1033,7 @@ with tab_viz:
         st.markdown(f"""
         <div style="background-color: #ecf0f1; padding: 30px; margin-top: 20px; border-radius: 15px; border-left: 10px solid #34495e; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center;">
             <h3 style="color: #2c3e50; margin:0; font-size: 1.4rem; letter-spacing: 1px;">⚖️ 整機估算重量 (Estimated Weight)</h3>
-            <h1 style="color: {vol_border}; margin:15px 0 10px 0; font-size: 3.5rem; font-weight: 800;">{round(total_weight_kg, 1)} kg</h1>
+            <h1 style="color: #34495e; margin:15px 0 10px 0; font-size: 3.5rem; font-weight: 800;">{round(total_weight_kg, 1)} kg</h1>
             <small style="color: #7f8c8d; line-height: 1.6;">
                 Heatsink ≈ {round(hs_weight_kg, 1)} kg | Shield ≈ {round(shield_weight_kg, 1)} kg<br>
                 Filter ≈ {round(filter_weight_kg, 1)} kg | Shielding Case ≈ {round(shielding_weight_kg, 1)} kg | PCB ≈ {round(pcb_weight_kg, 2)} kg
@@ -1210,7 +1204,7 @@ with project_io_save_placeholder.container():
             st.caption("ℹ️ 待更新")
 
 # --- Tab 5: 敏感度分析 ---
-tab_sensitivity = tab_3d = st.tabs([
+tab_sensitivity = st.tabs([
     "📝 COMPONENT SETUP (元件設定)", 
     "🔢 DETAILED ANALYSIS (詳細分析)", 
     "📊 VISUAL REPORT (視覺化報告)", 
@@ -1252,9 +1246,6 @@ with tab_sensitivity:
         # 取得目前狀態
         current_params = {k: st.session_state[k] for k in DEFAULT_GLOBALS.keys()}
         current_df = st.session_state['df_current'].copy()
-        
-        # 計算基準值
-        # base_results = compute_key_results(current_params, current_df) # 暫時不用，直接跑迴圈
         
         # 產生變化點
         if var_type == "全局參數":
