@@ -10,20 +10,18 @@ import json
 import copy
 
 # ==============================================================================
-# 版本：v4.13 (True Redesign)
+# 版本：v4.14 (Plotly Layout Fix)
 # 日期：2026-02-10
 # 狀態：正式發布版 (Production Ready)
 # 
-# [基底] 基於 v4.10 (Fix Indentation Error) 構建。
-# [新增] 核心計算函數 compute_key_results()。
-# [重構] Tab 5 敏感度分析介面：
-#       - 捨棄舊版上下排列。
-#       - 採用「左側控制面板 (Sidebar Style) + 右側戰情室 (Dashboard)」佈局。
-#       - 實作「單變數雙軸分析」：同時觀察 體積/重量 (Bar/Line) 與 溫升 (Line) 的變化。
+# [修正重點]
+# 1. [Fix] 修正 Tab 5 敏感度分析圖表的 update_layout 參數格式。
+#    - 解決 ValueError: 將 title 字串改為 dict(text=...) 標準格式。
+#    - 解決 Deprecation: 將 titlefont 改為標準 title=dict(font=...) 結構。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.13"
+APP_VERSION = "v4.14"
 UPDATE_DATE = "2026-02-10"
 
 # === APP 設定 ===
@@ -1279,18 +1277,16 @@ with tab_sensitivity:
                     yaxis="y2"
                 ))
 
-                # 版面設定 (雙軸)
+                # [v4.14 Fix] 版面設定 (修正 update_layout 參數格式以避免 ValueError)
                 fig.update_layout(
-                    title=f"<b>{var_name} 敏感度趨勢圖</b>",
-                    xaxis=dict(title=f"{var_name} 數值"),
+                    title=dict(text=f"<b>{var_name} 敏感度趨勢圖 (基準 {base_val:.2f})</b>"),
+                    xaxis=dict(title=dict(text=f"{var_name} 數值")),
                     yaxis=dict(
-                        title="體積 (L) / 重量 (kg)",
-                        titlefont=dict(color="#00b894"),
+                        title=dict(text="體積 (L) / 重量 (kg)", font=dict(color="#00b894")),
                         tickfont=dict(color="#00b894")
                     ),
                     yaxis2=dict(
-                        title="允許溫升裕度 (°C)",
-                        titlefont=dict(color="#d63031"),
+                        title=dict(text="瓶頸允許溫升 (°C)", font=dict(color="#d63031")),
                         tickfont=dict(color="#d63031"),
                         overlaying="y",
                         side="right"
