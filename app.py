@@ -10,21 +10,19 @@ import json
 import copy
 
 # ==============================================================================
-# 版本：v4.21 (Restored v4.18 UI + Logic Fixes)
+# 版本：v4.22 (Final Stability Fix)
 # 日期：2026-02-11
-# 狀態：正式發布版 (Production Ready) - 介面回溯至 v4.18，核心保留 v4.20 修正
+# 狀態：正式發布版 (Production Ready)
 # 
-# [介面還原]
-# 1. Header: 恢復右上角 "按鈕化 File Uploader" (隱藏列表/文字, 圓角8px, 粗體)。
-# 2. Tab 5: 恢復 "置頂橫向控制台 (Horizontal)" + "全寬圖表"。
-# 
-# [邏輯保留]
-# 1. Volume Fix: 修正體積單位錯誤 (移除多餘 /1000)。
-# 2. Bottleneck Fix: 排除 0W 元件對熱瓶頸的干擾。
+# [修正重點]
+# 1. [Critical Fix] 修復 compute_key_results 中的 NameError: 'num_fins_int' is not defined。
+#    - 在函數開頭強制初始化 num_fins_int = 0。
+#    - 確保鰭片數量計算邏輯在重量計算前執行。
+# 2. [UI] 保持 v4.21 的完美 UI (Header 按鈕化、Tab 5 橫向佈局)。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.21"
+APP_VERSION = "v4.22"
 UPDATE_DATE = "2026-02-11"
 
 # === APP 設定 ===
@@ -246,7 +244,7 @@ if "welcome_shown" not in st.session_state:
 # ==================================================
 # 👇 主程式開始 - Header 區塊
 # ==================================================
-# CSS 樣式 (v4.18/v4.21 CSS - Restore Pixel-Perfect UI)
+# CSS 樣式
 st.markdown("""
 <style>
     html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
@@ -280,19 +278,19 @@ st.markdown("""
     /* Header Container Style */
     [data-testid="stHeader"] { z-index: 0; }
 
-    /* ==================== File Uploader 完美按鈕化 (Restore v3.106/v4.18) ==================== */
-    /* 1. 隱藏預設文字與圖示 (Drag & Drop, Limits...) */
+    /* ==================== File Uploader 完美按鈕化 ==================== */
+    /* 1. 隱藏預設文字與圖示 */
     [data-testid="stFileUploader"] section > div > div > span, 
     [data-testid="stFileUploader"] section > div > div > small {
         display: none !important;
     }
     
-    /* 2. 關鍵：隱藏上傳後顯示的檔案列表與刪除按鈕 */
+    /* 2. 隱藏上傳後顯示的檔案列表與刪除按鈕 */
     [data-testid="stFileUploader"] ul {
         display: none !important;
     }
     
-    /* 3. 移除拖曳區背景與邊框，高度壓縮，只留按鈕 */
+    /* 3. 移除拖曳區背景與邊框，高度壓縮 */
     [data-testid="stFileUploader"] section {
         padding: 0px !important;
         min-height: 0px !important;
@@ -308,13 +306,14 @@ st.markdown("""
         border: 1px solid rgba(49, 51, 63, 0.2);
         border-radius: 8px !important;
         background-color: white;
+        color: transparent !important; /* 隱藏原生文字 */
         position: relative;
         padding: 0.25rem 0.5rem;
         min-height: 2.5rem;
         line-height: 1.6;
     }
 
-    /* 5. 植入新文字 "📂 載入專案" (偽裝, 粗體) */
+    /* 5. 植入新文字 "📂 載入專案" (粗體) */
     [data-testid="stFileUploader"] button::after {
         content: "📂 載入專案";
         color: rgb(49, 51, 63);
@@ -327,11 +326,6 @@ st.markdown("""
         width: 100%;
         text-align: center;
         pointer-events: none;
-    }
-    
-    /* 隱藏原生文字 */
-    [data-testid="stFileUploader"] button {
-        color: transparent !important;
     }
 
     /* 6. Hover 效果 */
@@ -547,7 +541,7 @@ with tab_input:
             "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
             "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量", min_value=0, step=1, width="small"),
             "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f", min_value=0.0, step=0.01),
-            "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。", format="%.2f"),
+            "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.2f"),
             "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.2f"),
             "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.2f"),
             "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.2f"),
@@ -661,6 +655,9 @@ def compute_key_results(global_params, df_components):
     }
     
     # === 熱阻與溫降計算 ===
+    # [Fix v4.22] 確保 num_fins_int 有初始值
+    num_fins_int = 0
+
     if not df.empty:
         calc_results = df.apply(lambda row: calc_thermal_resistance(row, g_for_calc), axis=1)
         calc_results.columns = ['Base_L', 'Base_W', 'Loc_Amb', 'R_int', 'R_TIM', 'Total_W', 'Drop', 'Allowed_dT']
@@ -695,6 +692,7 @@ def compute_key_results(global_params, df_components):
     W_hsk = p["W_pcb"] + p["Top"] + p["Btm"]
     base_area_m2 = (L_hsk * W_hsk) / 1e6
     
+    # [Fix v4.22] 確保在這裡計算 num_fins_int
     num_fins_int = calc_fin_count(W_hsk, p["Gap"], p["Fin_t"])
     
     # === 所需面積 ===
@@ -715,8 +713,10 @@ def compute_key_results(global_params, df_components):
     # [v4.20 Formula Fix] 修正單位錯誤：移除多餘的 / 1000
     Volume_L = round(L_hsk * W_hsk * RRU_Height / 1e6, 2)
     
-    # 重量計算
+    # 重量計算 (包含所有部件)
     base_vol_cm3 = L_hsk * W_hsk * p["t_base"] / 1000
+    
+    # [Fix v4.22] 這裡使用 num_fins_int 已經安全了
     fins_vol_cm3 = num_fins_int * p["Fin_t"] * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * p["al_density"] / 1000
     
@@ -804,7 +804,7 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
     
     # [v3.84] 重量計算
     base_vol_cm3 = L_hsk * W_hsk * t_base / 1000
-    fins_vol_cm3 = num_fins_int * p["Fin_t"] * Fin_Height * L_hsk / 1000
+    fins_vol_cm3 = num_fins_int * Fin_t * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * al_density / 1000
     
     shield_outer_vol_cm3 = L_hsk * W_hsk * H_shield / 1000
@@ -909,11 +909,11 @@ with tab_data:
             column_config={
                 "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
                 "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量"),
-                "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f"),
-                "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.1f"),
+                "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.1f"),
+                "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.2f"),
                 "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.1f"),
                 "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.1f"),
-                "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.2f"),
+                "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
                 "Board_Type": st.column_config.Column("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)"),
                 "TIM_Type": st.column_config.Column("介面材料", help="元件或銅塊底部與散熱器之間的TIM"),
                 "R_jc": st.column_config.NumberColumn("Rjc", help="結點到殼的內部熱阻", format="%.2f"),
@@ -1177,7 +1177,7 @@ with tab_3d:
         components.html(f"""<script>function copyToClipboard(){{const text=`{safe_prompt}`;if(navigator.clipboard&&window.isSecureContext){{navigator.clipboard.writeText(text).then(function(){{document.getElementById('status').innerHTML="✅ 已複製！";setTimeout(()=>{{document.getElementById('status').innerHTML="";}},2000)}},function(err){{fallbackCopy(text)}})}}else{{fallbackCopy(text)}}}}function fallbackCopy(text){{const textArea=document.createElement("textarea");textArea.value=text;textArea.style.position="fixed";document.body.appendChild(textArea);textArea.focus();textArea.select();try{{document.execCommand('copy');document.getElementById('status').innerHTML="✅ 已複製！"}}catch(err){{document.getElementById('status').innerHTML="❌ 複製失敗"}}document.body.removeChild(textArea);setTimeout(()=>{{document.getElementById('status').innerHTML="";}},2000)}}</script><div style="display: flex; align-items: center; font-family: 'Microsoft JhengHei', sans-serif;"><button onclick="copyToClipboard()" style="background-color: #ffffff; border: 1px solid #d1d5db; border-radius: 4px; padding: 8px 16px; font-size: 14px; cursor: pointer; color: #31333F; display: flex; align-items: center; gap: 5px; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" onmouseover="this.style.borderColor='#ff4b4b'; this.style.color='#ff4b4b'" onmouseout="this.style.borderColor='#d1d5db'; this.style.color='#31333F'">📋 複製提示詞 (Copy Prompt)</button><span id="status" style="margin-left: 10px; color: #00b894; font-size: 14px; font-weight: bold;"></span></div>""", height=50)
 
         st.markdown("#### Step 4. 執行 AI 生成")
-        st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
+        st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Image)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 # --- Tab 5: 敏感度分析 (New) ---
 # [Fix] 這裡不使用 st.tabs()，而是直接使用上方定義的 tab_sensitivity 變數
