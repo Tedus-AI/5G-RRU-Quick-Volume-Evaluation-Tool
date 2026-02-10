@@ -700,7 +700,8 @@ def compute_key_results(global_params, df_components):
         
     # === 體積與重量 (Detailed Logic) ===
     RRU_Height = p["H_shield"] + p["H_filter"] + p["t_base"] + Fin_Height
-    Volume_L = round(L_hsk * W_hsk * RRU_Height / 1e6 / 1000, 2)
+    # [Fix] 移除多餘的 / 1000，確保單位為公升 (Liter)
+    Volume_L = round(L_hsk * W_hsk * RRU_Height / 1e6, 2)
     
     # 重量計算 (包含所有部件)
     base_vol_cm3 = L_hsk * W_hsk * p["t_base"] / 1000
