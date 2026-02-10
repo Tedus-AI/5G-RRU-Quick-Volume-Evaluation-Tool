@@ -10,22 +10,17 @@ import json
 import copy
 
 # ==============================================================================
-# 版本：v4.16 (Advanced Sensitivity Engine)
+# 版本：v4.18 (Sensitivity Layout Finalized)
 # 日期：2026-02-10
-# 狀態：正式發布版 (Production Ready)
+# 狀態：正式發布版 (Production Ready) - Tab 5 佈局定案
 # 
-# [Tab 5 重大更新]
-# 1. 鎖定分析變數為 "Fin Air Gap"，移除其他干擾選項。
-# 2. 支援不對稱範圍設定 (分別設定 -% 與 +%)。
-# 3. 圖表升級為「三軸組合圖」：左軸流阻比(Line) + 右軸體積/重量(Grouped Bar)。
-# 
-# [系統修復]
-# 1. 修正 Tab 2 的 IndentationError。
-# 2. 修正 Plotly update_layout 參數格式 (dict語法) 避免 ValueError。
+# [定案內容]
+# 1. Tab 5 敏感度分析：採用「置頂橫向控制台 (Top Horizontal Controls)」+「全寬圖表 (Full Width Chart)」。
+# 2. 核心功能：熱流計算、重量估算、3D 模擬、專案存取皆已穩定。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.16"
+APP_VERSION = "v4.19"
 UPDATE_DATE = "2026-02-10"
 
 # === APP 設定 ===
@@ -197,6 +192,7 @@ def check_password():
                 <li><strong>散熱器尺寸優化</strong>：根據瓶頸元件裕度，自動推算所需鰭片高度、數量與整機體積</li>
                 <li><strong>重量預估</strong>：含散熱器、Shield、Filter、Shielding、PCB 等分項重量</li>
                 <li><strong>設計規則檢查 (DRC)</strong>：自動檢測 Gap 過小、流阻比過高、製程限制等問題</li>
+                <li><strong>敏感度分析</strong>：針對 Gap 等關鍵參數進行掃描，視覺化 Trade-off 趨勢</li>
                 <li><strong>3D 模擬視圖</strong>：真實比例展示電子艙 + 散熱器 + 鰭片結構</li>
                 <li><strong>AI 寫實渲染輔助</strong>：一鍵生成精確提示詞，搭配 Imagen 3 可產出照片級渲染圖</li>
                 <li><strong>專案存取</strong>：JSON 格式載入/儲存，支援參數與元件資料完整備份</li>
@@ -221,7 +217,6 @@ def check_password():
                 <li>本工具為<strong>快速概念設計與尺寸評估</strong>用途，非最終驗證級熱模擬</li>
                 <li>計算結果高度依賴輸入參數準確度，請使用實際量測或 Datasheet 數值</li>
                 <li>自然對流模型基於垂直鰭片、無風環境，室外高風速情境需另行評估</li>
-                <li>Embedded Fin 高度限制預設 < 100mm，超過將觸發 DRC 警告</li>
                 <li>建議將計算結果與 CFD 或實測進行交叉驗證，尤其在高功耗或極端環境下</li>
             </ul>
         </div>
@@ -247,7 +242,7 @@ if "welcome_shown" not in st.session_state:
 # ==================================================
 # 👇 主程式開始 - Header 區塊
 # ==================================================
-# CSS 樣式
+# CSS 樣式 (v4.00 Stable Style - Pixel Perfect Uploader)
 st.markdown("""
 <style>
     html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
@@ -281,19 +276,19 @@ st.markdown("""
     /* Header Container Style */
     [data-testid="stHeader"] { z-index: 0; }
 
-    /* ==================== File Uploader 完美按鈕化 ==================== */
-    /* 1. 隱藏預設文字與圖示 */
+    /* ==================== File Uploader Clean UI (v4.00 Stable) ==================== */
+    /* 1. 隱藏預設文字與圖示 (Drag & Drop, Limits...) */
     [data-testid="stFileUploader"] section > div > div > span, 
     [data-testid="stFileUploader"] section > div > div > small {
         display: none !important;
     }
     
-    /* 2. 隱藏上傳後顯示的檔案列表 */
+    /* 2. 關鍵：隱藏上傳後顯示的檔案列表與刪除按鈕 */
     [data-testid="stFileUploader"] ul {
         display: none !important;
     }
     
-    /* 3. 移除拖曳區背景與邊框 */
+    /* 3. 移除拖曳區背景與邊框，高度壓縮，只留按鈕 */
     [data-testid="stFileUploader"] section {
         padding: 0px !important;
         min-height: 0px !important;
@@ -302,21 +297,20 @@ st.markdown("""
         margin-bottom: 0px !important;
     }
     
-    /* 4. 改造 "Browse files" 按鈕為目標按鈕 */
+    /* 4. 調整 "Browse files" 按鈕為滿版 */
     [data-testid="stFileUploader"] button {
         width: 100% !important;
         margin-top: 0px;
         border: 1px solid rgba(49, 51, 63, 0.2);
         border-radius: 8px !important;
         background-color: white;
-        color: transparent !important; /* 隱藏原生 "Browse files" */
         position: relative;
         padding: 0.25rem 0.5rem;
         min-height: 2.5rem;
         line-height: 1.6;
     }
 
-    /* 5. 植入新文字 "📂 載入專案" (粗體) */
+    /* 5. 植入新文字 "📂 載入專案" (偽裝) */
     [data-testid="stFileUploader"] button::after {
         content: "📂 載入專案";
         color: rgb(49, 51, 63);
@@ -329,6 +323,11 @@ st.markdown("""
         width: 100%;
         text-align: center;
         pointer-events: none;
+    }
+    
+    /* 隱藏原生文字 */
+    [data-testid="stFileUploader"] button {
+        color: transparent !important;
     }
 
     /* 6. Hover 效果 */
@@ -524,7 +523,6 @@ with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=False):
 # ==================================================
 # 3. 分頁與邏輯
 # ==================================================
-# [Restore] Tabs 擴充為 5 頁籤
 tab_input, tab_data, tab_viz, tab_3d, tab_sensitivity = st.tabs([
     "📝 COMPONENT SETUP (元件設定)", 
     "🔢 DETAILED ANALYSIS (詳細分析)", 
@@ -638,6 +636,7 @@ def calc_thermal_resistance(row, g):
     allowed_dt = row['Limit(C)'] - drop - loc_amb
     return pd.Series([base_l, base_w, loc_amb, r_int, r_tim, total_w, drop, allowed_dt])
 
+# [v4.11 Core] 新增 compute_key_results 函數，供敏感度分析使用
 def compute_key_results(global_params, df_components):
     """
     獨立計算核心結果，不依賴 Streamlit session_state
@@ -700,10 +699,10 @@ def compute_key_results(global_params, df_components):
         
     # === 體積與重量 (Detailed Logic) ===
     RRU_Height = p["H_shield"] + p["H_filter"] + p["t_base"] + Fin_Height
-    # [Fix] 移除多餘的 / 1000，確保單位為公升 (Liter)
+    # [Fix] 單位修正 (公升)
     Volume_L = round(L_hsk * W_hsk * RRU_Height / 1e6, 2)
     
-    # 重量計算 (包含所有部件)
+    # 重量計算
     base_vol_cm3 = L_hsk * W_hsk * p["t_base"] / 1000
     fins_vol_cm3 = num_fins_int * p["Fin_t"] * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * p["al_density"] / 1000
@@ -897,10 +896,10 @@ with tab_data:
             column_config={
                 "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
                 "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量"),
-                "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f"),
-                "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.2f"),
-                "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.2f"),
-                "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.2f"),
+                "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.1f"),
+                "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.1f"),
+                "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.1f"),
+                "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.1f"),
                 "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.2f"),
                 "Board_Type": st.column_config.Column("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)"),
                 "TIM_Type": st.column_config.Column("介面材料", help="元件或銅塊底部與散熱器之間的TIM"),
