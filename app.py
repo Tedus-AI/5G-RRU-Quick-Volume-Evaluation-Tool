@@ -242,7 +242,7 @@ if "welcome_shown" not in st.session_state:
 # ==================================================
 # 👇 主程式開始 - Header 區塊
 # ==================================================
-# CSS 樣式 (v4.00 Stable Style - Pixel Perfect Uploader)
+# CSS 樣式
 st.markdown("""
 <style>
     html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
@@ -276,7 +276,7 @@ st.markdown("""
     /* Header Container Style */
     [data-testid="stHeader"] { z-index: 0; }
 
-    /* ==================== File Uploader Clean UI (v4.00 Stable) ==================== */
+    /* ==================== File Uploader 完美按鈕化 ==================== */
     /* 1. 隱藏預設文字與圖示 (Drag & Drop, Limits...) */
     [data-testid="stFileUploader"] section > div > div > span, 
     [data-testid="stFileUploader"] section > div > div > small {
@@ -288,7 +288,7 @@ st.markdown("""
         display: none !important;
     }
     
-    /* 3. 移除拖曳區背景與邊框，高度壓縮，只留按鈕 */
+    /* 3. 移除拖曳區背景與邊框，高度壓縮 */
     [data-testid="stFileUploader"] section {
         padding: 0px !important;
         min-height: 0px !important;
@@ -297,20 +297,21 @@ st.markdown("""
         margin-bottom: 0px !important;
     }
     
-    /* 4. 調整 "Browse files" 按鈕為滿版 */
+    /* 4. 改造 "Browse files" 按鈕為目標按鈕 */
     [data-testid="stFileUploader"] button {
         width: 100% !important;
         margin-top: 0px;
         border: 1px solid rgba(49, 51, 63, 0.2);
         border-radius: 8px !important;
         background-color: white;
+        color: transparent !important; /* 隱藏原生 "Browse files" */
         position: relative;
         padding: 0.25rem 0.5rem;
         min-height: 2.5rem;
         line-height: 1.6;
     }
 
-    /* 5. 植入新文字 "📂 載入專案" (偽裝) */
+    /* 5. 植入新文字 "📂 載入專案" (粗體) */
     [data-testid="stFileUploader"] button::after {
         content: "📂 載入專案";
         color: rgb(49, 51, 63);
@@ -323,11 +324,6 @@ st.markdown("""
         width: 100%;
         text-align: center;
         pointer-events: none;
-    }
-    
-    /* 隱藏原生文字 */
-    [data-testid="stFileUploader"] button {
-        color: transparent !important;
     }
 
     /* 6. Hover 效果 */
@@ -657,6 +653,9 @@ def compute_key_results(global_params, df_components):
     }
     
     # === 熱阻與溫降計算 ===
+    # [Fix v4.22] 確保 num_fins_int 有初始值
+    num_fins_int = 0
+
     if not df.empty:
         calc_results = df.apply(lambda row: calc_thermal_resistance(row, g_for_calc), axis=1)
         calc_results.columns = ['Base_L', 'Base_W', 'Loc_Amb', 'R_int', 'R_TIM', 'Total_W', 'Drop', 'Allowed_dT']
@@ -665,16 +664,17 @@ def compute_key_results(global_params, df_components):
         df["Allowed_dT"] = df["Allowed_dT"].clip(lower=0)
         Total_Power = (df["Power(W)"] * df["Qty"]).sum() * p["Margin"]
         
-        # [Fix v4.19] 邏輯對齊：計算瓶頸時，僅考慮總功耗 > 0 的元件 (排除不發熱元件)
-        valid_rows = df[df['Total_W'] > 0]
-        if not valid_rows.empty:
-            Min_dT_Allowed = valid_rows["Allowed_dT"].min()
-            if not pd.isna(valid_rows["Allowed_dT"].idxmin()):
-                Bottleneck_Name = valid_rows.loc[valid_rows["Allowed_dT"].idxmin(), "Component"]
+        # [v4.20 Logic Fix] 嚴格對齊主程式：計算瓶頸時，必須排除不發熱 (0W) 的元件
+        valid_rows_for_bottleneck = df[df['Total_W'] > 0]
+        
+        if not valid_rows_for_bottleneck.empty:
+            Min_dT_Allowed = valid_rows_for_bottleneck["Allowed_dT"].min()
+            if not pd.isna(valid_rows_for_bottleneck["Allowed_dT"].idxmin()):
+                Bottleneck_Name = valid_rows_for_bottleneck.loc[valid_rows_for_bottleneck["Allowed_dT"].idxmin(), "Component"]
             else:
                 Bottleneck_Name = "None"
         else:
-            Min_dT_Allowed = 50 # 預設安全值
+            Min_dT_Allowed = 50 
             Bottleneck_Name = "None"
             
     else:
@@ -690,6 +690,7 @@ def compute_key_results(global_params, df_components):
     W_hsk = p["W_pcb"] + p["Top"] + p["Btm"]
     base_area_m2 = (L_hsk * W_hsk) / 1e6
     
+    # [Fix v4.22] 確保在這裡計算 num_fins_int
     num_fins_int = calc_fin_count(W_hsk, p["Gap"], p["Fin_t"])
     
     # === 所需面積 ===
@@ -707,11 +708,13 @@ def compute_key_results(global_params, df_components):
         
     # === 體積與重量 (Detailed Logic) ===
     RRU_Height = p["H_shield"] + p["H_filter"] + p["t_base"] + Fin_Height
-    # [Fix] 單位修正 (公升)
+    # [v4.20 Formula Fix] 修正單位錯誤：移除多餘的 / 1000
     Volume_L = round(L_hsk * W_hsk * RRU_Height / 1e6, 2)
     
-    # 重量計算
+    # 重量計算 (包含所有部件)
     base_vol_cm3 = L_hsk * W_hsk * p["t_base"] / 1000
+    
+    # [Fix v4.22] 這裡使用 num_fins_int 已經安全了
     fins_vol_cm3 = num_fins_int * p["Fin_t"] * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * p["al_density"] / 1000
     
@@ -799,7 +802,7 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
     
     # [v3.84] 重量計算
     base_vol_cm3 = L_hsk * W_hsk * t_base / 1000
-    fins_vol_cm3 = num_fins_int * Fin_t * Fin_Height * L_hsk / 1000
+    fins_vol_cm3 = num_fins_int * p["Fin_t"] * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * al_density / 1000
     
     shield_outer_vol_cm3 = L_hsk * W_hsk * H_shield / 1000
@@ -908,7 +911,7 @@ with tab_data:
                 "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.1f"),
                 "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.1f"),
                 "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.1f"),
-                "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.2f"),
+                "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
                 "Board_Type": st.column_config.Column("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)"),
                 "TIM_Type": st.column_config.Column("介面材料", help="元件或銅塊底部與散熱器之間的TIM"),
                 "R_jc": st.column_config.NumberColumn("Rjc", help="結點到殼的內部熱阻", format="%.2f"),
