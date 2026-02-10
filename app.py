@@ -10,21 +10,20 @@ import json
 import copy
 
 # ==============================================================================
-# 版本：v4.11 (Sensitivity Feature Implementation)
+# 版本：v4.12 (New Sensitivity Engine)
 # 日期：2026-02-10
 # 狀態：正式發布版 (Production Ready)
 # 
-# [新增功能]
-# 1. [Core] 新增 compute_key_results() 函數，封裝完整的熱流與詳細重量計算邏輯。
-# 2. [UI] 新增 Tab 5 "敏感度分析"，採用左右分欄佈局，提供趨勢預測功能。
-# 
-# [保留功能]
-# 1. Header UI: 完美的按鈕化上傳介面。
-# 2. Tab 2: 自動隱藏非關鍵欄位。
+# [重構重點]
+# 1. [Redesign] Tab 5 敏感度分析完全重寫 (工程師視角)：
+#    - 佈局：左側控制台 (設定參數) vs 右側儀表板 (圖表與數據)。
+#    - 模式 1 (2D Trend): 雙 Y 軸折線圖，同時觀察 熱裕度 vs 體積/重量 的 Trade-off。
+#    - 模式 2 (Heatmap): 雙變數矩陣分析，視覺化尋找設計甜蜜點。
+# 2. [Clean] 移除舊版掃描邏輯，改用更彈性的動態範圍生成。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.11"
+APP_VERSION = "v4.12"
 UPDATE_DATE = "2026-02-10"
 
 # === APP 設定 ===
@@ -246,7 +245,7 @@ if "welcome_shown" not in st.session_state:
 # ==================================================
 # 👇 主程式開始 - Header 區塊
 # ==================================================
-# CSS 樣式
+# CSS 樣式 (v4.00 Stable Style - Pixel Perfect Uploader)
 st.markdown("""
 <style>
     html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
@@ -700,11 +699,11 @@ def compute_key_results(global_params, df_components):
         Area_req = 0
         Fin_Height = 0
         
-    # === 體積與重量 ===
+    # === 體積與重量 (Detailed Logic) ===
     RRU_Height = p["H_shield"] + p["H_filter"] + p["t_base"] + Fin_Height
     Volume_L = round(L_hsk * W_hsk * RRU_Height / 1e6 / 1000, 2)
     
-    # 重量計算 (包含所有部件)
+    # 重量計算
     base_vol_cm3 = L_hsk * W_hsk * p["t_base"] / 1000
     fins_vol_cm3 = num_fins_int * p["Fin_t"] * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * p["al_density"] / 1000
@@ -1040,8 +1039,8 @@ with tab_viz:
     if not drc_failed:
         st.markdown(f"""
         <div style="background-color: #ecf0f1; padding: 30px; margin-top: 20px; border-radius: 15px; border-left: 10px solid #34495e; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center;">
-            <h3 style="color: #2c3e50; margin:0; font-size: 1.4rem; letter-spacing: 1px;">⚖️ 整機估算重量 (Estimated Weight)</h3>
-            <h1 style="color: #34495e; margin:15px 0 10px 0; font-size: 3.5rem; font-weight: 800;">{round(total_weight_kg, 1)} kg</h1>
+            <h3 style="color: {vol_title}; margin:0; font-size: 1.4rem; letter-spacing: 1px;">⚖️ 整機估算重量 (Estimated Weight)</h3>
+            <h1 style="color: {vol_border}; margin:15px 0 10px 0; font-size: 3.5rem; font-weight: 800;">{round(total_weight_kg, 1)} kg</h1>
             <small style="color: #7f8c8d; line-height: 1.6;">
                 Heatsink ≈ {round(hs_weight_kg, 1)} kg | Shield ≈ {round(shield_weight_kg, 1)} kg<br>
                 Filter ≈ {round(filter_weight_kg, 1)} kg | Shielding Case ≈ {round(shielding_weight_kg, 1)} kg | PCB ≈ {round(pcb_weight_kg, 2)} kg
