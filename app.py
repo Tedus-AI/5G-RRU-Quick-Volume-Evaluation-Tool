@@ -10,17 +10,22 @@ import json
 import copy
 
 # ==============================================================================
-# 版本：v4.15 (Sensitivity Variable Fix)
+# 版本：v4.16 (Advanced Sensitivity Engine)
 # 日期：2026-02-10
 # 狀態：正式發布版 (Production Ready)
 # 
-# [修正重點]
-# 1. [Fix] 修正 Tab 5 圖表標題的 NameError。
-#    - 將誤用的變數 base_val 修正為 current_val (與上方定義一致)。
+# [Tab 5 重大更新]
+# 1. 鎖定分析變數為 "Fin Air Gap"，移除其他干擾選項。
+# 2. 支援不對稱範圍設定 (分別設定 -% 與 +%)。
+# 3. 圖表升級為「三軸組合圖」：左軸流阻比(Line) + 右軸體積/重量(Grouped Bar)。
+# 
+# [系統修復]
+# 1. 修正 Tab 2 的 IndentationError。
+# 2. 修正 Plotly update_layout 參數格式 (dict語法) 避免 ValueError。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.15"
+APP_VERSION = "v4.16"
 UPDATE_DATE = "2026-02-10"
 
 # === APP 設定 ===
@@ -142,7 +147,7 @@ def reset_download_state():
     st.session_state['json_ready_to_download'] = None
 
 # ==================================================
-# 🔐 密碼保護 (v4.05 Info Page Style)
+# 🔐 密碼保護
 # ==================================================
 def check_password():
     ACTUAL_PASSWORD = "tedus"
@@ -242,7 +247,7 @@ if "welcome_shown" not in st.session_state:
 # ==================================================
 # 👇 主程式開始 - Header 區塊
 # ==================================================
-# CSS 樣式 (v4.00 Stable Style - Pixel Perfect Uploader)
+# CSS 樣式
 st.markdown("""
 <style>
     html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
@@ -276,19 +281,19 @@ st.markdown("""
     /* Header Container Style */
     [data-testid="stHeader"] { z-index: 0; }
 
-    /* ==================== File Uploader Clean UI (v4.00 Stable) ==================== */
-    /* 1. 隱藏預設文字與圖示 (Drag & Drop, Limits...) */
+    /* ==================== File Uploader 完美按鈕化 ==================== */
+    /* 1. 隱藏預設文字與圖示 */
     [data-testid="stFileUploader"] section > div > div > span, 
     [data-testid="stFileUploader"] section > div > div > small {
         display: none !important;
     }
     
-    /* 2. 關鍵：隱藏上傳後顯示的檔案列表與刪除按鈕 */
+    /* 2. 隱藏上傳後顯示的檔案列表 */
     [data-testid="stFileUploader"] ul {
         display: none !important;
     }
     
-    /* 3. 移除拖曳區背景與邊框，高度壓縮，只留按鈕 */
+    /* 3. 移除拖曳區背景與邊框 */
     [data-testid="stFileUploader"] section {
         padding: 0px !important;
         min-height: 0px !important;
@@ -297,20 +302,21 @@ st.markdown("""
         margin-bottom: 0px !important;
     }
     
-    /* 4. 調整 "Browse files" 按鈕為滿版 */
+    /* 4. 改造 "Browse files" 按鈕為目標按鈕 */
     [data-testid="stFileUploader"] button {
         width: 100% !important;
         margin-top: 0px;
         border: 1px solid rgba(49, 51, 63, 0.2);
         border-radius: 8px !important;
         background-color: white;
+        color: transparent !important; /* 隱藏原生 "Browse files" */
         position: relative;
         padding: 0.25rem 0.5rem;
         min-height: 2.5rem;
         line-height: 1.6;
     }
 
-    /* 5. 植入新文字 "📂 載入專案" (偽裝) */
+    /* 5. 植入新文字 "📂 載入專案" (粗體) */
     [data-testid="stFileUploader"] button::after {
         content: "📂 載入專案";
         color: rgb(49, 51, 63);
@@ -323,11 +329,6 @@ st.markdown("""
         width: 100%;
         text-align: center;
         pointer-events: none;
-    }
-    
-    /* 隱藏原生文字 */
-    [data-testid="stFileUploader"] button {
-        color: transparent !important;
     }
 
     /* 6. Hover 效果 */
@@ -377,7 +378,7 @@ with col_header_R:
         with c_p1:
             st.markdown(f"<div style='{header_style}'>專案存取 (Project I/O)</div>", unsafe_allow_html=True)
             
-            # [UI v4.00] 判斷是否載入專案檔，顯示對應訊息
+            # 判斷是否載入專案檔，顯示對應訊息
             if st.session_state.get('current_project_name'):
                 # 藍色粗體顯示載入的檔名
                 file_display = f"📄 {st.session_state['current_project_name']}"
@@ -523,6 +524,7 @@ with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=False):
 # ==================================================
 # 3. 分頁與邏輯
 # ==================================================
+# [Restore] Tabs 擴充為 5 頁籤
 tab_input, tab_data, tab_viz, tab_3d, tab_sensitivity = st.tabs([
     "📝 COMPONENT SETUP (元件設定)", 
     "🔢 DETAILED ANALYSIS (詳細分析)", 
@@ -700,7 +702,7 @@ def compute_key_results(global_params, df_components):
     RRU_Height = p["H_shield"] + p["H_filter"] + p["t_base"] + Fin_Height
     Volume_L = round(L_hsk * W_hsk * RRU_Height / 1e6 / 1000, 2)
     
-    # 重量計算
+    # 重量計算 (包含所有部件)
     base_vol_cm3 = L_hsk * W_hsk * p["t_base"] / 1000
     fins_vol_cm3 = num_fins_int * p["Fin_t"] * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * p["al_density"] / 1000
@@ -894,11 +896,11 @@ with tab_data:
             column_config={
                 "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
                 "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量"),
-                "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.1f"),
-                "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.1f"),
-                "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.1f"),
-                "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.1f"),
-                "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
+                "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f"),
+                "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.2f"),
+                "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.2f"),
+                "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.2f"),
+                "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.2f"),
                 "Board_Type": st.column_config.Column("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)"),
                 "TIM_Type": st.column_config.Column("介面材料", help="元件或銅塊底部與散熱器之間的TIM"),
                 "R_jc": st.column_config.NumberColumn("Rjc", help="結點到殼的內部熱阻", format="%.2f"),
@@ -1147,7 +1149,24 @@ with tab_3d:
 
 外觀細節與材質（參考圖 2）：
 材質採用白色粉體烤漆壓鑄鋁（霧面質感）。僅在底部的 I/O 接口佈局（參考如圖二的I/O布局）或上網參考5G RRU I/O介面。
-# --- Tab 5: 敏感度分析 ---
+
+技術規格：
+整體尺寸約 {L_hsk:.0f}x{W_hsk:.0f}x{RRU_Height:.0f}mm。邊緣需呈現銳利的工業感，具備真實的金屬紋理與精細的倒角（Chamfer）。
+
+光線設定：
+專業攝影棚打光，強調對比與柔和陰影。使用邊緣光（Rim Lighting）來勾勒並凸顯每一片散熱鰭片的俐落線條與間隔。
+
+視覺規格：
+一律生成3D等角視圖，且角度要和第一張模擬圖的視角角位相同（Isometric view），純白背景，8k 高解析度，照片級真實影像渲染。
+        """.strip()
+        user_prompt = st.text_area(label="您可以在此直接修改提示詞：", value=prompt_template, height=300)
+        safe_prompt = user_prompt.replace('`', '\`')
+        components.html(f"""<script>function copyToClipboard(){{const text=`{safe_prompt}`;if(navigator.clipboard&&window.isSecureContext){{navigator.clipboard.writeText(text).then(function(){{document.getElementById('status').innerHTML="✅ 已複製！";setTimeout(()=>{{document.getElementById('status').innerHTML="";}},2000)}},function(err){{fallbackCopy(text)}})}}else{{fallbackCopy(text)}}}}function fallbackCopy(text){{const textArea=document.createElement("textarea");textArea.value=text;textArea.style.position="fixed";document.body.appendChild(textArea);textArea.focus();textArea.select();try{{document.execCommand('copy');document.getElementById('status').innerHTML="✅ 已複製！"}}catch(err){{document.getElementById('status').innerHTML="❌ 複製失敗"}}document.body.removeChild(textArea);setTimeout(()=>{{document.getElementById('status').innerHTML="";}},2000)}}</script><div style="display: flex; align-items: center; font-family: 'Microsoft JhengHei', sans-serif;"><button onclick="copyToClipboard()" style="background-color: #ffffff; border: 1px solid #d1d5db; border-radius: 4px; padding: 8px 16px; font-size: 14px; cursor: pointer; color: #31333F; display: flex; align-items: center; gap: 5px; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" onmouseover="this.style.borderColor='#ff4b4b'; this.style.color='#ff4b4b'" onmouseout="this.style.borderColor='#d1d5db'; this.style.color='#31333F'">📋 複製提示詞 (Copy Prompt)</button><span id="status" style="margin-left: 10px; color: #00b894; font-size: 14px; font-weight: bold;"></span></div>""", height=50)
+
+        st.markdown("#### Step 4. 執行 AI 生成")
+        st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
+
+# --- Tab 5: 敏感度分析 (New) ---
 # [Fix] 這裡不使用 st.tabs()，而是直接使用上方定義的 tab_sensitivity 變數
 with tab_sensitivity:
     st.subheader("📈 敏感度分析 (Sensitivity Analysis)")
