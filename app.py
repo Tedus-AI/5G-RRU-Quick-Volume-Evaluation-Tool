@@ -1172,168 +1172,174 @@ with tab_3d:
 with tab_sensitivity:
     st.subheader("📈 敏感度分析 (Sensitivity Analysis)")
     
-    # 建立左右分欄佈局 (左 1 : 右 3) - 調整比例讓圖表更寬
-    col_ctrl, col_dash = st.columns([1, 3], gap="large")
-
-    with col_ctrl:
-        st.markdown("#### ⚙️ 參數設定")
+    # [v4.17] 佈局重構：控制台置頂 + 橫向排列 + 圖表全寬
+    with st.container(border=True):
+        st.markdown("##### ⚙️ 參數設定與執行")
         
-        # 1. 鎖定變數為 Fin Air Gap
-        st.info("目前鎖定分析對象：\n**Fin Air Gap (鰭片間距)**")
-        var_name_internal = "Gap"
+        # 使用 6 個欄位將控制項平均橫向排列
+        c1, c2, c3, c4, c5, c6 = st.columns(6, gap="medium")
         
-        # 2. 取得目前基準值
-        base_val = float(st.session_state.get(var_name_internal, 13.2))
-        st.number_input("基準值 (Base, mm)", value=base_val, disabled=True)
-        
-        # 3. 設定不對稱範圍 (+/- 分開)
-        st.write("---")
-        st.caption("設定變化範圍")
-        c_minus, c_plus = st.columns(2)
-        minus_pct = c_minus.number_input("減少 (-%)", min_value=0.0, max_value=90.0, value=50.0, step=5.0)
-        plus_pct = c_plus.number_input("增加 (+%)", min_value=0.0, max_value=300.0, value=50.0, step=5.0)
-        
-        # 4. 計算點數 (Step = 1)
-        steps = st.slider("計算點數 (Points)", min_value=3, max_value=21, value=7, step=1)
-        
-        # 5. 執行按鈕
-        st.write("---")
-        run_analysis = st.button("🚀 執行分析", type="primary", use_container_width=True)
+        with c1:
+            st.caption("1. 分析變數")
+            st.info("**Fin Air Gap**") # 顯示目前鎖定的變數
+            var_name_internal = "Gap"
+            
+        with c2:
+            st.caption("2. 基準值 (mm)")
+            base_val = float(st.session_state.get(var_name_internal, 13.2))
+            st.number_input("Base", value=base_val, disabled=True, label_visibility="collapsed")
+            
+        with c3:
+            st.caption("3. 減少 (-%)")
+            minus_pct = st.number_input("Minus", min_value=0.0, max_value=90.0, value=50.0, step=5.0, label_visibility="collapsed")
+            
+        with c4:
+            st.caption("4. 增加 (+%)")
+            plus_pct = st.number_input("Plus", min_value=0.0, max_value=300.0, value=50.0, step=5.0, label_visibility="collapsed")
+            
+        with c5:
+            st.caption("5. 計算點數")
+            steps = st.slider("Steps", min_value=3, max_value=21, value=7, step=1, label_visibility="collapsed")
+            
+        with c6:
+            st.caption("6. 開始運算")
+            run_analysis = st.button("🚀 執行分析", type="primary", use_container_width=True)
 
-    with col_dash:
-        if run_analysis:
-            with st.spinner("正在進行熱流與結構多重迭代運算..."):
-                # 準備數據容器
-                results = []
-                
-                # 計算掃描範圍
-                val_min = base_val * (1 - minus_pct / 100)
-                val_max = base_val * (1 + plus_pct / 100)
-                
-                # 確保 gap 不為 0
-                val_min = max(val_min, 0.5)
-                
-                x_values = np.linspace(val_min, val_max, steps)
-                
-                # 取得當前全域參數與元件表
-                base_params = {k: st.session_state[k] for k in DEFAULT_GLOBALS.keys()}
-                base_params['Slope'] = 0.03
-                base_df = st.session_state['df_current'].copy()
+    # 圖表顯示區 (位於下方，佔滿全寬)
+    if run_analysis:
+        st.markdown("---")
+        with st.spinner("正在進行熱流與結構多重迭代運算..."):
+            # 準備數據容器
+            results = []
+            
+            # 計算掃描範圍
+            val_min = base_val * (1 - minus_pct / 100)
+            val_max = base_val * (1 + plus_pct / 100)
+            
+            # 確保 gap 不為 0
+            val_min = max(val_min, 0.5)
+            
+            x_values = np.linspace(val_min, val_max, steps)
+            
+            # 取得當前全域參數與元件表
+            base_params = {k: st.session_state[k] for k in DEFAULT_GLOBALS.keys()}
+            base_params['Slope'] = 0.03
+            base_df = st.session_state['df_current'].copy()
 
-                # 開始迴圈計算
-                for x in x_values:
-                    # 複製參數以免汙染
-                    p = copy.deepcopy(base_params)
-                    d = base_df.copy()
-                    
-                    # 修改 Gap
-                    p[var_name_internal] = x
-                    
-                    # 呼叫核心計算
-                    res = compute_key_results(p, d)
-                    
-                    # 計算 Aspect Ratio
-                    ar = res["Fin_Height"] / x if x > 0 else 0
-                    
-                    # 收集結果
-                    results.append({
-                        "Gap": x,
-                        "Volume": res["Volume_L"],
-                        "Weight": res["total_weight_kg"],
-                        "AR": ar
-                    })
+            # 開始迴圈計算
+            for x in x_values:
+                # 複製參數以免汙染
+                p = copy.deepcopy(base_params)
+                d = base_df.copy()
                 
-                # 轉為 DataFrame
-                df_res = pd.DataFrame(results)
+                # 修改 Gap
+                p[var_name_internal] = x
                 
-                # --- 繪圖 (複雜組合圖：Line + Grouped Bar + Dual Axis) ---
-                fig = go.Figure()
-
-                # Y2 (右軸1): 體積 (Bar)
-                fig.add_trace(go.Bar(
-                    x=df_res["Gap"], y=df_res["Volume"],
-                    name="體積 (L)",
-                    marker_color='rgba(52, 152, 219, 0.7)',
-                    yaxis="y2",
-                    offsetgroup=1
-                ))
+                # 呼叫核心計算
+                res = compute_key_results(p, d)
                 
-                # Y3 (右軸2): 重量 (Bar)
-                fig.add_trace(go.Bar(
-                    x=df_res["Gap"], y=df_res["Weight"],
-                    name="重量 (kg)",
-                    marker_color='rgba(46, 204, 113, 0.7)',
-                    yaxis="y3",
-                    offsetgroup=2
-                ))
-
-                # Y1 (左軸): 流阻比 (Line)
-                fig.add_trace(go.Scatter(
-                    x=df_res["Gap"], y=df_res["AR"],
-                    name="流阻比 (Aspect Ratio)",
-                    mode='lines+markers',
-                    line=dict(color='#e74c3c', width=3),
-                    marker=dict(size=8, symbol='diamond'),
-                    yaxis="y1"
-                ))
-
-                # 版面設定 (三軸)
-                fig.update_layout(
-                    title=dict(text=f"<b>Fin Air Gap 敏感度分析 (基準 {base_val:.2f} mm)</b>"),
-                    xaxis=dict(title=dict(text="Fin Air Gap (mm)"), domain=[0.05, 0.9]), # 縮減 X 軸給右側 Y 軸留空間
-                    
-                    # 左軸 (AR)
-                    yaxis=dict(
-                        title=dict(text="流阻比 (Aspect Ratio)", font=dict(color="#e74c3c")),
-                        tickfont=dict(color="#e74c3c"),
-                        side="left"
-                    ),
-                    
-                    # 右軸 1 (體積)
-                    yaxis2=dict(
-                        title=dict(text="體積 (L)", font=dict(color="#3498db")),
-                        tickfont=dict(color="#3498db"),
-                        anchor="x",
-                        overlaying="y",
-                        side="right"
-                    ),
-                    
-                    # 右軸 2 (重量) - 向右偏移，避免重疊
-                    yaxis3=dict(
-                        title=dict(text="重量 (kg)", font=dict(color="#2ecc71")),
-                        tickfont=dict(color="#2ecc71"),
-                        anchor="free",
-                        overlaying="y",
-                        side="right",
-                        position=0.95 # 偏移位置
-                    ),
-                    
-                    legend=dict(x=0.5, y=1.1, orientation="h", xanchor="center"),
-                    height=550,
-                    margin=dict(l=60, r=80, t=80, b=50),
-                    hovermode="x unified",
-                    barmode='group' # 讓 Bar 並排
-                )
+                # 計算 Aspect Ratio
+                ar = res["Fin_Height"] / x if x > 0 else 0
                 
-                # 標示基準線
-                fig.add_vline(x=base_val, line_width=1, line_dash="dash", line_color="gray", annotation_text="Current")
+                # 收集結果
+                results.append({
+                    "Gap": x,
+                    "Volume": res["Volume_L"],
+                    "Weight": res["total_weight_kg"],
+                    "AR": ar
+                })
+            
+            # 轉為 DataFrame
+            df_res = pd.DataFrame(results)
+            
+            # --- 繪圖 (複雜組合圖：Line + Grouped Bar + Dual Axis) ---
+            fig = go.Figure()
 
-                st.plotly_chart(fig, use_container_width=True)
+            # Y2 (右軸1): 體積 (Bar)
+            fig.add_trace(go.Bar(
+                x=df_res["Gap"], y=df_res["Volume"],
+                name="體積 (L)",
+                marker_color='rgba(52, 152, 219, 0.7)',
+                yaxis="y2",
+                offsetgroup=1
+            ))
+            
+            # Y3 (右軸2): 重量 (Bar)
+            fig.add_trace(go.Bar(
+                x=df_res["Gap"], y=df_res["Weight"],
+                name="重量 (kg)",
+                marker_color='rgba(46, 204, 113, 0.7)',
+                yaxis="y3",
+                offsetgroup=2
+            ))
+
+            # Y1 (左軸): 流阻比 (Line)
+            fig.add_trace(go.Scatter(
+                x=df_res["Gap"], y=df_res["AR"],
+                name="流阻比 (Aspect Ratio)",
+                mode='lines+markers',
+                line=dict(color='#e74c3c', width=3),
+                marker=dict(size=8, symbol='diamond'),
+                yaxis="y1"
+            ))
+
+            # 版面設定 (三軸)
+            fig.update_layout(
+                title=dict(text=f"<b>Fin Air Gap 敏感度分析 (基準 {base_val:.2f} mm)</b>"),
+                xaxis=dict(title=dict(text="Fin Air Gap (mm)"), domain=[0.05, 0.9]), # 縮減 X 軸給右側 Y 軸留空間
                 
-                # 顯示數據表
-                with st.expander("查看詳細數據"):
-                    df_show = df_res.copy()
-                    df_show.columns = ["Gap (mm)", "體積 (L)", "重量 (kg)", "流阻比 (AR)"]
-                    st.dataframe(df_show.style.background_gradient(cmap="Blues"), use_container_width=True)
+                # 左軸 (AR)
+                yaxis=dict(
+                    title=dict(text="流阻比 (Aspect Ratio)", font=dict(color="#e74c3c")),
+                    tickfont=dict(color="#e74c3c"),
+                    side="left"
+                ),
+                
+                # 右軸 1 (體積)
+                yaxis2=dict(
+                    title=dict(text="體積 (L)", font=dict(color="#3498db")),
+                    tickfont=dict(color="#3498db"),
+                    anchor="x",
+                    overlaying="y",
+                    side="right"
+                ),
+                
+                # 右軸 2 (重量) - 向右偏移，避免重疊
+                yaxis3=dict(
+                    title=dict(text="重量 (kg)", font=dict(color="#2ecc71")),
+                    tickfont=dict(color="#2ecc71"),
+                    anchor="free",
+                    overlaying="y",
+                    side="right",
+                    position=0.95 # 偏移位置
+                ),
+                
+                legend=dict(x=0.5, y=1.1, orientation="h", xanchor="center"),
+                height=650, # [v4.17] 增加高度，讓全寬圖表更舒適
+                margin=dict(l=60, r=80, t=80, b=50),
+                hovermode="x unified",
+                barmode='group' # 讓 Bar 並排
+            )
+            
+            # 標示基準線
+            fig.add_vline(x=base_val, line_width=1, line_dash="dash", line_color="gray", annotation_text="Current")
 
-        else:
-            # 尚未執行時的佔位畫面
-            st.markdown("""
-            <div style="text-align: center; color: #aaa; padding: 60px; border: 2px dashed #eee; border-radius: 10px; background-color: #fcfcfc;">
-                <h3 style="margin-bottom: 10px;">👈 準備就緒</h3>
-                <p>請在左側設定 <b>Fin Air Gap</b> 的變化範圍與點數，<br>系統將分析其對 <b>流阻比、體積與重量</b> 的綜合影響。</p>
-            </div>
-            """, unsafe_allow_html=True)
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # 顯示數據表
+            with st.expander("查看詳細數據"):
+                df_show = df_res.copy()
+                df_show.columns = ["Gap (mm)", "體積 (L)", "重量 (kg)", "流阻比 (AR)"]
+                st.dataframe(df_show.style.background_gradient(cmap="Blues"), use_container_width=True)
+
+    else:
+        # 尚未執行時的佔位畫面
+        st.markdown("""
+        <div style="text-align: center; color: #aaa; padding: 60px; border: 2px dashed #eee; border-radius: 10px; background-color: #fcfcfc; margin-top: 20px;">
+            <h3 style="margin-bottom: 10px;">👈 請設定參數並點擊上方「執行分析」</h3>
+            <p>系統將自動掃描參數變化對 <b>流阻比、體積與重量</b> 的影響趨勢。</p>
+        </div>
+        """, unsafe_allow_html=True)
 
 # --- [Project I/O - Save Logic] 移到底部執行 ---
 # [Critical Fix] 確保 placeholder 名稱與頂部定義一致 (project_io_save_placeholder)
