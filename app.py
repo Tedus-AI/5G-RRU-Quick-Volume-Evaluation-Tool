@@ -664,11 +664,19 @@ def compute_key_results(global_params, df_components):
         
         df["Allowed_dT"] = df["Allowed_dT"].clip(lower=0)
         Total_Power = (df["Power(W)"] * df["Qty"]).sum() * p["Margin"]
-        Min_dT_Allowed = df["Allowed_dT"].min()
-        if not pd.isna(df["Allowed_dT"].idxmin()):
-            Bottleneck_Name = df.loc[df["Allowed_dT"].idxmin(), "Component"]
+        
+        # [Fix v4.19] 邏輯對齊：計算瓶頸時，僅考慮總功耗 > 0 的元件 (排除不發熱元件)
+        valid_rows = df[df['Total_W'] > 0]
+        if not valid_rows.empty:
+            Min_dT_Allowed = valid_rows["Allowed_dT"].min()
+            if not pd.isna(valid_rows["Allowed_dT"].idxmin()):
+                Bottleneck_Name = valid_rows.loc[valid_rows["Allowed_dT"].idxmin(), "Component"]
+            else:
+                Bottleneck_Name = "None"
         else:
-             Bottleneck_Name = "None"
+            Min_dT_Allowed = 50 # 預設安全值
+            Bottleneck_Name = "None"
+            
     else:
         Total_Power = 0
         Min_dT_Allowed = 50
