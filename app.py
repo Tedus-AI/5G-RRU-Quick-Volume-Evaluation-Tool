@@ -10,17 +10,19 @@ import json
 import copy
 
 # ==============================================================================
-# 版本：v4.18 (Sensitivity Layout Finalized)
+# 版本：v4.20 (Logic & Formula Verification)
 # 日期：2026-02-10
-# 狀態：正式發布版 (Production Ready) - Tab 5 佈局定案
+# 狀態：正式發布版 (Production Ready)
 # 
-# [定案內容]
-# 1. Tab 5 敏感度分析：採用「置頂橫向控制台 (Top Horizontal Controls)」+「全寬圖表 (Full Width Chart)」。
-# 2. 核心功能：熱流計算、重量估算、3D 模擬、專案存取皆已穩定。
+# [修正重點]
+# 1. [Logic Fix] 敏感度分析 (compute_key_results) 邏輯修正：
+#    - 計算瓶頸 (Min_dT_Allowed) 前，強制排除 Total_W = 0 的元件。
+#    - 解決因不發熱元件導致的散熱需求誤判 (體積虛胖問題)。
+# 2. [Formula Fix] 修正體積計算公式，移除多餘的 /1000。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.19"
+APP_VERSION = "v4.20"
 UPDATE_DATE = "2026-02-10"
 
 # === APP 設定 ===
@@ -665,16 +667,18 @@ def compute_key_results(global_params, df_components):
         df["Allowed_dT"] = df["Allowed_dT"].clip(lower=0)
         Total_Power = (df["Power(W)"] * df["Qty"]).sum() * p["Margin"]
         
-        # [Fix v4.19] 邏輯對齊：計算瓶頸時，僅考慮總功耗 > 0 的元件 (排除不發熱元件)
-        valid_rows = df[df['Total_W'] > 0]
-        if not valid_rows.empty:
-            Min_dT_Allowed = valid_rows["Allowed_dT"].min()
-            if not pd.isna(valid_rows["Allowed_dT"].idxmin()):
-                Bottleneck_Name = valid_rows.loc[valid_rows["Allowed_dT"].idxmin(), "Component"]
+        # [v4.20 Logic Fix] 嚴格對齊主程式：計算瓶頸時，必須排除不發熱 (0W) 的元件
+        # 否則 0W 元件若限溫較低，會錯誤地拉低 Min_dT_Allowed，導致算出的體積偏大
+        valid_rows_for_bottleneck = df[df['Total_W'] > 0]
+        
+        if not valid_rows_for_bottleneck.empty:
+            Min_dT_Allowed = valid_rows_for_bottleneck["Allowed_dT"].min()
+            if not pd.isna(valid_rows_for_bottleneck["Allowed_dT"].idxmin()):
+                Bottleneck_Name = valid_rows_for_bottleneck.loc[valid_rows_for_bottleneck["Allowed_dT"].idxmin(), "Component"]
             else:
                 Bottleneck_Name = "None"
         else:
-            Min_dT_Allowed = 50 # 預設安全值
+            Min_dT_Allowed = 50 # 無發熱源時的預設值
             Bottleneck_Name = "None"
             
     else:
@@ -707,10 +711,12 @@ def compute_key_results(global_params, df_components):
         
     # === 體積與重量 (Detailed Logic) ===
     RRU_Height = p["H_shield"] + p["H_filter"] + p["t_base"] + Fin_Height
-    # [Fix] 單位修正 (公升)
+    
+    # [v4.20 Formula Fix] 修正單位錯誤：移除多餘的 / 1000
+    # L * W * H (mm^3) / 1e6 = Liter
     Volume_L = round(L_hsk * W_hsk * RRU_Height / 1e6, 2)
     
-    # 重量計算
+    # 重量計算 (包含所有部件)
     base_vol_cm3 = L_hsk * W_hsk * p["t_base"] / 1000
     fins_vol_cm3 = num_fins_int * p["Fin_t"] * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * p["al_density"] / 1000
