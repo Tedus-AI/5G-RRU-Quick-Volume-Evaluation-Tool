@@ -10,16 +10,16 @@ import json
 import copy
 
 # ==============================================================================
-# 版本：v4.07 (Duplicate Tabs Removed)
-# 日期：2026-02-09
+# 版本：v4.09 (Tab 2 Columns Hidden)
+# 日期：2026-02-10
 # 修正重點：
-# 1. [Fix] 移除程式末端重複呼叫 st.tabs() 的代碼，解決頁面底部出現第二排頁籤的問題。
-# 2. [Stable] 保持 Header UI、檔案存取邏輯與 CSS 樣式與 v4.06 完全一致。
+# 1. [UI] Tab 2 詳細數據表隱藏部分欄位 (Qty, Power, Dimensions...) 以減少橫向捲動。
+#    - 這些數據仍在後台計算，僅在顯示層隱藏。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.08"
-UPDATE_DATE = "2026-02-09"
+APP_VERSION = "v4.09"
+UPDATE_DATE = "2026-02-10"
 
 # === APP 設定 ===
 st.set_page_config(
@@ -869,12 +869,17 @@ with tab_data:
     st.caption("💡 **提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。**")
     
     if not final_df.empty:
+        # [v4.09] 篩選顯示欄位 (隱藏基礎尺寸參數，保留熱流關鍵數據)
+        cols_to_hide = ["Qty", "Power(W)", "Height(mm)", "Pad_L", "Pad_W", "Thick(mm)", "Base_L", "Base_W"]
+        # 確保只移除存在的欄位，建立一個新的顯示用 DataFrame
+        df_display = final_df.drop(columns=[c for c in cols_to_hide if c in final_df.columns])
+
         min_val = final_df['Allowed_dT'].min()
         max_val = final_df['Allowed_dT'].max()
         mid_val = (min_val + max_val) / 2
         
-        # [修改] 移除原本的左右分欄 (col_table, col_legend)，改為全寬顯示
-        styled_df = final_df.style.background_gradient(
+        # [修改] 使用 df_display 進行樣式設定
+        styled_df = df_display.style.background_gradient(
             subset=['Allowed_dT'], 
             cmap='RdYlGn'
         ).format({
@@ -882,6 +887,7 @@ with tab_data:
         })
         
         # [修正 v3.66] 還原完整的 Help 說明 (包含物理公式)
+        # 這裡保留完整的 config 沒關係，Streamlit 會自動忽略不存在的欄位設定
         st.dataframe(
             styled_df, 
             column_config={
@@ -913,13 +919,7 @@ with tab_data:
             hide_index=True
         )
         
-        # [UI Update] 將 Scale Bar 移至下方，並改為橫式
-        st.markdown(f"""
-        <div style="display: flex; flex-direction: column; align-items: center; margin: 15px 0;">
-            <div style="font-weight: bold; margin-bottom: 5px; color: #555; font-size: 0.9rem;">允許溫升 (Allowed dT) 色階參考</div>
-            <div style="width: 100%; max-width: 600px; height: 12px; background: linear-gradient(to right, #d73027, #fee08b, #1a9850); border-radius: 6px; border: 1px solid #ddd;"></div>
-            <div style="display: flex; justify-content: space-between; width: 100%; max-width: 600px; color: #555; font-weight: bold; font-size: 0.8rem; margin-top: 4px;">
-                <span>{min_val:.0f}°C (Risk)</span>
+        # 只有當 'Allowed_dT' 有顯示時，才顯示下方的 Scale Bar 與說明
                 <span>{mid_val:.0f}°C</span>
                 <span>{max_val:.0f}°C (Safe)</span>
             </div>
