@@ -10,17 +10,17 @@ import json
 import copy
 
 # ==============================================================================
-# 版本：v4.11 (Sensitivity Core)
+# 版本：v4.11 (Sensitivity Feature Implementation)
 # 日期：2026-02-10
 # 狀態：正式發布版 (Production Ready)
 # 
 # [新增功能]
-# 1. [Core] 新增 compute_key_results() 核心運算函數：
-#    - 封裝完整的熱流、尺寸、重量計算邏輯 (與主程式一致的詳細版)。
-#    - 支援傳入 Slope 參數，避免 KeyError。
-# 2. [UI] 新增 Tab 5 "敏感度分析"：
-#    - 採用左右分欄佈局 (左控制、右圖表)。
-#    - 實作「單變數分析」功能，可繪製雙軸圖表 (體積/重量 vs 變數)。
+# 1. [Core] 新增 compute_key_results() 函數，封裝完整的熱流與詳細重量計算邏輯。
+# 2. [UI] 新增 Tab 5 "敏感度分析"，採用左右分欄佈局，提供趨勢預測功能。
+# 
+# [保留功能]
+# 1. Header UI: 完美的按鈕化上傳介面。
+# 2. Tab 2: 自動隱藏非關鍵欄位。
 # ==============================================================================
 
 # 定義版本資訊
@@ -146,7 +146,7 @@ def reset_download_state():
     st.session_state['json_ready_to_download'] = None
 
 # ==================================================
-# 🔐 密碼保護 (v4.05 Info Page Style)
+# 🔐 密碼保護
 # ==================================================
 def check_password():
     ACTUAL_PASSWORD = "tedus"
@@ -246,7 +246,7 @@ if "welcome_shown" not in st.session_state:
 # ==================================================
 # 👇 主程式開始 - Header 區塊
 # ==================================================
-# CSS 樣式 (v4.00 Stable Style - Pixel Perfect Uploader)
+# CSS 樣式
 st.markdown("""
 <style>
     html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
@@ -1164,6 +1164,9 @@ with tab_3d:
         user_prompt = st.text_area(label="您可以在此直接修改提示詞：", value=prompt_template, height=300)
         safe_prompt = user_prompt.replace('`', '\`')
         components.html(f"""<script>function copyToClipboard(){{const text=`{safe_prompt}`;if(navigator.clipboard&&window.isSecureContext){{navigator.clipboard.writeText(text).then(function(){{document.getElementById('status').innerHTML="✅ 已複製！";setTimeout(()=>{{document.getElementById('status').innerHTML="";}},2000)}},function(err){{fallbackCopy(text)}})}}else{{fallbackCopy(text)}}}}function fallbackCopy(text){{const textArea=document.createElement("textarea");textArea.value=text;textArea.style.position="fixed";document.body.appendChild(textArea);textArea.focus();textArea.select();try{{document.execCommand('copy');document.getElementById('status').innerHTML="✅ 已複製！"}}catch(err){{document.getElementById('status').innerHTML="❌ 複製失敗"}}document.body.removeChild(textArea);setTimeout(()=>{{document.getElementById('status').innerHTML="";}},2000)}}</script><div style="display: flex; align-items: center; font-family: 'Microsoft JhengHei', sans-serif;"><button onclick="copyToClipboard()" style="background-color: #ffffff; border: 1px solid #d1d5db; border-radius: 4px; padding: 8px 16px; font-size: 14px; cursor: pointer; color: #31333F; display: flex; align-items: center; gap: 5px; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" onmouseover="this.style.borderColor='#ff4b4b'; this.style.color='#ff4b4b'" onmouseout="this.style.borderColor='#d1d5db'; this.style.color='#31333F'">📋 複製提示詞 (Copy Prompt)</button><span id="status" style="margin-left: 10px; color: #00b894; font-size: 14px; font-weight: bold;"></span></div>""", height=50)
+
+        st.markdown("#### Step 4. 執行 AI 生成")
+        st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Image)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 # --- Tab 5: 敏感度分析 ---
 # [Fix] 這裡不使用 st.tabs()，而是直接使用上方定義的 tab_sensitivity 變數
