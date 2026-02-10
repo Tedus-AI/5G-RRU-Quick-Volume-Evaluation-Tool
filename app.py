@@ -10,18 +10,17 @@ import json
 import copy
 
 # ==============================================================================
-# 版本：v4.14 (Plotly Layout Fix)
+# 版本：v4.15 (Sensitivity Variable Fix)
 # 日期：2026-02-10
 # 狀態：正式發布版 (Production Ready)
 # 
 # [修正重點]
-# 1. [Fix] 修正 Tab 5 敏感度分析圖表的 update_layout 參數格式。
-#    - 解決 ValueError: 將 title 字串改為 dict(text=...) 標準格式。
-#    - 解決 Deprecation: 將 titlefont 改為標準 title=dict(font=...) 結構。
+# 1. [Fix] 修正 Tab 5 圖表標題的 NameError。
+#    - 將誤用的變數 base_val 修正為 current_val (與上方定義一致)。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.14"
+APP_VERSION = "v4.15"
 UPDATE_DATE = "2026-02-10"
 
 # === APP 設定 ===
@@ -1278,8 +1277,9 @@ with tab_sensitivity:
                 ))
 
                 # [v4.14 Fix] 版面設定 (修正 update_layout 參數格式以避免 ValueError)
+                # [v4.15 Fix] 修正變數名稱 base_val -> current_val
                 fig.update_layout(
-                    title=dict(text=f"<b>{var_name} 敏感度趨勢圖 (基準 {base_val:.2f})</b>"),
+                    title=dict(text=f"<b>{var_name} 敏感度趨勢圖 (基準 {current_val:.2f})</b>"),
                     xaxis=dict(title=dict(text=f"{var_name} 數值")),
                     yaxis=dict(
                         title=dict(text="體積 (L) / 重量 (kg)", font=dict(color="#00b894")),
