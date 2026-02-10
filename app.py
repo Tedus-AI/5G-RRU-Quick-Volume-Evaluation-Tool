@@ -10,20 +10,22 @@ import json
 import copy
 
 # ==============================================================================
-# 版本：v4.20 (Logic & Formula Verification)
-# 日期：2026-02-10
-# 狀態：正式發布版 (Production Ready)
+# 版本：v4.21 (Restored v4.18 UI + Logic Fixes)
+# 日期：2026-02-11
+# 狀態：正式發布版 (Production Ready) - 介面回溯至 v4.18，核心保留 v4.20 修正
 # 
-# [修正重點]
-# 1. [Logic Fix] 敏感度分析 (compute_key_results) 邏輯修正：
-#    - 計算瓶頸 (Min_dT_Allowed) 前，強制排除 Total_W = 0 的元件。
-#    - 解決因不發熱元件導致的散熱需求誤判 (體積虛胖問題)。
-# 2. [Formula Fix] 修正體積計算公式，移除多餘的 /1000。
+# [介面還原]
+# 1. Header: 恢復右上角 "按鈕化 File Uploader" (隱藏列表/文字, 圓角8px, 粗體)。
+# 2. Tab 5: 恢復 "置頂橫向控制台 (Horizontal)" + "全寬圖表"。
+# 
+# [邏輯保留]
+# 1. Volume Fix: 修正體積單位錯誤 (移除多餘 /1000)。
+# 2. Bottleneck Fix: 排除 0W 元件對熱瓶頸的干擾。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.20"
-UPDATE_DATE = "2026-02-10"
+APP_VERSION = "v4.21"
+UPDATE_DATE = "2026-02-11"
 
 # === APP 設定 ===
 st.set_page_config(
@@ -244,7 +246,7 @@ if "welcome_shown" not in st.session_state:
 # ==================================================
 # 👇 主程式開始 - Header 區塊
 # ==================================================
-# CSS 樣式 (v4.00 Stable Style - Pixel Perfect Uploader)
+# CSS 樣式 (v4.18/v4.21 CSS - Restore Pixel-Perfect UI)
 st.markdown("""
 <style>
     html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
@@ -278,7 +280,7 @@ st.markdown("""
     /* Header Container Style */
     [data-testid="stHeader"] { z-index: 0; }
 
-    /* ==================== File Uploader Clean UI (v4.00 Stable) ==================== */
+    /* ==================== File Uploader 完美按鈕化 (Restore v3.106/v4.18) ==================== */
     /* 1. 隱藏預設文字與圖示 (Drag & Drop, Limits...) */
     [data-testid="stFileUploader"] section > div > div > span, 
     [data-testid="stFileUploader"] section > div > div > small {
@@ -312,7 +314,7 @@ st.markdown("""
         line-height: 1.6;
     }
 
-    /* 5. 植入新文字 "📂 載入專案" (偽裝) */
+    /* 5. 植入新文字 "📂 載入專案" (偽裝, 粗體) */
     [data-testid="stFileUploader"] button::after {
         content: "📂 載入專案";
         color: rgb(49, 51, 63);
@@ -545,7 +547,7 @@ with tab_input:
             "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
             "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量", min_value=0, step=1, width="small"),
             "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f", min_value=0.0, step=0.01),
-            "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.2f"),
+            "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。", format="%.2f"),
             "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.2f"),
             "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.2f"),
             "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.2f"),
@@ -668,7 +670,6 @@ def compute_key_results(global_params, df_components):
         Total_Power = (df["Power(W)"] * df["Qty"]).sum() * p["Margin"]
         
         # [v4.20 Logic Fix] 嚴格對齊主程式：計算瓶頸時，必須排除不發熱 (0W) 的元件
-        # 否則 0W 元件若限溫較低，會錯誤地拉低 Min_dT_Allowed，導致算出的體積偏大
         valid_rows_for_bottleneck = df[df['Total_W'] > 0]
         
         if not valid_rows_for_bottleneck.empty:
@@ -678,7 +679,7 @@ def compute_key_results(global_params, df_components):
             else:
                 Bottleneck_Name = "None"
         else:
-            Min_dT_Allowed = 50 # 無發熱源時的預設值
+            Min_dT_Allowed = 50 
             Bottleneck_Name = "None"
             
     else:
@@ -711,12 +712,10 @@ def compute_key_results(global_params, df_components):
         
     # === 體積與重量 (Detailed Logic) ===
     RRU_Height = p["H_shield"] + p["H_filter"] + p["t_base"] + Fin_Height
-    
     # [v4.20 Formula Fix] 修正單位錯誤：移除多餘的 / 1000
-    # L * W * H (mm^3) / 1e6 = Liter
     Volume_L = round(L_hsk * W_hsk * RRU_Height / 1e6, 2)
     
-    # 重量計算 (包含所有部件)
+    # 重量計算
     base_vol_cm3 = L_hsk * W_hsk * p["t_base"] / 1000
     fins_vol_cm3 = num_fins_int * p["Fin_t"] * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * p["al_density"] / 1000
@@ -805,7 +804,7 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
     
     # [v3.84] 重量計算
     base_vol_cm3 = L_hsk * W_hsk * t_base / 1000
-    fins_vol_cm3 = num_fins_int * Fin_t * Fin_Height * L_hsk / 1000
+    fins_vol_cm3 = num_fins_int * p["Fin_t"] * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * al_density / 1000
     
     shield_outer_vol_cm3 = L_hsk * W_hsk * H_shield / 1000
@@ -910,7 +909,7 @@ with tab_data:
             column_config={
                 "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
                 "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量"),
-                "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.1f"),
+                "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f"),
                 "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.1f"),
                 "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.1f"),
                 "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.1f"),
