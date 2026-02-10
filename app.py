@@ -10,20 +10,19 @@ import json
 import copy
 
 # ==============================================================================
-# 版本：v4.22 (Final Stability Fix)
-# 日期：2026-02-11
-# 狀態：正式發布版 (Production Ready)
+# 版本：v4.19 (Landing Page Update)
+# 日期：2026-02-10
+# 狀態：還原至指定版本
 # 
-# [修正重點]
-# 1. [Critical Fix] 修復 compute_key_results 中的 NameError: 'num_fins_int' is not defined。
-#    - 在函數開頭強制初始化 num_fins_int = 0。
-#    - 確保鰭片數量計算邏輯在重量計算前執行。
-# 2. [UI] 保持 v4.21 的完美 UI (Header 按鈕化、Tab 5 橫向佈局)。
+# [版本特徵]
+# 1. UI: Header 採用按鈕化 File Uploader，Tab 5 採用橫向置頂佈局。
+# 2. Landing: 登入頁面包含「敏感度分析」功能說明，並移除了 Embedded Fin 高度警告。
+# 3. Core: 包含 compute_key_results 運算核心。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.22"
-UPDATE_DATE = "2026-02-11"
+APP_VERSION = "v4.19"
+UPDATE_DATE = "2026-02-10"
 
 # === APP 設定 ===
 st.set_page_config(
@@ -290,7 +289,7 @@ st.markdown("""
         display: none !important;
     }
     
-    /* 3. 移除拖曳區背景與邊框，高度壓縮 */
+    /* 3. 移除拖曳區背景與邊框 */
     [data-testid="stFileUploader"] section {
         padding: 0px !important;
         min-height: 0px !important;
@@ -299,7 +298,7 @@ st.markdown("""
         margin-bottom: 0px !important;
     }
     
-    /* 4. 調整 "Browse files" 按鈕為滿版 */
+    /* 4. 改造 "Browse files" 按鈕為目標按鈕 */
     [data-testid="stFileUploader"] button {
         width: 100% !important;
         margin-top: 0px;
@@ -804,7 +803,7 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
     
     # [v3.84] 重量計算
     base_vol_cm3 = L_hsk * W_hsk * t_base / 1000
-    fins_vol_cm3 = num_fins_int * Fin_t * Fin_Height * L_hsk / 1000
+    fins_vol_cm3 = num_fins_int * p["Fin_t"] * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * al_density / 1000
     
     shield_outer_vol_cm3 = L_hsk * W_hsk * H_shield / 1000
@@ -910,7 +909,7 @@ with tab_data:
                 "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
                 "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量"),
                 "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.1f"),
-                "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.2f"),
+                "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.1f"),
                 "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.1f"),
                 "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.1f"),
                 "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
@@ -1177,7 +1176,7 @@ with tab_3d:
         components.html(f"""<script>function copyToClipboard(){{const text=`{safe_prompt}`;if(navigator.clipboard&&window.isSecureContext){{navigator.clipboard.writeText(text).then(function(){{document.getElementById('status').innerHTML="✅ 已複製！";setTimeout(()=>{{document.getElementById('status').innerHTML="";}},2000)}},function(err){{fallbackCopy(text)}})}}else{{fallbackCopy(text)}}}}function fallbackCopy(text){{const textArea=document.createElement("textarea");textArea.value=text;textArea.style.position="fixed";document.body.appendChild(textArea);textArea.focus();textArea.select();try{{document.execCommand('copy');document.getElementById('status').innerHTML="✅ 已複製！"}}catch(err){{document.getElementById('status').innerHTML="❌ 複製失敗"}}document.body.removeChild(textArea);setTimeout(()=>{{document.getElementById('status').innerHTML="";}},2000)}}</script><div style="display: flex; align-items: center; font-family: 'Microsoft JhengHei', sans-serif;"><button onclick="copyToClipboard()" style="background-color: #ffffff; border: 1px solid #d1d5db; border-radius: 4px; padding: 8px 16px; font-size: 14px; cursor: pointer; color: #31333F; display: flex; align-items: center; gap: 5px; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" onmouseover="this.style.borderColor='#ff4b4b'; this.style.color='#ff4b4b'" onmouseout="this.style.borderColor='#d1d5db'; this.style.color='#31333F'">📋 複製提示詞 (Copy Prompt)</button><span id="status" style="margin-left: 10px; color: #00b894; font-size: 14px; font-weight: bold;"></span></div>""", height=50)
 
         st.markdown("#### Step 4. 執行 AI 生成")
-        st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Image)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
+        st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
 # --- Tab 5: 敏感度分析 (New) ---
 # [Fix] 這裡不使用 st.tabs()，而是直接使用上方定義的 tab_sensitivity 變數
