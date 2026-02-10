@@ -7,19 +7,19 @@ import plotly.graph_objects as go
 import time
 import os
 import json
+import copy
 
 # ==============================================================================
-# 版本：v4.10 (Fix Indentation Error)
+# 版本：v4.11 (Restore Sensitivity Analysis)
 # 日期：2026-02-10
-# 狀態：正式發布版 (Production Ready)
-# 
-# [修正重點]
-# 1. [Fix] 修復 Tab 2 的 IndentationError (縮排錯誤)，確保 HTML 字串正確解析。
-# 2. [Feature] Tab 2 預設隱藏非關鍵欄位 (Qty, Power, Dimensions...) 以優化閱讀體驗。
+# 修正重點：
+# 1. [Fix] 補回 Tab 5 敏感度分析 (Sensitivity Analysis) 功能與介面。
+# 2. [Core] 補回 compute_key_results 計算核心函數。
+# 3. [Fix] 確保執行敏感度分析時 Slope 參數正確傳遞 (避免 KeyError)。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.10"
+APP_VERSION = "v4.11"
 UPDATE_DATE = "2026-02-10"
 
 # === APP 設定 ===
@@ -588,6 +588,107 @@ def calc_fin_count(W_hsk, Gap, Fin_t):
         num_fins_int = 0
     return num_fins_int
 
+# [Restore] 補回敏感度分析所需的核心計算函數
+def compute_key_results(global_params, df_components):
+    """
+    獨立計算核心結果，不依賴 Streamlit session_state
+    返回 dict 包含關鍵 KPI
+    """
+    # 複製參數，避免修改原始
+    p = global_params.copy()
+    df = df_components.copy()
+    
+    # 準備 globals_dict 給 calc_thermal_resistance 使用
+    g_for_calc = p.copy()
+    g_for_calc['tim_props'] = {
+        "Solder": {"k": p["K_Solder"], "t": p["t_Solder"]},
+        "Grease": {"k": p["K_Grease"], "t": p["t_Grease"]},
+        "Pad": {"k": p["K_Pad"], "t": p["t_Pad"]},
+        "Putty": {"k": p["K_Putty"], "t": p["t_Putty"]},
+        "None": {"k": 1, "t": 0}
+    }
+    
+    # === 熱阻與溫降計算 ===
+    if not df.empty:
+        # 使用既有的單行計算函數
+        calc_results = df.apply(lambda row: calc_thermal_resistance(row, g_for_calc), axis=1)
+        calc_results.columns = ['Base_L', 'Base_W', 'Loc_Amb', 'R_int', 'R_TIM', 'Total_W', 'Drop', 'Allowed_dT']
+        df = pd.concat([df, calc_results], axis=1)
+        
+        df["Allowed_dT"] = df["Allowed_dT"].clip(lower=0)
+        Total_Power = (df["Power(W)"] * df["Qty"]).sum() * p["Margin"]
+        Min_dT_Allowed = df["Allowed_dT"].min()
+        if not pd.isna(df["Allowed_dT"].idxmin()):
+            Bottleneck_Name = df.loc[df["Allowed_dT"].idxmin(), "Component"]
+        else:
+             Bottleneck_Name = "None"
+    else:
+        Total_Power = 0
+        Min_dT_Allowed = 50
+        Bottleneck_Name = "None"
+
+    # === h 值 ===
+    h_value, h_conv, h_rad = calc_h_value(p["Gap"])
+        
+    # === 鰭片高度與尺寸 ===
+    L_hsk = p["L_pcb"] + p["Left"] + p["Right"]
+    W_hsk = p["W_pcb"] + p["Top"] + p["Btm"]
+    base_area_m2 = (L_hsk * W_hsk) / 1e6
+    
+    num_fins_int = calc_fin_count(W_hsk, p["Gap"], p["Fin_t"])
+    
+    # === 所需面積 ===
+    eff = 0.95 if "Embedded" in p["fin_tech_selector_v2"] else 0.90
+    
+    if Total_Power > 0 and Min_dT_Allowed > 0:
+        Area_req = 1 / (h_value * (Min_dT_Allowed / Total_Power) * eff)
+        try:
+             Fin_Height = ((Area_req - base_area_m2) * 1e6) / (2 * num_fins_int * L_hsk)
+        except:
+             Fin_Height = 0
+    else:
+        Area_req = 0
+        Fin_Height = 0
+        
+    # === 體積與重量 ===
+    RRU_Height = p["H_shield"] + p["H_filter"] + p["t_base"] + Fin_Height
+    Volume_L = round(L_hsk * W_hsk * RRU_Height / 1e6 / 1000, 2)
+    
+    # 重量計算 (包含所有部件)
+    base_vol_cm3 = L_hsk * W_hsk * p["t_base"] / 1000
+    fins_vol_cm3 = num_fins_int * p["Fin_t"] * Fin_Height * L_hsk / 1000
+    hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * p["al_density"] / 1000
+    
+    shield_outer_vol_cm3 = L_hsk * W_hsk * p["H_shield"] / 1000
+    shield_inner_vol_cm3 = p["L_pcb"] * p["W_pcb"] * p["H_shield"] / 1000
+    shield_vol_cm3 = max(shield_outer_vol_cm3 - shield_inner_vol_cm3, 0)
+    shield_weight_kg = shield_vol_cm3 * p["al_density"] / 1000
+    
+    filter_vol_cm3 = L_hsk * W_hsk * p["H_filter"] / 1000
+    filter_weight_kg = filter_vol_cm3 * p["filter_density"] / 1000
+    
+    shielding_height_cm = 1.2
+    shielding_area_cm2 = p["L_pcb"] * p["W_pcb"] / 100
+    shielding_vol_cm3 = shielding_area_cm2 * shielding_height_cm
+    shielding_weight_kg = shielding_vol_cm3 * p["shielding_density"] / 1000
+    
+    pcb_area_cm2 = p["L_pcb"] * p["W_pcb"] / 100
+    pcb_weight_kg = pcb_area_cm2 * p["pcb_surface_density"] / 1000
+    
+    cavity_weight_kg = filter_weight_kg + shield_weight_kg + shielding_weight_kg + pcb_weight_kg
+    total_weight_kg = hs_weight_kg + cavity_weight_kg
+    
+    return {
+        "Total_Power": round(Total_Power, 2),
+        "Min_dT_Allowed": round(Min_dT_Allowed, 2),
+        "Bottleneck_Name": Bottleneck_Name,
+        "Area_req": round(Area_req, 3),
+        "Fin_Height": round(Fin_Height, 2),
+        "Volume_L": Volume_L,
+        "total_weight_kg": round(total_weight_kg, 2),
+        "h_value": round(h_value, 2)
+    }
+
 def calc_thermal_resistance(row, g):
     """單行元件熱阻計算 (取代原本 apply_excel_formulas)"""
     # 從 g (globals_dict) 取出需要的全域變數
@@ -717,19 +818,19 @@ else:
     filter_weight_kg = 0; shielding_weight_kg = 0; pcb_weight_kg = 0
 
 # ==================================================
-# [DRC] 設計規則檢查
+# 3. 分頁與邏輯
 # ==================================================
-drc_failed = False
-drc_msg = ""
+# [Restore] Tabs 擴充為 5 頁籤
+tab_input, tab_data, tab_viz, tab_3d, tab_sensitivity = st.tabs([
+    "📝 COMPONENT SETUP (元件設定)", 
+    "🔢 DETAILED ANALYSIS (詳細分析)", 
+    "📊 VISUAL REPORT (視覺化報告)", 
+    "🧊 3D SIMULATION (3D 模擬視圖)",
+    "📈 SENSITIVITY ANALYSIS (敏感度分析)"
+])
 
-# 計算流阻比 (Aspect Ratio)
-if Gap > 0 and Fin_Height > 0:
-    aspect_ratio = Fin_Height / Gap
-else:
-    aspect_ratio = 0
-
-# [UI] 更新側邊欄的 Aspect Ratio 資訊 (回填)
-# 修正建議值為 4.5 ~ 6.5
+# --- Tab 1: 輸入介面 ---
+with tab_input:
 if aspect_ratio > 12.0:
     ar_color = "#e74c3c" # Red
     ar_msg = "過高 (High)"
@@ -1066,6 +1167,101 @@ with tab_3d:
 
         st.markdown("#### Step 4. 執行 AI 生成")
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
+
+# [Restore] Tab 5: 敏感度分析 UI 內容
+with tab_sensitivity:
+    st.subheader("📈 敏感度分析 (Sensitivity Analysis)")
+    st.markdown("""
+    此功能讓您快速評估單一參數變化對整機體積、重量與熱裕度的影響。<br>
+    選擇一個變數，設定變化範圍後點擊執行，即可看到趨勢圖。
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        var_type = st.selectbox("變數類型", ["全局參數", "元件功率"])
+    with col2:
+        if var_type == "全局參數":
+            var_name = st.selectbox("選擇變數", ["T_amb", "Gap", "Fin_t", "Margin"])
+        else:
+            var_name = st.selectbox("選擇元件", ["Final PA Power(W)"])  # 未來可擴充
+            
+    col_range1, col_range2, col_range3 = st.columns([1, 1, 1])
+    with col_range1:
+        # 取得基準值
+        if var_type == "全局參數":
+            base_val_display = float(st.session_state.get(var_name, 0))
+        else:
+            base_val_display = float(st.session_state['df_current'].loc[st.session_state['df_current']["Component"] == "Final PA", "Power(W)"].iloc[0])
+        st.number_input("基準值 (自動帶入目前值)", value=base_val_display, disabled=True)
+        
+    with col_range2:
+        pct_range = st.number_input("變化範圍 (±%)", min_value=5.0, max_value=100.0, value=20.0, step=5.0)
+    with col_range3:
+        num_points = st.selectbox("計算點數", [5, 7, 9, 11], index=1)
+        
+    if st.button("🚀 執行敏感度分析", type="primary"):
+        # 取得目前狀態
+        current_params = {k: st.session_state[k] for k in DEFAULT_GLOBALS.keys()}
+        
+        # [Fix] 補上 Slope 參數，避免計算熱阻時發生 KeyError
+        # 因 Slope 定義在程式碼中而非 DEFAULT_GLOBALS，需手動補入
+        current_params['Slope'] = 0.03 
+        
+        current_df = st.session_state['df_current'].copy()
+        
+        # 產生變化點
+        if var_type == "全局參數":
+            base_val = current_params[var_name]
+        else:  # 元件功率
+            base_val = current_df.loc[current_df["Component"] == "Final PA", "Power(W)"].iloc[0]
+            
+        delta = base_val * (pct_range / 100)
+        values = np.linspace(base_val - delta, base_val + delta, num_points)
+        
+        # 儲存結果
+        results = {"var_values": [], "volume": [], "weight": [], "min_dt": []}
+        
+        for val in values:
+            # 深拷貝
+            params_copy = copy.deepcopy(current_params)
+            df_copy = current_df.copy()
+            
+            # 修改變數
+            if var_type == "全局參數":
+                params_copy[var_name] = val
+            else:
+                df_copy.loc[df_copy["Component"] == "Final PA", "Power(W)"] = val
+                
+            # 計算
+            res = compute_key_results(params_copy, df_copy)
+            
+            results["var_values"].append(round(val, 2))
+            results["volume"].append(res["Volume_L"])
+            results["weight"].append(res["total_weight_kg"])
+            results["min_dt"].append(res["Min_dT_Allowed"])
+        
+        # 畫圖
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=results["var_values"], y=results["volume"], mode='lines+markers', name='體積 (L)', line=dict(color='#00b894')))
+        fig.add_trace(go.Scatter(x=results["var_values"], y=results["weight"], mode='lines+markers', name='重量 (kg)', line=dict(color='#34495e'), yaxis='y2'))
+        fig.add_trace(go.Scatter(x=results["var_values"], y=results["min_dt"], mode='lines+markers', name='瓶頸允許溫升 (°C)', line=dict(color='#e74c3c', dash='dot'), yaxis='y3'))
+        
+        fig.update_layout(
+            title=f"<b>{var_name} 敏感度分析 (基準 {base_val:.2f})</b>",
+            xaxis_title=var_name,
+            yaxis=dict(title="體積 (L)", side="left"),
+            yaxis2=dict(title="重量 (kg)", side="right", overlaying="y", position=0.95, showgrid=False),
+            yaxis3=dict(title="瓶頸允許溫升 (°C)", side="right", overlaying="y", position=1.0, showgrid=False),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            height=600
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # 表格顯示
+        df_sens = pd.DataFrame(results)
+        df_sens.columns = [var_name, "體積 (L)", "重量 (kg)", "瓶頸允許溫升 (°C)"]
+        st.dataframe(df_sens, use_container_width=True)
 
 # --- [Project I/O - Save Logic] 移到底部執行 ---
 # [Critical Fix] 確保 placeholder 名稱與頂部定義一致 (project_io_save_placeholder)
