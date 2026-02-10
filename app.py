@@ -10,20 +10,20 @@ import json
 import copy
 
 # ==============================================================================
-# 版本：v4.12 (New Sensitivity Engine)
+# 版本：v4.13 (True Redesign)
 # 日期：2026-02-10
 # 狀態：正式發布版 (Production Ready)
 # 
-# [重構重點]
-# 1. [Redesign] Tab 5 敏感度分析完全重寫 (工程師視角)：
-#    - 佈局：左側控制台 (設定參數) vs 右側儀表板 (圖表與數據)。
-#    - 模式 1 (2D Trend): 雙 Y 軸折線圖，同時觀察 熱裕度 vs 體積/重量 的 Trade-off。
-#    - 模式 2 (Heatmap): 雙變數矩陣分析，視覺化尋找設計甜蜜點。
-# 2. [Clean] 移除舊版掃描邏輯，改用更彈性的動態範圍生成。
+# [基底] 基於 v4.10 (Fix Indentation Error) 構建。
+# [新增] 核心計算函數 compute_key_results()。
+# [重構] Tab 5 敏感度分析介面：
+#       - 捨棄舊版上下排列。
+#       - 採用「左側控制面板 (Sidebar Style) + 右側戰情室 (Dashboard)」佈局。
+#       - 實作「單變數雙軸分析」：同時觀察 體積/重量 (Bar/Line) 與 溫升 (Line) 的變化。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.12"
+APP_VERSION = "v4.13"
 UPDATE_DATE = "2026-02-10"
 
 # === APP 設定 ===
@@ -145,7 +145,7 @@ def reset_download_state():
     st.session_state['json_ready_to_download'] = None
 
 # ==================================================
-# 🔐 密碼保護
+# 🔐 密碼保護 (v4.05 Info Page Style)
 # ==================================================
 def check_password():
     ACTUAL_PASSWORD = "tedus"
@@ -1039,8 +1039,8 @@ with tab_viz:
     if not drc_failed:
         st.markdown(f"""
         <div style="background-color: #ecf0f1; padding: 30px; margin-top: 20px; border-radius: 15px; border-left: 10px solid #34495e; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center;">
-            <h3 style="color: {vol_title}; margin:0; font-size: 1.4rem; letter-spacing: 1px;">⚖️ 整機估算重量 (Estimated Weight)</h3>
-            <h1 style="color: {vol_border}; margin:15px 0 10px 0; font-size: 3.5rem; font-weight: 800;">{round(total_weight_kg, 1)} kg</h1>
+            <h3 style="color: #2c3e50; margin:0; font-size: 1.4rem; letter-spacing: 1px;">⚖️ 整機估算重量 (Estimated Weight)</h3>
+            <h1 style="color: #34495e; margin:15px 0 10px 0; font-size: 3.5rem; font-weight: 800;">{round(total_weight_kg, 1)} kg</h1>
             <small style="color: #7f8c8d; line-height: 1.6;">
                 Heatsink ≈ {round(hs_weight_kg, 1)} kg | Shield ≈ {round(shield_weight_kg, 1)} kg<br>
                 Filter ≈ {round(filter_weight_kg, 1)} kg | Shielding Case ≈ {round(shielding_weight_kg, 1)} kg | PCB ≈ {round(pcb_weight_kg, 2)} kg
@@ -1165,100 +1165,159 @@ with tab_3d:
         components.html(f"""<script>function copyToClipboard(){{const text=`{safe_prompt}`;if(navigator.clipboard&&window.isSecureContext){{navigator.clipboard.writeText(text).then(function(){{document.getElementById('status').innerHTML="✅ 已複製！";setTimeout(()=>{{document.getElementById('status').innerHTML="";}},2000)}},function(err){{fallbackCopy(text)}})}}else{{fallbackCopy(text)}}}}function fallbackCopy(text){{const textArea=document.createElement("textarea");textArea.value=text;textArea.style.position="fixed";document.body.appendChild(textArea);textArea.focus();textArea.select();try{{document.execCommand('copy');document.getElementById('status').innerHTML="✅ 已複製！"}}catch(err){{document.getElementById('status').innerHTML="❌ 複製失敗"}}document.body.removeChild(textArea);setTimeout(()=>{{document.getElementById('status').innerHTML="";}},2000)}}</script><div style="display: flex; align-items: center; font-family: 'Microsoft JhengHei', sans-serif;"><button onclick="copyToClipboard()" style="background-color: #ffffff; border: 1px solid #d1d5db; border-radius: 4px; padding: 8px 16px; font-size: 14px; cursor: pointer; color: #31333F; display: flex; align-items: center; gap: 5px; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" onmouseover="this.style.borderColor='#ff4b4b'; this.style.color='#ff4b4b'" onmouseout="this.style.borderColor='#d1d5db'; this.style.color='#31333F'">📋 複製提示詞 (Copy Prompt)</button><span id="status" style="margin-left: 10px; color: #00b894; font-size: 14px; font-weight: bold;"></span></div>""", height=50)
 
         st.markdown("#### Step 4. 執行 AI 生成")
-        st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Image)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
+        st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
-# --- Tab 5: 敏感度分析 ---
-# [Fix] 這裡不使用 st.tabs()，而是直接使用上方定義的 tab_sensitivity 變數
+# --- Tab 5: 敏感度分析 (New) ---
+# 確保這個新的 Tab 不會干擾其他 Tab
 with tab_sensitivity:
-    st.subheader("📈 SENSITIVITY ANALYSIS (敏感度分析)")
+    st.subheader("📈 敏感度分析 (Sensitivity Analysis)")
     
-    col1, col2 = st.columns([1, 1])
-    with col1:
-        st.info("此功能讓您快速評估單一參數變化對整機體積、重量與熱裕度的影響。")
-        var_type = st.selectbox("變數類型", ["全局參數", "元件功率"])
-    with col2:
-        st.caption("選擇一個變數，設定變化範圍後點擊執行，即可看到趨勢圖。")
+    # 建立左右分欄佈局 (左 1 : 右 2.5)
+    col_ctrl, col_dash = st.columns([1, 2.5], gap="large")
+
+    with col_ctrl:
+        st.markdown("#### ⚙️ 參數設定 (Settings)")
+        
+        # 1. 選擇變數
+        var_type = st.radio("變數類型", ["全局參數", "元件功率"], horizontal=True)
         if var_type == "全局參數":
-            var_name = st.selectbox("選擇變數", ["T_amb", "Gap", "Fin_t", "Margin"])
+            var_name = st.selectbox("選擇變數", ["Gap", "Fin_t", "T_amb", "Margin"])
         else:
-            var_name = st.selectbox("選擇元件", ["Final PA Power(W)"]) 
-            
-    col_range1, col_range2, col_range3 = st.columns([1, 1, 1])
-    with col_range1:
-        # 取得基準值
+            var_name = st.selectbox("選擇元件", ["Final PA Power(W)"])
+
+        # 2. 取得目前基準值
+        current_val = 0.0
         if var_type == "全局參數":
-            base_val_display = float(st.session_state.get(var_name, 0))
+            current_val = st.session_state.get(var_name, 0.0)
         else:
-            base_val_display = float(st.session_state['df_current'].loc[st.session_state['df_current']["Component"] == "Final PA", "Power(W)"].iloc[0])
-        st.number_input("基準值 (自動帶入目前值)", value=base_val_display, disabled=True)
-        
-    with col_range2:
-        pct_range = st.number_input("變化範圍 (±%)", min_value=5.0, max_value=100.0, value=20.0, step=5.0)
-    with col_range3:
-        num_points = st.selectbox("計算點數", [5, 7, 9, 11], index=1)
-        
-    if st.button("🚀 執行敏感度分析", type="primary"):
-        # 取得目前狀態
-        current_params = {k: st.session_state[k] for k in DEFAULT_GLOBALS.keys()}
-        
-        # [Fix v4.08] 補上 Slope 參數，避免計算熱阻時發生 KeyError
-        current_params['Slope'] = 0.03 
-        
-        current_df = st.session_state['df_current'].copy()
-        
-        # 產生變化點
-        if var_type == "全局參數":
-            base_val = current_params[var_name]
-        else:  # 元件功率
-            base_val = current_df.loc[current_df["Component"] == "Final PA", "Power(W)"].iloc[0]
+            # 簡化：假設只改 Final PA
+            current_val = st.session_state['df_current'].loc[
+                st.session_state['df_current']['Component'] == "Final PA", 'Power(W)'
+            ].values[0]
             
-        delta = base_val * (pct_range / 100)
-        values = np.linspace(base_val - delta, base_val + delta, num_points)
+        st.info(f"📍 目前基準值: **{current_val}**")
+
+        # 3. 設定範圍
+        range_pct = st.slider("變化範圍 (±%)", 5, 100, 20, 5)
+        steps = st.slider("計算點數", 3, 21, 7, 2)
         
-        # 儲存結果
-        results = {"var_values": [], "volume": [], "weight": [], "min_dt": []}
-        
-        for val in values:
-            # 深拷貝參數
-            params_copy = copy.deepcopy(current_params)
-            df_copy = current_df.copy()
-            
-            # 修改變數
-            if var_type == "全局參數":
-                params_copy[var_name] = val
-            else:
-                df_copy.loc[df_copy["Component"] == "Final PA", "Power(W)"] = val
+        # 4. 執行按鈕
+        run_analysis = st.button("🚀 執行敏感度分析", type="primary", use_container_width=True)
+
+    with col_dash:
+        if run_analysis:
+            with st.spinner("正在進行熱流與結構運算..."):
+                # 準備數據容器
+                results = []
                 
-            # 計算 (使用獨立的核心函數)
-            res = compute_key_results(params_copy, df_copy)
-            
-            results["var_values"].append(round(val, 2))
-            results["volume"].append(res["Volume_L"])
-            results["weight"].append(res["total_weight_kg"])
-            results["min_dt"].append(res["Min_dT_Allowed"])
-        
-        # 畫圖
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=results["var_values"], y=results["volume"], mode='lines+markers', name='體積 (L)', line=dict(color='#00b894')))
-        fig.add_trace(go.Scatter(x=results["var_values"], y=results["weight"], mode='lines+markers', name='重量 (kg)', line=dict(color='#34495e'), yaxis='y2'))
-        fig.add_trace(go.Scatter(x=results["var_values"], y=results["min_dt"], mode='lines+markers', name='瓶頸允許溫升 (°C)', line=dict(color='#e74c3c', dash='dot'), yaxis='y3'))
-        
-        fig.update_layout(
-            title=f"<b>{var_name} 敏感度分析 (基準 {base_val:.2f})</b>",
-            xaxis_title=var_name,
-            yaxis=dict(title="體積 (L)", side="left"),
-            yaxis2=dict(title="重量 (kg)", side="right", overlaying="y", position=0.95, showgrid=False),
-            yaxis3=dict(title="瓶頸允許溫升 (°C)", side="right", overlaying="y", position=1.0, showgrid=False),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            height=600
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # 表格顯示
-        df_sens = pd.DataFrame(results)
-        df_sens.columns = [var_name, "體積 (L)", "重量 (kg)", "瓶頸允許溫升 (°C)"]
-        st.dataframe(df_sens, use_container_width=True)
+                # 計算範圍
+                delta = current_val * (range_pct / 100)
+                x_values = np.linspace(current_val - delta, current_val + delta, steps)
+                
+                # 取得當前全域參數與元件表
+                base_params = {k: st.session_state[k] for k in DEFAULT_GLOBALS.keys()}
+                # [Fix] 補上 Slope
+                base_params['Slope'] = 0.03
+                base_df = st.session_state['df_current'].copy()
+
+                # 開始迴圈計算
+                for x in x_values:
+                    # 複製參數以免汙染
+                    p = copy.deepcopy(base_params)
+                    d = base_df.copy()
+                    
+                    # 修改變數
+                    if var_type == "全局參數":
+                        p[var_name] = x
+                    else:
+                        d.loc[d['Component'] == "Final PA", 'Power(W)'] = x
+                    
+                    # 呼叫核心計算
+                    res = compute_key_results(p, d)
+                    
+                    # 收集結果
+                    results.append({
+                        "x": x,
+                        "Volume": res["Volume_L"],
+                        "Weight": res["total_weight_kg"],
+                        "dT": res["Min_dT_Allowed"]
+                    })
+                
+                # 轉為 DataFrame
+                df_res = pd.DataFrame(results)
+                
+                # --- 繪圖 (雙軸圖表) ---
+                fig = go.Figure()
+
+                # 左軸：體積 (Bar)
+                fig.add_trace(go.Scatter(
+                    x=df_res["x"], y=df_res["Volume"],
+                    name="體積 (L)",
+                    mode='lines+markers',
+                    line=dict(color='#00b894', width=3),
+                    marker=dict(size=8),
+                    yaxis="y1"
+                ))
+                
+                # 左軸：重量 (Bar - Optional, 這裡先畫兩條線)
+                fig.add_trace(go.Scatter(
+                    x=df_res["x"], y=df_res["Weight"],
+                    name="重量 (kg)",
+                    mode='lines+markers',
+                    line=dict(color='#0984e3', width=3, dash='dash'), # 藍色虛線
+                    marker=dict(symbol='square', size=8),
+                    yaxis="y1"
+                ))
+
+                # 右軸：允許溫升 (Line)
+                fig.add_trace(go.Scatter(
+                    x=df_res["x"], y=df_res["dT"],
+                    name="瓶頸熱裕度 (°C)",
+                    mode='lines+markers',
+                    line=dict(color='#d63031', width=4), # 紅色實線
+                    marker=dict(size=10, symbol='diamond'),
+                    yaxis="y2"
+                ))
+
+                # 版面設定 (雙軸)
+                fig.update_layout(
+                    title=f"<b>{var_name} 敏感度趨勢圖</b>",
+                    xaxis=dict(title=f"{var_name} 數值"),
+                    yaxis=dict(
+                        title="體積 (L) / 重量 (kg)",
+                        titlefont=dict(color="#00b894"),
+                        tickfont=dict(color="#00b894")
+                    ),
+                    yaxis2=dict(
+                        title="允許溫升裕度 (°C)",
+                        titlefont=dict(color="#d63031"),
+                        tickfont=dict(color="#d63031"),
+                        overlaying="y",
+                        side="right"
+                    ),
+                    legend=dict(x=0, y=1.1, orientation="h"),
+                    height=500,
+                    margin=dict(l=50, r=50, t=80, b=50),
+                    hovermode="x unified"
+                )
+                
+                # 標示基準線
+                fig.add_vline(x=current_val, line_width=1, line_dash="dash", line_color="gray", annotation_text="目前設定")
+
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # 顯示數據表
+                with st.expander("查看詳細數據"):
+                    st.dataframe(df_res.style.highlight_max(axis=0), use_container_width=True)
+
+        else:
+            # 尚未執行時的佔位畫面
+            st.markdown("""
+            <div style="text-align: center; color: #aaa; padding: 50px; border: 2px dashed #eee; border-radius: 10px;">
+                <h3>👈 請在左側設定參數並點擊「執行分析」</h3>
+                <p>系統將自動掃描參數變化對 <b>體積、重量、熱裕度</b> 的影響趨勢。</p>
+            </div>
+            """, unsafe_allow_html=True)
 
 # --- [Project I/O - Save Logic] 移到底部執行 ---
 # [Critical Fix] 確保 placeholder 名稱與頂部定義一致 (project_io_save_placeholder)
