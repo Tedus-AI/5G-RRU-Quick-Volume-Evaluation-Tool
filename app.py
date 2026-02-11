@@ -155,82 +155,17 @@ def check_password():
 
     if "password_correct" not in st.session_state:
         st.markdown("""<style>.stTextInput > div > div > input {text-align: center;}</style>""", unsafe_allow_html=True)
-        
-        # === 1. 大標題 ===
-        st.markdown("""
-        <div style="background: linear-gradient(135deg, #007CF0, #00DFD8); padding: 30px; border-radius: 15px; color: white; text-align: center; margin-bottom: 30px; box-shadow: 0 6px 12px rgba(0,0,0,0.2);">
-            <h1 style="margin:0; font-size: 2.8rem; font-weight: 900;">📡 5G RRU 熱流引擎 Pro</h1>
-            <p style="font-size: 1.3rem; margin: 10px 0 0; opacity: 0.95;">High-Performance Thermal & Volume Estimation System</p>
-            <p style="font-size: 1rem; margin-top: 15px; opacity: 0.9;">{APP_VERSION} • {UPDATE_DATE}</p>
-        </div>
-        """.format(APP_VERSION=APP_VERSION, UPDATE_DATE=UPDATE_DATE), unsafe_allow_html=True)
-
-        # === 2. 密碼輸入區塊 ===
         c1, c2, c3 = st.columns([1,2,1])
         with c2:
-            st.markdown("<h2 style='text-align: center; color: #2c3e50; margin-bottom: 20px;'>🔐 請輸入授權金鑰</h2>", unsafe_allow_html=True)
-            st.text_input(
-                "", 
-                type="password", 
-                on_change=password_entered, 
-                key="password", 
-                label_visibility="collapsed",
-                placeholder="輸入密碼後按 Enter"
-            )
-            # 若密碼錯誤，顯示紅色提示
-            if st.session_state.get("password_correct") == False:
-                st.error("❌ 密碼錯誤，請重新輸入")
-
-        st.markdown("<div style='margin: 40px 0;'></div>", unsafe_allow_html=True)  # 間距
-
-        # === 3. 功能說明區塊 (Green Card) ===
-        st.markdown("""
-        <div style="background: #e9f7ef; padding: 25px; border-radius: 12px; border-left: 6px solid #2ecc71; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.08);">
-            <h3 style="color: #27ae60; margin-top: 0; padding-bottom: 8px;">🛠️ 主要功能一覽</h3>
-            <ul style="font-size: 1.05rem; line-height: 1.8; color: #34495e;">
-                <li><strong>元件熱源管理</strong>：動態新增/編輯元件清單，支援 Copper Coin、Thermal Via、多種 TIM</li>
-                <li><strong>精準熱阻計算</strong>：自動計算 Rjc + Rint + Rtim，並考慮局部環溫與高度效應</li>
-                <li><strong>散熱器尺寸優化</strong>：根據瓶頸元件裕度，自動推算所需鰭片高度、數量與整機體積</li>
-                <li><strong>重量預估</strong>：含散熱器、Shield、Filter、Shielding、PCB 等分項重量</li>
-                <li><strong>設計規則檢查 (DRC)</strong>：自動檢測 Gap 過小、流阻比過高、製程限制等問題</li>
-                <li><strong>敏感度分析</strong>：針對 Gap 等關鍵參數進行掃描，視覺化 Trade-off 趨勢</li>
-                <li><strong>3D 模擬視圖</strong>：真實比例展示電子艙 + 散熱器 + 鰭片結構</li>
-                <li><strong>AI 寫實渲染輔助</strong>：一鍵生成精確提示詞，搭配 Imagen 3 可產出照片級渲染圖</li>
-                <li><strong>專案存取</strong>：JSON 格式載入/儲存，支援參數與元件資料完整備份</li>
-            </ul>
-        </div>
-
-        <div style="background: #e8f4fd; padding: 20px; border-radius: 12px; border-left: 6px solid #3498db; margin-bottom: 30px;">
-            <h3 style="color: #2980b9; margin-top: 0;">🔥 綜合傳熱係數 h 的計算原理</h3>
-            <p style="line-height: 1.7; color: #2c3e50;">
-            本工具的 h 值採用<strong>半經驗模型</strong>，經多款實際 RRU 產品的 CFD 模擬結果校正而得，具有高度可信度：<br><br>
-            • <strong>h_conv</strong> = 6.4 × tanh(Gap / 7.0)　→ 模擬自然對流隨鰭片間距的飽和行為<br>
-            • <strong>h_rad</strong> = 2.4 × (Gap / 10)<sup>0.5</sup>　→ 考慮鰭片間輻射交換隨間距衰減<br>
-            • <strong>h_total</strong> = h_conv + h_rad<br><br>
-            該模型已在多個專案中與 FloTHERM 結果比對，誤差通常在 <strong>±8%</strong> 以內。<br><br>
-            當 Gap 過小時會自動提示 h_conv 過低；當流阻比（Aspect Ratio）過高時也會觸發設計風險警告，提醒避免空氣滯留與散熱效率下降。
-            </p>
-        </div>
-
-        <div style="background: #fffacd; padding: 20px; border-radius: 12px; border-left: 6px solid #f39c12;">
-            <h3 style="color: #d35400; margin-top: 0;">⚠️ 使用注意事項</h3>
-            <ul style="line-height: 1.7; color: #34495e;">
-                <li>本工具為<strong>快速概念設計與尺寸評估</strong>用途，非最終驗證級熱模擬</li>
-                <li>計算結果高度依賴輸入參數準確度，請使用實際量測或 Datasheet 數值</li>
-                <li>自然對流模型基於垂直鰭片、無風環境，室外高風速情境需另行評估</li>
-                <li>Embedded Fin 高度限制預設 < 100mm，超過將觸發 DRC 警告</li>
-                <li>建議將計算結果與 CFD 或實測進行交叉驗證，尤其在高功耗或極端環境下</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
+            st.markdown("<h2 style='text-align: center;'>🔐 系統鎖定</h2>", unsafe_allow_html=True)
+            st.caption("<p style='text-align: center;'>請輸入授權金鑰以存取熱流引擎</p>", unsafe_allow_html=True)
+            st.text_input("Password", type="password", on_change=password_entered, key="password", label_visibility="collapsed")
         return False
-
     elif not st.session_state["password_correct"]:
-        # 密碼錯誤時仍顯示輸入框（放在最上）
         c1, c2, c3 = st.columns([1,2,1])
         with c2:
-            st.markdown("<h2 style='text-align: center; color: #2c3e50;'>🔐 密碼錯誤</h2>", unsafe_allow_html=True)
-            st.text_input("", type="password", on_change=password_entered, key="password", label_visibility="collapsed", placeholder="請重新輸入")
+            st.text_input("Password", type="password", on_change=password_entered, key="password", label_visibility="collapsed")
+            st.error("❌ 密碼錯誤")
         return False
     else:
         return True
@@ -245,7 +180,7 @@ if "welcome_shown" not in st.session_state:
 # ==================================================
 # 👇 主程式開始 - Header 區塊
 # ==================================================
-# CSS 樣式 (v4.00 Stable Style - Pixel Perfect Uploader)
+# CSS 樣式
 st.markdown("""
 <style>
     html, body, [class*="css"] { font-family: "Microsoft JhengHei", "Roboto", sans-serif; }
@@ -279,19 +214,19 @@ st.markdown("""
     /* Header Container Style */
     [data-testid="stHeader"] { z-index: 0; }
 
-    /* ==================== File Uploader Clean UI (v4.00 Stable) ==================== */
-    /* 1. 隱藏預設文字與圖示 (Drag & Drop, Limits...) */
+    /* ==================== File Uploader 完美按鈕化 ==================== */
+    /* 1. 隱藏預設文字與圖示 */
     [data-testid="stFileUploader"] section > div > div > span, 
     [data-testid="stFileUploader"] section > div > div > small {
         display: none !important;
     }
     
-    /* 2. 關鍵：隱藏上傳後顯示的檔案列表與刪除按鈕 */
+    /* 2. 隱藏上傳後顯示的檔案列表 */
     [data-testid="stFileUploader"] ul {
         display: none !important;
     }
     
-    /* 3. 移除拖曳區背景與邊框，高度壓縮，只留按鈕 */
+    /* 3. 移除拖曳區背景與邊框 */
     [data-testid="stFileUploader"] section {
         padding: 0px !important;
         min-height: 0px !important;
@@ -300,20 +235,21 @@ st.markdown("""
         margin-bottom: 0px !important;
     }
     
-    /* 4. 調整 "Browse files" 按鈕為滿版 */
+    /* 4. 改造 "Browse files" 按鈕為目標按鈕 */
     [data-testid="stFileUploader"] button {
         width: 100% !important;
         margin-top: 0px;
         border: 1px solid rgba(49, 51, 63, 0.2);
         border-radius: 8px !important;
         background-color: white;
+        color: transparent !important; /* 隱藏原生文字 */
         position: relative;
         padding: 0.25rem 0.5rem;
         min-height: 2.5rem;
         line-height: 1.6;
     }
 
-    /* 5. 植入新文字 "📂 載入專案" (偽裝) */
+    /* 5. 植入新文字 "📂 載入專案" (粗體) */
     [data-testid="stFileUploader"] button::after {
         content: "📂 載入專案";
         color: rgb(49, 51, 63);
@@ -326,11 +262,6 @@ st.markdown("""
         width: 100%;
         text-align: center;
         pointer-events: none;
-    }
-    
-    /* 隱藏原生文字 */
-    [data-testid="stFileUploader"] button {
-        color: transparent !important;
     }
 
     /* 6. Hover 效果 */
@@ -380,7 +311,7 @@ with col_header_R:
         with c_p1:
             st.markdown(f"<div style='{header_style}'>專案存取 (Project I/O)</div>", unsafe_allow_html=True)
             
-            # [UI v4.00] 判斷是否載入專案檔，顯示對應訊息
+            # 判斷是否載入專案檔，顯示對應訊息
             if st.session_state.get('current_project_name'):
                 # 藍色粗體顯示載入的檔名
                 file_display = f"📄 {st.session_state['current_project_name']}"
@@ -809,7 +740,7 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
     
     # [v3.84] 重量計算
     base_vol_cm3 = L_hsk * W_hsk * t_base / 1000
-    fins_vol_cm3 = num_fins_int * p["Fin_t"] * Fin_Height * L_hsk / 1000
+    fins_vol_cm3 = num_fins_int * Fin_t * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * al_density / 1000
     
     shield_outer_vol_cm3 = L_hsk * W_hsk * H_shield / 1000
