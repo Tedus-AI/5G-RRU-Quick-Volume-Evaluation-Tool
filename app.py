@@ -201,7 +201,7 @@ def check_password():
         </div>
 
         <div style="background: #e8f4fd; padding: 20px; border-radius: 12px; border-left: 6px solid #3498db; margin-bottom: 30px;">
-            <h3 style="color: #2980b9; margin-top: 0;">🔥 綜合傳熱係數 h 的計算原理</h3>
+            <h3 style="color: #2980b9; margin-top: 0;">🔥 綜合熱傳係數 h 的計算原理</h3>
             <p style="line-height: 1.7; color: #2c3e50;">
             本工具的 h 值採用<strong>半經驗模型</strong>，經多款實際 RRU 產品的 CFD 模擬結果校正而得，具有高度可信度：<br><br>
             • <strong>h_conv</strong> = 6.4 × tanh(Gap / 7.0)　→ 模擬自然對流隨鰭片間距的飽和行為<br>
