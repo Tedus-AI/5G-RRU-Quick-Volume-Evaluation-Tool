@@ -737,14 +737,14 @@ def compute_key_results(global_params, df_components):
     total_weight_kg = hs_weight_kg + cavity_weight_kg
     
     return {
-        "Total_Power": round(Total_Power, 2),
-        "Min_dT_Allowed": round(Min_dT_Allowed, 2),
+        "Total_Power": Total_Power,  # 移除 round
+        "Min_dT_Allowed": Min_dT_Allowed,  # 移除 round
         "Bottleneck_Name": Bottleneck_Name,
-        "Area_req": round(Area_req, 3),
-        "Fin_Height": round(Fin_Height, 2),
-        "Volume_L": Volume_L,
-        "total_weight_kg": round(total_weight_kg, 2),
-        "h_value": round(h_value, 2)
+        "Area_req": Area_req,  # 移除 round (若需要顯示 round 可在 Tab 5 處理)
+        "Fin_Height": Fin_Height,  # 【關鍵】移除 round，讓 Fin_Height 保持精確值，與 Tab 3 完全一致
+        "Volume_L": volume_raw,  # 已使用未 round 的 volume_raw
+        "total_weight_kg": total_weight_kg,  # 移除 round
+        "h_value": h_value  # 移除 round
     }
 
 # --- 後台運算 (Refactored) ---
@@ -1259,10 +1259,10 @@ with tab_sensitivity:
                 
                 # 收集結果
                 results.append({
-                    "Gap": x,
-                    "Volume": res["Volume_L"],
-                    "Weight": res["total_weight_kg"],
-                    "AR": ar
+                    "Gap": round(x, 1),  # Gap 顯示到小數點後 1 位
+                    "Volume": round(res["Volume_L"], 2),  # 顯示 round 到 2 位，與 Tab 3 完全對齊
+                    "Weight": round(res["total_weight_kg"], 2),
+                    "AR": round(ar, 1)
                 })
             
             # 轉為 DataFrame
