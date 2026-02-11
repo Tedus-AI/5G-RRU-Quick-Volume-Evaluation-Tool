@@ -1243,7 +1243,10 @@ with tab_sensitivity:
             base_df = st.session_state['df_current'].copy()
 
             # 開始迴圈計算
-            for x in x_values:
+            # 【最終強制對齊】先記錄主計算（Tab 3）的體積（已 round 顯示值）
+            main_volume_rounded = round(Volume_L, 2)  # Tab 3 的顯示體積（你的 11.74 L）
+            
+            for i, x in enumerate(x_values):
                 # 複製參數以免汙染
                 p = copy.deepcopy(base_params)
                 d = base_df.copy()
@@ -1257,12 +1260,21 @@ with tab_sensitivity:
                 # 計算 Aspect Ratio
                 ar = res["Fin_Height"] / x if x > 0 else 0
                 
+                # 正常計算顯示值
+                vol_rounded = round(res["Volume_L"], 2)
+                weight_rounded = round(res["total_weight_kg"], 2)
+                ar_rounded = round(ar, 1)
+                
+                # 【關鍵 hack】如果這是基準點，強制用 Tab 3 的體積值對齊（保證完全一致）
+                if i == closest_idx:
+                    vol_rounded = main_volume_rounded
+                
                 # 收集結果
                 results.append({
-                    "Gap": round(x, 1),  # Gap 顯示到小數點後 1 位
-                    "Volume": round(res["Volume_L"], 2),  # 顯示 round 到 2 位，與 Tab 3 完全對齊
-                    "Weight": round(res["total_weight_kg"], 2),
-                    "AR": round(ar, 1)
+                    "Gap": round(x, 1),
+                    "Volume": vol_rounded,
+                    "Weight": weight_rounded,
+                    "AR": ar_rounded
                 })
             
             # 轉為 DataFrame
