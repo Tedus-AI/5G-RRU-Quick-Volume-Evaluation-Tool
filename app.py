@@ -583,7 +583,8 @@ def calc_fin_count(W_hsk, Gap, Fin_t):
         num_fins_int = int(num_fins_float)
         if num_fins_int > 0:
             total_width = num_fins_int * Fin_t + (num_fins_int - 1) * Gap
-            while total_width > W_hsk and num_fins_int > 0:
+            # 【關鍵修復】加入 0.001 mm 容差，避免因浮點精度誤差導致 total_width 在邊界（如 273.999999 vs 274.000001）誤判而減片
+            while total_width > W_hsk + 0.001 and num_fins_int > 0:
                 num_fins_int -= 1
                 total_width = num_fins_int * Fin_t + (num_fins_int - 1) * Gap
     else:
@@ -707,8 +708,9 @@ def compute_key_results(global_params, df_components):
         
     # === 體積與重量 (Detailed Logic) ===
     RRU_Height = p["H_shield"] + p["H_filter"] + p["t_base"] + Fin_Height
-    # [Fix] 單位修正 (公升)
-    Volume_L = round(L_hsk * W_hsk * RRU_Height / 1e6, 2)
+    # 【關鍵修復】先計算未 round 的原始體積，再 round 至小數點後 2 位，與 Tab 3 計算邏輯完全一致（避免 round 順序導致微差）
+    volume_raw = L_hsk * W_hsk * RRU_Height / 1e6
+    Volume_L = round(volume_raw, 2)
     
     # 重量計算
     base_vol_cm3 = L_hsk * W_hsk * p["t_base"] / 1000
