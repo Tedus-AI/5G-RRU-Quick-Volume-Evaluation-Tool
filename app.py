@@ -177,10 +177,11 @@ def check_password():
                 label_visibility="collapsed",
                 placeholder="輸入密碼後按 Enter"
             )
+            # 若密碼錯誤，顯示紅色提示
             if st.session_state.get("password_correct") == False:
                 st.error("❌ 密碼錯誤，請重新輸入")
 
-        st.markdown("<div style='margin: 40px 0;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin: 40px 0;'></div>", unsafe_allow_html=True)  # 間距
 
         # === 3. 功能說明區塊 (Green Card) ===
         st.markdown("""
@@ -217,6 +218,7 @@ def check_password():
                 <li>本工具為<strong>快速概念設計與尺寸評估</strong>用途，非最終驗證級熱模擬</li>
                 <li>計算結果高度依賴輸入參數準確度，請使用實際量測或 Datasheet 數值</li>
                 <li>自然對流模型基於垂直鰭片、無風環境，室外高風速情境需另行評估</li>
+                <li>Embedded Fin 高度限制預設 < 100mm，超過將觸發 DRC 警告</li>
                 <li>建議將計算結果與 CFD 或實測進行交叉驗證，尤其在高功耗或極端環境下</li>
             </ul>
         </div>
@@ -224,10 +226,11 @@ def check_password():
         return False
 
     elif not st.session_state["password_correct"]:
+        # 密碼錯誤時仍顯示輸入框（放在最上）
         c1, c2, c3 = st.columns([1,2,1])
         with c2:
+            st.markdown("<h2 style='text-align: center; color: #2c3e50;'>🔐 密碼錯誤</h2>", unsafe_allow_html=True)
             st.text_input("", type="password", on_change=password_entered, key="password", label_visibility="collapsed", placeholder="請重新輸入")
-            st.error("❌ 密碼錯誤")
         return False
     else:
         return True
@@ -377,7 +380,7 @@ with col_header_R:
         with c_p1:
             st.markdown(f"<div style='{header_style}'>專案存取 (Project I/O)</div>", unsafe_allow_html=True)
             
-            # 判斷是否載入專案檔，顯示對應訊息
+            # [UI v4.00] 判斷是否載入專案檔，顯示對應訊息
             if st.session_state.get('current_project_name'):
                 # 藍色粗體顯示載入的檔名
                 file_display = f"📄 {st.session_state['current_project_name']}"
@@ -657,6 +660,9 @@ def compute_key_results(global_params, df_components):
     }
     
     # === 熱阻與溫降計算 ===
+    # [Fix v4.22] 確保 num_fins_int 有初始值
+    num_fins_int = 0
+
     if not df.empty:
         calc_results = df.apply(lambda row: calc_thermal_resistance(row, g_for_calc), axis=1)
         calc_results.columns = ['Base_L', 'Base_W', 'Loc_Amb', 'R_int', 'R_TIM', 'Total_W', 'Drop', 'Allowed_dT']
@@ -665,16 +671,17 @@ def compute_key_results(global_params, df_components):
         df["Allowed_dT"] = df["Allowed_dT"].clip(lower=0)
         Total_Power = (df["Power(W)"] * df["Qty"]).sum() * p["Margin"]
         
-        # [Fix v4.19] 邏輯對齊：計算瓶頸時，僅考慮總功耗 > 0 的元件 (排除不發熱元件)
-        valid_rows = df[df['Total_W'] > 0]
-        if not valid_rows.empty:
-            Min_dT_Allowed = valid_rows["Allowed_dT"].min()
-            if not pd.isna(valid_rows["Allowed_dT"].idxmin()):
-                Bottleneck_Name = valid_rows.loc[valid_rows["Allowed_dT"].idxmin(), "Component"]
+        # [v4.20 Logic Fix] 嚴格對齊主程式：計算瓶頸時，必須排除不發熱 (0W) 的元件
+        valid_rows_for_bottleneck = df[df['Total_W'] > 0]
+        
+        if not valid_rows_for_bottleneck.empty:
+            Min_dT_Allowed = valid_rows_for_bottleneck["Allowed_dT"].min()
+            if not pd.isna(valid_rows_for_bottleneck["Allowed_dT"].idxmin()):
+                Bottleneck_Name = valid_rows_for_bottleneck.loc[valid_rows_for_bottleneck["Allowed_dT"].idxmin(), "Component"]
             else:
                 Bottleneck_Name = "None"
         else:
-            Min_dT_Allowed = 50 # 預設安全值
+            Min_dT_Allowed = 50 
             Bottleneck_Name = "None"
             
     else:
@@ -690,6 +697,7 @@ def compute_key_results(global_params, df_components):
     W_hsk = p["W_pcb"] + p["Top"] + p["Btm"]
     base_area_m2 = (L_hsk * W_hsk) / 1e6
     
+    # [Fix v4.22] 確保在這裡計算 num_fins_int
     num_fins_int = calc_fin_count(W_hsk, p["Gap"], p["Fin_t"])
     
     # === 所需面積 ===
@@ -707,11 +715,13 @@ def compute_key_results(global_params, df_components):
         
     # === 體積與重量 (Detailed Logic) ===
     RRU_Height = p["H_shield"] + p["H_filter"] + p["t_base"] + Fin_Height
-    # [Fix] 單位修正 (公升)
+    # [v4.20 Formula Fix] 修正單位錯誤：移除多餘的 / 1000
     Volume_L = round(L_hsk * W_hsk * RRU_Height / 1e6, 2)
     
-    # 重量計算
+    # 重量計算 (包含所有部件)
     base_vol_cm3 = L_hsk * W_hsk * p["t_base"] / 1000
+    
+    # [Fix v4.22] 這裡使用 num_fins_int 已經安全了
     fins_vol_cm3 = num_fins_int * p["Fin_t"] * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * p["al_density"] / 1000
     
@@ -799,7 +809,7 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
     
     # [v3.84] 重量計算
     base_vol_cm3 = L_hsk * W_hsk * t_base / 1000
-    fins_vol_cm3 = num_fins_int * Fin_t * Fin_Height * L_hsk / 1000
+    fins_vol_cm3 = num_fins_int * p["Fin_t"] * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * al_density / 1000
     
     shield_outer_vol_cm3 = L_hsk * W_hsk * H_shield / 1000
@@ -908,7 +918,7 @@ with tab_data:
                 "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.1f"),
                 "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.1f"),
                 "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.1f"),
-                "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.2f"),
+                "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.1f"),
                 "Board_Type": st.column_config.Column("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)"),
                 "TIM_Type": st.column_config.Column("介面材料", help="元件或銅塊底部與散熱器之間的TIM"),
                 "R_jc": st.column_config.NumberColumn("Rjc", help="結點到殼的內部熱阻", format="%.2f"),
