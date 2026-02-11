@@ -1228,6 +1228,13 @@ with tab_sensitivity:
             
             x_values = np.linspace(val_min, val_max, steps)
             
+            # 【關鍵修復】強制將最接近基準值的掃描點設為「精確的 base_val」
+            # 這能消除 np.linspace 與 float 運算造成的微小誤差（1e-14 級），
+            # 避免剛好在鰭片數量跳變邊界時，基準點的 Fin Count 與 Tab 3 不一致，
+            # 從而讓基準點的體積、重量、AR 完全對齊 Tab 3 的計算結果。
+            closest_idx = np.argmin(np.abs(x_values - base_val))
+            x_values[closest_idx] = base_val
+            
             # 取得當前全域參數與元件表
             base_params = {k: st.session_state[k] for k in DEFAULT_GLOBALS.keys()}
             base_params['Slope'] = 0.03
