@@ -625,7 +625,7 @@ with tab_input:
         "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.2f")
     }
 
-    sub_rf, sub_digital, sub_pwr = st.tabs(["📡 RF 類", "💻 Digital 類", "⚡ Power 類"])
+    sub_rf, sub_digital, sub_pwr = st.tabs(["📡 RF Component", "💻 Digital Component", "⚡ PWR Component"])
 
     with sub_rf:
         # 小計
