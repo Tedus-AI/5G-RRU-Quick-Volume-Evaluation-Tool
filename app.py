@@ -781,6 +781,16 @@ if not valid_rows.empty:
 else:
     Total_Watts_Sum = 0; Min_dT_Allowed = 50; Bottleneck_Name = "None"
 
+# [New] 反向推算 Tc / Tj
+# T_hsk_base = 散熱器基部溫度（h=0），由瓶頸裕度反推
+# T_hsk_eff  = 各元件高度處的散熱器有效溫度（含高度梯度修正）
+T_hsk_base = T_amb + Min_dT_Allowed
+if not final_df.empty:
+    final_df['T_hsk_eff'] = T_hsk_base + final_df['Height(mm)'] * Slope
+    final_df['Tc'] = final_df['T_hsk_eff'] + final_df['Power(W)'] * (final_df['R_int'] + final_df['R_TIM'])
+    final_df['Tj'] = final_df['Tc'] + final_df['Power(W)'] * final_df['R_jc']
+    final_df['Tj_Margin'] = final_df['Limit(C)'] - final_df['Tj']
+
 L_hsk, W_hsk = L_pcb + Top + Btm, W_pcb + Left + Right
 
 # 核心計算呼叫
@@ -884,7 +894,7 @@ with tab_data:
     
     if not final_df.empty:
         # [v4.10] 篩選顯示欄位 (隱藏基礎尺寸參數，保留熱流關鍵數據)
-        cols_to_hide = ["Qty", "Power(W)", "Height(mm)", "Pad_L", "Pad_W", "Thick(mm)", "Base_L", "Base_W"]
+        cols_to_hide = ["Qty", "Power(W)", "Height(mm)", "Pad_L", "Pad_W", "Thick(mm)", "Base_L", "Base_W", "T_hsk_eff"]
         # 確保只移除存在的欄位，建立一個新的顯示用 DataFrame
         df_display = final_df.drop(columns=[c for c in cols_to_hide if c in final_df.columns])
 
@@ -893,11 +903,18 @@ with tab_data:
         mid_val = (min_val + max_val) / 2
         
         # [修改] 使用 df_display 進行樣式設定
+        gradient_cols = [c for c in ['Allowed_dT', 'Tj_Margin'] if c in df_display.columns]
+        tj_cols = [c for c in ['Tc', 'Tj'] if c in df_display.columns]
+        
         styled_df = df_display.style.background_gradient(
-            subset=['Allowed_dT'], 
+            subset=gradient_cols, 
             cmap='RdYlGn'
+        ).background_gradient(
+            subset=tj_cols,
+            cmap='RdYlGn_r'   # Tj 越高越紅
         ).format({
-            "R_int": "{:.4f}", "R_TIM": "{:.4f}", "Allowed_dT": "{:.2f}"
+            "R_int": "{:.4f}", "R_TIM": "{:.4f}", 
+            "Allowed_dT": "{:.2f}", "Tc": "{:.1f}", "Tj": "{:.1f}", "Tj_Margin": "{:.1f}"
         })
         
         # [修正 v3.66] 還原完整的 Help 說明 (包含物理公式)
@@ -924,6 +941,9 @@ with tab_data:
                 "Allowed_dT": st.column_config.NumberColumn("允許溫升 (°C)", help="散熱器剩餘可用的溫升裕度。數值越小代表該元件越容易過熱 (瓶頸)。公式：Limit - Loc_Amb - Drop。", format="%.2f"),
                 "R_int": st.column_config.NumberColumn("基板熱阻 (°C/W)", help="元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值。", format="%.4f"),
                 "R_TIM": st.column_config.NumberColumn("介面熱阻 (°C/W)", help="元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)。", format="%.4f"),
+                "Tc": st.column_config.NumberColumn("殼溫 Tc (°C)", help="元件外殼溫度。公式：T_hsk_eff + Q×(Rint+Rtim)，其中 T_hsk_eff 已含高度梯度修正。", format="%.1f"),
+                "Tj": st.column_config.NumberColumn("接面溫 Tj (°C)", help="元件晶片接面溫度。公式：Tc + Q×Rjc。數值越接近 Limit 代表越危險。", format="%.1f"),
+                "Tj_Margin": st.column_config.NumberColumn("Tj 裕度 (°C)", help="距溫度上限的裕度。公式：Limit - Tj。負值代表超溫！", format="%.1f"),
             },
             use_container_width=True, 
             hide_index=True
