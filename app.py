@@ -92,18 +92,64 @@ for k, v in DEFAULT_GLOBALS.items():
         st.session_state[k] = v
 
 # 2. 預設元件清單
-default_component_data = {
-    "Component": ["Final PA", "Driver PA", "Pre Driver", "Circulator", "Cavity Filter", "CPU (FPGA)", "Si5518", "16G DDR", "Power Mod", "SFP"],
-    "Qty": [4, 4, 4, 4, 1, 1, 1, 2, 1, 1],
-    "Power(W)": [52.13, 9.54, 0.37, 2.76, 31.07, 35.00, 2.00, 0.40, 29.00, 0.50],
-    "Height(mm)": [250, 200, 180, 250, 0, 50, 80, 60, 30, 0], 
-    "Pad_L": [20, 5, 2, 10, 0, 35, 8.6, 7.5, 58, 14], 
-    "Pad_W": [10, 5, 2, 10, 0, 35, 8.6, 11.5, 61, 50],
-    "Thick(mm)": [2.5, 2.0, 2.0, 2.0, 0, 0, 2.0, 0, 0, 0],
-    "Board_Type": ["Copper Coin", "Thermal Via", "Thermal Via", "Thermal Via", "None", "None", "Thermal Via", "None", "None", "None"],
-    "Limit(C)": [225, 200, 175, 125, 200, 100, 125, 95, 95, 200],
-    "R_jc": [1.50, 1.70, 50.0, 0.0, 0.0, 0.16, 0.50, 0.0, 0.0, 0.0],
-    "TIM_Type": ["Solder", "Grease", "Grease", "Grease", "None", "Putty", "Pad", "Grease", "Grease", "Grease"]
+# 三類預設元件資料
+default_rf_data = {
+    "Component": ["Final PA", "Driver PA", "Pre Driver", "Circulator", "Cavity Filter"],
+    "Qty": [4, 4, 4, 4, 1],
+    "Power(W)": [52.13, 9.54, 0.37, 2.76, 31.07],
+    "Height(mm)": [250, 200, 180, 250, 0],
+    "Pad_L": [20, 5, 2, 10, 0],
+    "Pad_W": [10, 5, 2, 10, 0],
+    "Thick(mm)": [2.5, 2.0, 2.0, 2.0, 0],
+    "Board_Type": ["Copper Coin", "Thermal Via", "Thermal Via", "Thermal Via", "None"],
+    "Limit(C)": [225, 200, 175, 125, 200],
+    "R_jc": [1.50, 1.70, 50.0, 0.0, 0.0],
+    "TIM_Type": ["Grease", "Grease", "Grease", "Grease", "None"]
+}
+
+default_digital_data = {
+    "Component": ["CPU (FPGA)", "Si5518", "16G DDR", "SFP"],
+    "Qty": [1, 1, 2, 1],
+    "Power(W)": [35.00, 2.00, 0.40, 0.50],
+    "Height(mm)": [50, 80, 60, 0],
+    "Pad_L": [35, 8.6, 7.5, 14],
+    "Pad_W": [35, 8.6, 11.5, 50],
+    "Thick(mm)": [0, 2.0, 0, 0],
+    "Board_Type": ["None", "Thermal Via", "None", "None"],
+    "Limit(C)": [100, 125, 95, 200],
+    "R_jc": [0.16, 0.50, 0.0, 0.0],
+    "TIM_Type": ["Putty", "Pad", "Grease", "Grease"]
+}
+
+default_pwr_data = {
+    "Component": ["Power Mod"],
+    "Qty": [1],
+    "Power(W)": [29.00],
+    "Height(mm)": [30],
+    "Pad_L": [58],
+    "Pad_W": [61],
+    "Thick(mm)": [0],
+    "Board_Type": ["None"],
+    "Limit(C)": [95],
+    "R_jc": [0.0],
+    "TIM_Type": ["Grease"]
+}
+
+# 各類新增列預設值
+RF_ROW_DEFAULT = {
+    "Component": "New_RF", "Qty": 1, "Power(W)": 0.0,
+    "Height(mm)": 250, "Pad_L": 10.0, "Pad_W": 10.0, "Thick(mm)": 2.5,
+    "Board_Type": "Copper Coin", "Limit(C)": 200, "R_jc": 1.5, "TIM_Type": "Grease"
+}
+DIGITAL_ROW_DEFAULT = {
+    "Component": "New_Digital", "Qty": 1, "Power(W)": 0.0,
+    "Height(mm)": 50, "Pad_L": 10.0, "Pad_W": 10.0, "Thick(mm)": 0.0,
+    "Board_Type": "Thermal Via", "Limit(C)": 100, "R_jc": 0.5, "TIM_Type": "Putty"
+}
+PWR_ROW_DEFAULT = {
+    "Component": "New_PWR", "Qty": 1, "Power(W)": 0.0,
+    "Height(mm)": 30, "Pad_L": 20.0, "Pad_W": 20.0, "Thick(mm)": 0.0,
+    "Board_Type": "None", "Limit(C)": 95, "R_jc": 0.0, "TIM_Type": "Grease"
 }
 
 # 再次檢查 JSON 是否有元件資料並覆蓋
@@ -111,19 +157,35 @@ if os.path.exists(config_path):
     try:
         with open(config_path, "r", encoding='utf-8') as f:
             custom_config = json.load(f)
-            if 'components_data' in custom_config:
-                default_component_data = custom_config['components_data']
+            if 'rf_data' in custom_config:
+                default_rf_data = custom_config['rf_data']
+            if 'digital_data' in custom_config:
+                default_digital_data = custom_config['digital_data']
+            if 'pwr_data' in custom_config:
+                default_pwr_data = custom_config['pwr_data']
     except:
         pass
 
-if 'df_initial' not in st.session_state:
-    st.session_state['df_initial'] = pd.DataFrame(default_component_data)
+# Session State 初始化
+if 'df_rf' not in st.session_state:
+    st.session_state['df_rf'] = pd.DataFrame(default_rf_data)
 
-if 'df_current' not in st.session_state:
-    st.session_state['df_current'] = st.session_state['df_initial'].copy()
+if 'df_digital' not in st.session_state:
+    st.session_state['df_digital'] = pd.DataFrame(default_digital_data)
+
+if 'df_pwr' not in st.session_state:
+    st.session_state['df_pwr'] = pd.DataFrame(default_pwr_data)
 
 if 'editor_key' not in st.session_state:
     st.session_state['editor_key'] = 0
+
+# 相容舊版：保留 df_current 供後續計算使用
+if 'df_current' not in st.session_state:
+    st.session_state['df_current'] = pd.concat([
+        st.session_state['df_rf'],
+        st.session_state['df_digital'],
+        st.session_state['df_pwr']
+    ], ignore_index=True)
 
 if 'last_loaded_file' not in st.session_state:
     st.session_state['last_loaded_file'] = None
@@ -408,11 +470,13 @@ with col_header_R:
                     if 'global_params' in data:
                         for k, v in data['global_params'].items():
                             st.session_state[k] = v
-                    if 'components_data' in data:
-                        new_df = pd.DataFrame(data['components_data'])
-                        st.session_state['df_initial'] = new_df
-                        st.session_state['df_current'] = new_df.copy()
-                        st.session_state['editor_key'] += 1
+                    if 'rf_data' in data:
+                        st.session_state['df_rf'] = pd.DataFrame(data['rf_data'])
+                    if 'digital_data' in data:
+                        st.session_state['df_digital'] = pd.DataFrame(data['digital_data'])
+                    if 'pwr_data' in data:
+                        st.session_state['df_pwr'] = pd.DataFrame(data['pwr_data'])
+                    st.session_state['editor_key'] += 1
                     
                     st.session_state['last_loaded_file'] = uploaded_proj
                     # 記錄檔名
@@ -546,31 +610,84 @@ with tab_input:
     st.subheader("🔥 元件熱源清單設定")
     st.caption("💡 **提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。**")
 
-    # [Fix] 使用 df_initial (穩定源)
-    edited_df = st.data_editor(
-        st.session_state['df_initial'],
-        column_config={
-            "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
-            "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量", min_value=0, step=1, width="small"),
-            "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f", min_value=0.0, step=0.01),
-            "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。高度越高，局部環溫 (Local Amb) 越高。公式：全域環溫 + (元件高度 × 0.03)", format="%.2f"),
-            "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.2f"),
-            "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.2f"),
-            "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊 (Coin) 厚度", format="%.2f"),
-            "Board_Type": st.column_config.SelectboxColumn("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)", options=["Thermal Via", "Copper Coin", "None"], width="medium"),
-            # [修正] 移除 Solder 選項
-            "TIM_Type": st.column_config.SelectboxColumn("介面材料", help="元件或銅塊底部與散熱器之間的TIM", options=["Grease", "Pad", "Putty", "None"], width="medium"),
-            "R_jc": st.column_config.NumberColumn("熱阻 Rjc", help="結點到殼的內部熱阻", format="%.2f"),
-            "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.2f")
-        },
-        num_rows="dynamic",
-        use_container_width=True,
-        key=f"editor_{st.session_state['editor_key']}",
-        on_change=reset_download_state # [Fix] 表格變動也會觸發下載按鈕重置
-    )
-    
-    # [Fix] 實時更新 df_current
+    # 共用 column_config
+    shared_column_config = {
+        "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號", width="medium"),
+        "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量", min_value=0, step=1, width="small"),
+        "Power(W)": st.column_config.NumberColumn("單顆功耗 (W)", help="單一顆元件的發熱瓦數 (TDP)", format="%.2f", min_value=0.0, step=0.01),
+        "Height(mm)": st.column_config.NumberColumn("高度 (mm)", help="元件距離 PCB 底部的垂直高度。公式：全域環溫 + (元件高度 × 0.03)", format="%.2f"),
+        "Pad_L": st.column_config.NumberColumn("Pad 長 (mm)", help="元件底部散熱焊盤 (E-pad) 的長度", format="%.2f"),
+        "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.2f"),
+        "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊厚度", format="%.2f"),
+        "Board_Type": st.column_config.SelectboxColumn("導熱方式", help="元件導熱到HSK表面的方式", options=["Thermal Via", "Copper Coin", "None"], width="medium"),
+        "TIM_Type": st.column_config.SelectboxColumn("介面材料", help="元件底部與散熱器之間的TIM。Final PA 的 Solder die attach 已內建於 R_int，此欄填 Grease 即可", options=["Grease", "Pad", "Putty", "None"], width="medium"),
+        "R_jc": st.column_config.NumberColumn("熱阻 Rjc", help="結點到殼的內部熱阻 (°C/W)", format="%.2f"),
+        "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.2f")
+    }
+
+    sub_rf, sub_digital, sub_pwr = st.tabs(["📡 RF 類", "💻 Digital 類", "⚡ Power 類"])
+
+    with sub_rf:
+        # 小計
+        rf_power = (st.session_state['df_rf']['Power(W)'] * st.session_state['df_rf']['Qty']).sum()
+        st.caption(f"📊 RF 類總功耗：**{rf_power:.1f} W** | 共 **{len(st.session_state['df_rf'])}** 種元件")
+        
+        df_rf_edited = st.data_editor(
+            st.session_state['df_rf'],
+            column_config=shared_column_config,
+            num_rows="dynamic",
+            use_container_width=True,
+            key=f"editor_rf_{st.session_state['editor_key']}",
+            on_change=reset_download_state
+        )
+        # 補齊新增列的預設值
+        for col, val in RF_ROW_DEFAULT.items():
+            if col in df_rf_edited.columns:
+                df_rf_edited[col] = df_rf_edited[col].fillna(val)
+        st.session_state['df_rf'] = df_rf_edited
+
+    with sub_digital:
+        digital_power = (st.session_state['df_digital']['Power(W)'] * st.session_state['df_digital']['Qty']).sum()
+        st.caption(f"📊 Digital 類總功耗：**{digital_power:.1f} W** | 共 **{len(st.session_state['df_digital'])}** 種元件")
+        
+        df_digital_edited = st.data_editor(
+            st.session_state['df_digital'],
+            column_config=shared_column_config,
+            num_rows="dynamic",
+            use_container_width=True,
+            key=f"editor_digital_{st.session_state['editor_key']}",
+            on_change=reset_download_state
+        )
+        for col, val in DIGITAL_ROW_DEFAULT.items():
+            if col in df_digital_edited.columns:
+                df_digital_edited[col] = df_digital_edited[col].fillna(val)
+        st.session_state['df_digital'] = df_digital_edited
+
+    with sub_pwr:
+        pwr_power = (st.session_state['df_pwr']['Power(W)'] * st.session_state['df_pwr']['Qty']).sum()
+        st.caption(f"📊 Power 類總功耗：**{pwr_power:.1f} W** | 共 **{len(st.session_state['df_pwr'])}** 種元件")
+        
+        df_pwr_edited = st.data_editor(
+            st.session_state['df_pwr'],
+            column_config=shared_column_config,
+            num_rows="dynamic",
+            use_container_width=True,
+            key=f"editor_pwr_{st.session_state['editor_key']}",
+            on_change=reset_download_state
+        )
+        for col, val in PWR_ROW_DEFAULT.items():
+            if col in df_pwr_edited.columns:
+                df_pwr_edited[col] = df_pwr_edited[col].fillna(val)
+        st.session_state['df_pwr'] = df_pwr_edited
+
+    # 合併三類 → 供後續所有計算使用
+    edited_df = pd.concat([df_rf_edited, df_digital_edited, df_pwr_edited], ignore_index=True)
     st.session_state['df_current'] = edited_df
+
+    # 整機小計
+    total_input_power = (edited_df['Power(W)'] * edited_df['Qty']).sum()
+    st.markdown("---")
+    st.info(f"⚡ **整機總功耗（未含 Margin）：{total_input_power:.1f} W** | RF：{rf_power:.1f}W　Digital：{digital_power:.1f}W　Power：{pwr_power:.1f}W")
 
 # ==================================================
 # # 核心計算函數 (Refactored for Maintainability)
@@ -1411,12 +1528,12 @@ with project_io_save_placeholder.container():
             if k in st.session_state:
                 saved_params[k] = st.session_state[k]
         
-        components_data = st.session_state['df_current'].to_dict('records')
-        
         export_data = {
             "meta": {"version": APP_VERSION, "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
             "global_params": saved_params,
-            "components_data": components_data
+            "rf_data": st.session_state['df_rf'].to_dict('records'),
+            "digital_data": st.session_state['df_digital'].to_dict('records'),
+            "pwr_data": st.session_state['df_pwr'].to_dict('records'),
         }
         return json.dumps(export_data, indent=4)
 
