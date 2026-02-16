@@ -898,20 +898,22 @@ with tab_data:
         # 確保只移除存在的欄位，建立一個新的顯示用 DataFrame
         df_display = final_df.drop(columns=[c for c in cols_to_hide if c in final_df.columns])
 
+        # [Move Column] 將 Allowed_dT 移至最後
+        if 'Allowed_dT' in df_display.columns:
+            cols = [c for c in df_display.columns if c != 'Allowed_dT'] + ['Allowed_dT']
+            df_display = df_display[cols]
+
         min_val = final_df['Allowed_dT'].min()
         max_val = final_df['Allowed_dT'].max()
         mid_val = (min_val + max_val) / 2
         
         # [修改] 使用 df_display 進行樣式設定
-        gradient_cols = [c for c in ['Allowed_dT', 'Tj_Margin'] if c in df_display.columns]
-        tj_cols = [c for c in ['Tc', 'Tj'] if c in df_display.columns]
+        # 僅保留 Allowed_dT 的色階 (移除 Tc, Tj, Tj_Margin 的色階)
+        gradient_cols = [c for c in ['Allowed_dT'] if c in df_display.columns]
         
         styled_df = df_display.style.background_gradient(
             subset=gradient_cols, 
             cmap='RdYlGn'
-        ).background_gradient(
-            subset=tj_cols,
-            cmap='RdYlGn_r'   # Tj 越高越紅
         ).format({
             "R_int": "{:.4f}", "R_TIM": "{:.4f}", 
             "Allowed_dT": "{:.2f}", "Tc": "{:.1f}", "Tj": "{:.1f}", "Tj_Margin": "{:.1f}"
