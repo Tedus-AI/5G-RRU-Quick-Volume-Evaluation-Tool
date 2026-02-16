@@ -298,9 +298,21 @@ st.markdown("""
     [data-testid="stFileUploader"] section {
         padding: 0px !important;
         min-height: 0px !important;
+        height: 0px !important;
         background-color: transparent !important;
         border: none !important;
-        margin-bottom: 0px !important;
+        margin: 0px !important;
+    }
+
+    /* 3b. 隱藏雲朵與拖曳區，徹底不佔空間 */
+    [data-testid="stFileUploader"] section > div {
+        display: none !important;
+    }
+
+    /* 3c. 壓縮整個 file uploader 外層容器的多餘 padding */
+    [data-testid="stFileUploader"] {
+        padding: 0px !important;
+        margin: 0px !important;
     }
     
     /* 4. 調整 "Browse files" 按鈕為滿版 */
@@ -377,21 +389,21 @@ with col_header_R:
         # 標題樣式
         header_style = "font-size: 0.9rem; font-weight: 700; color: #333; margin-bottom: 2px;"
 
-        # 第一行：標題 + 狀態（佔滿整行）
-        st.markdown(f"<div style='{header_style}'>專案存取 (Project I/O)</div>", unsafe_allow_html=True)
-        
-        if st.session_state.get('current_project_name'):
-            file_display = f"📄 {st.session_state['current_project_name']}"
-            st.markdown(f"<div style='font-size: 0.8rem; color: #007CF0; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;' title='{file_display}'>{file_display}</div>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"<div style='font-size: 0.8rem; color: #555; margin-bottom: 4px;'>{config_loaded_msg}</div>", unsafe_allow_html=True)
-        
-        # 第二行：對齊下方「更新並產生」與「待更新」的欄位寬度
+        # 同一行：左放標題+狀態，右放載入按鈕
         c_p1, c_p2 = st.columns(2, gap="small")
+        
         with c_p1:
-            pass  # 保留空間，對齊下方「更新並產生」
+            st.markdown(f"<div style='{header_style}'>專案存取 (Project I/O)</div>", unsafe_allow_html=True)
+            
+            if st.session_state.get('current_project_name'):
+                file_display = f"📄 {st.session_state['current_project_name']}"
+                st.markdown(f"<div style='font-size: 0.8rem; color: #007CF0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;' title='{file_display}'>{file_display}</div>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<div style='font-size: 0.8rem; color: #555;'>{config_loaded_msg}</div>", unsafe_allow_html=True)
+            
         with c_p2:
-            # 載入專案按鈕，對齊下方「待更新」
+            # 小幅往下推，讓按鈕與左側狀態文字垂直對齊
+            st.markdown("<div style='margin-top: 18px;'></div>", unsafe_allow_html=True)
             uploaded_proj = st.file_uploader("📂 載入專案", type=["json"], key="project_loader", label_visibility="collapsed")
             
         if uploaded_proj is not None:
