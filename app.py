@@ -821,7 +821,7 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
     
     # [v3.84] 重量計算
     base_vol_cm3 = L_hsk * W_hsk * t_base / 1000
-    fins_vol_cm3 = num_fins_int * p["Fin_t"] * Fin_Height * L_hsk / 1000
+    fins_vol_cm3 = num_fins_int * Fin_t * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * al_density / 1000
     
     shield_outer_vol_cm3 = L_hsk * W_hsk * H_shield / 1000
