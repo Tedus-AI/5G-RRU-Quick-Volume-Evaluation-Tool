@@ -10,19 +10,19 @@ import json
 import copy
 
 # ==============================================================================
-# 版本：v4.20 (Golden Release)
-# 日期：2026-02-11
-# 狀態：正式發布版 (Production Ready) - 數值精度與邊界對齊最終定案
+# 版本：v4.21 (UI Optimized)
+# 日期：2026-02-17
+# 狀態：正式發布版 (Production Ready)
 # 
 # [定案內容]
-# 1. Tab 5 敏感度分析：採用「置頂橫向控制台」+「全寬圖表」。
-# 2. 精度修復：Tab 5 基準點強制對齊 Tab 3，消除 1e-14 級浮點誤差。
-# 3. 穩定性：鰭片計算加入容差，防止邊界跳動。
+# 1. 核心核心：熱流計算、重量估算、3D 模擬、敏感度分析皆已鎖定。
+# 2. 精度保證：Tab 5 基準點強制對齊機制 & 鰭片計算容差。
+# 3. UI 優化：Header 佈局整合為單行，上傳組件樣式極簡化 (Hidden Dropzone)。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.20 (Golden)"
-UPDATE_DATE = "2026-02-11"
+APP_VERSION = "v4.21 (UI Optimized)"
+UPDATE_DATE = "2026-02-17"
 
 # === APP 設定 ===
 st.set_page_config(
@@ -284,17 +284,17 @@ st.markdown("""
         display: none !important;
     }
     
-    /* 2. 關鍵：隱藏上傳後顯示的檔案列表與刪除按鈕 */
+    /* 2. 隱藏上傳後顯示的檔案列表與刪除按鈕 */
     [data-testid="stFileUploader"] ul {
         display: none !important;
     }
     
-    /* 2b. 隱藏雲朵圖示與拖曳區內容（只保留按鈕） */
+    /* 3. 隱藏雲朵圖示與拖曳區內容（只保留按鈕） */
     [data-testid="stFileUploader"] section > div {
         display: none !important;
     }
     
-    /* 3. 移除拖曳區背景與邊框，高度壓縮，只留按鈕 */
+    /* 4. 移除拖曳區背景與邊框，高度壓縮，只留按鈕 */
     [data-testid="stFileUploader"] section {
         padding: 0px !important;
         min-height: 0px !important;
@@ -304,18 +304,13 @@ st.markdown("""
         margin: 0px !important;
     }
 
-    /* 3b. 隱藏雲朵與拖曳區，徹底不佔空間 */
-    [data-testid="stFileUploader"] section > div {
-        display: none !important;
-    }
-
-    /* 3c. 壓縮整個 file uploader 外層容器的多餘 padding */
+    /* 5. 壓縮整個 file uploader 外層容器的多餘 padding */
     [data-testid="stFileUploader"] {
         padding: 0px !important;
         margin: 0px !important;
     }
     
-    /* 4. 調整 "Browse files" 按鈕為滿版 */
+    /* 6. 調整 "Browse files" 按鈕為滿版 */
     [data-testid="stFileUploader"] button {
         width: 100% !important;
         margin-top: 0px;
@@ -328,7 +323,7 @@ st.markdown("""
         line-height: 1.6;
     }
 
-    /* 5. 植入新文字 "📂 載入專案" (偽裝) */
+    /* 7. 植入新文字 "📂 載入專案" (偽裝) */
     [data-testid="stFileUploader"] button::after {
         content: "📂 載入專案";
         color: rgb(49, 51, 63);
@@ -348,7 +343,7 @@ st.markdown("""
         color: transparent !important;
     }
 
-    /* 6. Hover 效果 */
+    /* 8. Hover 效果 */
     [data-testid="stFileUploader"] button:hover {
         border-color: #ff4b4b !important;
         color: transparent !important;
@@ -826,7 +821,7 @@ if Total_Power > 0 and Min_dT_Allowed > 0:
     
     # [v3.84] 重量計算
     base_vol_cm3 = L_hsk * W_hsk * t_base / 1000
-    fins_vol_cm3 = num_fins_int * Fin_t * Fin_Height * L_hsk / 1000
+    fins_vol_cm3 = num_fins_int * p["Fin_t"] * Fin_Height * L_hsk / 1000
     hs_weight_kg = (base_vol_cm3 + fins_vol_cm3) * al_density / 1000
     
     shield_outer_vol_cm3 = L_hsk * W_hsk * H_shield / 1000
