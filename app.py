@@ -289,6 +289,11 @@ st.markdown("""
         display: none !important;
     }
     
+    /* 2b. 隱藏雲朵圖示與拖曳區內容（只保留按鈕） */
+    [data-testid="stFileUploader"] section > div {
+        display: none !important;
+    }
+    
     /* 3. 移除拖曳區背景與邊框，高度壓縮，只留按鈕 */
     [data-testid="stFileUploader"] section {
         padding: 0px !important;
@@ -369,27 +374,24 @@ with col_header_L:
 with col_header_R:
     # 專案存取控制台 (外框)
     with st.container(border=True):
-        # 左右兩大欄
-        c_p1, c_p2 = st.columns(2, gap="small")
-        
         # 標題樣式
         header_style = "font-size: 0.9rem; font-weight: 700; color: #333; margin-bottom: 2px;"
 
+        # 第一行：標題 + 狀態（佔滿整行）
+        st.markdown(f"<div style='{header_style}'>專案存取 (Project I/O)</div>", unsafe_allow_html=True)
+        
+        if st.session_state.get('current_project_name'):
+            file_display = f"📄 {st.session_state['current_project_name']}"
+            st.markdown(f"<div style='font-size: 0.8rem; color: #007CF0; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;' title='{file_display}'>{file_display}</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<div style='font-size: 0.8rem; color: #555; margin-bottom: 4px;'>{config_loaded_msg}</div>", unsafe_allow_html=True)
+        
+        # 第二行：對齊下方「更新並產生」與「待更新」的欄位寬度
+        c_p1, c_p2 = st.columns(2, gap="small")
         with c_p1:
-            st.markdown(f"<div style='{header_style}'>專案存取 (Project I/O)</div>", unsafe_allow_html=True)
-            
-            # 判斷是否載入專案檔，顯示對應訊息
-            if st.session_state.get('current_project_name'):
-                # 藍色粗體顯示載入的檔名
-                file_display = f"📄 {st.session_state['current_project_name']}"
-                st.markdown(f"<div style='font-size: 0.8rem; color: #007CF0; font-weight: 600; margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;' title='{file_display}'>{file_display}</div>", unsafe_allow_html=True)
-            else:
-                # 顯示預設設定檔狀態
-                st.markdown(f"<div style='font-size: 0.8rem; color: #555; margin-top: 5px;'>{config_loaded_msg}</div>", unsafe_allow_html=True)
-            
+            pass  # 保留空間，對齊下方「更新並產生」
         with c_p2:
-            # 檔案上傳按鈕 (CSS 已偽裝成 "📂 載入專案" 按鈕)
-            st.markdown(f"<div style='height: 2px;'></div>", unsafe_allow_html=True)
+            # 載入專案按鈕，對齊下方「待更新」
             uploaded_proj = st.file_uploader("📂 載入專案", type=["json"], key="project_loader", label_visibility="collapsed")
             
         if uploaded_proj is not None:
