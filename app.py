@@ -12,19 +12,30 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 # ==============================================================================
-# 版本：v4.21 (UI Optimized)
-# 日期：2026-02-17
+# 版本：v4.23 (Component Library Enhanced)
+# 日期：2026-02-22
 # 狀態：正式發布版 (Production Ready)
-# 
-# [定案內容]
-# 1. 核心核心：熱流計算、重量估算、3D 模擬、敏感度分析皆已鎖定。
-# 2. 精度保證：Tab 5 基準點強制對齊機制 & 鰭片計算容差。
-# 3. UI 優化：Header 佈局整合為單行，上傳組件樣式極簡化 (Hidden Dropzone)。
+#
+# [版本歷程]
+# v4.23 (2026-02-22) - Component Library Enhanced
+#   1. Tab 1：新增「複製整排」功能，可一鍵複製 RF / Digital / PWR 任意元件列。
+#   2. Tab 1：元件庫「儲存至資料庫」加入覆寫確認對話框，防止意外覆蓋舊資料。
+#   3. Tab 1：元件庫加入「刪除元件」功能（附確認機制），支援 RF / Digital / PWR。
+#
+# v4.22 (2026-02-17) - Firebase Component Library
+#   1. 整合 Firebase Firestore，支援 RF / Digital / PWR 三個元件庫集合。
+#   2. Tab 1 加入元件庫快選面板，可直接從資料庫載入元件。
+#   3. 支援將自定義元件儲存回 Firebase，實現跨專案共用元件庫。
+#
+# v4.21 (2026-02-17) - UI Optimized
+#   1. 核心計算：熱流計算、重量估算、3D 模擬、敏感度分析皆已鎖定。
+#   2. 精度保證：Tab 5 基準點強制對齊機制 & 鰭片計算容差。
+#   3. UI 優化：Header 佈局整合為單行，上傳組件樣式極簡化 (Hidden Dropzone)。
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.21 (UI Optimized)"
-UPDATE_DATE = "2026-02-17"
+APP_VERSION = "v4.23 (Component Library Enhanced)"
+UPDATE_DATE = "2026-02-22"
 
 # === APP 設定 ===
 st.set_page_config(
