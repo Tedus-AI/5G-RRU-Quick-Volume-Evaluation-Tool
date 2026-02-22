@@ -716,6 +716,20 @@ with tab_input:
                 df_rf_edited[col] = df_rf_edited[col].fillna(val)
         st.session_state['df_rf'] = df_rf_edited
 
+        # === 複製整排區 ===
+        if not df_rf_edited.empty:
+            st.markdown("---")
+            copy_col1, copy_col2 = st.columns([3, 1])
+            with copy_col1:
+                row_to_copy_rf = st.selectbox("選擇要複製的元件列", df_rf_edited['Component'].tolist(), key="copy_rf_selector")
+            with copy_col2:
+                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                if st.button("📋 複製", key="copy_rf", use_container_width=True):
+                    matched_row = df_rf_edited[df_rf_edited['Component'] == row_to_copy_rf].iloc[0].to_dict()
+                    new_row = pd.DataFrame([matched_row])
+                    st.session_state['df_rf'] = pd.concat([st.session_state['df_rf'], new_row], ignore_index=True)
+                    st.rerun()
+
         # === 存入區 ===
         st.markdown("---")
         if not df_rf_edited.empty:
@@ -850,6 +864,20 @@ with tab_input:
                 df_digital_edited[col] = df_digital_edited[col].fillna(val)
         st.session_state['df_digital'] = df_digital_edited
 
+        # === 複製整排區 ===
+        if not df_digital_edited.empty:
+            st.markdown("---")
+            copy_col1, copy_col2 = st.columns([3, 1])
+            with copy_col1:
+                row_to_copy_digital = st.selectbox("選擇要複製的元件列", df_digital_edited['Component'].tolist(), key="copy_digital_selector")
+            with copy_col2:
+                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                if st.button("📋 複製", key="copy_digital", use_container_width=True):
+                    matched_row = df_digital_edited[df_digital_edited['Component'] == row_to_copy_digital].iloc[0].to_dict()
+                    new_row = pd.DataFrame([matched_row])
+                    st.session_state['df_digital'] = pd.concat([st.session_state['df_digital'], new_row], ignore_index=True)
+                    st.rerun()
+
         # === 存入區 ===
         st.markdown("---")
         if not df_digital_edited.empty:
@@ -983,6 +1011,20 @@ with tab_input:
             if col in df_pwr_edited.columns:
                 df_pwr_edited[col] = df_pwr_edited[col].fillna(val)
         st.session_state['df_pwr'] = df_pwr_edited
+
+        # === 複製整排區 ===
+        if not df_pwr_edited.empty:
+            st.markdown("---")
+            copy_col1, copy_col2 = st.columns([3, 1])
+            with copy_col1:
+                row_to_copy_pwr = st.selectbox("選擇要複製的元件列", df_pwr_edited['Component'].tolist(), key="copy_pwr_selector")
+            with copy_col2:
+                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                if st.button("📋 複製", key="copy_pwr", use_container_width=True):
+                    matched_row = df_pwr_edited[df_pwr_edited['Component'] == row_to_copy_pwr].iloc[0].to_dict()
+                    new_row = pd.DataFrame([matched_row])
+                    st.session_state['df_pwr'] = pd.concat([st.session_state['df_pwr'], new_row], ignore_index=True)
+                    st.rerun()
 
         # === 存入區 ===
         st.markdown("---")
