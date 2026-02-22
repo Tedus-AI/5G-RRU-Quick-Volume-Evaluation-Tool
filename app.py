@@ -244,6 +244,12 @@ if 'trigger_generation' not in st.session_state:
 if 'current_project_name' not in st.session_state:
     st.session_state['current_project_name'] = None
 
+for _flag in ['rf_confirm_overwrite', 'rf_confirm_delete',
+              'digital_confirm_overwrite', 'digital_confirm_delete',
+              'pwr_confirm_overwrite', 'pwr_confirm_delete']:
+    if _flag not in st.session_state:
+        st.session_state[_flag] = None
+
 def reset_download_state():
     st.session_state['json_ready_to_download'] = None
 
@@ -721,22 +727,15 @@ with tab_input:
                 if st.button("💾 存入", key="save_rf", use_container_width=True):
                     matched_row = df_rf_edited[df_rf_edited['Component'] == row_to_save].iloc[0].to_dict()
                     existing = [item for item in rf_lib if item['Component'] == row_to_save]
-
                     if existing:
-                        st.warning(f"⚠️ '{row_to_save}' 已存在 RF 資料庫！")
+                        st.session_state['rf_confirm_overwrite'] = row_to_save
                     else:
                         if st.session_state.get('firebase_initialized') and st.session_state.get('db'):
                             try:
                                 db = st.session_state['db']
-                                # 清理文件 ID（移除特殊字元）
                                 doc_id = row_to_save.replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")
-
-                                # 寫入 Firestore
                                 db.collection('rf_library').document(doc_id).set(matched_row)
-
-                                # 更新 session state
                                 st.session_state['component_library']['rf_library'].append(matched_row)
-
                                 st.success(f"✅ '{row_to_save}' 已存入 RF 資料庫！")
                                 time.sleep(1)
                                 st.rerun()
@@ -744,6 +743,74 @@ with tab_input:
                                 st.error(f"存入失敗: {e}")
                         else:
                             st.error("⚠️ Firebase 未連線，無法存入資料庫")
+
+            if st.session_state.get('rf_confirm_overwrite'):
+                comp_ow = st.session_state['rf_confirm_overwrite']
+                st.warning(f"⚠️ '{comp_ow}' 已存在 RF 資料庫，確定要覆蓋？")
+                ow_col1, ow_col2 = st.columns(2)
+                with ow_col1:
+                    if st.button("✅ 確認覆蓋", key="rf_ow_confirm", use_container_width=True):
+                        if st.session_state.get('firebase_initialized') and st.session_state.get('db'):
+                            try:
+                                db = st.session_state['db']
+                                matched_row = df_rf_edited[df_rf_edited['Component'] == comp_ow].iloc[0].to_dict()
+                                doc_id = comp_ow.replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")
+                                db.collection('rf_library').document(doc_id).set(matched_row)
+                                lib = st.session_state['component_library']['rf_library']
+                                st.session_state['component_library']['rf_library'] = [
+                                    matched_row if item['Component'] == comp_ow else item for item in lib
+                                ]
+                                st.session_state['rf_confirm_overwrite'] = None
+                                st.success(f"✅ '{comp_ow}' 已覆蓋更新！")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"覆蓋失敗: {e}")
+                        else:
+                            st.error("⚠️ Firebase 未連線，無法覆蓋")
+                with ow_col2:
+                    if st.button("❌ 取消", key="rf_ow_cancel", use_container_width=True):
+                        st.session_state['rf_confirm_overwrite'] = None
+                        st.rerun()
+
+        # === 刪除區 ===
+        if rf_lib:
+            st.markdown("---")
+            del_col1, del_col2 = st.columns([3, 1])
+            with del_col1:
+                rf_del_options = [item['Component'] for item in rf_lib]
+                row_to_delete = st.selectbox("選擇要從資料庫刪除的元件", rf_del_options, key="del_rf_selector")
+            with del_col2:
+                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                if st.button("🗑️ 刪除", key="del_rf", use_container_width=True):
+                    st.session_state['rf_confirm_delete'] = row_to_delete
+
+            if st.session_state.get('rf_confirm_delete'):
+                comp_del = st.session_state['rf_confirm_delete']
+                st.warning(f"⚠️ 確定要從 RF 資料庫刪除 '{comp_del}'？此操作無法復原！")
+                dc1, dc2 = st.columns(2)
+                with dc1:
+                    if st.button("✅ 確認刪除", key="rf_del_confirm", use_container_width=True):
+                        if st.session_state.get('firebase_initialized') and st.session_state.get('db'):
+                            try:
+                                db = st.session_state['db']
+                                doc_id = comp_del.replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")
+                                db.collection('rf_library').document(doc_id).delete()
+                                st.session_state['component_library']['rf_library'] = [
+                                    item for item in rf_lib if item['Component'] != comp_del
+                                ]
+                                st.session_state['rf_confirm_delete'] = None
+                                st.success(f"🗑️ '{comp_del}' 已從 RF 資料庫刪除！")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"刪除失敗: {e}")
+                        else:
+                            st.error("⚠️ Firebase 未連線，無法刪除")
+                with dc2:
+                    if st.button("❌ 取消", key="rf_del_cancel", use_container_width=True):
+                        st.session_state['rf_confirm_delete'] = None
+                        st.rerun()
 
     with sub_digital:
         # === 快選區 ===
@@ -794,9 +861,8 @@ with tab_input:
                 if st.button("💾 存入", key="save_digital", use_container_width=True):
                     matched_row = df_digital_edited[df_digital_edited['Component'] == row_to_save].iloc[0].to_dict()
                     existing = [item for item in digital_lib if item['Component'] == row_to_save]
-
                     if existing:
-                        st.warning(f"⚠️ '{row_to_save}' 已存在 Digital 資料庫！")
+                        st.session_state['digital_confirm_overwrite'] = row_to_save
                     else:
                         if st.session_state.get('firebase_initialized') and st.session_state.get('db'):
                             try:
@@ -811,6 +877,74 @@ with tab_input:
                                 st.error(f"存入失敗: {e}")
                         else:
                             st.error("⚠️ Firebase 未連線，無法存入資料庫")
+
+            if st.session_state.get('digital_confirm_overwrite'):
+                comp_ow = st.session_state['digital_confirm_overwrite']
+                st.warning(f"⚠️ '{comp_ow}' 已存在 Digital 資料庫，確定要覆蓋？")
+                ow_col1, ow_col2 = st.columns(2)
+                with ow_col1:
+                    if st.button("✅ 確認覆蓋", key="digital_ow_confirm", use_container_width=True):
+                        if st.session_state.get('firebase_initialized') and st.session_state.get('db'):
+                            try:
+                                db = st.session_state['db']
+                                matched_row = df_digital_edited[df_digital_edited['Component'] == comp_ow].iloc[0].to_dict()
+                                doc_id = comp_ow.replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")
+                                db.collection('digital_library').document(doc_id).set(matched_row)
+                                lib = st.session_state['component_library']['digital_library']
+                                st.session_state['component_library']['digital_library'] = [
+                                    matched_row if item['Component'] == comp_ow else item for item in lib
+                                ]
+                                st.session_state['digital_confirm_overwrite'] = None
+                                st.success(f"✅ '{comp_ow}' 已覆蓋更新！")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"覆蓋失敗: {e}")
+                        else:
+                            st.error("⚠️ Firebase 未連線，無法覆蓋")
+                with ow_col2:
+                    if st.button("❌ 取消", key="digital_ow_cancel", use_container_width=True):
+                        st.session_state['digital_confirm_overwrite'] = None
+                        st.rerun()
+
+        # === 刪除區 ===
+        if digital_lib:
+            st.markdown("---")
+            del_col1, del_col2 = st.columns([3, 1])
+            with del_col1:
+                digital_del_options = [item['Component'] for item in digital_lib]
+                row_to_delete = st.selectbox("選擇要從資料庫刪除的元件", digital_del_options, key="del_digital_selector")
+            with del_col2:
+                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                if st.button("🗑️ 刪除", key="del_digital", use_container_width=True):
+                    st.session_state['digital_confirm_delete'] = row_to_delete
+
+            if st.session_state.get('digital_confirm_delete'):
+                comp_del = st.session_state['digital_confirm_delete']
+                st.warning(f"⚠️ 確定要從 Digital 資料庫刪除 '{comp_del}'？此操作無法復原！")
+                dc1, dc2 = st.columns(2)
+                with dc1:
+                    if st.button("✅ 確認刪除", key="digital_del_confirm", use_container_width=True):
+                        if st.session_state.get('firebase_initialized') and st.session_state.get('db'):
+                            try:
+                                db = st.session_state['db']
+                                doc_id = comp_del.replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")
+                                db.collection('digital_library').document(doc_id).delete()
+                                st.session_state['component_library']['digital_library'] = [
+                                    item for item in digital_lib if item['Component'] != comp_del
+                                ]
+                                st.session_state['digital_confirm_delete'] = None
+                                st.success(f"🗑️ '{comp_del}' 已從 Digital 資料庫刪除！")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"刪除失敗: {e}")
+                        else:
+                            st.error("⚠️ Firebase 未連線，無法刪除")
+                with dc2:
+                    if st.button("❌ 取消", key="digital_del_cancel", use_container_width=True):
+                        st.session_state['digital_confirm_delete'] = None
+                        st.rerun()
 
     with sub_pwr:
         # === 快選區 ===
@@ -861,9 +995,8 @@ with tab_input:
                 if st.button("💾 存入", key="save_pwr", use_container_width=True):
                     matched_row = df_pwr_edited[df_pwr_edited['Component'] == row_to_save].iloc[0].to_dict()
                     existing = [item for item in pwr_lib if item['Component'] == row_to_save]
-
                     if existing:
-                        st.warning(f"⚠️ '{row_to_save}' 已存在 PWR 資料庫！")
+                        st.session_state['pwr_confirm_overwrite'] = row_to_save
                     else:
                         if st.session_state.get('firebase_initialized') and st.session_state.get('db'):
                             try:
@@ -878,6 +1011,74 @@ with tab_input:
                                 st.error(f"存入失敗: {e}")
                         else:
                             st.error("⚠️ Firebase 未連線，無法存入資料庫")
+
+            if st.session_state.get('pwr_confirm_overwrite'):
+                comp_ow = st.session_state['pwr_confirm_overwrite']
+                st.warning(f"⚠️ '{comp_ow}' 已存在 PWR 資料庫，確定要覆蓋？")
+                ow_col1, ow_col2 = st.columns(2)
+                with ow_col1:
+                    if st.button("✅ 確認覆蓋", key="pwr_ow_confirm", use_container_width=True):
+                        if st.session_state.get('firebase_initialized') and st.session_state.get('db'):
+                            try:
+                                db = st.session_state['db']
+                                matched_row = df_pwr_edited[df_pwr_edited['Component'] == comp_ow].iloc[0].to_dict()
+                                doc_id = comp_ow.replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")
+                                db.collection('pwr_library').document(doc_id).set(matched_row)
+                                lib = st.session_state['component_library']['pwr_library']
+                                st.session_state['component_library']['pwr_library'] = [
+                                    matched_row if item['Component'] == comp_ow else item for item in lib
+                                ]
+                                st.session_state['pwr_confirm_overwrite'] = None
+                                st.success(f"✅ '{comp_ow}' 已覆蓋更新！")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"覆蓋失敗: {e}")
+                        else:
+                            st.error("⚠️ Firebase 未連線，無法覆蓋")
+                with ow_col2:
+                    if st.button("❌ 取消", key="pwr_ow_cancel", use_container_width=True):
+                        st.session_state['pwr_confirm_overwrite'] = None
+                        st.rerun()
+
+        # === 刪除區 ===
+        if pwr_lib:
+            st.markdown("---")
+            del_col1, del_col2 = st.columns([3, 1])
+            with del_col1:
+                pwr_del_options = [item['Component'] for item in pwr_lib]
+                row_to_delete = st.selectbox("選擇要從資料庫刪除的元件", pwr_del_options, key="del_pwr_selector")
+            with del_col2:
+                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                if st.button("🗑️ 刪除", key="del_pwr", use_container_width=True):
+                    st.session_state['pwr_confirm_delete'] = row_to_delete
+
+            if st.session_state.get('pwr_confirm_delete'):
+                comp_del = st.session_state['pwr_confirm_delete']
+                st.warning(f"⚠️ 確定要從 PWR 資料庫刪除 '{comp_del}'？此操作無法復原！")
+                dc1, dc2 = st.columns(2)
+                with dc1:
+                    if st.button("✅ 確認刪除", key="pwr_del_confirm", use_container_width=True):
+                        if st.session_state.get('firebase_initialized') and st.session_state.get('db'):
+                            try:
+                                db = st.session_state['db']
+                                doc_id = comp_del.replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")
+                                db.collection('pwr_library').document(doc_id).delete()
+                                st.session_state['component_library']['pwr_library'] = [
+                                    item for item in pwr_lib if item['Component'] != comp_del
+                                ]
+                                st.session_state['pwr_confirm_delete'] = None
+                                st.success(f"🗑️ '{comp_del}' 已從 PWR 資料庫刪除！")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"刪除失敗: {e}")
+                        else:
+                            st.error("⚠️ Firebase 未連線，無法刪除")
+                with dc2:
+                    if st.button("❌ 取消", key="pwr_del_cancel", use_container_width=True):
+                        st.session_state['pwr_confirm_delete'] = None
+                        st.rerun()
 
     # 合併三類 → 供後續所有計算使用
     edited_df = pd.concat([df_rf_edited, df_digital_edited, df_pwr_edited], ignore_index=True)
