@@ -8,6 +8,8 @@ import time
 import os
 import json
 import copy
+import firebase_admin
+from firebase_admin import credentials, firestore
 
 # ==============================================================================
 # 版本：v4.21 (UI Optimized)
@@ -186,6 +188,47 @@ if 'df_current' not in st.session_state:
         st.session_state['df_digital'],
         st.session_state['df_pwr']
     ], ignore_index=True)
+
+# ==================== Firebase 初始化 ====================
+if 'firebase_initialized' not in st.session_state:
+    try:
+        # 從 Streamlit Secrets 載入憑證
+        firebase_creds = dict(st.secrets["firebase"])
+        cred = credentials.Certificate(firebase_creds)
+
+        # 檢查是否已初始化（避免重複）
+        if not firebase_admin._apps:
+            firebase_admin.initialize_app(cred)
+
+        st.session_state['firebase_initialized'] = True
+        st.session_state['db'] = firestore.client()
+    except Exception as e:
+        st.warning(f"⚠️ Firebase 初始化失敗（將使用本地空資料庫）: {e}")
+        st.session_state['firebase_initialized'] = False
+        st.session_state['db'] = None
+
+# 載入元件資料庫（從 Firestore 讀取）
+if 'component_library' not in st.session_state:
+    if st.session_state.get('firebase_initialized') and st.session_state.get('db'):
+        try:
+            db = st.session_state['db']
+
+            # 讀取三個 Collection
+            rf_docs = db.collection('rf_library').stream()
+            digital_docs = db.collection('digital_library').stream()
+            pwr_docs = db.collection('pwr_library').stream()
+
+            st.session_state['component_library'] = {
+                "rf_library": [doc.to_dict() for doc in rf_docs],
+                "digital_library": [doc.to_dict() for doc in digital_docs],
+                "pwr_library": [doc.to_dict() for doc in pwr_docs]
+            }
+        except Exception as e:
+            st.warning(f"Firestore 讀取失敗，使用空資料庫: {e}")
+            st.session_state['component_library'] = {"rf_library": [], "digital_library": [], "pwr_library": []}
+    else:
+        # Fallback：Firebase 失敗時使用空資料庫
+        st.session_state['component_library'] = {"rf_library": [], "digital_library": [], "pwr_library": []}
 
 if 'last_loaded_file' not in st.session_state:
     st.session_state['last_loaded_file'] = None
@@ -628,10 +671,31 @@ with tab_input:
     sub_rf, sub_digital, sub_pwr = st.tabs(["📡 RF Component", "💻 Digital Component", "⚡ PWR Component"])
 
     with sub_rf:
+        # === 快選區 ===
+        rf_lib = st.session_state['component_library']['rf_library']
+        if rf_lib:
+            rf_options = ["（請選擇）"] + [f"{item['Component']} ({item['Power(W)']}W)" for item in rf_lib]
+            col_select, col_btn = st.columns([3, 1])
+            with col_select:
+                selected_rf = st.selectbox("📚 從 RF 資料庫快選", rf_options, key="rf_selector")
+            with col_btn:
+                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                if selected_rf != "（請選擇）" and st.button("➕ 新增", key="add_rf", use_container_width=True):
+                    comp_name = selected_rf.split(" (")[0]
+                    matched = [item for item in rf_lib if item['Component'] == comp_name]
+                    if matched:
+                        new_row = pd.DataFrame([matched[0]])
+                        st.session_state['df_rf'] = pd.concat([st.session_state['df_rf'], new_row], ignore_index=True)
+                        st.rerun()
+        else:
+            st.info("📚 RF 資料庫目前為空，請先在下方表格建立元件後存入。")
+
+        st.markdown("---")
+
         # 小計
         rf_power = (st.session_state['df_rf']['Power(W)'] * st.session_state['df_rf']['Qty']).sum()
         st.caption(f"📊 RF 類總功耗：**{rf_power:.1f} W** | 共 **{len(st.session_state['df_rf'])}** 種元件")
-        
+
         df_rf_edited = st.data_editor(
             st.session_state['df_rf'],
             column_config=shared_column_config,
@@ -646,10 +710,66 @@ with tab_input:
                 df_rf_edited[col] = df_rf_edited[col].fillna(val)
         st.session_state['df_rf'] = df_rf_edited
 
+        # === 存入區 ===
+        st.markdown("---")
+        if not df_rf_edited.empty:
+            save_col1, save_col2 = st.columns([3, 1])
+            with save_col1:
+                row_to_save = st.selectbox("選擇要存入資料庫的元件", df_rf_edited['Component'].tolist(), key="save_rf_selector")
+            with save_col2:
+                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                if st.button("💾 存入", key="save_rf", use_container_width=True):
+                    matched_row = df_rf_edited[df_rf_edited['Component'] == row_to_save].iloc[0].to_dict()
+                    existing = [item for item in rf_lib if item['Component'] == row_to_save]
+
+                    if existing:
+                        st.warning(f"⚠️ '{row_to_save}' 已存在 RF 資料庫！")
+                    else:
+                        if st.session_state.get('firebase_initialized') and st.session_state.get('db'):
+                            try:
+                                db = st.session_state['db']
+                                # 清理文件 ID（移除特殊字元）
+                                doc_id = row_to_save.replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")
+
+                                # 寫入 Firestore
+                                db.collection('rf_library').document(doc_id).set(matched_row)
+
+                                # 更新 session state
+                                st.session_state['component_library']['rf_library'].append(matched_row)
+
+                                st.success(f"✅ '{row_to_save}' 已存入 RF 資料庫！")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"存入失敗: {e}")
+                        else:
+                            st.error("⚠️ Firebase 未連線，無法存入資料庫")
+
     with sub_digital:
+        # === 快選區 ===
+        digital_lib = st.session_state['component_library']['digital_library']
+        if digital_lib:
+            digital_options = ["（請選擇）"] + [f"{item['Component']} ({item['Power(W)']}W)" for item in digital_lib]
+            col_select, col_btn = st.columns([3, 1])
+            with col_select:
+                selected_digital = st.selectbox("📚 從 Digital 資料庫快選", digital_options, key="digital_selector")
+            with col_btn:
+                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                if selected_digital != "（請選擇）" and st.button("➕ 新增", key="add_digital", use_container_width=True):
+                    comp_name = selected_digital.split(" (")[0]
+                    matched = [item for item in digital_lib if item['Component'] == comp_name]
+                    if matched:
+                        new_row = pd.DataFrame([matched[0]])
+                        st.session_state['df_digital'] = pd.concat([st.session_state['df_digital'], new_row], ignore_index=True)
+                        st.rerun()
+        else:
+            st.info("📚 Digital 資料庫目前為空，請先在下方表格建立元件後存入。")
+
+        st.markdown("---")
+
         digital_power = (st.session_state['df_digital']['Power(W)'] * st.session_state['df_digital']['Qty']).sum()
         st.caption(f"📊 Digital 類總功耗：**{digital_power:.1f} W** | 共 **{len(st.session_state['df_digital'])}** 種元件")
-        
+
         df_digital_edited = st.data_editor(
             st.session_state['df_digital'],
             column_config=shared_column_config,
@@ -663,10 +783,60 @@ with tab_input:
                 df_digital_edited[col] = df_digital_edited[col].fillna(val)
         st.session_state['df_digital'] = df_digital_edited
 
+        # === 存入區 ===
+        st.markdown("---")
+        if not df_digital_edited.empty:
+            save_col1, save_col2 = st.columns([3, 1])
+            with save_col1:
+                row_to_save = st.selectbox("選擇要存入資料庫的元件", df_digital_edited['Component'].tolist(), key="save_digital_selector")
+            with save_col2:
+                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                if st.button("💾 存入", key="save_digital", use_container_width=True):
+                    matched_row = df_digital_edited[df_digital_edited['Component'] == row_to_save].iloc[0].to_dict()
+                    existing = [item for item in digital_lib if item['Component'] == row_to_save]
+
+                    if existing:
+                        st.warning(f"⚠️ '{row_to_save}' 已存在 Digital 資料庫！")
+                    else:
+                        if st.session_state.get('firebase_initialized') and st.session_state.get('db'):
+                            try:
+                                db = st.session_state['db']
+                                doc_id = row_to_save.replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")
+                                db.collection('digital_library').document(doc_id).set(matched_row)
+                                st.session_state['component_library']['digital_library'].append(matched_row)
+                                st.success(f"✅ '{row_to_save}' 已存入 Digital 資料庫！")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"存入失敗: {e}")
+                        else:
+                            st.error("⚠️ Firebase 未連線，無法存入資料庫")
+
     with sub_pwr:
+        # === 快選區 ===
+        pwr_lib = st.session_state['component_library']['pwr_library']
+        if pwr_lib:
+            pwr_options = ["（請選擇）"] + [f"{item['Component']} ({item['Power(W)']}W)" for item in pwr_lib]
+            col_select, col_btn = st.columns([3, 1])
+            with col_select:
+                selected_pwr = st.selectbox("📚 從 PWR 資料庫快選", pwr_options, key="pwr_selector")
+            with col_btn:
+                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                if selected_pwr != "（請選擇）" and st.button("➕ 新增", key="add_pwr", use_container_width=True):
+                    comp_name = selected_pwr.split(" (")[0]
+                    matched = [item for item in pwr_lib if item['Component'] == comp_name]
+                    if matched:
+                        new_row = pd.DataFrame([matched[0]])
+                        st.session_state['df_pwr'] = pd.concat([st.session_state['df_pwr'], new_row], ignore_index=True)
+                        st.rerun()
+        else:
+            st.info("📚 PWR 資料庫目前為空，請先在下方表格建立元件後存入。")
+
+        st.markdown("---")
+
         pwr_power = (st.session_state['df_pwr']['Power(W)'] * st.session_state['df_pwr']['Qty']).sum()
         st.caption(f"📊 Power 類總功耗：**{pwr_power:.1f} W** | 共 **{len(st.session_state['df_pwr'])}** 種元件")
-        
+
         df_pwr_edited = st.data_editor(
             st.session_state['df_pwr'],
             column_config=shared_column_config,
@@ -679,6 +849,35 @@ with tab_input:
             if col in df_pwr_edited.columns:
                 df_pwr_edited[col] = df_pwr_edited[col].fillna(val)
         st.session_state['df_pwr'] = df_pwr_edited
+
+        # === 存入區 ===
+        st.markdown("---")
+        if not df_pwr_edited.empty:
+            save_col1, save_col2 = st.columns([3, 1])
+            with save_col1:
+                row_to_save = st.selectbox("選擇要存入資料庫的元件", df_pwr_edited['Component'].tolist(), key="save_pwr_selector")
+            with save_col2:
+                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                if st.button("💾 存入", key="save_pwr", use_container_width=True):
+                    matched_row = df_pwr_edited[df_pwr_edited['Component'] == row_to_save].iloc[0].to_dict()
+                    existing = [item for item in pwr_lib if item['Component'] == row_to_save]
+
+                    if existing:
+                        st.warning(f"⚠️ '{row_to_save}' 已存在 PWR 資料庫！")
+                    else:
+                        if st.session_state.get('firebase_initialized') and st.session_state.get('db'):
+                            try:
+                                db = st.session_state['db']
+                                doc_id = row_to_save.replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")
+                                db.collection('pwr_library').document(doc_id).set(matched_row)
+                                st.session_state['component_library']['pwr_library'].append(matched_row)
+                                st.success(f"✅ '{row_to_save}' 已存入 PWR 資料庫！")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"存入失敗: {e}")
+                        else:
+                            st.error("⚠️ Firebase 未連線，無法存入資料庫")
 
     # 合併三類 → 供後續所有計算使用
     edited_df = pd.concat([df_rf_edited, df_digital_edited, df_pwr_edited], ignore_index=True)
