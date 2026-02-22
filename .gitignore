@@ -1,0 +1,10 @@
+# Streamlit secrets (contains Firebase credentials)
+.streamlit/secrets.toml
+
+# Firebase service account key
+*-firebase-adminsdk-*.json
+
+# Python
+__pycache__/
+*.pyc
+.env
