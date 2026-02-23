@@ -41,8 +41,8 @@ from firebase_admin import credentials, firestore
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.23 (Component Library Enhanced)"
-UPDATE_DATE = "2026-02-22"
+APP_VERSION = "v4.25 (Tab1 Single-Input Fix)"
+UPDATE_DATE = "2026-02-23"
 
 # === APP 設定 ===
 st.set_page_config(
@@ -297,9 +297,8 @@ def _sync_editor_state(editor_prefix, df_key, row_defaults):
 
     st.session_state[df_key] = df
 
-    # Force new widget key on structural changes to clear stale delta
-    if added or deleted:
-        st.session_state['editor_key'] += 1
+    # Always increment key to clear stale delta and prevent double-apply on next render
+    st.session_state['editor_key'] += 1
 
     reset_download_state()
 
