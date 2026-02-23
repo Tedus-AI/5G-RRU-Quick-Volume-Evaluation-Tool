@@ -41,7 +41,7 @@ from firebase_admin import credentials, firestore
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.25 (Tab1 Single-Input Fix)"
+APP_VERSION = "v4.26 (Sidebar Default Values Restored)"
 UPDATE_DATE = "2026-02-23"
 
 # === APP 設定 ===
@@ -610,8 +610,8 @@ st.sidebar.header("🛠️ 參數控制台")
 
 # --- 參數設定區 (綁定 on_change=reset_download_state + 讀取 value) ---
 with st.sidebar.expander("1. 環境與係數", expanded=True):
-    T_amb = st.number_input("環境溫度 (°C)", step=1.0, key="T_amb", on_change=reset_download_state)
-    Margin = st.number_input("設計安全係數 (Margin)", step=0.1, key="Margin", on_change=reset_download_state)
+    T_amb = st.number_input("環境溫度 (°C)", step=1.0, key="T_amb", value=st.session_state['T_amb'], on_change=reset_download_state)
+    Margin = st.number_input("設計安全係數 (Margin)", step=0.1, key="Margin", value=st.session_state['Margin'], on_change=reset_download_state)
     Slope = 0.03 
     
     fin_tech = st.selectbox(
@@ -628,39 +628,39 @@ with st.sidebar.expander("1. 環境與係數", expanded=True):
     st.caption(f"目前設定效率 (Eff): **{Eff}**")
 
 with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
-    L_pcb = st.number_input("PCB 長度 (mm)", key="L_pcb", on_change=reset_download_state)
-    W_pcb = st.number_input("PCB 寬度 (mm)", key="W_pcb", on_change=reset_download_state)
-    t_base = st.number_input("散熱器基板厚 (mm)", key="t_base", on_change=reset_download_state)
-    H_shield = st.number_input("HSK內腔深度 (mm)", key="H_shield", on_change=reset_download_state)
-    H_filter = st.number_input("Cavity Filter 厚度 (mm)", key="H_filter", on_change=reset_download_state)
-    
+    L_pcb = st.number_input("PCB 長度 (mm)", key="L_pcb", value=st.session_state['L_pcb'], on_change=reset_download_state)
+    W_pcb = st.number_input("PCB 寬度 (mm)", key="W_pcb", value=st.session_state['W_pcb'], on_change=reset_download_state)
+    t_base = st.number_input("散熱器基板厚 (mm)", key="t_base", value=st.session_state['t_base'], on_change=reset_download_state)
+    H_shield = st.number_input("HSK內腔深度 (mm)", key="H_shield", value=st.session_state['H_shield'], on_change=reset_download_state)
+    H_filter = st.number_input("Cavity Filter 厚度 (mm)", key="H_filter", value=st.session_state['H_filter'], on_change=reset_download_state)
+
     # 重量參數
     st.caption("⚖️ 重量估算參數")
-    al_density = st.number_input("鋁材密度 (g/cm³)", step=0.01, key="al_density", on_change=reset_download_state, help="Heatsink + Shield 用；壓鑄略調低")
-    filter_density = st.number_input("Cavity Filter (g/cm³)", step=0.05, key="filter_density", on_change=reset_download_state, help="實測校正 ≈0.97–1.05")
-    shielding_density = st.number_input("Shielding (g/cm³)", step=0.05, key="shielding_density", on_change=reset_download_state, help="實測 0.758；固定高度 12 mm")
-    pcb_surface_density = st.number_input("PCB 面密度 (g/cm²)", step=0.05, key="pcb_surface_density", on_change=reset_download_state, help="含 SMT；實測 0.965 保守調低")
+    al_density = st.number_input("鋁材密度 (g/cm³)", step=0.01, key="al_density", value=st.session_state['al_density'], on_change=reset_download_state, help="Heatsink + Shield 用；壓鑄略調低")
+    filter_density = st.number_input("Cavity Filter (g/cm³)", step=0.05, key="filter_density", value=st.session_state['filter_density'], on_change=reset_download_state, help="實測校正 ≈0.97–1.05")
+    shielding_density = st.number_input("Shielding (g/cm³)", step=0.05, key="shielding_density", value=st.session_state['shielding_density'], on_change=reset_download_state, help="實測 0.758；固定高度 12 mm")
+    pcb_surface_density = st.number_input("PCB 面密度 (g/cm²)", step=0.05, key="pcb_surface_density", value=st.session_state['pcb_surface_density'], on_change=reset_download_state, help="含 SMT；實測 0.965 保守調低")
 
     st.markdown("---")
     st.caption("📏 PCB板離外殼邊距(防水)")
     m1, m2 = st.columns(2)
-    Top = m1.number_input("Top (mm)", step=1.0, key="Top", on_change=reset_download_state)
-    Btm = m2.number_input("Bottom (mm)", step=1.0, key="Btm", on_change=reset_download_state)
+    Top = m1.number_input("Top (mm)", step=1.0, key="Top", value=st.session_state['Top'], on_change=reset_download_state)
+    Btm = m2.number_input("Bottom (mm)", step=1.0, key="Btm", value=st.session_state['Btm'], on_change=reset_download_state)
     m3, m4 = st.columns(2)
-    Left = m3.number_input("Left (mm)", step=1.0, key="Left", on_change=reset_download_state)
-    Right = m4.number_input("Right (mm)", step=1.0, key="Right", on_change=reset_download_state)
-    
+    Left = m3.number_input("Left (mm)", step=1.0, key="Left", value=st.session_state['Left'], on_change=reset_download_state)
+    Right = m4.number_input("Right (mm)", step=1.0, key="Right", value=st.session_state['Right'], on_change=reset_download_state)
+
     st.markdown("---")
     st.caption("🔶 Final PA 銅塊設定")
     c1, c2 = st.columns(2)
-    Coin_L_Setting = c1.number_input("銅塊長 (mm)", step=1.0, key="Coin_L_Setting", on_change=reset_download_state)
-    Coin_W_Setting = c2.number_input("銅塊寬 (mm)", step=1.0, key="Coin_W_Setting", on_change=reset_download_state)
+    Coin_L_Setting = c1.number_input("銅塊長 (mm)", step=1.0, key="Coin_L_Setting", value=st.session_state['Coin_L_Setting'], on_change=reset_download_state)
+    Coin_W_Setting = c2.number_input("銅塊寬 (mm)", step=1.0, key="Coin_W_Setting", value=st.session_state['Coin_W_Setting'], on_change=reset_download_state)
 
     st.markdown("---")
     st.caption("🌊 鰭片幾何")
     c_fin1, c_fin2 = st.columns(2)
-    Gap = c_fin1.number_input("鰭片air gap (mm)", step=0.1, key="Gap", on_change=reset_download_state)
-    Fin_t = c_fin2.number_input("鰭片厚度 (mm)", step=0.1, key="Fin_t", on_change=reset_download_state)
+    Gap = c_fin1.number_input("鰭片air gap (mm)", step=0.1, key="Gap", value=st.session_state['Gap'], on_change=reset_download_state)
+    Fin_t = c_fin2.number_input("鰭片厚度 (mm)", step=0.1, key="Fin_t", value=st.session_state['Fin_t'], on_change=reset_download_state)
 
     # [Core] h 值自動計算
     h_conv = 6.4 * np.tanh(Gap / 7.0)
@@ -681,25 +681,25 @@ with st.sidebar.expander("2. PCB 與 機構尺寸", expanded=True):
 
 with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=False):
     c1, c2 = st.columns(2)
-    K_Via = c1.number_input("Via 等效 K值", key="K_Via", on_change=reset_download_state)
-    Via_Eff = c2.number_input("Via 製程係數", key="Via_Eff", on_change=reset_download_state)
-    st.markdown("---") 
+    K_Via = c1.number_input("Via 等效 K值", key="K_Via", value=st.session_state['K_Via'], on_change=reset_download_state)
+    Via_Eff = c2.number_input("Via 製程係數", key="Via_Eff", value=st.session_state['Via_Eff'], on_change=reset_download_state)
+    st.markdown("---")
     st.caption("🔷 熱介面材料 (TIM)")
     c3, c4 = st.columns(2)
-    K_Putty = c3.number_input("K (Putty)", key="K_Putty", on_change=reset_download_state)
-    t_Putty = c4.number_input("t (Putty)", key="t_Putty", on_change=reset_download_state)
+    K_Putty = c3.number_input("K (Putty)", key="K_Putty", value=st.session_state['K_Putty'], on_change=reset_download_state)
+    t_Putty = c4.number_input("t (Putty)", key="t_Putty", value=st.session_state['t_Putty'], on_change=reset_download_state)
     c5, c6 = st.columns(2)
-    K_Pad = c5.number_input("K (Pad)", key="K_Pad", on_change=reset_download_state)
-    t_Pad = c6.number_input("t (Pad)", key="t_Pad", on_change=reset_download_state)
+    K_Pad = c5.number_input("K (Pad)", key="K_Pad", value=st.session_state['K_Pad'], on_change=reset_download_state)
+    t_Pad = c6.number_input("t (Pad)", key="t_Pad", value=st.session_state['t_Pad'], on_change=reset_download_state)
     c7, c8 = st.columns(2)
-    K_Grease = c7.number_input("K (Grease)", key="K_Grease", on_change=reset_download_state)
-    t_Grease = c8.number_input("t (Grease)", format="%.3f", key="t_Grease", on_change=reset_download_state)
-    st.markdown("---") 
-    st.markdown("**🔘 Solder (錫片)**") 
+    K_Grease = c7.number_input("K (Grease)", key="K_Grease", value=st.session_state['K_Grease'], on_change=reset_download_state)
+    t_Grease = c8.number_input("t (Grease)", format="%.3f", key="t_Grease", value=st.session_state['t_Grease'], on_change=reset_download_state)
+    st.markdown("---")
+    st.markdown("**🔘 Solder (錫片)**")
     c9, c10 = st.columns(2)
-    K_Solder = c9.number_input("K (錫片)", key="K_Solder", on_change=reset_download_state)
-    t_Solder = c10.number_input("t (錫片)", key="t_Solder", on_change=reset_download_state)
-    Voiding = st.number_input("錫片空洞率 (Voiding)", key="Voiding", on_change=reset_download_state)
+    K_Solder = c9.number_input("K (錫片)", key="K_Solder", value=st.session_state['K_Solder'], on_change=reset_download_state)
+    t_Solder = c10.number_input("t (錫片)", key="t_Solder", value=st.session_state['t_Solder'], on_change=reset_download_state)
+    Voiding = st.number_input("錫片空洞率 (Voiding)", key="Voiding", value=st.session_state['Voiding'], on_change=reset_download_state)
 
 # ==================================================
 # 3. 分頁與邏輯
