@@ -12,11 +12,18 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 # ==============================================================================
-# 版本：v4.23 (Component Library Enhanced)
-# 日期：2026-02-22
+# 版本：v4.24 (Tab2 Enhanced Analysis)
+# 日期：2026-02-23
 # 狀態：正式發布版 (Production Ready)
 #
 # [版本歷程]
+# v4.24 (2026-02-23) - Tab2 Enhanced Analysis
+#   1. Tab 2：新增超溫警告 Banner，當任一元件 Tj_Margin < 0 時顯示紅色警告。
+#   2. Tab 2：新增風險排名 Top 3 KPI 卡片，一眼識別最危險的瓶頸元件。
+#   3. Tab 2：所有欄位改為可選顯示（multiselect），預設顯示關鍵欄位。
+#   4. Tab 2：Scale Bar 色階移至表格上方，提升易讀性。
+#   5. Tab 2：Allowed_dT 移至第二欄、Tj_Margin 新增色階標示。
+#
 # v4.23 (2026-02-22) - Component Library Enhanced
 #   1. Tab 1：新增「複製整排」功能，可一鍵複製 RF / Digital / PWR 任意元件列。
 #   2. Tab 1：元件庫「儲存至資料庫」加入覆寫確認對話框，防止意外覆蓋舊資料。
@@ -1470,38 +1477,109 @@ elif "Embedded" in fin_tech and Fin_Height > 100.0:
 with tab_data:
     st.subheader("🔢 DETAILED ANALYSIS (詳細分析)")
     st.caption("💡 **提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。**")
-    
+
     if not final_df.empty:
-        # [v4.10] 篩選顯示欄位 (隱藏基礎尺寸參數，保留熱流關鍵數據)
-        cols_to_hide = ["Qty", "Power(W)", "Height(mm)", "Pad_L", "Pad_W", "Thick(mm)", "Base_L", "Base_W", "T_hsk_eff"]
-        # 確保只移除存在的欄位，建立一個新的顯示用 DataFrame
-        df_display = final_df.drop(columns=[c for c in cols_to_hide if c in final_df.columns])
+        # === [v4.24] 超溫警告 Banner ===
+        if 'Tj_Margin' in final_df.columns:
+            overheat_df = final_df[final_df['Tj_Margin'] < 0]
+            if not overheat_df.empty:
+                warn_lines = []
+                for _, oh_row in overheat_df.iterrows():
+                    warn_lines.append(
+                        f"**{oh_row['Component']}** 超溫 **{abs(oh_row['Tj_Margin']):.1f}°C** "
+                        f"(Tj={oh_row['Tj']:.1f}°C, Limit={oh_row['Limit(C)']:.0f}°C)"
+                    )
+                st.error("🔥 **超溫警告！以下元件已超過溫度上限：**\n\n" + "\n\n".join(warn_lines))
 
-        # [Move Column] 將 Allowed_dT 移至最後
-        if 'Allowed_dT' in df_display.columns:
-            cols = [c for c in df_display.columns if c != 'Allowed_dT'] + ['Allowed_dT']
-            df_display = df_display[cols]
+        # === [v4.24] 風險排名 Top 3 ===
+        valid_for_rank = final_df[final_df['Total_W'] > 0].nsmallest(3, 'Allowed_dT')
+        if not valid_for_rank.empty:
+            rank_cols = st.columns(len(valid_for_rank))
+            rank_emojis = ["🥇", "🥈", "🥉"]
+            for i, (_, rk_row) in enumerate(valid_for_rank.iterrows()):
+                rank_cols[i].metric(
+                    label=f"{rank_emojis[i]} 風險 #{i+1}  {rk_row['Component']}",
+                    value=f"{rk_row['Allowed_dT']:.1f} °C",
+                    delta=f"Tj_Margin: {rk_row['Tj_Margin']:.1f}°C" if 'Tj_Margin' in rk_row.index else None,
+                    delta_color="off"
+                )
 
+        # === [v4.24] Scale Bar (移至表格上方) ===
         min_val = final_df['Allowed_dT'].min()
         max_val = final_df['Allowed_dT'].max()
         mid_val = (min_val + max_val) / 2
-        
-        # [修改] 使用 df_display 進行樣式設定
-        # 僅保留 Allowed_dT 的色階 (移除 Tc, Tj, Tj_Margin 的色階)
-        gradient_cols = [c for c in ['Allowed_dT'] if c in df_display.columns]
-        
-        styled_df = df_display.style.background_gradient(
-            subset=gradient_cols, 
-            cmap='RdYlGn'
-        ).format({
-            "R_int": "{:.4f}", "R_TIM": "{:.4f}", 
-            "Allowed_dT": "{:.2f}", "Tc": "{:.1f}", "Tj": "{:.1f}", "Tj_Margin": "{:.1f}"
-        })
-        
+        st.markdown(f"""
+        <div style="display: flex; flex-direction: column; align-items: center; margin: 10px 0 5px 0;">
+            <div style="font-weight: bold; margin-bottom: 5px; color: #555; font-size: 0.9rem;">允許溫升 (Allowed dT) 色階參考</div>
+            <div style="width: 100%; max-width: 600px; height: 12px; background: linear-gradient(to right, #d73027, #fee08b, #1a9850); border-radius: 6px; border: 1px solid #ddd;"></div>
+            <div style="display: flex; justify-content: space-between; width: 100%; max-width: 600px; color: #555; font-weight: bold; font-size: 0.8rem; margin-top: 4px;">
+                <span>{min_val:.0f}°C (Risk)</span>
+                <span>{mid_val:.0f}°C</span>
+                <span>{max_val:.0f}°C (Safe)</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # === [v4.24] 欄位選擇器 (所有欄位可選) ===
+        col_label_map = {
+            "Allowed_dT": "允許溫升", "Tj_Margin": "Tj 裕度", "Tj": "Tj", "Tc": "Tc",
+            "Total_W": "總功耗", "Loc_Amb": "局部環溫", "Drop": "內部溫降",
+            "R_jc": "Rjc", "R_int": "基板熱阻", "R_TIM": "介面熱阻", "Limit(C)": "限溫",
+            "Qty": "數量", "Power(W)": "單顆功耗", "Height(mm)": "高度",
+            "Pad_L": "Pad長", "Pad_W": "Pad寬", "Thick(mm)": "板厚",
+            "Board_Type": "導熱方式", "TIM_Type": "介面材料",
+            "Base_L": "Base長", "Base_W": "Base寬", "T_hsk_eff": "散熱器有效溫度",
+        }
+        all_optional_cols = [c for c in final_df.columns if c != 'Component']
+        default_cols = ["Allowed_dT", "Tj_Margin", "Tj", "Tc", "Total_W", "Loc_Amb", "Drop",
+                        "R_jc", "R_int", "R_TIM", "Limit(C)"]
+        default_cols = [c for c in default_cols if c in all_optional_cols]
+
+        with st.expander("⚙️ 自訂顯示欄位", expanded=False):
+            selected_cols = st.multiselect(
+                "選擇要顯示的欄位（Component 固定顯示）",
+                options=all_optional_cols,
+                default=default_cols,
+                format_func=lambda x: f"{col_label_map.get(x, x)} ({x})",
+                key="tab2_col_selector"
+            )
+
+        # === [v4.24] 組裝顯示 DataFrame：Component → Allowed_dT → 其餘 ===
+        display_order = ["Component"]
+        if "Allowed_dT" in selected_cols:
+            display_order.append("Allowed_dT")
+        for c in selected_cols:
+            if c not in display_order:
+                display_order.append(c)
+        df_display = final_df[display_order]
+
+        # === 樣式設定 ===
+        gradient_subsets = []
+        if "Allowed_dT" in df_display.columns:
+            gradient_subsets.append("Allowed_dT")
+
+        styled_df = df_display.style
+        if gradient_subsets:
+            styled_df = styled_df.background_gradient(subset=gradient_subsets, cmap='RdYlGn')
+        if "Tj_Margin" in df_display.columns:
+            styled_df = styled_df.background_gradient(subset=["Tj_Margin"], cmap='RdYlGn')
+
+        # 只格式化實際存在的欄位
+        fmt_map = {
+            "R_int": "{:.4f}", "R_TIM": "{:.4f}", "Allowed_dT": "{:.2f}",
+            "Tc": "{:.1f}", "Tj": "{:.1f}", "Tj_Margin": "{:.1f}",
+            "Loc_Amb": "{:.1f}", "Drop": "{:.1f}", "Total_W": "{:.1f}",
+            "Power(W)": "{:.1f}", "Height(mm)": "{:.1f}", "Pad_L": "{:.1f}",
+            "Pad_W": "{:.1f}", "Thick(mm)": "{:.2f}", "Base_L": "{:.1f}",
+            "Base_W": "{:.1f}", "T_hsk_eff": "{:.1f}", "R_jc": "{:.2f}", "Limit(C)": "{:.1f}",
+        }
+        active_fmt = {k: v for k, v in fmt_map.items() if k in df_display.columns}
+        styled_df = styled_df.format(active_fmt)
+
         # [修正 v3.66] 還原完整的 Help 說明 (包含物理公式)
         # 這裡保留完整的 config 沒關係，Streamlit 會自動忽略不存在的欄位設定
         st.dataframe(
-            styled_df, 
+            styled_df,
             column_config={
                 "Component": st.column_config.TextColumn("元件名稱", help="元件型號或代號 (如 PA, FPGA)", width="medium"),
                 "Qty": st.column_config.NumberColumn("數量", help="該元件的使用數量"),
@@ -1513,7 +1591,7 @@ with tab_data:
                 "Board_Type": st.column_config.Column("元件導熱方式", help="元件導熱到HSK表面的方式(thermal via或銅塊)"),
                 "TIM_Type": st.column_config.Column("介面材料", help="元件或銅塊底部與散熱器之間的TIM"),
                 "R_jc": st.column_config.NumberColumn("Rjc", help="結點到殼的內部熱阻", format="%.2f"),
-                "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.2f"),
+                "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.1f"),
                 "Base_L": st.column_config.NumberColumn("Base 長 (mm)", help="熱量擴散後的底部有效長度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
                 "Base_W": st.column_config.NumberColumn("Base 寬 (mm)", help="熱量擴散後的底部有效寬度。Final PA 為銅塊設定值；一般元件為 Pad + 板厚。", format="%.1f"),
                 "Loc_Amb": st.column_config.NumberColumn("局部環溫 (°C)", help="該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)。", format="%.1f"),
@@ -1525,30 +1603,17 @@ with tab_data:
                 "Tc": st.column_config.NumberColumn("元件 Tc (°C)", help="元件外殼溫度。公式：T_hsk_eff + Q×(Rint+Rtim)，其中 T_hsk_eff 已含高度梯度修正。", format="%.1f"),
                 "Tj": st.column_config.NumberColumn("元件 Tj (°C)", help="元件晶片接面溫度。公式：Tc + Q×Rjc。數值越接近 Limit 代表越危險。", format="%.1f"),
                 "Tj_Margin": st.column_config.NumberColumn("Tj 裕度 (°C)", help="距溫度上限的裕度。公式：Limit - Tj。負值代表超溫！", format="%.1f"),
+                "T_hsk_eff": st.column_config.NumberColumn("散熱器有效溫度 (°C)", help="該元件高度處的散熱器有效溫度，已含高度梯度修正。", format="%.1f"),
             },
-            use_container_width=True, 
+            use_container_width=True,
             hide_index=True
         )
-        
-        # 只有當 'Allowed_dT' 有顯示時，才顯示下方的 Scale Bar 與說明
-        if 'Allowed_dT' in df_display.columns:
-            st.markdown(f"""
-            <div style="display: flex; flex-direction: column; align-items: center; margin: 15px 0;">
-                <div style="font-weight: bold; margin-bottom: 5px; color: #555; font-size: 0.9rem;">允許溫升 (Allowed dT) 色階參考</div>
-                <div style="width: 100%; max-width: 600px; height: 12px; background: linear-gradient(to right, #d73027, #fee08b, #1a9850); border-radius: 6px; border: 1px solid #ddd;"></div>
-                <div style="display: flex; justify-content: space-between; width: 100%; max-width: 600px; color: #555; font-weight: bold; font-size: 0.8rem; margin-top: 4px;">
-                    <span>{min_val:.0f}°C (Risk)</span>
-                    <span>{mid_val:.0f}°C</span>
-                    <span>{max_val:.0f}°C (Safe)</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.info("""
-            ℹ️ **名詞解釋 - 允許溫升 (Allowed dT)** 此數值代表 **「散熱器可用的溫升裕度」** (Limit - Local Ambient - Drop)。
-            * 🟩 **綠色 (數值高)**：代表散熱裕度充足，該元件不易過熱。
-            * 🟥 **紅色 (數值低)**：代表散熱裕度極低，該元件是系統的熱瓶頸。
-            """)
+
+        st.info("""
+        ℹ️ **名詞解釋 - 允許溫升 (Allowed dT)** 此數值代表 **「散熱器可用的溫升裕度」** (Limit - Local Ambient - Drop)。
+        * 🟩 **綠色 (數值高)**：代表散熱裕度充足，該元件不易過熱。
+        * 🟥 **紅色 (數值低)**：代表散熱裕度極低，該元件是系統的熱瓶頸。
+        """)
 
 # --- Tab 3: 視覺化報告 ---
 with tab_viz:
