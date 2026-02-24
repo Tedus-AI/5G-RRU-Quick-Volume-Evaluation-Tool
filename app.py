@@ -26,6 +26,15 @@ from firebase_admin import credentials, firestore
 #   6. [C] 視角預設按鈕：等角/頂視/前視/側視一鍵切換。
 #   7. [C] 圖層顯示開關：機殼/PCB/元件熱點/鰭片/尺寸標注可獨立開關。
 #
+# v4.33 (2026-02-24) - Tab5 Sensitivity Analysis Full Upgrade
+#   [A1] 變數選擇器：Gap / T_amb / Fin_t / Power Scale 四選一。
+#        - Fin_t 主 Y 軸為鰭片數（階梯線，揭示 floor() 跳階行為）
+#        - T_amb / Power Scale 主 Y 軸為 Bottleneck Tj_Margin + 超溫紅線
+#   [A2] compute_key_results 新增 Bottleneck_Tj_Margin / Fin_Count 回傳。
+#        計算鏈：Min_dT_Allowed → T_hsk_base → Tc/Tj → T_ref → Tj_Margin。
+#   [A3] Tornado Chart 模式：對全部四個關鍵參數各自 ±% 雙點計算，
+#        橫向條狀圖依 swing 排序，支援「體積」「Tj_Margin」「兩者並排」三種顯示。
+#
 # v4.32 (2026-02-24) - Dual Custom PAD Support
 #   1. 側邊欄「材料參數」新增第二組自訂 PAD（Pad 2）的 K 值與厚度輸入。
 #   2. Tab 1 介面材料下拉選單新增「Pad2」選項，可分別選擇 Pad / Pad2 規格。
@@ -1391,16 +1400,38 @@ def compute_key_results(global_params, df_components):
     
     cavity_weight_kg = filter_weight_kg + shield_weight_kg + shielding_weight_kg + pcb_weight_kg
     total_weight_kg = hs_weight_kg + cavity_weight_kg
-    
+
+    # === Bottleneck Tj_Margin 計算 (供敏感度分析使用) ===
+    Bottleneck_Tj_Margin = 0.0
+    if not df.empty and Min_dT_Allowed < 50 and 'R_int' in df.columns:
+        _slope = p.get('Slope', 0.03)
+        _T_hsk_base = p['T_amb'] + Min_dT_Allowed / p['Margin']
+        df['_T_hsk_eff'] = _T_hsk_base + df['Height(mm)'] * _slope
+        df['_Tc'] = df['_T_hsk_eff'] + df['Power(W)'] * (df['R_int'] + df['R_TIM'])
+        df['_Tj'] = df['_Tc'] + df['Power(W)'] * df['R_jc']
+        _tc_lim = df['Component'].str.contains('DDR', case=False, na=False)
+        if '_src' in df.columns:
+            _tc_lim = _tc_lim | (df['_src'] == 'PWR')
+        df['_T_ref'] = df['_Tj']
+        df.loc[_tc_lim, '_T_ref'] = df.loc[_tc_lim, '_Tc']
+        df['_Tj_Margin'] = df['Limit(C)'] - df['_T_ref']
+        _valid_tj = df[df['Total_W'] > 0]
+        if not _valid_tj.empty:
+            _bt_idx = _valid_tj['Allowed_dT'].idxmin()
+            if not pd.isna(_bt_idx):
+                Bottleneck_Tj_Margin = round(_valid_tj.loc[_bt_idx, '_Tj_Margin'], 1)
+
     return {
-        "Total_Power": Total_Power,  # 移除 round
-        "Min_dT_Allowed": Min_dT_Allowed,  # 移除 round
+        "Total_Power": Total_Power,
+        "Min_dT_Allowed": Min_dT_Allowed,
         "Bottleneck_Name": Bottleneck_Name,
-        "Area_req": Area_req,  # 移除 round (若需要顯示 round 可在 Tab 5 處理)
-        "Fin_Height": Fin_Height,  # 【關鍵】移除 round，讓 Fin_Height 保持精確值，與 Tab 3 完全一致
-        "Volume_L": volume_raw,  # 已使用未 round 的 volume_raw
-        "total_weight_kg": total_weight_kg,  # 移除 round
-        "h_value": h_value  # 移除 round
+        "Area_req": Area_req,
+        "Fin_Height": Fin_Height,
+        "Volume_L": volume_raw,
+        "total_weight_kg": total_weight_kg,
+        "h_value": h_value,
+        "Bottleneck_Tj_Margin": Bottleneck_Tj_Margin,
+        "Fin_Count": num_fins_int,
     }
 
 # --- 後台運算 (Refactored) ---
@@ -1999,198 +2030,327 @@ with tab_3d:
         st.markdown("#### Step 4. 執行 AI 生成")
         st.success("""1. 開啟 **Gemini** 對話視窗。\n2. 確認模型設定為 **思考型 (Thinking) + Nano Banana (Imagen 3)**。\n3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。\n4. 貼上提示詞並送出。""")
 
-# --- Tab 5: 敏感度分析 (New) ---
-# [Fix] 這裡不使用 st.tabs()，而是直接使用上方定義的 tab_sensitivity 變數
+# --- Tab 5: 敏感度分析 (v4.33) ---
+# [v4.33] 全面升級：A1 變數選擇器 + A2 Tj_Margin 輸出 + A3 Tornado Chart
 with tab_sensitivity:
     st.subheader("📈 敏感度分析 (Sensitivity Analysis)")
-    
-    # [v4.17] 佈局重構：控制台置頂 + 橫向排列 + 圖表全寬
-    with st.container(border=True):
-        st.markdown("##### ⚙️ 參數設定與執行")
-        
-        # 使用 6 個欄位將控制項平均橫向排列
-        c1, c2, c3, c4, c5, c6 = st.columns(6, gap="medium")
-        
-        with c1:
-            st.caption("1. 分析變數")
-            st.info("**Fin Air Gap**") # 顯示目前鎖定的變數
-            var_name_internal = "Gap"
-            
-        with c2:
-            st.caption("2. 基準值 (mm)")
-            base_val = float(st.session_state.get(var_name_internal, 13.2))
-            st.number_input("Base", value=base_val, disabled=True, label_visibility="collapsed")
-            
-        with c3:
-            st.caption("3. 減少 (-%)")
-            minus_pct = st.number_input("Minus", min_value=0.0, max_value=90.0, value=50.0, step=5.0, label_visibility="collapsed")
-            
-        with c4:
-            st.caption("4. 增加 (+%)")
-            plus_pct = st.number_input("Plus", min_value=0.0, max_value=300.0, value=50.0, step=5.0, label_visibility="collapsed")
-            
-        with c5:
-            st.caption("5. 計算點數")
-            steps = st.slider("Steps", min_value=3, max_value=21, value=7, step=1, label_visibility="collapsed")
-            
-        with c6:
-            st.caption("6. 開始運算")
-            run_analysis = st.button("🚀 執行分析", type="primary", use_container_width=True)
 
-    # 圖表顯示區 (位於下方，佔滿全寬)
-    if run_analysis:
-        st.markdown("---")
-        with st.spinner("正在進行熱流與結構多重迭代運算..."):
-            # 準備數據容器
-            results = []
-            
-            # 計算掃描範圍
-            val_min = base_val * (1 - minus_pct / 100)
-            val_max = base_val * (1 + plus_pct / 100)
-            
-            # 確保 gap 不為 0
-            val_min = max(val_min, 0.5)
-            
-            x_values = np.linspace(val_min, val_max, steps)
-            
-            # 【關鍵修復】強制將最接近基準值的掃描點設為「精確的 base_val」
-            # 這能消除 np.linspace 與 float 運算造成的微小誤差（1e-14 級），
-            # 避免剛好在鰭片數量跳變邊界時，基準點的 Fin Count 與 Tab 3 不一致，
-            # 從而讓基準點的體積、重量、AR 完全對齊 Tab 3 的計算結果。
-            closest_idx = np.argmin(np.abs(x_values - base_val))
-            x_values[closest_idx] = base_val
-            
-            # 取得當前全域參數與元件表
-            base_params = {k: st.session_state[k] for k in DEFAULT_GLOBALS.keys()}
-            base_params['Slope'] = 0.03
-            base_df = st.session_state['df_current'].copy()
+    # 模式切換
+    mode = st.radio(
+        "分析模式",
+        ["🔬 單變數掃描", "🌪️ Tornado Chart (全局敏感度)"],
+        horizontal=True, label_visibility="collapsed"
+    )
+    st.markdown("---")
 
-            # 開始迴圈計算
-            # 【最終強制對齊】先記錄主計算（Tab 3）的體積（已 round 顯示值）
-            main_volume_rounded = round(Volume_L, 2)  # Tab 3 的顯示體積（你的 11.74 L）
-            
-            for i, x in enumerate(x_values):
-                # 複製參數以免汙染
-                p = copy.deepcopy(base_params)
-                d = base_df.copy()
-                
-                # 修改 Gap
-                p[var_name_internal] = x
-                
-                # 呼叫核心計算
-                res = compute_key_results(p, d)
-                
-                # 計算 Aspect Ratio
-                ar = res["Fin_Height"] / x if x > 0 else 0
-                
-                # 正常計算顯示值
-                vol_rounded = round(res["Volume_L"], 2)
-                weight_rounded = round(res["total_weight_kg"], 2)
-                ar_rounded = round(ar, 1)
-                
-                # 【關鍵 hack】如果這是基準點，強制用 Tab 3 的體積值對齊（保證完全一致）
-                if i == closest_idx:
-                    vol_rounded = main_volume_rounded
-                
-                # 收集結果
-                results.append({
-                    "Gap": round(x, 1),
-                    "Volume": vol_rounded,
-                    "Weight": weight_rounded,
-                    "AR": ar_rounded
-                })
-            
-            # 轉為 DataFrame
-            df_res = pd.DataFrame(results)
-            
-            # --- 繪圖 (複雜組合圖：Line + Grouped Bar + Dual Axis) ---
-            fig = go.Figure()
+    # 共用：取得基礎參數與元件表
+    base_params_sa = {k: st.session_state[k] for k in DEFAULT_GLOBALS.keys()}
+    base_params_sa['Slope'] = 0.03
+    base_df_sa = st.session_state['df_current'].copy()
 
-            # Y2 (右軸1): 體積 (Bar)
-            fig.add_trace(go.Bar(
-                x=df_res["Gap"], y=df_res["Volume"],
-                name="體積 (L)",
-                marker_color='rgba(52, 152, 219, 0.7)',
-                yaxis="y2",
-                offsetgroup=1
-            ))
-            
-            # Y3 (右軸2): 重量 (Bar)
-            fig.add_trace(go.Bar(
-                x=df_res["Gap"], y=df_res["Weight"],
-                name="重量 (kg)",
-                marker_color='rgba(46, 204, 113, 0.7)',
-                yaxis="y3",
-                offsetgroup=2
-            ))
+    # 變數定義表
+    VAR_MAP = {
+        "Gap (Fin Air Gap)":       {"key": "Gap",         "unit": "mm", "label": "Fin Air Gap"},
+        "T_amb (環境溫度)":          {"key": "T_amb",       "unit": "°C", "label": "環境溫度"},
+        "Fin_t (鰭片厚度)":          {"key": "Fin_t",       "unit": "mm", "label": "鰭片厚度"},
+        "Power Scale (功耗縮放)":    {"key": "power_scale", "unit": "×",  "label": "功耗縮放係數"},
+    }
 
-            # Y1 (左軸): 流阻比 (Line)
-            fig.add_trace(go.Scatter(
-                x=df_res["Gap"], y=df_res["AR"],
-                name="流阻比 (Aspect Ratio)",
-                mode='lines+markers',
-                line=dict(color='#e74c3c', width=3),
-                marker=dict(size=8, symbol='diamond'),
-                yaxis="y1"
-            ))
+    def _sa_calc(p_dict, d_df, vk, x_val):
+        """單點計算封裝：修改變數後呼叫 compute_key_results"""
+        p = copy.deepcopy(p_dict)
+        d = d_df.copy()
+        if vk == "power_scale":
+            d['Power(W)'] = d['Power(W)'] * x_val
+        else:
+            p[vk] = x_val
+        return compute_key_results(p, d)
 
-            # 版面設定 (三軸)
-            fig.update_layout(
-                title=dict(text=f"<b>Fin Air Gap 敏感度分析 (基準 {base_val:.2f} mm)</b>"),
-                xaxis=dict(title=dict(text="Fin Air Gap (mm)"), domain=[0.05, 0.9]), # 縮減 X 軸給右側 Y 軸留空間
-                
-                # 左軸 (AR)
-                yaxis=dict(
-                    title=dict(text="流阻比 (Aspect Ratio)", font=dict(color="#e74c3c")),
-                    tickfont=dict(color="#e74c3c"),
-                    side="left"
-                ),
-                
-                # 右軸 1 (體積)
-                yaxis2=dict(
-                    title=dict(text="體積 (L)", font=dict(color="#3498db")),
-                    tickfont=dict(color="#3498db"),
-                    anchor="x",
-                    overlaying="y",
-                    side="right"
-                ),
-                
-                # 右軸 2 (重量) - 向右偏移，避免重疊
-                yaxis3=dict(
-                    title=dict(text="重量 (kg)", font=dict(color="#2ecc71")),
-                    tickfont=dict(color="#2ecc71"),
-                    anchor="free",
-                    overlaying="y",
-                    side="right",
-                    position=0.95 # 偏移位置
-                ),
-                
-                legend=dict(x=0.5, y=1.1, orientation="h", xanchor="center"),
-                height=650, # [v4.17] 增加高度，讓全寬圖表更舒適
-                margin=dict(l=60, r=80, t=80, b=50),
-                hovermode="x unified",
-                barmode='group' # 讓 Bar 並排
-            )
-            
-            # 標示基準線
-            fig.add_vline(x=base_val, line_width=1, line_dash="dash", line_color="gray", annotation_text="Current")
+    # =====================================================
+    # 模式 A：單變數掃描
+    # =====================================================
+    if mode == "🔬 單變數掃描":
+        with st.container(border=True):
+            st.markdown("##### ⚙️ 參數設定與執行")
+            c1, c2, c3, c4, c5, c6 = st.columns(6, gap="medium")
 
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # 顯示數據表
-            with st.expander("查看詳細數據"):
-                df_show = df_res.copy()
-                df_show.columns = ["Gap (mm)", "體積 (L)", "重量 (kg)", "流阻比 (AR)"]
-                st.dataframe(df_show.style.background_gradient(cmap="Blues"), use_container_width=True)
+            with c1:
+                st.caption("1. 分析變數")
+                var_choice = st.selectbox("var", list(VAR_MAP.keys()), label_visibility="collapsed")
 
+            var_info = VAR_MAP[var_choice]
+            var_key  = var_info["key"]
+            var_unit = var_info["unit"]
+
+            if var_key == "power_scale":
+                base_val = 1.0
+            else:
+                base_val = float(st.session_state.get(var_key, DEFAULT_GLOBALS.get(var_key, 1.0)))
+
+            with c2:
+                st.caption(f"2. 基準值 ({var_unit})")
+                st.number_input("Base", value=base_val, disabled=True, label_visibility="collapsed")
+
+            with c3:
+                st.caption("3. 減少 (-%)")
+                minus_pct = st.number_input("Minus", min_value=0.0, max_value=90.0, value=50.0, step=5.0, label_visibility="collapsed")
+
+            with c4:
+                st.caption("4. 增加 (+%)")
+                plus_pct = st.number_input("Plus", min_value=0.0, max_value=300.0, value=50.0, step=5.0, label_visibility="collapsed")
+
+            with c5:
+                st.caption("5. 計算點數")
+                steps = st.slider("Steps", min_value=3, max_value=21, value=9, step=2, label_visibility="collapsed")
+
+            with c6:
+                st.caption("6. 開始運算")
+                run_analysis = st.button("🚀 執行分析", type="primary", use_container_width=True)
+
+        if run_analysis:
+            st.markdown("---")
+            with st.spinner("正在進行熱流與結構多重迭代運算..."):
+                val_min = base_val * (1 - minus_pct / 100)
+                val_max = base_val * (1 + plus_pct / 100)
+                if var_key == "Gap":         val_min = max(val_min, 0.5)
+                elif var_key == "Fin_t":     val_min = max(val_min, 0.3)
+                elif var_key == "power_scale": val_min = max(val_min, 0.1)
+
+                x_values = np.linspace(val_min, val_max, steps)
+                closest_idx = np.argmin(np.abs(x_values - base_val))
+                x_values[closest_idx] = base_val
+                main_volume_rounded = round(Volume_L, 2)
+
+                results = []
+                for i, x in enumerate(x_values):
+                    res = _sa_calc(base_params_sa, base_df_sa, var_key, x)
+                    gap_now = base_params_sa["Gap"] if var_key != "Gap" else x
+                    ar = res["Fin_Height"] / gap_now if gap_now > 0 else 0
+                    vol_r = round(res["Volume_L"], 2)
+                    if i == closest_idx:
+                        vol_r = main_volume_rounded
+                    results.append({
+                        "x":         round(x, 4),
+                        "Volume":    vol_r,
+                        "Weight":    round(res["total_weight_kg"], 2),
+                        "AR":        round(ar, 1),
+                        "Fin_Count": res.get("Fin_Count", 0),
+                        "Tj_Margin": res.get("Bottleneck_Tj_Margin", 0),
+                    })
+
+                df_res = pd.DataFrame(results)
+                fig = go.Figure()
+
+                # 右軸 Bar：體積 + 重量
+                fig.add_trace(go.Bar(
+                    x=df_res["x"], y=df_res["Volume"], name="體積 (L)",
+                    marker_color='rgba(52,152,219,0.7)', yaxis="y2", offsetgroup=1
+                ))
+                fig.add_trace(go.Bar(
+                    x=df_res["x"], y=df_res["Weight"], name="重量 (kg)",
+                    marker_color='rgba(46,204,113,0.7)', yaxis="y3", offsetgroup=2
+                ))
+
+                # 左軸 Line：依變數決定
+                if var_key == "Gap":
+                    fig.add_trace(go.Scatter(
+                        x=df_res["x"], y=df_res["AR"], name="流阻比 (AR)",
+                        mode='lines+markers', line=dict(color='#e74c3c', width=3),
+                        marker=dict(size=8, symbol='diamond'), yaxis="y1"
+                    ))
+                    y1_title, y1_color = "流阻比 (Aspect Ratio)", "#e74c3c"
+
+                elif var_key == "Fin_t":
+                    fig.add_trace(go.Scatter(
+                        x=df_res["x"], y=df_res["Fin_Count"], name="鰭片數 (Pcs)",
+                        mode='lines+markers', line=dict(color='#9b59b6', width=3, shape='hv'),
+                        marker=dict(size=8, symbol='square'), yaxis="y1"
+                    ))
+                    y1_title, y1_color = "鰭片數 (Pcs)", "#9b59b6"
+
+                else:  # T_amb 或 Power Scale → 主 Y = Tj_Margin
+                    fig.add_trace(go.Scatter(
+                        x=df_res["x"], y=df_res["Tj_Margin"], name="Bottleneck Tj_Margin (°C)",
+                        mode='lines+markers', line=dict(color='#e67e22', width=3),
+                        marker=dict(size=8, symbol='circle'), yaxis="y1"
+                    ))
+                    fig.add_hline(
+                        y=0, line_width=2, line_dash="dot", line_color="red",
+                        annotation_text="Tj_Margin = 0 (超溫紅線)",
+                        annotation_position="bottom right"
+                    )
+                    y1_title, y1_color = "Bottleneck Tj_Margin (°C)", "#e67e22"
+
+                fig.update_layout(
+                    title=dict(text=f"<b>{var_info['label']} 敏感度分析 (基準 {base_val:.3g} {var_unit})</b>"),
+                    xaxis=dict(title=dict(text=f"{var_info['label']} ({var_unit})"), domain=[0.05, 0.9]),
+                    yaxis=dict(title=dict(text=y1_title, font=dict(color=y1_color)),
+                               tickfont=dict(color=y1_color), side="left"),
+                    yaxis2=dict(title=dict(text="體積 (L)", font=dict(color="#3498db")),
+                                tickfont=dict(color="#3498db"), anchor="x", overlaying="y", side="right"),
+                    yaxis3=dict(title=dict(text="重量 (kg)", font=dict(color="#2ecc71")),
+                                tickfont=dict(color="#2ecc71"), anchor="free",
+                                overlaying="y", side="right", position=0.95),
+                    legend=dict(x=0.5, y=1.1, orientation="h", xanchor="center"),
+                    height=650, margin=dict(l=60, r=80, t=80, b=50),
+                    hovermode="x unified", barmode='group'
+                )
+                fig.add_vline(x=base_val, line_width=1, line_dash="dash",
+                              line_color="gray", annotation_text="Current")
+                st.plotly_chart(fig, use_container_width=True)
+
+                with st.expander("查看詳細數據"):
+                    col_rename = {
+                        "x": f"{var_info['label']} ({var_unit})",
+                        "Volume": "體積 (L)", "Weight": "重量 (kg)",
+                        "AR": "流阻比", "Fin_Count": "鰭片數",
+                        "Tj_Margin": "Bottleneck Tj_Margin (°C)"
+                    }
+                    st.dataframe(
+                        df_res.rename(columns=col_rename).style.background_gradient(cmap="Blues"),
+                        use_container_width=True
+                    )
+        else:
+            st.markdown("""
+            <div style="text-align: center; color: #aaa; padding: 60px; border: 2px dashed #eee; border-radius: 10px; background-color: #fcfcfc; margin-top: 20px;">
+                <h3 style="margin-bottom: 10px;">👈 請設定參數並點擊上方「執行分析」</h3>
+                <p>系統將自動掃描所選參數對 <b>流阻比 / 鰭片數 / Tj_Margin、體積與重量</b> 的影響趨勢。</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # =====================================================
+    # 模式 B：Tornado Chart
+    # =====================================================
     else:
-        # 尚未執行時的佔位畫面
-        st.markdown("""
-        <div style="text-align: center; color: #aaa; padding: 60px; border: 2px dashed #eee; border-radius: 10px; background-color: #fcfcfc; margin-top: 20px;">
-            <h3 style="margin-bottom: 10px;">👈 請設定參數並點擊上方「執行分析」</h3>
-            <p>系統將自動掃描參數變化對 <b>流阻比、體積與重量</b> 的影響趨勢。</p>
-        </div>
-        """, unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown("##### ⚙️ Tornado Chart 設定")
+            tc1, tc2, tc3 = st.columns([2, 2, 2])
+            with tc1:
+                tornado_pct = st.number_input(
+                    "敏感度範圍 (±%)", min_value=5.0, max_value=50.0, value=20.0, step=5.0,
+                    help="對每個參數，各自在 base ± 此百分比計算一次，比較 swing 大小"
+                )
+            with tc2:
+                tornado_metric = st.selectbox(
+                    "分析指標", ["兩者並排", "體積 (L)", "Bottleneck Tj_Margin (°C)"],
+                    help="選擇要比較敏感度的輸出指標"
+                )
+            with tc3:
+                run_tornado = st.button("🌪️ 執行 Tornado 分析", type="primary", use_container_width=True)
+
+        if run_tornado:
+            st.markdown("---")
+            with st.spinner("正在對所有關鍵參數進行雙點計算..."):
+                tornado_vars = [
+                    {"choice": "Gap (Fin Air Gap)",    "key": "Gap",         "default": DEFAULT_GLOBALS["Gap"]},
+                    {"choice": "T_amb (環境溫度)",      "key": "T_amb",       "default": DEFAULT_GLOBALS["T_amb"]},
+                    {"choice": "Fin_t (鰭片厚度)",      "key": "Fin_t",       "default": DEFAULT_GLOBALS["Fin_t"]},
+                    {"choice": "Power Scale (功耗縮放)","key": "power_scale", "default": 1.0},
+                ]
+
+                tornado_rows = []
+                for tv in tornado_vars:
+                    vk = tv["key"]
+                    bv = 1.0 if vk == "power_scale" else float(st.session_state.get(vk, tv["default"]))
+                    v_low  = max(bv * (1 - tornado_pct / 100), 0.1)
+                    v_high = bv * (1 + tornado_pct / 100)
+
+                    r_low  = _sa_calc(base_params_sa, base_df_sa, vk, v_low)
+                    r_base = _sa_calc(base_params_sa, base_df_sa, vk, bv)
+                    r_high = _sa_calc(base_params_sa, base_df_sa, vk, v_high)
+
+                    tornado_rows.append({
+                        "label":    VAR_MAP[tv["choice"]]["label"],
+                        "Vol_low":  round(r_low["Volume_L"], 2),
+                        "Vol_base": round(r_base["Volume_L"], 2),
+                        "Vol_high": round(r_high["Volume_L"], 2),
+                        "Tj_low":   r_low.get("Bottleneck_Tj_Margin", 0),
+                        "Tj_base":  r_base.get("Bottleneck_Tj_Margin", 0),
+                        "Tj_high":  r_high.get("Bottleneck_Tj_Margin", 0),
+                    })
+
+                df_tornado = pd.DataFrame(tornado_rows)
+
+                def _make_tornado(df, k_low, k_high, k_base, x_title, c_dec, c_inc):
+                    df = df.copy()
+                    df["swing"] = (df[k_high] - df[k_low]).abs()
+                    df = df.sort_values("swing", ascending=True)
+                    fig_t = go.Figure()
+                    base_mean = df[k_base].mean()
+                    first_label = df["label"].iloc[0]
+                    for _, row in df.iterrows():
+                        is_first = (row["label"] == first_label)
+                        lo, hi, bs = row[k_low], row[k_high], row[k_base]
+                        fig_t.add_trace(go.Bar(
+                            y=[row["label"]], x=[lo - bs], base=[bs], orientation='h',
+                            marker_color=c_dec, name=f"-{tornado_pct:.0f}%", showlegend=is_first,
+                            hovertemplate=f"<b>{row['label']}</b><br>-{tornado_pct:.0f}%: {lo:.2f}<extra></extra>"
+                        ))
+                        fig_t.add_trace(go.Bar(
+                            y=[row["label"]], x=[hi - bs], base=[bs], orientation='h',
+                            marker_color=c_inc, name=f"+{tornado_pct:.0f}%", showlegend=is_first,
+                            hovertemplate=f"<b>{row['label']}</b><br>+{tornado_pct:.0f}%: {hi:.2f}<extra></extra>"
+                        ))
+                    fig_t.add_vline(x=base_mean, line_width=2, line_dash="dash", line_color="gray",
+                                    annotation_text="Base")
+                    fig_t.update_layout(
+                        barmode='overlay',
+                        xaxis=dict(title=x_title),
+                        legend=dict(x=0.7, y=0.02),
+                        height=360, margin=dict(l=20, r=20, t=30, b=40)
+                    )
+                    return fig_t
+
+                if tornado_metric in ["兩者並排", "體積 (L)"]:
+                    if tornado_metric == "兩者並排":
+                        col_a, col_b = st.columns(2)
+                        ctx_vol = col_a
+                    else:
+                        ctx_vol = st.container()
+                    with ctx_vol:
+                        st.markdown("**體積敏感度 (L)**")
+                        st.plotly_chart(_make_tornado(
+                            df_tornado, "Vol_low", "Vol_high", "Vol_base", "體積 (L)",
+                            "rgba(231,76,60,0.7)", "rgba(52,152,219,0.7)"
+                        ), use_container_width=True)
+
+                if tornado_metric in ["兩者並排", "Bottleneck Tj_Margin (°C)"]:
+                    if tornado_metric == "兩者並排":
+                        ctx_tj = col_b
+                    else:
+                        ctx_tj = st.container()
+                    with ctx_tj:
+                        st.markdown("**Tj_Margin 敏感度 (°C)**")
+                        st.plotly_chart(_make_tornado(
+                            df_tornado, "Tj_low", "Tj_high", "Tj_base", "Bottleneck Tj_Margin (°C)",
+                            "rgba(231,76,60,0.7)", "rgba(46,204,113,0.7)"
+                        ), use_container_width=True)
+
+                with st.expander("查看 Tornado 詳細數據"):
+                    df_show_t = df_tornado[["label", "Vol_low", "Vol_base", "Vol_high",
+                                            "Tj_low", "Tj_base", "Tj_high"]].copy()
+                    pct_str = f"{tornado_pct:.0f}%"
+                    df_show_t.columns = [
+                        "參數",
+                        f"體積 -{pct_str}", "體積 Base", f"體積 +{pct_str}",
+                        f"Tj_Margin -{pct_str}", "Tj_Margin Base", f"Tj_Margin +{pct_str}"
+                    ]
+                    tj_cols  = [c for c in df_show_t.columns if "Tj" in c]
+                    vol_cols = [c for c in df_show_t.columns if "體積" in c]
+                    st.dataframe(
+                        df_show_t.style
+                            .background_gradient(cmap="RdYlGn", subset=tj_cols)
+                            .background_gradient(cmap="Blues_r", subset=vol_cols),
+                        use_container_width=True
+                    )
+        else:
+            st.markdown("""
+            <div style="text-align: center; color: #aaa; padding: 60px; border: 2px dashed #eee; border-radius: 10px; background-color: #fcfcfc; margin-top: 20px;">
+                <h3 style="margin-bottom: 10px;">👈 請設定敏感度範圍並點擊「執行 Tornado 分析」</h3>
+                <p>系統將對 <b>Gap / T_amb / Fin_t / Power Scale</b> 四個參數同時進行 ±% 掃描，<br>
+                以 Tornado Chart 呈現各參數對 <b>體積</b> 與 <b>Tj_Margin</b> 的影響力排名。</p>
+            </div>
+            """, unsafe_allow_html=True)
 
 # --- [Project I/O - Save Logic] 移到底部執行 ---
 # [Critical Fix] 確保 placeholder 名稱與頂部定義一致 (project_io_save_placeholder)
