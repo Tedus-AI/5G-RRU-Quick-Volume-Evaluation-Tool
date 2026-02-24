@@ -12,11 +12,17 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 # ==============================================================================
-# 版本：v4.27 (Tab3 Visual Revamp)
+# 版本：v4.28 (Tc/Tj Label Fix)
 # 日期：2026-02-24
 # 狀態：正式發布版 (Production Ready)
 #
 # [版本歷程]
+# v4.28 (2026-02-24) - Tc/Tj Label Fix
+#   1. 新增 _src 欄位（RF/Digital/PWR）追蹤元件來源，無需依賴元件名稱。
+#   2. PWR 類 + DDR 類元件限溫為 Tc 規格，T_ref / Tj_Margin 改用 Tc 計算（更正確）。
+#   3. Tab 3 進度條圖改為「溫度裕度總覽」，動態顯示 Tc 或 Tj 標籤。
+#   4. 修正 Tab 3 標題：「尺寸與體積估算」→「尺寸、體積、重量估算」。
+#
 # v4.27 (2026-02-24) - Tab3 Visual Revamp
 #   1. Tab 3：新增「Tj 危險度進度條圖」，橫向顯示每個元件 Tj vs Limit，RdYlGn 配色。
 #   2. Tab 3：Allowed_dT 柱狀圖改為 Tj_Margin 柱狀圖，跨部門更直覺。
@@ -47,7 +53,7 @@ from firebase_admin import credentials, firestore
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.27 (Tab3 Visual Revamp)"
+APP_VERSION = "v4.28 (Tc/Tj Label Fix)"
 UPDATE_DATE = "2026-02-24"
 
 # === APP 設定 ===
@@ -1176,7 +1182,10 @@ with tab_input:
                         st.session_state['pwr_confirm_delete'] = None
                         st.rerun()
 
-    # 合併三類 → 供後續所有計算使用
+    # 合併三類 → 供後續所有計算使用（加入 _src 標記以辨別元件來源）
+    df_rf_edited['_src'] = 'RF'
+    df_digital_edited['_src'] = 'Digital'
+    df_pwr_edited['_src'] = 'PWR'
     edited_df = pd.concat([df_rf_edited, df_digital_edited, df_pwr_edited], ignore_index=True)
     st.session_state['df_current'] = edited_df
 
@@ -1413,7 +1422,15 @@ if not final_df.empty:
     final_df['T_hsk_eff'] = T_hsk_base + final_df['Height(mm)'] * Slope
     final_df['Tc'] = final_df['T_hsk_eff'] + final_df['Power(W)'] * (final_df['R_int'] + final_df['R_TIM'])
     final_df['Tj'] = final_df['Tc'] + final_df['Power(W)'] * final_df['R_jc']
-    final_df['Tj_Margin'] = final_df['Limit(C)'] - final_df['Tj']
+
+    # Tc 限溫元件：PWR 類 + 名稱含 DDR 的 Digital 類（限溫規格指 Tc，非 Tj）
+    tc_limited = (final_df.get('_src', '') == 'PWR') | \
+                 (final_df['Component'].str.contains('DDR', case=False, na=False))
+    final_df['T_ref'] = final_df['Tj']
+    final_df.loc[tc_limited, 'T_ref'] = final_df.loc[tc_limited, 'Tc']
+    final_df['Temp_Label'] = 'Tj'
+    final_df.loc[tc_limited, 'Temp_Label'] = 'Tc'
+    final_df['Tj_Margin'] = final_df['Limit(C)'] - final_df['T_ref']
 
     # [Update] 更新 valid_rows 以包含 Tj/Tc/Tj_Margin 欄位（供 Tab 3 圖表使用）
     valid_rows = final_df[final_df['Total_W'] > 0].copy()
@@ -1684,10 +1701,12 @@ with tab_viz:
     st.markdown("<br>", unsafe_allow_html=True)
 
     if not valid_rows.empty and 'Tj_Margin' in valid_rows.columns:
-        # === [1] Tj 危險度進度條圖 (Tj Risk Overview) ===
+        # === [1] 溫度裕度進度條圖 (Temperature Margin Overview) ===
         tj_sorted = valid_rows.sort_values(by='Tj_Margin', ascending=False)
         tj_colors = ['#e74c3c' if m < 0 else '#f39c12' if m < 10 else '#f1c40f' if m < 20 else '#2ecc71'
                      for m in tj_sorted['Tj_Margin']]
+        t_ref_col = 'T_ref' if 'T_ref' in tj_sorted.columns else 'Tj'
+        label_col = 'Temp_Label' if 'Temp_Label' in tj_sorted.columns else None
 
         fig_tj = go.Figure()
         # 背景條：Limit
@@ -1696,18 +1715,21 @@ with tab_viz:
             orientation='h', marker_color='#E8E8E8', name='Limit',
             hovertemplate='Limit: %{x}°C<extra></extra>'
         ))
-        # 前景條：Tj
+        # 前景條：T_ref (Tj 或 Tc，依元件類型)
+        bar_texts = []
+        for _, r in tj_sorted.iterrows():
+            lbl = r[label_col] if label_col else 'Tj'
+            bar_texts.append(f"{lbl}: {r[t_ref_col]:.1f}°C / Limit: {r['Limit(C)']:.0f}°C  (Margin: {r['Tj_Margin']:.1f}°C)")
         fig_tj.add_trace(go.Bar(
-            y=tj_sorted['Component'], x=tj_sorted['Tj'],
-            orientation='h', marker_color=tj_colors, name='Tj',
-            text=[f"Tj: {tj:.1f}°C / Limit: {lim:.0f}°C  (Margin: {mar:.1f}°C)"
-                  for tj, lim, mar in zip(tj_sorted['Tj'], tj_sorted['Limit(C)'], tj_sorted['Tj_Margin'])],
+            y=tj_sorted['Component'], x=tj_sorted[t_ref_col],
+            orientation='h', marker_color=tj_colors, name='T_ref',
+            text=bar_texts,
             textposition='outside',
-            hovertemplate='Tj: %{x:.1f}°C<extra></extra>'
+            hovertemplate='%{text}<extra></extra>'
         ))
         fig_tj.update_layout(
             barmode='overlay',
-            title='<b>Tj 危險度總覽 (Tj Risk Overview)</b>',
+            title='<b>溫度裕度總覽 (Temperature Margin Overview)</b>',
             xaxis_title='Temperature (°C)',
             yaxis_title='',
             showlegend=False,
@@ -1758,7 +1780,7 @@ with tab_viz:
             st.plotly_chart(fig_margin, use_container_width=True)
 
     st.markdown("---")
-    st.subheader("📏 尺寸與體積估算")
+    st.subheader("📏 尺寸、體積、重量估算")
     c5, c6 = st.columns(2)
     
     if drc_failed:
