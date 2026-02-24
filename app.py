@@ -12,11 +12,17 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 # ==============================================================================
-# 版本：v4.24 (Tab2 Enhanced Analysis)
-# 日期：2026-02-23
+# 版本：v4.27 (Tab3 Visual Revamp)
+# 日期：2026-02-24
 # 狀態：正式發布版 (Production Ready)
 #
 # [版本歷程]
+# v4.27 (2026-02-24) - Tab3 Visual Revamp
+#   1. Tab 3：新增「Tj 危險度進度條圖」，橫向顯示每個元件 Tj vs Limit，RdYlGn 配色。
+#   2. Tab 3：Allowed_dT 柱狀圖改為 Tj_Margin 柱狀圖，跨部門更直覺。
+#   3. Tab 3：KPI 瓶頸卡片由 dT 改顯示 Margin，資訊更直覺。
+#   4. Tab 3：圓餅圖改為水平長條圖，解決元件多時標籤重疊問題。
+#
 # v4.24 (2026-02-23) - Tab2 Enhanced Analysis
 #   1. Tab 2：新增超溫警告 Banner，當任一元件 Tj_Margin < 0 時顯示紅色警告。
 #   2. Tab 2：新增風險排名 Top 3 KPI 卡片，一眼識別最危險的瓶頸元件。
@@ -41,8 +47,8 @@ from firebase_admin import credentials, firestore
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.26 (Sidebar Default Values Restored)"
-UPDATE_DATE = "2026-02-23"
+APP_VERSION = "v4.27 (Tab3 Visual Revamp)"
+UPDATE_DATE = "2026-02-24"
 
 # === APP 設定 ===
 st.set_page_config(
@@ -1397,6 +1403,8 @@ if not valid_rows.empty:
 else:
     Total_Watts_Sum = 0; Min_dT_Allowed = 50; Bottleneck_Name = "None"
 
+Bottleneck_Tj_Margin = 0  # 預設值，稍後在 Tj_Margin 計算完成後更新
+
 # [New] 反向推算 Tc / Tj
 # T_hsk_base = 散熱器基部溫度（h=0），由瓶頸裕度反推
 # T_hsk_eff  = 各元件高度處的散熱器有效溫度（含高度梯度修正）
@@ -1406,6 +1414,12 @@ if not final_df.empty:
     final_df['Tc'] = final_df['T_hsk_eff'] + final_df['Power(W)'] * (final_df['R_int'] + final_df['R_TIM'])
     final_df['Tj'] = final_df['Tc'] + final_df['Power(W)'] * final_df['R_jc']
     final_df['Tj_Margin'] = final_df['Limit(C)'] - final_df['Tj']
+
+    # [Update] 更新 valid_rows 以包含 Tj/Tc/Tj_Margin 欄位（供 Tab 3 圖表使用）
+    valid_rows = final_df[final_df['Total_W'] > 0].copy()
+    if not valid_rows.empty and 'Tj_Margin' in valid_rows.columns and Bottleneck_Name != "None":
+        bt_idx = valid_rows.loc[valid_rows['Allowed_dT'].idxmin()].name
+        Bottleneck_Tj_Margin = round(valid_rows.loc[bt_idx, 'Tj_Margin'], 1)
 
 L_hsk, W_hsk = L_pcb + Top + Btm, W_pcb + Left + Right
 
@@ -1661,7 +1675,7 @@ with tab_viz:
     # Total Power: Red (#e74c3c)
     card(k1, "整機總熱耗", f"{round(Total_Power, 2)} W", "Total Power", "#e74c3c")
     # Bottleneck: Orange (#f39c12)
-    card(k2, "系統瓶頸元件", f"{Bottleneck_Name}", f"dT: {round(Min_dT_Allowed, 2)}°C", "#f39c12")
+    card(k2, "系統瓶頸元件", f"{Bottleneck_Name}", f"Margin: {Bottleneck_Tj_Margin}°C", "#f39c12")
     # Area: Blue (#3498db)
     card(k3, "所需散熱面積", f"{round(Area_req, 3)} m²", "Required Area", "#3498db")
     # Fin Count: Purple (#9b59b6)
@@ -1669,48 +1683,79 @@ with tab_viz:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    if not valid_rows.empty:
+    if not valid_rows.empty and 'Tj_Margin' in valid_rows.columns:
+        # === [1] Tj 危險度進度條圖 (Tj Risk Overview) ===
+        tj_sorted = valid_rows.sort_values(by='Tj_Margin', ascending=False)
+        tj_colors = ['#e74c3c' if m < 0 else '#f39c12' if m < 10 else '#f1c40f' if m < 20 else '#2ecc71'
+                     for m in tj_sorted['Tj_Margin']]
+
+        fig_tj = go.Figure()
+        # 背景條：Limit
+        fig_tj.add_trace(go.Bar(
+            y=tj_sorted['Component'], x=tj_sorted['Limit(C)'],
+            orientation='h', marker_color='#E8E8E8', name='Limit',
+            hovertemplate='Limit: %{x}°C<extra></extra>'
+        ))
+        # 前景條：Tj
+        fig_tj.add_trace(go.Bar(
+            y=tj_sorted['Component'], x=tj_sorted['Tj'],
+            orientation='h', marker_color=tj_colors, name='Tj',
+            text=[f"Tj: {tj:.1f}°C / Limit: {lim:.0f}°C  (Margin: {mar:.1f}°C)"
+                  for tj, lim, mar in zip(tj_sorted['Tj'], tj_sorted['Limit(C)'], tj_sorted['Tj_Margin'])],
+            textposition='outside',
+            hovertemplate='Tj: %{x:.1f}°C<extra></extra>'
+        ))
+        fig_tj.update_layout(
+            barmode='overlay',
+            title='<b>Tj 危險度總覽 (Tj Risk Overview)</b>',
+            xaxis_title='Temperature (°C)',
+            yaxis_title='',
+            showlegend=False,
+            height=max(300, len(tj_sorted) * 50 + 100),
+            margin=dict(t=60, b=40, l=10, r=200),
+            yaxis=dict(automargin=True)
+        )
+        st.plotly_chart(fig_tj, use_container_width=True)
+
+        # === [2] 功耗長條圖 + Tj_Margin 柱狀圖 (左右並排) ===
         c1, c2 = st.columns(2)
         with c1:
-            # 圓餅圖
-            fig_pie = px.pie(valid_rows, values='Total_W', names='Component', 
-                             title='<b>各元件功耗佔比 (Power Breakdown)</b>', 
-                             hole=0.5,
-                             color_discrete_sequence=px.colors.qualitative.Pastel)
-            
-            fig_pie.update_traces(
-                textposition='outside', 
-                textinfo='label+percent',
-                marker=dict(line=dict(color='#ffffff', width=2))
+            # 水平長條圖取代圓餅圖
+            power_sorted = valid_rows.sort_values(by='Total_W', ascending=True)
+            fig_power = px.bar(
+                power_sorted, y='Component', x='Total_W',
+                orientation='h',
+                title='<b>各元件功耗分佈 (Power Breakdown)</b>',
+                color='Total_W',
+                color_continuous_scale='Oranges',
+                labels={'Total_W': '功耗 (W)'},
+                text=power_sorted['Total_W'].apply(lambda x: f"{x:.1f} W")
             )
-            
-            # 設定超大 Margin，強迫標籤往左右空白處延伸
-            fig_pie.update_layout(
-                showlegend=False, 
-                margin=dict(t=90, b=150, l=100, r=100),
-                title=dict(pad=dict(b=20)),
+            fig_power.update_traces(textposition='outside')
+            fig_power.update_layout(
+                xaxis_title="功耗 (W)", yaxis_title="",
+                showlegend=False,
+                margin=dict(t=60, b=40, l=10, r=80),
+                yaxis=dict(automargin=True),
                 annotations=[
-                    dict(
-                        text=f"<b>{round(Total_Power, 2)} W</b><br><span style='font-size:14px; color:#888'>Total</span>", 
-                        x=0.5, y=0.5, 
-                        font_size=24, 
-                        showarrow=False
-                    )
+                    dict(text=f"Total: {round(Total_Power, 2)} W", xref="paper", yref="paper",
+                         x=0.95, y=1.06, showarrow=False, font=dict(size=13, color="#888"))
                 ]
             )
-            st.plotly_chart(fig_pie, use_container_width=True)
-            
+            st.plotly_chart(fig_power, use_container_width=True)
+
         with c2:
-            valid_rows_sorted = valid_rows.sort_values(by="Allowed_dT", ascending=True)
-            fig_bar = px.bar(
-                valid_rows_sorted, x='Component', y='Allowed_dT', 
-                title='<b>各元件剩餘溫升裕度 (Thermal Budget)</b>',
-                color='Allowed_dT', 
+            # Tj_Margin 柱狀圖（取代 Allowed_dT）
+            margin_sorted = valid_rows.sort_values(by='Tj_Margin', ascending=True)
+            fig_margin = px.bar(
+                margin_sorted, x='Component', y='Tj_Margin',
+                title='<b>各元件 Tj 裕度 (Tj Margin)</b>',
+                color='Tj_Margin',
                 color_continuous_scale='RdYlGn',
-                labels={'Allowed_dT': '允許溫升 (°C)'}
+                labels={'Tj_Margin': 'Tj Margin (°C)'}
             )
-            fig_bar.update_layout(xaxis_title="元件名稱", yaxis_title="散熱器允許溫升 (°C)")
-            st.plotly_chart(fig_bar, use_container_width=True)
+            fig_margin.update_layout(xaxis_title="元件名稱", yaxis_title="Tj Margin (°C)")
+            st.plotly_chart(fig_margin, use_container_width=True)
 
     st.markdown("---")
     st.subheader("📏 尺寸與體積估算")
