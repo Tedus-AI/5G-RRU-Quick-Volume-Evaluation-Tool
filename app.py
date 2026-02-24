@@ -1767,16 +1767,16 @@ with tab_viz:
             st.plotly_chart(fig_power, use_container_width=True)
 
         with c2:
-            # Tj_Margin 柱狀圖（取代 Allowed_dT）
+            # 溫度裕度柱狀圖（取代 Allowed_dT）
             margin_sorted = valid_rows.sort_values(by='Tj_Margin', ascending=True)
             fig_margin = px.bar(
                 margin_sorted, x='Component', y='Tj_Margin',
-                title='<b>各元件 Tj 裕度 (Tj Margin)</b>',
+                title='<b>各元件溫度裕度 (Temperature Margin)</b>',
                 color='Tj_Margin',
                 color_continuous_scale='RdYlGn',
-                labels={'Tj_Margin': 'Tj Margin (°C)'}
+                labels={'Tj_Margin': 'Margin (°C)'}
             )
-            fig_margin.update_layout(xaxis_title="元件名稱", yaxis_title="Tj Margin (°C)")
+            fig_margin.update_layout(xaxis_title="元件名稱", yaxis_title="Margin (°C)")
             st.plotly_chart(fig_margin, use_container_width=True)
 
     st.markdown("---")
