@@ -26,6 +26,11 @@ from firebase_admin import credentials, firestore
 #   6. [C] 視角預設按鈕：等角/頂視/前視/側視一鍵切換。
 #   7. [C] 圖層顯示開關：機殼/PCB/元件熱點/鰭片/尺寸標注可獨立開關。
 #
+# v4.32 (2026-02-24) - Dual Custom PAD Support
+#   1. 側邊欄「材料參數」新增第二組自訂 PAD（Pad 2）的 K 值與厚度輸入。
+#   2. Tab 1 介面材料下拉選單新增「Pad2」選項，可分別選擇 Pad / Pad2 規格。
+#   3. tim_props 計算鏈（compute_key_results + globals_dict）同步支援 Pad2。
+#
 # v4.31 (2026-02-24) - Safety Margin Tj_Margin Fix
 #   1. 修正 T_hsk_base 計算：改為 T_amb + Min_dT_Allowed / Margin。
 #      當安全係數 > 1 時，散熱器容量超過瓶頸需求，元件實際溫度降低，
@@ -92,6 +97,7 @@ DEFAULT_GLOBALS = {
     "K_Via": 30.0, "Via_Eff": 0.9,
     "K_Putty": 9.1, "t_Putty": 0.5,
     "K_Pad": 7.5, "t_Pad": 1.7,
+    "K_Pad2": 7.5, "t_Pad2": 1.0,
     "K_Grease": 3.0, "t_Grease": 0.05,
     "K_Solder": 58.0, "t_Solder": 0.3, "Voiding": 0.75,
     "fin_tech_selector_v2": "Embedded Fin (0.95)",
@@ -717,6 +723,9 @@ with st.sidebar.expander("3. 材料參數 (含 Via K值)", expanded=False):
     c5, c6 = st.columns(2)
     K_Pad = c5.number_input("K (Pad)", key="K_Pad", value=st.session_state['K_Pad'], on_change=reset_download_state)
     t_Pad = c6.number_input("t (Pad)", key="t_Pad", value=st.session_state['t_Pad'], on_change=reset_download_state)
+    c5b, c6b = st.columns(2)
+    K_Pad2 = c5b.number_input("K (Pad 2)", key="K_Pad2", value=st.session_state['K_Pad2'], on_change=reset_download_state)
+    t_Pad2 = c6b.number_input("t (Pad 2)", key="t_Pad2", value=st.session_state['t_Pad2'], on_change=reset_download_state)
     c7, c8 = st.columns(2)
     K_Grease = c7.number_input("K (Grease)", key="K_Grease", value=st.session_state['K_Grease'], on_change=reset_download_state)
     t_Grease = c8.number_input("t (Grease)", format="%.3f", key="t_Grease", value=st.session_state['t_Grease'], on_change=reset_download_state)
@@ -753,7 +762,7 @@ with tab_input:
         "Pad_W": st.column_config.NumberColumn("Pad 寬 (mm)", help="元件底部散熱焊盤 (E-pad) 的寬度", format="%.2f"),
         "Thick(mm)": st.column_config.NumberColumn("板厚 (mm)", help="熱需傳導穿過的 PCB 或銅塊厚度", format="%.2f"),
         "Board_Type": st.column_config.SelectboxColumn("導熱方式", help="元件導熱到HSK表面的方式", options=["Thermal Via", "Copper Coin", "None"], width="medium"),
-        "TIM_Type": st.column_config.SelectboxColumn("介面材料", help="元件底部與散熱器之間的TIM。Final PA 的 Solder die attach 已內建於 R_int，此欄填 Grease 即可", options=["Grease", "Pad", "Putty", "None"], width="medium"),
+        "TIM_Type": st.column_config.SelectboxColumn("介面材料", help="元件底部與散熱器之間的TIM。Final PA 的 Solder die attach 已內建於 R_int，此欄填 Grease 即可", options=["Grease", "Pad", "Pad2", "Putty", "None"], width="medium"),
         "R_jc": st.column_config.NumberColumn("熱阻 Rjc", help="結點到殼的內部熱阻 (°C/W)", format="%.2f"),
         "Limit(C)": st.column_config.NumberColumn("限溫 (°C)", help="元件允許最高運作溫度", format="%.2f")
     }
@@ -1299,6 +1308,7 @@ def compute_key_results(global_params, df_components):
         "Solder": {"k": p["K_Solder"], "t": p["t_Solder"]},
         "Grease": {"k": p["K_Grease"], "t": p["t_Grease"]},
         "Pad": {"k": p["K_Pad"], "t": p["t_Pad"]},
+        "Pad2": {"k": p["K_Pad2"], "t": p["t_Pad2"]},
         "Putty": {"k": p["K_Putty"], "t": p["t_Putty"]},
         "None": {"k": 1, "t": 0}
     }
@@ -1404,6 +1414,7 @@ tim_props = {
     "Solder": {"k": K_Solder, "t": t_Solder},
     "Grease": {"k": K_Grease, "t": t_Grease},
     "Pad": {"k": K_Pad, "t": t_Pad},
+    "Pad2": {"k": K_Pad2, "t": t_Pad2},
     "Putty": {"k": K_Putty, "t": t_Putty},
     "None": {"k": 1, "t": 0}
 }
