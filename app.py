@@ -62,7 +62,7 @@ from firebase_admin import credentials, firestore
 # ==============================================================================
 
 # 定義版本資訊
-APP_VERSION = "v4.29 (Tab4 3D Full Upgrade)"
+APP_VERSION = "v4.30 (Tab4 3D Simplified)"
 UPDATE_DATE = "2026-02-24"
 
 # === APP 設定 ===
@@ -1833,37 +1833,9 @@ with tab_viz:
 # --- Tab 4: 3D 模擬視圖 ---
 with tab_3d:
     st.subheader("🧊 3D SIMULATION (3D 模擬視圖)")
-    st.caption("機殼半透明顯示內部 PCB 與元件熱點；散熱鰭片含底部→頂部熱梯度配色。可切換視角與圖層。")
+    st.caption("模型展示：底部電子艙 + 頂部散熱鰭片，鰭片數量與間距皆為真實比例。鰭片含底部→頂部熱梯度配色。")
 
-    # 3D 圖受 DRC 控制
     if not drc_failed and L_hsk > 0 and W_hsk > 0 and RRU_Height > 0 and Fin_Height > 0:
-
-        # === [C] 控制列：視角預設 + 圖層開關 ===
-        ctrl1, ctrl2 = st.columns([1.2, 2])
-        with ctrl1:
-            st.caption("📷 視角預設")
-            view_preset = st.radio(
-                "view_preset",
-                ["🔷 等角", "⬆️ 頂視", "➡️ 前視", "↗️ 側視"],
-                horizontal=True, label_visibility="collapsed"
-            )
-        with ctrl2:
-            st.caption("👁️ 顯示圖層")
-            show_layers = st.multiselect(
-                "show_layers",
-                ["機殼", "PCB", "元件熱點", "鰭片", "尺寸標注"],
-                default=["機殼", "PCB", "元件熱點", "鰭片", "尺寸標注"],
-                label_visibility="collapsed"
-            )
-
-        # === 相機預設 ===
-        camera_map = {
-            "🔷 等角": dict(eye=dict(x=1.5, y=1.5, z=1.2)),
-            "⬆️ 頂視": dict(eye=dict(x=0.001, y=0.001, z=2.5)),
-            "➡️ 前視": dict(eye=dict(x=2.5, y=0.001, z=0.5)),
-            "↗️ 側視": dict(eye=dict(x=0.001, y=2.5, z=0.5)),
-        }
-        camera = {**camera_map[view_preset], "projection": {"type": "orthographic"}}
 
         LIGHTING_METAL = dict(ambient=0.5, diffuse=0.8, specular=0.5, roughness=0.1)
         LIGHTING_MATTE = dict(ambient=0.6, diffuse=0.8, specular=0.1, roughness=0.8)
@@ -1873,95 +1845,38 @@ with tab_3d:
             k=[0, 7, 2, 3, 6, 7, 1, 1, 5, 5, 7, 6]
         )
 
-        def box_xyz(x0, x1, y0, y1, z0, z1):
-            return ([x0,x1,x1,x0,x0,x1,x1,x0],
-                    [y0,y0,y1,y1,y0,y0,y1,y1],
-                    [z0]*4+[z1]*4)
-
         h_body       = H_shield + H_filter
         z_base_start = h_body
         z_base_end   = h_body + t_base
         z_fin_start  = z_base_end
         z_fin_end    = z_base_end + Fin_Height
-        pcb_t        = 1.6
-        pcb_x0, pcb_x1 = Btm, Btm + L_pcb
-        pcb_y0, pcb_y1 = Left, Left + W_pcb
 
         fig_3d = go.Figure()
 
-        # === [A] 1. 機殼 (半透明深藍灰) ===
-        if "機殼" in show_layers:
-            bx, by, bz = box_xyz(0, L_hsk, 0, W_hsk, 0, h_body)
-            fig_3d.add_trace(go.Mesh3d(
-                x=bx, y=by, z=bz, **IJK,
-                color='#5D6D7E', opacity=0.12,
-                lighting=LIGHTING_MATTE, flatshading=True,
-                name='機殼 Body', showscale=False
-            ))
-
-        # === [B] 2. PCB 薄層 (綠, 1.6 mm) ===
-        if "PCB" in show_layers:
-            px, py, pz = box_xyz(pcb_x0, pcb_x1, pcb_y0, pcb_y1, 0, pcb_t)
-            fig_3d.add_trace(go.Mesh3d(
-                x=px, y=py, z=pz, **IJK,
-                color='#1E8449', opacity=0.9,
-                lighting=LIGHTING_MATTE, flatshading=True,
-                name='PCB', showscale=False
-            ))
-
-        # === [B] 3. 元件熱點色塊 (依 T_ref 冷→暖上色) ===
-        if "元件熱點" in show_layers and not valid_rows.empty and 'T_ref' in valid_rows.columns:
-            t_vals = valid_rows['T_ref']
-            t_min_v, t_max_v = t_vals.min(), t_vals.max()
-
-            def t_to_rgb(t):
-                ratio = (t - t_min_v) / (t_max_v - t_min_v) if t_max_v > t_min_v else 0.5
-                r = int(60  + 195 * ratio)
-                g = int(180 - 150 * ratio)
-                b = int(220 - 190 * ratio)
-                return f'rgb({min(r,255)},{max(g,0)},{max(b,0)})'
-
-            n_comp = len(valid_rows)
-            n_cols = max(1, int(np.ceil(np.sqrt(n_comp * L_pcb / max(W_pcb, 1)))))
-            n_rows = max(1, int(np.ceil(n_comp / n_cols)))
-            cw = L_pcb / n_cols
-            ch = W_pcb / n_rows
-
-            for idx, (_, row) in enumerate(valid_rows.iterrows()):
-                ci, ri   = idx % n_cols, idx // n_cols
-                cx       = pcb_x0 + (ci + 0.5) * cw
-                cy       = pcb_y0 + (ri + 0.5) * ch
-                pad_l    = min(float(row.get('Pad_L', cw * 0.7)), cw  * 0.85)
-                pad_w    = min(float(row.get('Pad_W', ch * 0.7)), ch  * 0.85)
-                comp_h   = max(float(row.get('Height(mm)', 5)), 2.0)
-                lbl      = row.get('Temp_Label', 'Tj')
-                t_val    = float(row['T_ref'])
-                margin_v = float(row['Tj_Margin'])
-                vx, vy, vz = box_xyz(cx-pad_l/2, cx+pad_l/2,
-                                     cy-pad_w/2, cy+pad_w/2,
-                                     pcb_t, pcb_t + comp_h)
-                fig_3d.add_trace(go.Mesh3d(
-                    x=vx, y=vy, z=vz, **IJK,
-                    color=t_to_rgb(t_val), opacity=0.92,
-                    lighting=LIGHTING_MATTE, flatshading=True,
-                    name=row['Component'],
-                    hovertemplate=(f"<b>{row['Component']}</b><br>"
-                                   f"{lbl}: {t_val:.1f}°C<br>"
-                                   f"Margin: {margin_v:.1f}°C<extra></extra>"),
-                    showscale=False, showlegend=True
-                ))
-
-        # === 4. 散熱器基座 (銀灰，常駐) ===
-        hbx, hby, hbz = box_xyz(0, L_hsk, 0, W_hsk, z_base_start, z_base_end)
+        # 1. 機殼 (實心深藍灰)
         fig_3d.add_trace(go.Mesh3d(
-            x=hbx, y=hby, z=hbz, **IJK,
+            x=[0, L_hsk, L_hsk, 0, 0, L_hsk, L_hsk, 0],
+            y=[0, 0, W_hsk, W_hsk, 0, 0, W_hsk, W_hsk],
+            z=[0, 0, 0, 0, h_body, h_body, h_body, h_body],
+            **IJK,
+            color='#5D6D7E', opacity=1.0,
+            lighting=LIGHTING_MATTE, flatshading=True,
+            name='Electronics Body', showscale=False
+        ))
+
+        # 2. 散熱器基座 (銀灰)
+        fig_3d.add_trace(go.Mesh3d(
+            x=[0, L_hsk, L_hsk, 0, 0, L_hsk, L_hsk, 0],
+            y=[0, 0, W_hsk, W_hsk, 0, 0, W_hsk, W_hsk],
+            z=[z_base_start]*4 + [z_base_end]*4,
+            **IJK,
             color='#BDC3C7', opacity=1.0,
             lighting=LIGHTING_METAL, flatshading=True,
             name='Heatsink Base', showscale=False
         ))
 
-        # === [A] 5. 散熱鰭片 (底部暖→頂部冷熱梯度) ===
-        if "鰭片" in show_layers and num_fins_int > 0:
+        # 3. 散熱鰭片 (底部暖色→頂部冷色熱梯度)
+        if num_fins_int > 0:
             total_fin_w = num_fins_int * Fin_t + (num_fins_int - 1) * Gap
             y_off = (W_hsk - total_fin_w) / 2
             fi = [7,0,0,0,4,4,6,6,4,0,3,2]
@@ -1972,53 +1887,37 @@ with tab_3d:
                 fy1 = fy0 + Fin_t
                 if fy1 > W_hsk:
                     break
-                vx = [0, L_hsk, L_hsk, 0, 0, L_hsk, L_hsk, 0]
-                vy = [fy0, fy0, fy1, fy1, fy0, fy0, fy1, fy1]
-                vz = [z_fin_start]*4 + [z_fin_end]*4
                 fig_3d.add_trace(go.Mesh3d(
-                    x=vx, y=vy, z=vz, i=fi, j=fj, k=fk,
+                    x=[0, L_hsk, L_hsk, 0, 0, L_hsk, L_hsk, 0],
+                    y=[fy0, fy0, fy1, fy1, fy0, fy0, fy1, fy1],
+                    z=[z_fin_start]*4 + [z_fin_end]*4,
+                    i=fi, j=fj, k=fk,
                     intensity=[0,0,0,0,1,1,1,1], cmin=0, cmax=1,
                     colorscale=[[0,'#E67E22'],[0.45,'#BDC3C7'],[1,'#D6EAF8']],
                     showscale=False,
                     lighting=LIGHTING_METAL, flatshading=True,
-                    name='散熱鰭片' if idx == 0 else '',
+                    name='Fins' if idx == 0 else '',
                     showlegend=(idx == 0)
                 ))
 
-        # === 6. 外框線 ===
+        # 4. 外框線
         xl = [0,L_hsk,L_hsk,0,0,None,0,L_hsk,L_hsk,0,0,None,0,0,None,L_hsk,L_hsk,None,L_hsk,L_hsk,None,0,0]
         yl = [0,0,W_hsk,W_hsk,0,None,0,0,W_hsk,W_hsk,0,None,0,0,None,0,0,None,W_hsk,W_hsk,None,W_hsk,W_hsk]
         zl = [0,0,0,0,0,None,RRU_Height,RRU_Height,RRU_Height,RRU_Height,RRU_Height,None,0,RRU_Height,None,0,RRU_Height,None,0,RRU_Height,None,0,RRU_Height]
         fig_3d.add_trace(go.Scatter3d(x=xl, y=yl, z=zl, mode='lines',
                                       line=dict(color='#2C3E50', width=2), showlegend=False))
 
-        # === [A] 7. 尺寸標注 ===
-        annots = []
-        if "尺寸標注" in show_layers:
-            annots = [
-                dict(x=L_hsk/2,    y=-W_hsk*0.13, z=0,
-                     text=f"<b>L: {L_hsk:.0f} mm</b>", showarrow=False,
-                     font=dict(size=11, color='#1A5276')),
-                dict(x=L_hsk*1.12, y=W_hsk/2,    z=0,
-                     text=f"<b>W: {W_hsk:.0f} mm</b>", showarrow=False,
-                     font=dict(size=11, color='#1A5276')),
-                dict(x=L_hsk*1.12, y=0,           z=RRU_Height/2,
-                     text=f"<b>H: {RRU_Height:.1f} mm</b>", showarrow=False,
-                     font=dict(size=11, color='#922B21')),
-            ]
-
-        max_dim = max(L_hsk, W_hsk, RRU_Height) * 1.2
+        max_dim = max(L_hsk, W_hsk, RRU_Height) * 1.1
         fig_3d.update_layout(
             scene=dict(
-                xaxis=dict(title='Length (mm)', range=[0, max_dim], dtick=50),
-                yaxis=dict(title='Width (mm)',  range=[-max_dim*0.15, max_dim], dtick=50),
-                zaxis=dict(title='Height (mm)', range=[0, max_dim], dtick=50),
+                xaxis=dict(title='Length', range=[0, max_dim], dtick=50),
+                yaxis=dict(title='Width',  range=[0, max_dim], dtick=50),
+                zaxis=dict(title='Height', range=[0, max_dim], dtick=50),
                 aspectmode='manual', aspectratio=dict(x=1, y=1, z=1),
-                camera=camera, bgcolor='white',
-                annotations=annots
+                camera=dict(projection=dict(type="orthographic"), eye=dict(x=1.2, y=1.2, z=1.2)),
+                bgcolor='white'
             ),
-            margin=dict(l=0, r=0, b=0, t=20), height=640,
-            legend=dict(x=0.01, y=0.99, bgcolor='rgba(255,255,255,0.8)', font=dict(size=10))
+            margin=dict(l=0, r=0, b=0, t=0), height=600
         )
         st.plotly_chart(fig_3d, use_container_width=True)
         c1, c2 = st.columns(2)
