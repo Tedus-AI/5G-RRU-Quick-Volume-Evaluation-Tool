@@ -2146,9 +2146,42 @@ with tab_sensitivity:
                         "AR":        round(ar, 1),
                         "Fin_Count": res.get("Fin_Count", 0),
                         "Tj_Margin": res.get("Bottleneck_Tj_Margin", 0),
+                        "Fin_Height": round(res.get("Fin_Height", 0), 1),
                     })
 
                 df_res = pd.DataFrame(results)
+
+                # ── DRC 超限偵測 ──
+                _fin_tech_sa = base_params_sa.get("fin_tech_selector_v2", "")
+                _fh_drc_limit = 100.0 if "Embedded" in _fin_tech_sa else float('inf')
+                df_res["DRC_fail"] = (df_res["AR"] > 12.0) | (df_res["Fin_Height"] > _fh_drc_limit)
+                _drc_fail_pts = df_res[df_res["DRC_fail"]]
+
+                def _apply_drc_zone(fig):
+                    """在圖表上標記 DRC 超限區間"""
+                    if _drc_fail_pts.empty:
+                        return
+                    _x0   = _drc_fail_pts["x"].iloc[0]
+                    _xmax = df_res["x"].max()
+                    _xspan = df_res["x"].max() - df_res["x"].min()
+                    _row  = _drc_fail_pts.iloc[0]
+                    _reasons = []
+                    if _row["AR"] > 12.0:
+                        _reasons.append(f"AR={_row['AR']:.1f} > 12")
+                    if _row["Fin_Height"] > _fh_drc_limit:
+                        _reasons.append(f"FH={_row['Fin_Height']:.0f}mm > {_fh_drc_limit:.0f}mm")
+                    _label = "⚠ DRC超限: " + " / ".join(_reasons)
+                    fig.add_vrect(
+                        x0=_x0, x1=_xmax + _xspan * 0.03,
+                        fillcolor="rgba(231,76,60,0.10)", line_width=0,
+                    )
+                    fig.add_vline(
+                        x=_x0, line_dash="dash",
+                        line_color="rgba(200,0,0,0.7)", line_width=2,
+                        annotation_text=_label,
+                        annotation_position="top right",
+                        annotation_font=dict(color="red", size=11),
+                    )
 
                 # ── 決定右圖（熱流/幾何）的 Y 軸設定 ──
                 if var_key == "Gap":
@@ -2209,6 +2242,7 @@ with tab_sensitivity:
                         barmode="group", hovermode="x unified",
                         height=420, margin=dict(l=50, r=50, t=50, b=50)
                     )
+                    _apply_drc_zone(fig_size)
                     st.plotly_chart(fig_size, use_container_width=True)
 
                 # ── 右圖：熱流 / 幾何性能 ──
@@ -2237,6 +2271,7 @@ with tab_sensitivity:
                         hovermode="x unified",
                         height=420, margin=dict(l=50, r=50, t=50, b=50)
                     )
+                    _apply_drc_zone(fig_perf)
                     st.plotly_chart(fig_perf, use_container_width=True)
 
                 with st.expander("查看詳細數據"):
@@ -2244,7 +2279,8 @@ with tab_sensitivity:
                         "x": f"{var_info['label']} ({var_unit})",
                         "Volume": "體積 (L)", "Weight": "重量 (kg)",
                         "AR": "流阻比", "Fin_Count": "鰭片數",
-                        "Tj_Margin": "Bottleneck Tj_Margin (°C)"
+                        "Tj_Margin": "Bottleneck Tj_Margin (°C)",
+                        "Fin_Height": "Fin 高度 (mm)", "DRC_fail": "DRC超限"
                     }
                     st.dataframe(
                         df_res.rename(columns=col_rename).style.background_gradient(cmap="Blues"),
