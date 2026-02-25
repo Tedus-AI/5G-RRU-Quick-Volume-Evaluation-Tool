@@ -2170,8 +2170,8 @@ with tab_sensitivity:
 
                 df_res = pd.DataFrame(results)
 
-                # ── Power Scale：計算對應實際整機瓦數 ──
-                _base_total_power = (base_df_sa['Power(W)'] * base_df_sa['Qty']).sum()
+                # ── Power Scale：計算對應實際整機瓦數（含安全係數 Margin）──
+                _base_total_power = (base_df_sa['Power(W)'] * base_df_sa['Qty']).sum() * base_params_sa.get('Margin', 1.0)
                 if var_key == "power_scale":
                     df_res["Total_Power_W"] = (df_res["x"] * _base_total_power).round(1)
 
