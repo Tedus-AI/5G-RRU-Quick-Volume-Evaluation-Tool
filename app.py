@@ -1559,6 +1559,7 @@ else:
 # ==================================================
 drc_failed = False
 drc_msg = ""
+drc_warn_msg = ""
 
 # 計算流阻比 (Aspect Ratio)
 if Gap > 0 and Fin_Height > 0:
@@ -1569,11 +1570,14 @@ else:
 # [UI] 更新側邊欄的 Aspect Ratio 資訊 (回填)
 # 修正建議值為 4.5 ~ 6.5
 if aspect_ratio > 12.0:
-    ar_color = "#e74c3c" # Red
+    ar_color = "#e74c3c"  # Red
     ar_msg = "過高 (High)"
-else:
-    ar_color = "#00b894" # Green
+elif 4.5 <= aspect_ratio <= 6.5:
+    ar_color = "#00b894"  # Green
     ar_msg = "良好 (Good)"
+else:
+    ar_color = "#f39c12"  # Orange
+    ar_msg = "不佳 (Poor)"
 
 if Fin_Height > 0:
     ar_status_box.markdown(f"""
@@ -1600,6 +1604,21 @@ elif Gap < 4.0:
 elif "Embedded" in fin_tech and Fin_Height > 100.0:
     drc_failed = True
     drc_msg = f"⛔ **製程限制 (Process Limit)：** Embedded Fin (埋入式鰭片) 製程高度限制需 < 100mm (目前計算值: {Fin_Height:.1f}mm)。\n此高度已超過製程極限，建議增加設備的X/Y方向面積來讓Z方向面積增加。"
+elif "Die-casting" in fin_tech:
+    _fin_ratio = Fin_Height / Fin_t if Fin_t > 0 else float('inf')
+    if Fin_t < 3.0:
+        drc_failed = True
+        drc_msg = (f"⛔ **製程限制 (Fin_t Too Thin)：** 壓鑄鰭片平均厚度 {Fin_t}mm < 最小值 3.0mm。\n"
+                   f"壓鑄錐形鰭片平均厚度需 ≥ 3.0mm（參考：Huawei RRU 量測值，頭部 1.5mm / 根部 4.5mm，均值 3.0mm）。")
+    elif _fin_ratio > 30.0:
+        drc_failed = True
+        drc_msg = (f"⛔ **製程限制 (Fin Height/Thickness Ratio)：** 壓鑄鰭片高厚比 {_fin_ratio:.1f} > 30 (上限)。\n"
+                   f"(Fin_Height={Fin_Height:.1f}mm ÷ Fin_t={Fin_t}mm)\n"
+                   f"金屬液無法在凝固前完整充填鰭片腔體，將導致缺料或成型不良。請增加 Fin_t 或降低 Fin_Height。\n"
+                   f"參考案例：Huawei RRU H=80mm / Fin_t=3.0mm → 高厚比 26.7 ✓")
+    elif _fin_ratio > 25.0:
+        drc_warn_msg = (f"⚠️ **壓鑄製程警告 (Near Limit)：** 鰭片高厚比 {_fin_ratio:.1f}（介於 25～30，接近製程上限）。\n"
+                        f"(Fin_Height={Fin_Height:.1f}mm ÷ Fin_t={Fin_t}mm)　建議與壓鑄廠確認充填可行性。")
 
 # --- Tab 2: 詳細數據 (表二) ---
 with tab_data:
@@ -1850,6 +1869,8 @@ with tab_viz:
     st.subheader("📏 尺寸、體積、重量估算")
     c5, c6 = st.columns(2)
     
+    if drc_warn_msg:
+        st.warning(drc_warn_msg)
     if drc_failed:
         st.error(drc_msg)
         st.markdown(f"""
@@ -1983,7 +2004,7 @@ with tab_3d:
         c2.success(f"⚡ **鰭片規格：** 數量 {num_fins_int} pcs | 高度 {Fin_Height:.1f} mm | 厚度 {Fin_t} mm | 間距 {Gap} mm")
 
     elif drc_failed:
-        st.error("🚫 因設計參數不合理 (DRC Failed)，無法生成有效模型。")
+        st.error(f"🚫 **DRC Failed：無法生成有效模型**\n\n{drc_msg}")
     else:
         st.warning("⚠️ 無法繪製 3D 圖形，因為計算出的尺寸無效 (為 0)。請檢查元件清單與參數設定。")
 
@@ -2153,8 +2174,18 @@ with tab_sensitivity:
 
                 # ── DRC 超限偵測 ──
                 _fin_tech_sa = base_params_sa.get("fin_tech_selector_v2", "")
-                _fh_drc_limit = 100.0 if "Embedded" in _fin_tech_sa else float('inf')
-                df_res["DRC_fail"] = (df_res["AR"] > 12.0) | (df_res["Fin_Height"] > _fh_drc_limit)
+                if "Embedded" in _fin_tech_sa:
+                    _fh_drc_limit = 100.0
+                else:
+                    _fh_drc_limit = float('inf')
+                _gap_drc = (df_res["x"] < 4.0) if var_key == "Gap" else pd.Series([False] * len(df_res), dtype=bool)
+                if "Die-casting" in _fin_tech_sa:
+                    _fin_t_sa = df_res["x"] if var_key == "Fin_t" else base_params_sa.get("Fin_t", 3.0)
+                    _fin_ratio_fail = (df_res["Fin_Height"] / _fin_t_sa) > 30.0
+                    _fin_t_thin = _fin_t_sa < 3.0
+                    df_res["DRC_fail"] = (df_res["AR"] > 12.0) | _fin_ratio_fail | _fin_t_thin | _gap_drc
+                else:
+                    df_res["DRC_fail"] = (df_res["AR"] > 12.0) | (df_res["Fin_Height"] > _fh_drc_limit) | _gap_drc
                 _drc_fail_pts = df_res[df_res["DRC_fail"]]
 
                 def _apply_drc_zone(fig):
@@ -2166,9 +2197,18 @@ with tab_sensitivity:
                     _xspan = df_res["x"].max() - df_res["x"].min()
                     _row  = _drc_fail_pts.iloc[0]
                     _reasons = []
+                    if var_key == "Gap" and _row["x"] < 4.0:
+                        _reasons.append(f"Gap={_row['x']:.1f}mm < 4mm (物理極限)")
                     if _row["AR"] > 12.0:
                         _reasons.append(f"AR={_row['AR']:.1f} > 12")
-                    if _row["Fin_Height"] > _fh_drc_limit:
+                    if "Die-casting" in _fin_tech_sa:
+                        _ft = float(_row["x"]) if var_key == "Fin_t" else base_params_sa.get("Fin_t", 3.0)
+                        _fr = _row["Fin_Height"] / _ft if _ft > 0 else float('inf')
+                        if _fr > 30.0:
+                            _reasons.append(f"H/Fin_t={_fr:.1f} > 30")
+                        if _ft < 3.0:
+                            _reasons.append(f"Fin_t={_ft:.1f}mm < 3.0mm")
+                    elif _row["Fin_Height"] > _fh_drc_limit:
                         _reasons.append(f"FH={_row['Fin_Height']:.0f}mm > {_fh_drc_limit:.0f}mm")
                     _label = "⚠ DRC超限: " + " / ".join(_reasons)
                     fig.add_vrect(
