@@ -2082,7 +2082,6 @@ with tab_sensitivity:
     VAR_MAP = {
         "Gap (Fin Air Gap)":       {"key": "Gap",         "unit": "mm", "label": "Fin Air Gap"},
         "T_amb (環境溫度)":          {"key": "T_amb",       "unit": "°C", "label": "環境溫度"},
-        "Fin_t (鰭片厚度)":          {"key": "Fin_t",       "unit": "mm", "label": "鰭片厚度"},
         "Power Scale (功耗縮放)":    {"key": "power_scale", "unit": "×",  "label": "功耗縮放係數"},
     }
 
@@ -2142,8 +2141,7 @@ with tab_sensitivity:
             with st.spinner("正在進行熱流與結構多重迭代運算..."):
                 val_min = base_val * (1 - minus_pct / 100)
                 val_max = base_val * (1 + plus_pct / 100)
-                if var_key == "Gap":         val_min = max(val_min, 0.5)
-                elif var_key == "Fin_t":     val_min = max(val_min, 0.3)
+                if var_key == "Gap":           val_min = max(val_min, 0.5)
                 elif var_key == "power_scale": val_min = max(val_min, 0.1)
 
                 x_values = np.linspace(val_min, val_max, steps)
@@ -2172,6 +2170,11 @@ with tab_sensitivity:
 
                 df_res = pd.DataFrame(results)
 
+                # ── Power Scale：計算對應實際整機瓦數 ──
+                _base_total_power = (base_df_sa['Power(W)'] * base_df_sa['Qty']).sum()
+                if var_key == "power_scale":
+                    df_res["Total_Power_W"] = (df_res["x"] * _base_total_power).round(1)
+
                 # ── DRC 超限偵測 ──
                 _fin_tech_sa = base_params_sa.get("fin_tech_selector_v2", "")
                 if "Embedded" in _fin_tech_sa:
@@ -2180,7 +2183,7 @@ with tab_sensitivity:
                     _fh_drc_limit = float('inf')
                 _gap_drc = (df_res["x"] < 4.0) if var_key == "Gap" else pd.Series([False] * len(df_res), dtype=bool)
                 if "Die-casting" in _fin_tech_sa:
-                    _fin_t_sa = df_res["x"] if var_key == "Fin_t" else base_params_sa.get("Fin_t", 3.0)
+                    _fin_t_sa = base_params_sa.get("Fin_t", 3.0)
                     _fin_ratio_fail = (df_res["Fin_Height"] / _fin_t_sa) > 30.0
                     _fin_t_thin = _fin_t_sa < 3.0
                     df_res["DRC_fail"] = (df_res["AR"] > 12.0) | _fin_ratio_fail | _fin_t_thin | _gap_drc
@@ -2202,7 +2205,7 @@ with tab_sensitivity:
                     if _row["AR"] > 12.0:
                         _reasons.append(f"AR={_row['AR']:.1f} > 12")
                     if "Die-casting" in _fin_tech_sa:
-                        _ft = float(_row["x"]) if var_key == "Fin_t" else base_params_sa.get("Fin_t", 3.0)
+                        _ft = base_params_sa.get("Fin_t", 3.0)
                         _fr = _row["Fin_Height"] / _ft if _ft > 0 else float('inf')
                         if _fr > 30.0:
                             _reasons.append(f"H/Fin_t={_fr:.1f} > 30")
@@ -2233,15 +2236,6 @@ with tab_sensitivity:
                     perf_shape  = "linear"
                     perf_ytitle = "流阻比 (Aspect Ratio)"
                     add_zero    = False
-                elif var_key == "Fin_t":
-                    perf_y      = df_res["Fin_Count"]
-                    perf_name   = "鰭片數 (Pcs)"
-                    perf_color  = "#9b59b6"
-                    perf_symbol = "square"
-                    perf_mode   = "lines+markers"
-                    perf_shape  = "hv"
-                    perf_ytitle = "鰭片數 (Pcs)"
-                    add_zero    = False
                 else:  # T_amb 或 Power Scale
                     perf_y      = df_res["Tj_Margin"]
                     perf_name   = "Bottleneck Tj_Margin (°C)"
@@ -2253,6 +2247,8 @@ with tab_sensitivity:
                     add_zero    = True
 
                 x_title = f"{var_info['label']} ({var_unit})"
+                if var_key == "power_scale":
+                    x_title = f"功耗縮放係數 (×)　[基準整機：{_base_total_power:.0f} W]"
                 vline_kw = dict(line_width=1, line_dash="dash", line_color="gray",
                                 annotation_text="Current")
 
@@ -2283,6 +2279,10 @@ with tab_sensitivity:
                         height=420, margin=dict(l=50, r=50, t=50, b=50)
                     )
                     _apply_drc_zone(fig_size)
+                    if var_key == "power_scale":
+                        _tvals = df_res["x"].tolist()
+                        _ttexts = [f"{v:.2f}×<br>({v * _base_total_power:.0f}W)" for v in _tvals]
+                        fig_size.update_layout(xaxis=dict(tickvals=_tvals, ticktext=_ttexts))
                     st.plotly_chart(fig_size, use_container_width=True)
 
                 # ── 右圖：熱流 / 幾何性能 ──
@@ -2312,6 +2312,10 @@ with tab_sensitivity:
                         height=420, margin=dict(l=50, r=50, t=50, b=50)
                     )
                     _apply_drc_zone(fig_perf)
+                    if var_key == "power_scale":
+                        _tvals = df_res["x"].tolist()
+                        _ttexts = [f"{v:.2f}×<br>({v * _base_total_power:.0f}W)" for v in _tvals]
+                        fig_perf.update_layout(xaxis=dict(tickvals=_tvals, ticktext=_ttexts))
                     st.plotly_chart(fig_perf, use_container_width=True)
 
                 with st.expander("查看詳細數據"):
@@ -2320,7 +2324,8 @@ with tab_sensitivity:
                         "Volume": "體積 (L)", "Weight": "重量 (kg)",
                         "AR": "流阻比", "Fin_Count": "鰭片數",
                         "Tj_Margin": "Bottleneck Tj_Margin (°C)",
-                        "Fin_Height": "Fin 高度 (mm)", "DRC_fail": "DRC超限"
+                        "Fin_Height": "Fin 高度 (mm)", "DRC_fail": "DRC超限",
+                        "Total_Power_W": "整機功耗 (W)",
                     }
                     st.dataframe(
                         df_res.rename(columns=col_rename).style.background_gradient(cmap="Blues"),
@@ -2360,7 +2365,6 @@ with tab_sensitivity:
                 tornado_vars = [
                     {"choice": "Gap (Fin Air Gap)",    "key": "Gap",         "default": DEFAULT_GLOBALS["Gap"]},
                     {"choice": "T_amb (環境溫度)",      "key": "T_amb",       "default": DEFAULT_GLOBALS["T_amb"]},
-                    {"choice": "Fin_t (鰭片厚度)",      "key": "Fin_t",       "default": DEFAULT_GLOBALS["Fin_t"]},
                     {"choice": "Power Scale (功耗縮放)","key": "power_scale", "default": 1.0},
                 ]
 
