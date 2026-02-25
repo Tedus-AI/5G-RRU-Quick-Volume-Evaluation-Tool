@@ -2146,8 +2146,11 @@ with tab_sensitivity:
 
                     # Fixed-Design Tj_Margin = Min_dT_Allowed - dT_actual(固定面積)
                     # 意義：散熱器維持基準尺寸不變，參數改變時的溫度裕量
+                    # [Fix] dT 用實際功率(÷Margin)，因 Margin 影響的是設計面積，非實際發熱
+                    margin_sa = base_params_sa.get("Margin", 1.0)
                     if area_base_fixed > 0 and res["h_value"] > 0 and res["Total_Power"] > 0:
-                        dT_fixed = res["Total_Power"] / (res["h_value"] * area_base_fixed * eff_sa)
+                        actual_power = res["Total_Power"] / margin_sa
+                        dT_fixed = actual_power / (res["h_value"] * area_base_fixed * eff_sa)
                         fixed_tj = res["Min_dT_Allowed"] - dT_fixed
                     else:
                         fixed_tj = 0
@@ -2306,10 +2309,12 @@ with tab_sensitivity:
                 area_tornado_fixed = r_tornado_base["Area_req"]
                 eff_tornado = 0.95 if "Embedded" in base_params_sa.get("fin_tech_selector_v2", "") else 0.90
 
+                margin_tornado = base_params_sa.get("Margin", 1.0)
                 def _fixed_tj(res):
-                    """以固定基準散熱面積計算 Tj_Margin"""
+                    """以固定基準散熱面積計算 Tj_Margin（用實際功率，÷Margin）"""
                     if area_tornado_fixed > 0 and res["h_value"] > 0 and res["Total_Power"] > 0:
-                        dT = res["Total_Power"] / (res["h_value"] * area_tornado_fixed * eff_tornado)
+                        actual_pwr = res["Total_Power"] / margin_tornado
+                        dT = actual_pwr / (res["h_value"] * area_tornado_fixed * eff_tornado)
                         return round(res["Min_dT_Allowed"] - dT, 1)
                     return 0.0
 
