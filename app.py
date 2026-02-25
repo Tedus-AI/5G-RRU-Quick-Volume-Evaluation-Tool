@@ -2130,11 +2130,6 @@ with tab_sensitivity:
                 x_values[closest_idx] = base_val
                 main_volume_rounded = round(Volume_L, 2)
 
-                # Fixed-Design Tj_Margin：先取基準散熱面積，後續固定面積計算溫度裕量
-                res_base_sa = _sa_calc(base_params_sa, base_df_sa, var_key, base_val)
-                area_base_fixed = res_base_sa["Area_req"]
-                eff_sa = 0.95 if "Embedded" in base_params_sa.get("fin_tech_selector_v2", "") else 0.90
-
                 results = []
                 for i, x in enumerate(x_values):
                     res = _sa_calc(base_params_sa, base_df_sa, var_key, x)
@@ -2144,24 +2139,13 @@ with tab_sensitivity:
                     if i == closest_idx:
                         vol_r = main_volume_rounded
 
-                    # Fixed-Design Tj_Margin = Min_dT_Allowed - dT_actual(固定面積)
-                    # 意義：散熱器維持基準尺寸不變，參數改變時的溫度裕量
-                    # [Fix] dT 用實際功率(÷Margin)，因 Margin 影響的是設計面積，非實際發熱
-                    margin_sa = base_params_sa.get("Margin", 1.0)
-                    if area_base_fixed > 0 and res["h_value"] > 0 and res["Total_Power"] > 0:
-                        actual_power = res["Total_Power"] / margin_sa
-                        dT_fixed = actual_power / (res["h_value"] * area_base_fixed * eff_sa)
-                        fixed_tj = res["Min_dT_Allowed"] - dT_fixed
-                    else:
-                        fixed_tj = 0
-
                     results.append({
                         "x":         round(x, 4),
                         "Volume":    vol_r,
                         "Weight":    round(res["total_weight_kg"], 2),
                         "AR":        round(ar, 1),
                         "Fin_Count": res.get("Fin_Count", 0),
-                        "Tj_Margin": round(fixed_tj, 1),
+                        "Tj_Margin": res.get("Bottleneck_Tj_Margin", 0),
                     })
 
                 df_res = pd.DataFrame(results)
@@ -2304,20 +2288,6 @@ with tab_sensitivity:
                     {"choice": "Power Scale (功耗縮放)","key": "power_scale", "default": 1.0},
                 ]
 
-                # Fixed-Design：取基準散熱面積
-                r_tornado_base = _sa_calc(base_params_sa, base_df_sa, "Gap", base_params_sa["Gap"])
-                area_tornado_fixed = r_tornado_base["Area_req"]
-                eff_tornado = 0.95 if "Embedded" in base_params_sa.get("fin_tech_selector_v2", "") else 0.90
-
-                margin_tornado = base_params_sa.get("Margin", 1.0)
-                def _fixed_tj(res):
-                    """以固定基準散熱面積計算 Tj_Margin（用實際功率，÷Margin）"""
-                    if area_tornado_fixed > 0 and res["h_value"] > 0 and res["Total_Power"] > 0:
-                        actual_pwr = res["Total_Power"] / margin_tornado
-                        dT = actual_pwr / (res["h_value"] * area_tornado_fixed * eff_tornado)
-                        return round(res["Min_dT_Allowed"] - dT, 1)
-                    return 0.0
-
                 tornado_rows = []
                 for tv in tornado_vars:
                     vk = tv["key"]
@@ -2334,9 +2304,9 @@ with tab_sensitivity:
                         "Vol_low":  round(r_low["Volume_L"], 2),
                         "Vol_base": round(r_base["Volume_L"], 2),
                         "Vol_high": round(r_high["Volume_L"], 2),
-                        "Tj_low":   _fixed_tj(r_low),
-                        "Tj_base":  _fixed_tj(r_base),
-                        "Tj_high":  _fixed_tj(r_high),
+                        "Tj_low":   r_low.get("Bottleneck_Tj_Margin", 0),
+                        "Tj_base":  r_base.get("Bottleneck_Tj_Margin", 0),
+                        "Tj_high":  r_high.get("Bottleneck_Tj_Margin", 0),
                     })
 
                 df_tornado = pd.DataFrame(tornado_rows)
