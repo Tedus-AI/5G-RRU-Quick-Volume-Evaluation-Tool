@@ -2162,65 +2162,95 @@ with tab_sensitivity:
                     })
 
                 df_res = pd.DataFrame(results)
-                fig = go.Figure()
 
-                # 右軸 Bar：體積 + 重量
-                fig.add_trace(go.Bar(
-                    x=df_res["x"], y=df_res["Volume"], name="體積 (L)",
-                    marker_color='rgba(52,152,219,0.7)', yaxis="y2", offsetgroup=1
-                ))
-                fig.add_trace(go.Bar(
-                    x=df_res["x"], y=df_res["Weight"], name="重量 (kg)",
-                    marker_color='rgba(46,204,113,0.7)', yaxis="y3", offsetgroup=2
-                ))
-
-                # 左軸 Line：依變數決定
+                # ── 決定右圖（熱流/幾何）的 Y 軸設定 ──
                 if var_key == "Gap":
-                    fig.add_trace(go.Scatter(
-                        x=df_res["x"], y=df_res["AR"], name="流阻比 (AR)",
-                        mode='lines+markers', line=dict(color='#e74c3c', width=3),
-                        marker=dict(size=8, symbol='diamond'), yaxis="y1"
-                    ))
-                    y1_title, y1_color = "流阻比 (Aspect Ratio)", "#e74c3c"
-
+                    perf_y      = df_res["AR"]
+                    perf_name   = "流阻比 (AR)"
+                    perf_color  = "#e74c3c"
+                    perf_symbol = "diamond"
+                    perf_mode   = "lines+markers"
+                    perf_shape  = "linear"
+                    perf_ytitle = "流阻比 (Aspect Ratio)"
+                    add_zero    = False
                 elif var_key == "Fin_t":
-                    fig.add_trace(go.Scatter(
-                        x=df_res["x"], y=df_res["Fin_Count"], name="鰭片數 (Pcs)",
-                        mode='lines+markers', line=dict(color='#9b59b6', width=3, shape='hv'),
-                        marker=dict(size=8, symbol='square'), yaxis="y1"
-                    ))
-                    y1_title, y1_color = "鰭片數 (Pcs)", "#9b59b6"
+                    perf_y      = df_res["Fin_Count"]
+                    perf_name   = "鰭片數 (Pcs)"
+                    perf_color  = "#9b59b6"
+                    perf_symbol = "square"
+                    perf_mode   = "lines+markers"
+                    perf_shape  = "hv"
+                    perf_ytitle = "鰭片數 (Pcs)"
+                    add_zero    = False
+                else:  # T_amb 或 Power Scale
+                    perf_y      = df_res["Tj_Margin"]
+                    perf_name   = "Bottleneck Tj_Margin (°C)"
+                    perf_color  = "#e67e22"
+                    perf_symbol = "circle"
+                    perf_mode   = "lines+markers"
+                    perf_shape  = "linear"
+                    perf_ytitle = "Bottleneck Tj_Margin (°C)"
+                    add_zero    = True
 
-                else:  # T_amb 或 Power Scale → 主 Y = Tj_Margin
-                    fig.add_trace(go.Scatter(
-                        x=df_res["x"], y=df_res["Tj_Margin"], name="Bottleneck Tj_Margin (°C)",
-                        mode='lines+markers', line=dict(color='#e67e22', width=3),
-                        marker=dict(size=8, symbol='circle'), yaxis="y1"
+                x_title = f"{var_info['label']} ({var_unit})"
+                vline_kw = dict(line_width=1, line_dash="dash", line_color="gray",
+                                annotation_text="Current")
+
+                col_left, col_right = st.columns(2)
+
+                # ── 左圖：散熱器規模（體積 + 重量） ──
+                with col_left:
+                    st.markdown(f"**散熱器規模 — 體積 & 重量**")
+                    fig_size = go.Figure()
+                    fig_size.add_trace(go.Bar(
+                        x=df_res["x"], y=df_res["Volume"], name="體積 (L)",
+                        marker_color='rgba(52,152,219,0.8)', yaxis="y1", offsetgroup=1
                     ))
-                    fig.add_hline(
-                        y=0, line_width=2, line_dash="dot", line_color="red",
-                        annotation_text="Tj_Margin = 0 (超溫紅線)",
-                        annotation_position="bottom right"
+                    fig_size.add_trace(go.Bar(
+                        x=df_res["x"], y=df_res["Weight"], name="重量 (kg)",
+                        marker_color='rgba(46,204,113,0.8)', yaxis="y2", offsetgroup=2
+                    ))
+                    fig_size.add_vline(x=base_val, **vline_kw)
+                    fig_size.update_layout(
+                        xaxis=dict(title=x_title),
+                        yaxis=dict(title=dict(text="體積 (L)", font=dict(color="#3498db")),
+                                   tickfont=dict(color="#3498db"), side="left"),
+                        yaxis2=dict(title=dict(text="重量 (kg)", font=dict(color="#2ecc71")),
+                                    tickfont=dict(color="#2ecc71"), overlaying="y",
+                                    side="right", anchor="x"),
+                        legend=dict(orientation="h", x=0.5, y=1.08, xanchor="center"),
+                        barmode="group", hovermode="x unified",
+                        height=420, margin=dict(l=50, r=50, t=50, b=50)
                     )
-                    y1_title, y1_color = "Bottleneck Tj_Margin (°C)", "#e67e22"
+                    st.plotly_chart(fig_size, use_container_width=True)
 
-                fig.update_layout(
-                    title=dict(text=f"<b>{var_info['label']} 敏感度分析 (基準 {base_val:.3g} {var_unit})</b>"),
-                    xaxis=dict(title=dict(text=f"{var_info['label']} ({var_unit})"), domain=[0.05, 0.9]),
-                    yaxis=dict(title=dict(text=y1_title, font=dict(color=y1_color)),
-                               tickfont=dict(color=y1_color), side="left"),
-                    yaxis2=dict(title=dict(text="體積 (L)", font=dict(color="#3498db")),
-                                tickfont=dict(color="#3498db"), anchor="x", overlaying="y", side="right"),
-                    yaxis3=dict(title=dict(text="重量 (kg)", font=dict(color="#2ecc71")),
-                                tickfont=dict(color="#2ecc71"), anchor="free",
-                                overlaying="y", side="right", position=0.95),
-                    legend=dict(x=0.5, y=1.1, orientation="h", xanchor="center"),
-                    height=650, margin=dict(l=60, r=80, t=80, b=50),
-                    hovermode="x unified", barmode='group'
-                )
-                fig.add_vline(x=base_val, line_width=1, line_dash="dash",
-                              line_color="gray", annotation_text="Current")
-                st.plotly_chart(fig, use_container_width=True)
+                # ── 右圖：熱流 / 幾何性能 ──
+                with col_right:
+                    st.markdown(f"**熱流/幾何性能 — {perf_name}**")
+                    fig_perf = go.Figure()
+                    fig_perf.add_trace(go.Scatter(
+                        x=df_res["x"], y=perf_y, name=perf_name,
+                        mode=perf_mode,
+                        line=dict(color=perf_color, width=3, shape=perf_shape),
+                        marker=dict(size=8, symbol=perf_symbol)
+                    ))
+                    if add_zero:
+                        fig_perf.add_hline(
+                            y=0, line_width=2, line_dash="dot", line_color="red",
+                            annotation_text="Tj_Margin = 0 (超溫紅線)",
+                            annotation_position="bottom right"
+                        )
+                    fig_perf.add_vline(x=base_val, **vline_kw)
+                    fig_perf.update_layout(
+                        xaxis=dict(title=x_title),
+                        yaxis=dict(title=dict(text=perf_ytitle,
+                                              font=dict(color=perf_color)),
+                                   tickfont=dict(color=perf_color)),
+                        legend=dict(orientation="h", x=0.5, y=1.08, xanchor="center"),
+                        hovermode="x unified",
+                        height=420, margin=dict(l=50, r=50, t=50, b=50)
+                    )
+                    st.plotly_chart(fig_perf, use_container_width=True)
 
                 with st.expander("查看詳細數據"):
                     col_rename = {
