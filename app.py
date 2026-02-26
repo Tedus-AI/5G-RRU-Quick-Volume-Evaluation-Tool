@@ -1311,7 +1311,7 @@ def calc_thermal_resistance(row, g):
     return pd.Series([base_l, base_w, loc_amb, r_int, r_tim, total_w, drop, allowed_dt])
 
 # [v4.11 Core] 新增 compute_key_results 函數，供敏感度分析使用
-def compute_key_results(global_params, df_components):
+def compute_key_results(global_params, df_components, Area_fixed_m2=None):
     """
     獨立計算核心結果，不依賴 Streamlit session_state
     返回 dict 包含關鍵 KPI
@@ -1411,10 +1411,16 @@ def compute_key_results(global_params, df_components):
     total_weight_kg = hs_weight_kg + cavity_weight_kg
 
     # === Bottleneck Tj_Margin 計算 (供敏感度分析使用) ===
+    # 若提供 Area_fixed_m2 (Fixed-Design)：以固定散熱面積反算 T_hsk，
+    # 這樣改變 T_amb / Power / Gap 時 Tj_Margin 才能正確反映差異。
+    # 若未提供 (一般計算)：散熱器重新 sizing，Tj_Margin = D × (1 - 1/Margin)。
     Bottleneck_Tj_Margin = 0.0
     if not df.empty and Bottleneck_Name != "None" and 'R_int' in df.columns:
         _slope = p.get('Slope', 0.03)
-        _T_hsk_base = p['T_amb'] + Min_dT_Allowed / p['Margin']
+        if Area_fixed_m2 is not None and Area_fixed_m2 > 0:
+            _T_hsk_base = p['T_amb'] + Total_Power / (h_value * Area_fixed_m2 * eff)
+        else:
+            _T_hsk_base = p['T_amb'] + Min_dT_Allowed / p['Margin']
         df['_T_hsk_eff'] = _T_hsk_base + df['Height(mm)'] * _slope
         df['_Tc'] = df['_T_hsk_eff'] + df['Power(W)'] * (df['R_int'] + df['R_TIM'])
         df['_Tj'] = df['_Tc'] + df['Power(W)'] * df['R_jc']
@@ -2085,7 +2091,7 @@ with tab_sensitivity:
         "Power Scale (功耗縮放)":    {"key": "power_scale", "unit": "×",  "label": "功耗縮放係數"},
     }
 
-    def _sa_calc(p_dict, d_df, vk, x_val):
+    def _sa_calc(p_dict, d_df, vk, x_val, Area_fixed_m2=None):
         """單點計算封裝：修改變數後呼叫 compute_key_results"""
         p = copy.deepcopy(p_dict)
         d = d_df.copy()
@@ -2093,7 +2099,7 @@ with tab_sensitivity:
             d['Power(W)'] = d['Power(W)'] * x_val
         else:
             p[vk] = x_val
-        return compute_key_results(p, d)
+        return compute_key_results(p, d, Area_fixed_m2=Area_fixed_m2)
 
     # =====================================================
     # 模式 A：單變數掃描
@@ -2149,9 +2155,13 @@ with tab_sensitivity:
                 x_values[closest_idx] = base_val
                 main_volume_rounded = round(Volume_L, 2)
 
+                # Fixed-Design：先算基準散熱面積，後續掃描用固定面積算 Tj_Margin
+                _base_res = _sa_calc(base_params_sa, base_df_sa, var_key, base_val)
+                _area_base = _base_res.get("Area_req", 0)
+
                 results = []
                 for i, x in enumerate(x_values):
-                    res = _sa_calc(base_params_sa, base_df_sa, var_key, x)
+                    res = _sa_calc(base_params_sa, base_df_sa, var_key, x, Area_fixed_m2=_area_base)
                     gap_now = base_params_sa["Gap"] if var_key != "Gap" else x
                     ar = res["Fin_Height"] / gap_now if gap_now > 0 else 0
                     vol_r = round(res["Volume_L"], 2)
@@ -2369,15 +2379,19 @@ with tab_sensitivity:
                 ]
 
                 tornado_rows = []
+                # Fixed-Design：先以 Gap 基準算出散熱面積，後續所有變數掃描共用此面積算 Tj_Margin
+                _tornado_base_res = _sa_calc(base_params_sa, base_df_sa, "Gap", base_params_sa["Gap"])
+                _tornado_area_base = _tornado_base_res.get("Area_req", 0)
+
                 for tv in tornado_vars:
                     vk = tv["key"]
                     bv = 1.0 if vk == "power_scale" else float(st.session_state.get(vk, tv["default"]))
                     v_low  = max(bv * (1 - tornado_pct / 100), 0.1)
                     v_high = bv * (1 + tornado_pct / 100)
 
-                    r_low  = _sa_calc(base_params_sa, base_df_sa, vk, v_low)
-                    r_base = _sa_calc(base_params_sa, base_df_sa, vk, bv)
-                    r_high = _sa_calc(base_params_sa, base_df_sa, vk, v_high)
+                    r_low  = _sa_calc(base_params_sa, base_df_sa, vk, v_low,  Area_fixed_m2=_tornado_area_base)
+                    r_base = _sa_calc(base_params_sa, base_df_sa, vk, bv,     Area_fixed_m2=_tornado_area_base)
+                    r_high = _sa_calc(base_params_sa, base_df_sa, vk, v_high, Area_fixed_m2=_tornado_area_base)
 
                     tornado_rows.append({
                         "label":    VAR_MAP[tv["choice"]]["label"],
@@ -2416,8 +2430,8 @@ with tab_sensitivity:
                     fig_t.update_layout(
                         barmode='overlay',
                         xaxis=dict(title=x_title),
-                        legend=dict(x=0.7, y=0.02),
-                        height=360, margin=dict(l=20, r=20, t=30, b=40)
+                        legend=dict(orientation="h", x=0.5, y=1.12, xanchor="center"),
+                        height=380, margin=dict(l=20, r=20, t=55, b=40)
                     )
                     return fig_t
 
@@ -2467,7 +2481,7 @@ with tab_sensitivity:
             st.markdown("""
             <div style="text-align: center; color: #aaa; padding: 60px; border: 2px dashed #eee; border-radius: 10px; background-color: #fcfcfc; margin-top: 20px;">
                 <h3 style="margin-bottom: 10px;">👈 請設定敏感度範圍並點擊「執行 Tornado 分析」</h3>
-                <p>系統將對 <b>Gap / T_amb / Fin_t / Power Scale</b> 四個參數同時進行 ±% 掃描，<br>
+                <p>系統將對 <b>Gap / T_amb / Power Scale</b> 三個參數同時進行 ±% 掃描，<br>
                 以 Tornado Chart 呈現各參數對 <b>體積</b> 與 <b>Tj_Margin</b> 的影響力排名。</p>
             </div>
             """, unsafe_allow_html=True)
