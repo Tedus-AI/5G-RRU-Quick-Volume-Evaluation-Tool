@@ -2477,6 +2477,70 @@ with tab_sensitivity:
                             .background_gradient(cmap="Blues_r", subset=vol_cols),
                         use_container_width=True
                     )
+
+                with st.expander("📖 如何解讀 Tornado Chart？"):
+                    st.markdown(f"""
+#### 一、這張圖在問什麼？
+
+> **「如果我把某個參數改變 ±{tornado_pct:.0f}%，整機的散熱器體積與熱裕度會跑多遠？」**
+
+把三個參數（Gap / 環境溫度 / 功耗縮放係數）各自偏移 ±{tornado_pct:.0f}%，
+**誰動一下、結果就跑最多 → 那就是最需要管控的風險項目。**
+
+---
+
+#### 二、左圖：體積敏感度
+
+| 顏色 | 代表方向 |
+|---|---|
+| 🔴 紅色條（往左）| 該參數 **減少** {tornado_pct:.0f}%，體積的變化量 |
+| 🔵 藍色條（往右）| 該參數 **增加** {tornado_pct:.0f}%，體積的變化量 |
+
+- **條越長 → 體積對這個參數越敏感**，代表設計容忍度低，量產公差需嚴格管控
+- 以 Gap（鰭片間距）為例：Gap 越小 → 流阻比 AR 上升 → 需要更高的鰭片 → 體積增大（右條）
+
+---
+
+#### 三、右圖：Tj_Margin 敏感度（Fixed-Design 固定散熱器方式）
+
+**重要前提：右圖固定現有散熱器面積不變，模擬「工況偏移但散熱器不重設計」的情境。**
+
+| 顏色 | 代表方向 |
+|---|---|
+| 🔴 紅色條（往左）| 參數變化讓 Tj_Margin **下降**（熱裕度縮水、趨向超溫） |
+| 🟢 綠色條（往右）| 參數變化讓 Tj_Margin **上升**（更有餘裕） |
+
+- **Base 線 = 目前設計工況**（Tj_Margin 以此為起點向左右延伸）
+- 條穿越 Tj_Margin = 0（超溫紅線）= 在該工況下散熱器不夠用，需重設計
+- 條越長 → 熱設計對這個參數越敏感
+
+**物理意義：**
+- `T_amb ↑` → 基板溫度 T_hsk 整體升高 → 所有元件 Tj 同步上升 → Margin 下滑
+- `功耗 ↑` → T_hsk 因承受更多熱量而升高 → Tj 因 P×R 也增加 → 雙重衝擊
+- `Gap ↑` → 對流係數 h 改善 → T_hsk 下降 → Margin 增加（右條）
+
+---
+
+#### 四、為什麼 T_amb +{tornado_pct:.0f}% 與 功耗 +{tornado_pct:.0f}% 的 Tj_Margin 幾乎一樣？
+
+這是一個設計相關的數學巧合，並非 Bug。
+推導如下（設 pct = {tornado_pct/100:.1f}）：
+
+| 情境 | Tj_Margin 下降量 |
+|---|---|
+| T_amb 增加 pct | `pct × T_amb_base` |
+| 功耗增加 pct | `pct × (D + P_瓶頸 × R_total)` |
+
+**兩者相等的條件：`T_amb ≈ D + P × R`**
+
+其中 D（Allowed_dT）= 散熱器基板到元件接面之間允許的溫升預算。
+換算成元件極限溫度：`Limit_瓶頸 ≈ 2 × T_amb + Height × Slope`
+
+以你的設計 T_amb = {float(st.session_state.get('T_amb', 45)):.0f}°C 代入：**瓶頸元件 Limit ≈ {2 * float(st.session_state.get('T_amb', 45)):.0f}°C**。
+這是 PA 類元件極常見的 Tc 規格（85–95°C 區間），因此數值接近是合理的設計現象，
+代表你的設計在 T_amb 壓力與功耗壓力上幾乎「等效敏感」。
+""")
+
         else:
             st.markdown("""
             <div style="text-align: center; color: #aaa; padding: 60px; border: 2px dashed #eee; border-radius: 10px; background-color: #fcfcfc; margin-top: 20px;">
