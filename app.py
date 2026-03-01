@@ -2520,6 +2520,9 @@ with tab_sensitivity:
 **物理意義：**
 - `T_amb ↑` → 基板溫度 T_hsk 整體升高 → 所有元件 Tj 同步上升 → Margin 下滑
 - `功耗 ↑` → T_hsk 因承受更多熱量而升高 → Tj 因 P×R 也增加 → **雙重衝擊**
+  - **P** = 元件單顆功耗 (W)
+  - **R** = 元件接面到散熱器基板的總熱阻 (°C/W)，包含 R_jc（接面到外殼）+ R_int（內部板材）+ R_TIM（導熱介面材料）
+  - **P×R** = 元件接面相對散熱器基板的溫差 (°C)；功耗越大、熱阻越高，溫差越大
 - `Gap ↑` → h（對流+輻射係數）改善 → T_hsk 下降 → Margin 增加（右條）
 
 **Gap 的計算方式說明：**
@@ -2530,6 +2533,17 @@ h_rad  = 2.4 × (Gap / 10)^0.5    ← 鰭片間輻射交換
 T_hsk  = T_amb + TotalPower / (h_total × Area_fixed × eff)
 ```
 Gap ↑ → h_total ↑ → T_hsk ↓ → Tj_Margin ↑
+
+**名詞說明（第三點公式）：**
+
+| 符號 | 全名 | 說明 |
+|---|---|---|
+| h_conv | 自然對流換熱係數 | W/m²·K，鰭片間距越大對流越強，但趨近飽和（tanh 曲線） |
+| h_rad | 輻射換熱係數 | W/m²·K，間距越大鰭片互見輻射越多 |
+| h_total | 綜合換熱係數 | h_conv + h_rad (W/m²·K) |
+| TotalPower | 整機總功耗 | 含安全係數 Margin，= Σ(P×Qty) × Margin (W) |
+| Area_fixed | 固定散熱器面積 | 由基準工況計算後凍結，Fixed-Design 期間不隨工況改變 (m²) |
+| eff | 鰭片效率係數 | 壓鑄 0.90，嵌入式 0.95（反映鰭片導熱損耗） |
 
 > **你的理解補充：** 從結構角度，Gap↑ 確實使鰭片數變少、鰭片高度需增加才能守住面積。
 > 熱模型這裡將此幾何效應轉換為：「相同面積、不同 Gap → 不同 h 係數」來計算。
@@ -2548,10 +2562,22 @@ Gap ↑ → h_total ↑ → T_hsk ↓ → Tj_Margin ↑
 
 **兩者體積影響相等的數學條件：**
 ```
-D_base + P_瓶頸 × R_total = (1 + pct/100) × T_amb_base
+D_base + P_瓶頸 × R_total = (1 + pct) × T_amb_base
 ```
-- pct = {tornado_pct:.0f}% 時，條件為：D + P×R = {(1 + tornado_pct/100) * float(st.session_state.get('T_amb', 45)):.1f}°C
+- 目前 pct = {tornado_pct:.0f}%（= {tornado_pct/100:.2f}），條件為：D + P×R = {(1 + tornado_pct/100) * float(st.session_state.get('T_amb', 45)):.1f}°C
 - **這個閾值隨 pct 增大而增大**，因此不同 % 下條長是否接近會改變
+
+**名詞說明（第四點公式）：**
+
+| 符號 | 全名 | 說明 |
+|---|---|---|
+| D_base | 瓶頸元件允許溫升 | = Limit − P×R − T_amb − H×Slope (°C)，即散熱器基板到元件接面之間的溫升預算 |
+| P_瓶頸 | 瓶頸元件單顆功耗 | 熱設計決定體積的關鍵元件之功耗 (W) |
+| R_total | 瓶頸元件總熱阻 | R_jc + R_int + R_TIM (°C/W)，接面到散熱器基板的熱阻路徑 |
+| pct | 敏感度偏移量 | 即設定的 ±N%，以小數 N/100 代入公式（目前 = {tornado_pct/100:.2f}） |
+| T_amb_base | 基準環境溫度 | 目前設定值 = {float(st.session_state.get('T_amb', 45)):.0f}°C |
+| Limit | 元件溫度極限 | 瓶頸元件規格書中的 Tj（或 Tc）最高操作溫度 (°C) |
+| H×Slope | 高度溫升修正 | 元件高度 × 溫度斜率 (°C/mm × mm)，反映機殼內高度造成的局部溫升差異 |
 
 **實際意義：**
 若兩條長度接近 → 環境溫度升高與功耗增加對你的散熱器體積影響力相當，
