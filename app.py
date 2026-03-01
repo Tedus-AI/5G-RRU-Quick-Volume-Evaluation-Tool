@@ -2408,7 +2408,10 @@ with tab_sensitivity:
                 def _make_tornado(df, k_low, k_high, k_base, x_title, c_dec, c_inc):
                     df = df.copy()
                     df["swing"] = (df[k_high] - df[k_low]).abs()
-                    df = df.sort_values("swing", ascending=True)
+                    # 固定顯示順序：Gap 底 → T_amb 中 → 功耗縮放係數 頂（不依 swing 動態排序）
+                    _FIXED_ORDER = {"Fin Air Gap": 0, "環境溫度": 1, "功耗縮放係數": 2}
+                    df["_order"] = df["label"].map(_FIXED_ORDER).fillna(99)
+                    df = df.sort_values("_order", ascending=True)
                     fig_t = go.Figure()
                     base_mean = df[k_base].mean()
                     first_label = df["label"].iloc[0]
@@ -2516,29 +2519,43 @@ with tab_sensitivity:
 
 **物理意義：**
 - `T_amb ↑` → 基板溫度 T_hsk 整體升高 → 所有元件 Tj 同步上升 → Margin 下滑
-- `功耗 ↑` → T_hsk 因承受更多熱量而升高 → Tj 因 P×R 也增加 → 雙重衝擊
-- `Gap ↑` → 對流係數 h 改善 → T_hsk 下降 → Margin 增加（右條）
+- `功耗 ↑` → T_hsk 因承受更多熱量而升高 → Tj 因 P×R 也增加 → **雙重衝擊**
+- `Gap ↑` → h（對流+輻射係數）改善 → T_hsk 下降 → Margin 增加（右條）
+
+**Gap 的計算方式說明：**
+固定面積下，Gap 改變只透過 h 值影響 T_hsk，不重算鰭片數量與高度：
+```
+h_conv = 6.4 × tanh(Gap / 7.0)   ← 自然對流飽和曲線
+h_rad  = 2.4 × (Gap / 10)^0.5    ← 鰭片間輻射交換
+T_hsk  = T_amb + TotalPower / (h_total × Area_fixed × eff)
+```
+Gap ↑ → h_total ↑ → T_hsk ↓ → Tj_Margin ↑
+
+> **你的理解補充：** 從結構角度，Gap↑ 確實使鰭片數變少、鰭片高度需增加才能守住面積。
+> 熱模型這裡將此幾何效應轉換為：「相同面積、不同 Gap → 不同 h 係數」來計算。
+> 兩個角度描述的是同一個物理現象的不同層面。
 
 ---
 
-#### 四、為什麼 T_amb +{tornado_pct:.0f}% 與 功耗 +{tornado_pct:.0f}% 的 Tj_Margin 幾乎一樣？
+#### 四、為什麼體積敏感度圖中，T_amb 與功耗縮放的長條長度在某個 % 下會接近？
 
-這是一個設計相關的數學巧合，並非 Bug。
-推導如下（設 pct = {tornado_pct/100:.1f}）：
+這是**設計工況特定**的現象，並非通用規律。背後的數學條件會隨 % 改變：
 
-| 情境 | Tj_Margin 下降量 |
+| 情境 | 體積變化來源 |
 |---|---|
-| T_amb 增加 pct | `pct × T_amb_base` |
-| 功耗增加 pct | `pct × (D + P_瓶頸 × R_total)` |
+| T_amb ↑ pct% | Allowed_dT 縮小（空間變少）→ 需更大面積 |
+| 功耗 ↑ pct% | Allowed_dT 縮小 **且** 功率增大 → 雙重放大效應 |
 
-**兩者相等的條件：`T_amb ≈ D + P × R`**
+**兩者體積影響相等的數學條件：**
+```
+D_base + P_瓶頸 × R_total = (1 + pct/100) × T_amb_base
+```
+- pct = {tornado_pct:.0f}% 時，條件為：D + P×R = {(1 + tornado_pct/100) * float(st.session_state.get('T_amb', 45)):.1f}°C
+- **這個閾值隨 pct 增大而增大**，因此不同 % 下條長是否接近會改變
 
-其中 D（Allowed_dT）= 散熱器基板到元件接面之間允許的溫升預算。
-換算成元件極限溫度：`Limit_瓶頸 ≈ 2 × T_amb + Height × Slope`
-
-以你的設計 T_amb = {float(st.session_state.get('T_amb', 45)):.0f}°C 代入：**瓶頸元件 Limit ≈ {2 * float(st.session_state.get('T_amb', 45)):.0f}°C**。
-這是 PA 類元件極常見的 Tc 規格（85–95°C 區間），因此數值接近是合理的設計現象，
-代表你的設計在 T_amb 壓力與功耗壓力上幾乎「等效敏感」。
+**實際意義：**
+若兩條長度接近 → 環境溫度升高與功耗增加對你的散熱器體積影響力相當，
+兩者都需要一起管控，不能只注意其中一個。
 """)
 
         else:
