@@ -609,27 +609,20 @@ with col_header_R:
         # 標題樣式
         header_style = "font-size: 0.9rem; font-weight: 700; color: #333; margin-bottom: 2px;"
 
-        # 同一行：左放標題+狀態，右放載入按鈕
-        c_p1, c_p2 = st.columns(2, gap="small")
-        
-        with c_p1:
-            st.markdown(f"<div style='{header_style}'>專案存取 (Project I/O)</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='{header_style}'>專案存取 (Project I/O)</div>", unsafe_allow_html=True)
 
-            if st.session_state.get('current_project_name'):
-                file_display = f"📄 {st.session_state['current_project_name']}"
-                st.markdown(f"<div style='font-size: 0.8rem; color: #007CF0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;' title='{file_display}'>{file_display}</div>", unsafe_allow_html=True)
-                meta = st.session_state.get('project_meta') or {}
-                ver = meta.get('version', '')
-                ts  = meta.get('timestamp', '')[:10]
-                if ver or ts:
-                    st.markdown(f"<div style='font-size: 0.7rem; color: #aaa;'>ver {ver} · {ts}</div>", unsafe_allow_html=True)
-            else:
-                st.markdown(f"<div style='font-size: 0.8rem; color: #555;'>{config_loaded_msg}</div>", unsafe_allow_html=True)
-            
-        with c_p2:
-            # 小幅往下推，讓按鈕與左側狀態文字垂直對齊
-            st.markdown("<div style='margin-top: 18px;'></div>", unsafe_allow_html=True)
-            uploaded_proj = st.file_uploader("📂 載入專案", type=["json"], key="project_loader", label_visibility="collapsed")
+        if st.session_state.get('current_project_name'):
+            file_display = f"📄 {st.session_state['current_project_name']}"
+            st.markdown(f"<div style='font-size: 0.8rem; color: #007CF0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;' title='{file_display}'>{file_display}</div>", unsafe_allow_html=True)
+            meta = st.session_state.get('project_meta') or {}
+            ver = meta.get('version', '')
+            ts  = meta.get('timestamp', '')[:10]
+            if ver or ts:
+                st.markdown(f"<div style='font-size: 0.7rem; color: #aaa;'>ver {ver} · {ts}</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<div style='font-size: 0.8rem; color: #555;'>{config_loaded_msg}</div>", unsafe_allow_html=True)
+
+        uploaded_proj = st.file_uploader("📂 載入專案", type=["json"], key="project_loader", label_visibility="collapsed")
             
         if uploaded_proj is not None:
             if uploaded_proj != st.session_state['last_loaded_file']:
