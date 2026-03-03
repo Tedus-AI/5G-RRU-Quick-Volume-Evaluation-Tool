@@ -611,18 +611,22 @@ with col_header_R:
 
         st.markdown(f"<div style='{header_style}'>專案存取 (Project I/O)</div>", unsafe_allow_html=True)
 
-        if st.session_state.get('current_project_name'):
-            file_display = f"📄 {st.session_state['current_project_name']}"
-            st.markdown(f"<div style='font-size: 0.8rem; color: #007CF0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;' title='{file_display}'>{file_display}</div>", unsafe_allow_html=True)
-            meta = st.session_state.get('project_meta') or {}
-            ver = meta.get('version', '')
-            ts  = meta.get('timestamp', '')[:10]
-            if ver or ts:
-                st.markdown(f"<div style='font-size: 0.7rem; color: #aaa;'>ver {ver} · {ts}</div>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"<div style='font-size: 0.8rem; color: #555;'>{config_loaded_msg}</div>", unsafe_allow_html=True)
+        col_btn, col_status = st.columns([1, 1.5])
 
-        uploaded_proj = st.file_uploader("📂 載入專案", type=["json"], key="project_loader", label_visibility="collapsed")
+        with col_btn:
+            uploaded_proj = st.file_uploader("📂 載入專案", type=["json"], key="project_loader", label_visibility="collapsed")
+
+        with col_status:
+            if st.session_state.get('current_project_name'):
+                file_display = f"📄 {st.session_state['current_project_name']}"
+                st.markdown(f"<div style='font-size: 0.8rem; color: #007CF0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;' title='{file_display}'>{file_display}</div>", unsafe_allow_html=True)
+                meta = st.session_state.get('project_meta') or {}
+                ver = meta.get('version', '')
+                ts  = meta.get('timestamp', '')[:10]
+                if ver or ts:
+                    st.markdown(f"<div style='font-size: 0.7rem; color: #aaa;'>ver {ver} · {ts}</div>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<div style='font-size: 0.8rem; color: #555; padding-top: 0.6rem;'>{config_loaded_msg}</div>", unsafe_allow_html=True)
             
         if uploaded_proj is not None:
             if uploaded_proj != st.session_state['last_loaded_file']:
