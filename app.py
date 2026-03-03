@@ -301,16 +301,11 @@ if 'component_library' not in st.session_state:
 if 'last_loaded_file' not in st.session_state:
     st.session_state['last_loaded_file'] = None
 
-if 'json_ready_to_download' not in st.session_state:
-    st.session_state['json_ready_to_download'] = None
-if 'json_file_name' not in st.session_state:
-    st.session_state['json_file_name'] = ""
-if 'trigger_generation' not in st.session_state:
-    st.session_state['trigger_generation'] = False
-
 # 新增記錄目前載入專案名稱的狀態
 if 'current_project_name' not in st.session_state:
     st.session_state['current_project_name'] = None
+if 'project_meta' not in st.session_state:
+    st.session_state['project_meta'] = None
 
 for _flag in ['rf_confirm_overwrite', 'rf_confirm_delete',
               'digital_confirm_overwrite', 'digital_confirm_delete',
@@ -319,7 +314,18 @@ for _flag in ['rf_confirm_overwrite', 'rf_confirm_delete',
         st.session_state[_flag] = None
 
 def reset_download_state():
-    st.session_state['json_ready_to_download'] = None
+    pass  # 保留供各 widget on_change 使用
+
+def get_current_state_json():
+    saved_params = {k: st.session_state[k] for k in DEFAULT_GLOBALS if k in st.session_state}
+    export_data = {
+        "meta": {"version": APP_VERSION, "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
+        "global_params": saved_params,
+        "rf_data": st.session_state['df_rf'].to_dict('records'),
+        "digital_data": st.session_state['df_digital'].to_dict('records'),
+        "pwr_data": st.session_state['df_pwr'].to_dict('records'),
+    }
+    return json.dumps(export_data, indent=4)
 
 def _sync_editor_state(editor_prefix, df_key, row_defaults):
     """Callback for data_editor: apply edits directly to session_state to avoid feedback loop."""
@@ -608,10 +614,15 @@ with col_header_R:
         
         with c_p1:
             st.markdown(f"<div style='{header_style}'>專案存取 (Project I/O)</div>", unsafe_allow_html=True)
-            
+
             if st.session_state.get('current_project_name'):
                 file_display = f"📄 {st.session_state['current_project_name']}"
                 st.markdown(f"<div style='font-size: 0.8rem; color: #007CF0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;' title='{file_display}'>{file_display}</div>", unsafe_allow_html=True)
+                meta = st.session_state.get('project_meta') or {}
+                ver = meta.get('version', '')
+                ts  = meta.get('timestamp', '')[:10]
+                if ver or ts:
+                    st.markdown(f"<div style='font-size: 0.7rem; color: #aaa;'>ver {ver} · {ts}</div>", unsafe_allow_html=True)
             else:
                 st.markdown(f"<div style='font-size: 0.8rem; color: #555;'>{config_loaded_msg}</div>", unsafe_allow_html=True)
             
@@ -636,8 +647,8 @@ with col_header_R:
                     st.session_state['editor_key'] += 1
                     
                     st.session_state['last_loaded_file'] = uploaded_proj
-                    # 記錄檔名
                     st.session_state['current_project_name'] = uploaded_proj.name
+                    st.session_state['project_meta'] = data.get('meta', None)
                     
                     st.toast("✅ 專案載入成功！", icon="📂")
                     time.sleep(0.5)
@@ -2593,45 +2604,14 @@ D_base + P_瓶頸 × R_total = (1 + pct) × T_amb_base
             </div>
             """, unsafe_allow_html=True)
 
-# --- [Project I/O - Save Logic] 移到底部執行 ---
-# [Critical Fix] 確保 placeholder 名稱與頂部定義一致 (project_io_save_placeholder)
+# --- [Project I/O - Save Logic] 底部渲染至頂部 placeholder ---
 with project_io_save_placeholder.container():
-    def get_current_state_json():
-        params_to_save = list(DEFAULT_GLOBALS.keys())
-        saved_params = {}
-        for k in params_to_save:
-            if k in st.session_state:
-                saved_params[k] = st.session_state[k]
-        
-        export_data = {
-            "meta": {"version": APP_VERSION, "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")},
-            "global_params": saved_params,
-            "rf_data": st.session_state['df_rf'].to_dict('records'),
-            "digital_data": st.session_state['df_digital'].to_dict('records'),
-            "pwr_data": st.session_state['df_pwr'].to_dict('records'),
-        }
-        return json.dumps(export_data, indent=4)
-
-    if st.session_state.get('trigger_generation', False):
-        json_data = get_current_state_json()
-        st.session_state['json_ready_to_download'] = json_data
-        st.session_state['json_file_name'] = f"RRU_Project_{time.strftime('%Y%m%d_%H%M%S')}.json"
-        st.session_state['trigger_generation'] = False 
-        st.rerun() 
-
-    # [UI Fix] 左右並排按鈕 (使用 columns)
-    c_btn1, c_btn2 = st.columns(2)
-    with c_btn1:
-        if st.button("🔄 1. 更新並產生"):
-            st.session_state['trigger_generation'] = True
-            st.rerun()
-    with c_btn2:
-        if st.session_state.get('json_ready_to_download'):
-            st.download_button(
-                label="💾 2. 下載專案",
-                data=st.session_state['json_ready_to_download'],
-                file_name=st.session_state['json_file_name'],
-                mime="application/json"
-            )
-        else:
-            st.caption("ℹ️ 待更新")
+    _json_data  = get_current_state_json()
+    _file_name  = f"RRU_Project_{time.strftime('%Y%m%d_%H%M%S')}.json"
+    st.download_button(
+        label="💾 儲存專案",
+        data=_json_data,
+        file_name=_file_name,
+        mime="application/json",
+        use_container_width=True,
+    )
