@@ -413,12 +413,14 @@ def check_password():
         <div style="background: #e9f7ef; padding: 25px; border-radius: 12px; border-left: 6px solid #2ecc71; margin-bottom: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.08);">
             <h3 style="color: #27ae60; margin-top: 0; padding-bottom: 8px;">🛠️ 主要功能一覽</h3>
             <ul style="font-size: 1.05rem; line-height: 1.8; color: #34495e;">
-                <li><strong>元件熱源管理</strong>：動態新增/編輯元件清單，支援 Copper Coin、Thermal Via、多種 TIM</li>
-                <li><strong>精準熱阻計算</strong>：自動計算 Rjc + Rint + Rtim，並考慮局部環溫與高度效應</li>
-                <li><strong>散熱器尺寸優化</strong>：根據瓶頸元件裕度，自動推算所需鰭片高度、數量與整機體積</li>
+                <li><strong>元件熱源管理</strong>：動態新增/編輯/複製/刪除元件清單，支援 Copper Coin、Thermal Via、多種 TIM（含雙組自訂 Pad / Pad2 規格）</li>
+                <li><strong>雲端元件資料庫</strong>：整合 Firebase Firestore，RF / Digital / PWR 三類元件庫可雲端共用，支援儲存、載入、覆寫確認與刪除</li>
+                <li><strong>精準熱阻計算</strong>：自動計算 Rjc + Rint + Rtim，考慮局部環溫與高度效應；PWR / DDR 類自動切換為 Tc 規格計算</li>
+                <li><strong>Tj_Margin 裕度分析</strong>：全元件 Tj / Tc 裕量色階顯示，超溫自動觸發紅色警告 Banner，並列出風險排名 Top 3 瓶頸元件</li>
+                <li><strong>散熱器尺寸優化</strong>：根據瓶頸元件裕度與安全係數，自動推算所需鰭片高度、數量與整機體積</li>
                 <li><strong>重量預估</strong>：含散熱器、Shield、Filter、Shielding、PCB 等分項重量</li>
                 <li><strong>設計規則檢查 (DRC)</strong>：自動檢測 Gap 過小、流阻比過高、製程限制等問題</li>
-                <li><strong>敏感度分析</strong>：針對 Gap 等關鍵參數進行掃描，視覺化 Trade-off 趨勢</li>
+                <li><strong>敏感度分析 & Tornado Chart</strong>：支援 Gap / T_amb / Power Scale 三變數掃描，視覺化 Tj_Margin 趨勢；Tornado Chart 模式可一次比較三參數對體積 / 裕量的影響幅度</li>
                 <li><strong>3D 模擬視圖</strong>：真實比例展示電子艙 + 散熱器 + 鰭片結構</li>
                 <li><strong>AI 寫實渲染輔助</strong>：一鍵生成精確提示詞，搭配 Imagen 3 可產出照片級渲染圖</li>
                 <li><strong>專案存取</strong>：JSON 格式載入/儲存，支援參數與元件資料完整備份</li>
@@ -432,6 +434,7 @@ def check_password():
             • <strong>h_conv</strong> = 6.4 × tanh(Gap / 7.0)　→ 模擬自然對流隨鰭片間距的飽和行為<br>
             • <strong>h_rad</strong> = 2.4 × (Gap / 10)<sup>0.5</sup>　→ 考慮鰭片間輻射交換隨間距衰減<br>
             • <strong>h_total</strong> = h_conv + h_rad<br><br>
+            Gap 由鰭片間距直接決定；當 Fin_t（鰭片厚度）調整時，Gap = (W_pcb - 邊界) / Fin數 - Fin_t，h 值隨之動態連動更新。<br><br>
             該模型已在多個專案中與 FloTHERM 結果比對，誤差通常在 <strong>±8%</strong> 以內。<br><br>
             當 Gap 過小時會自動提示 h_conv 過低；當流阻比（Aspect Ratio）過高時也會觸發設計風險警告，提醒避免空氣滯留與散熱效率下降。
             </p>
