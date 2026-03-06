@@ -88,11 +88,78 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
 .fb-ok{background:#e8f5e9;color:#2e7d32;}.fb-fail{background:#ffebee;color:#c0392b;}
 #loading{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#1e293b,#0f172a);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;color:#e2e8f0;}
 #loading h2{font-size:1.8rem;margin-bottom:15px;}#loading p{color:#94a3b8;margin-bottom:20px;}#loading progress{width:300px;height:6px;}
+.kpi-card .value{font-family:"Segoe UI","Roboto","Helvetica Neue",Arial,sans-serif;font-size:1.8rem;font-weight:700;color:#333;margin:6px 0;}
+/* Login Page */
+#login-page{position:fixed;top:0;left:0;width:100%;height:100%;background:#f5f7fa;z-index:10000;overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:40px 20px;}
+#login-page .login-header{background:linear-gradient(135deg,#007CF0,#00DFD8);padding:30px;border-radius:15px;color:#fff;text-align:center;margin-bottom:30px;box-shadow:0 6px 12px rgba(0,0,0,0.2);width:100%;max-width:700px;}
+#login-page .login-header h1{margin:0;font-size:2.8rem;font-weight:900;}
+#login-page .login-header p{font-size:1.3rem;margin:10px 0 0;opacity:0.95;}
+#login-page .login-header .ver{font-size:1rem;margin-top:15px;opacity:0.9;}
+#login-page .login-box{width:100%;max-width:400px;text-align:center;margin-bottom:30px;}
+#login-page .login-box h2{color:#2c3e50;margin-bottom:20px;}
+#login-page .login-box input{width:100%;padding:12px;border:2px solid #ddd;border-radius:8px;font-size:1rem;text-align:center;outline:none;transition:border 0.3s;}
+#login-page .login-box input:focus{border-color:#007CF0;}
+#login-page .login-box .error{color:#e74c3c;margin-top:10px;font-weight:600;display:none;}
+#login-page .login-box button{width:100%;padding:12px;margin-top:15px;background:linear-gradient(135deg,#007CF0,#00DFD8);color:#fff;border:none;border-radius:8px;font-size:1.1rem;font-weight:700;cursor:pointer;transition:opacity 0.2s;}
+#login-page .login-box button:hover{opacity:0.9;}
+#login-page .info-cards{width:100%;max-width:700px;}
+#login-page .info-card{padding:25px;border-radius:12px;margin-bottom:20px;line-height:1.8;}
+#login-page .info-card h3{margin-top:0;padding-bottom:8px;}
+#login-page .info-card ul{padding-left:20px;}
 @media(max-width:900px){body{flex-direction:column;}.sidebar{width:100%;height:auto;position:relative;}.kpi-row{flex-direction:column;}}
 </style>
 </head>
 <body>
-<div id="loading"><h2>📡 5G RRU 熱流引擎 Pro</h2><p>⚙️ 初始化熱流引擎中，請稍候...</p><progress></progress></div>
+<!-- Login Page -->
+<div id="login-page">
+  <div class="login-header">
+    <h1>📡 5G RRU 熱流引擎 Pro</h1>
+    <p>High-Performance Thermal & Volume Estimation System</p>
+    <div class="ver">v4.30 (GitHub Pages Edition)</div>
+  </div>
+  <div class="login-box">
+    <h2>🔐 請輸入授權金鑰</h2>
+    <input type="password" id="login-pw" placeholder="輸入密碼後按 Enter" onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()">登入</button>
+    <div class="error" id="login-error">❌ 密碼錯誤，請重新輸入</div>
+  </div>
+  <div class="info-cards">
+    <div class="info-card" style="background:#e9f7ef;border-left:6px solid #2ecc71;">
+      <h3 style="color:#27ae60;">🛠️ 主要功能一覽</h3>
+      <ul style="color:#34495e;">
+        <li><strong>元件熱源管理</strong>：動態新增/編輯/複製/刪除元件清單，支援 Copper Coin、Thermal Via、多種 TIM（含雙組自訂 Pad / Pad2 規格）</li>
+        <li><strong>雲端元件資料庫</strong>：整合 Firebase Firestore，RF / Digital / PWR 三類元件庫可雲端共用</li>
+        <li><strong>精準熱阻計算</strong>：自動計算 Rjc + Rint + Rtim，考慮局部環溫與高度效應</li>
+        <li><strong>Tj_Margin 裕度分析</strong>：全元件 Tj / Tc 裕量色階顯示，超溫自動觸發紅色警告</li>
+        <li><strong>散熱器尺寸優化</strong>：根據瓶頸元件裕度與安全係數，自動推算所需鰭片高度、數量與整機體積</li>
+        <li><strong>重量預估</strong>：含散熱器、Shield、Filter、Shielding、PCB 等分項重量</li>
+        <li><strong>敏感度分析 & Tornado Chart</strong>：支援 Gap / T_amb / Power Scale 變數掃描</li>
+        <li><strong>3D 模擬視圖</strong>：真實比例展示電子艙 + 散熱器 + 鰭片結構</li>
+        <li><strong>AI 寫實渲染輔助</strong>：一鍵生成精確提示詞</li>
+        <li><strong>專案存取</strong>：JSON 格式載入/儲存</li>
+      </ul>
+    </div>
+    <div class="info-card" style="background:#e8f4fd;border-left:6px solid #3498db;">
+      <h3 style="color:#2980b9;">🔥 綜合熱傳係數 h 的計算原理</h3>
+      <p style="color:#2c3e50;">本工具的 h 值採用<strong>半經驗模型</strong>，經多款實際 RRU 產品的 CFD 模擬結果校正而得：<br>
+      • <strong>h_conv</strong> = 6.4 × tanh(Gap / 7.0)　→ 模擬自然對流隨鰭片間距的飽和行為<br>
+      • <strong>h_rad</strong> = 2.4 × (Gap / 10)<sup>0.5</sup>　→ 考慮鰭片間輻射交換隨間距衰減<br>
+      • <strong>h_total</strong> = h_conv + h_rad<br>
+      該模型已在多個專案中與 FloTHERM 結果比對，誤差通常在 <strong>±8%</strong> 以內。</p>
+    </div>
+    <div class="info-card" style="background:#fffacd;border-left:6px solid #f39c12;">
+      <h3 style="color:#d35400;">⚠️ 使用注意事項</h3>
+      <ul style="color:#34495e;">
+        <li>本工具為<strong>快速概念設計與尺寸評估</strong>用途，非最終驗證級熱模擬</li>
+        <li>計算結果高度依賴輸入參數準確度，請使用實際量測或 Datasheet 數值</li>
+        <li>自然對流模型基於垂直鰭片、無風環境，室外高風速情境需另行評估</li>
+        <li>建議將計算結果與 CFD 或實測進行交叉驗證</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div id="loading" style="display:none;"><h2>📡 5G RRU 熱流引擎 Pro</h2><p>⚙️ 初始化熱流引擎中，請稍候...</p><progress></progress></div>
 
 <div class="sidebar" id="sidebar">
   <h2>🛠️ 參數控制台</h2>
@@ -737,14 +804,15 @@ function renderTab2(){
   if(!calcResults)return;let R=calcResults;
   document.getElementById('tab2-kpi').innerHTML=kpiCard('整機總熱耗',R.Total_Power.toFixed(2)+' W','Total Power','#e74c3c')+kpiCard('系統瓶頸元件',R.Bottleneck_Name,'Margin: '+R.Bottleneck_Tj_Margin+'°C','#f39c12')+kpiCard('所需散熱面積',R.Area_req.toFixed(3)+' m²','Required Area','#3498db')+kpiCard('預估鰭片數量',R.Fin_Count+' Pcs','Fin Count','#9b59b6');
   let valid=R.rows.filter(r=>r.Total_W>0);
+  let pCfg={responsive:true,displaylogo:false,modeBarButtonsToAdd:['toggleSpikelines'],displayModeBar:true};
   if(valid.length){
     let cd=document.getElementById('tab2-charts');cd.innerHTML='<div id="chart-margin" style="width:100%;"></div><div style="display:flex;gap:15px;margin-top:15px;"><div id="chart-power" style="flex:1;"></div><div id="chart-tjm" style="flex:1;"></div></div>';
     let sorted=[...valid].sort((a,b)=>b.Tj_Margin-a.Tj_Margin);let colors=sorted.map(r=>r.Tj_Margin<0?'#e74c3c':r.Tj_Margin<10?'#f39c12':r.Tj_Margin<20?'#f1c40f':'#2ecc71');
-    Plotly.newPlot('chart-margin',[{y:sorted.map(r=>r.Component),x:sorted.map(r=>r['Limit(C)']),type:'bar',orientation:'h',marker:{color:'#E8E8E8'},name:'Limit'},{y:sorted.map(r=>r.Component),x:sorted.map(r=>r.T_ref),type:'bar',orientation:'h',marker:{color:colors},name:'T_ref',text:sorted.map(r=>r.Temp_Label+': '+r.T_ref.toFixed(1)+'°C (Margin: '+r.Tj_Margin.toFixed(1)+'°C)'),textposition:'outside'}],{barmode:'overlay',title:'<b>溫度裕度總覽 (Temperature Margin Overview)</b>',showlegend:false,height:Math.max(300,sorted.length*50+100),margin:{l:10,r:200,t:60,b:40},yaxis:{automargin:true}});
+    Plotly.newPlot('chart-margin',[{y:sorted.map(r=>r.Component),x:sorted.map(r=>r['Limit(C)']),type:'bar',orientation:'h',marker:{color:'#E8E8E8'},name:'Limit',hovertemplate:'Limit: %{x}°C<extra></extra>'},{y:sorted.map(r=>r.Component),x:sorted.map(r=>r.T_ref),type:'bar',orientation:'h',marker:{color:colors},name:'T_ref',text:sorted.map(r=>r.Temp_Label+': '+r.T_ref.toFixed(1)+'°C / Limit: '+r['Limit(C)'].toFixed(0)+'°C  (Margin: '+r.Tj_Margin.toFixed(1)+'°C)'),textposition:'outside',hovertemplate:'%{text}<extra></extra>'}],{barmode:'overlay',title:'<b>溫度裕度總覽 (Temperature Margin Overview)</b>',showlegend:false,height:Math.max(300,sorted.length*50+100),margin:{l:10,r:250,t:60,b:40},yaxis:{automargin:true}},pCfg);
     let pS=[...valid].sort((a,b)=>a.Total_W-b.Total_W);
-    Plotly.newPlot('chart-power',[{y:pS.map(r=>r.Component),x:pS.map(r=>r.Total_W),type:'bar',orientation:'h',marker:{colorscale:'Oranges',color:pS.map(r=>r.Total_W),showscale:false},text:pS.map(r=>r.Total_W.toFixed(1)+' W'),textposition:'outside'}],{title:'<b>各元件功耗分佈 (Power Breakdown)</b>',showlegend:false,margin:{l:10,r:80,t:60,b:40},yaxis:{automargin:true},annotations:[{text:'Total: '+R.Total_Power.toFixed(2)+' W',xref:'paper',yref:'paper',x:0.95,y:1.06,showarrow:false,font:{size:13,color:'#888'}}]});
+    Plotly.newPlot('chart-power',[{y:pS.map(r=>r.Component),x:pS.map(r=>r.Total_W),type:'bar',orientation:'h',marker:{colorscale:'Oranges',color:pS.map(r=>r.Total_W),showscale:true,colorbar:{title:'W'}},text:pS.map(r=>r.Total_W.toFixed(1)+' W'),textposition:'outside'}],{title:'<b>各元件功耗分佈 (Power Breakdown)</b>',showlegend:false,margin:{l:10,r:80,t:60,b:40},xaxis:{title:'功耗 (W)'},yaxis:{automargin:true},annotations:[{text:'Total: '+R.Total_Power.toFixed(2)+' W',xref:'paper',yref:'paper',x:0.95,y:1.06,showarrow:false,font:{size:13,color:'#888'}}]},pCfg);
     let mS=[...valid].sort((a,b)=>a.Tj_Margin-b.Tj_Margin);
-    Plotly.newPlot('chart-tjm',[{x:mS.map(r=>r.Component),y:mS.map(r=>r.Tj_Margin),type:'bar',marker:{colorscale:'RdYlGn',color:mS.map(r=>r.Tj_Margin),showscale:false}}],{title:'<b>各元件溫度裕度 (Temperature Margin)</b>',yaxis:{title:'Margin (°C)'}});
+    Plotly.newPlot('chart-tjm',[{x:mS.map(r=>r.Component),y:mS.map(r=>r.Tj_Margin),type:'bar',marker:{colorscale:'RdYlGn',color:mS.map(r=>r.Tj_Margin),showscale:true,colorbar:{title:'°C'}}}],{title:'<b>各元件溫度裕度 (Temperature Margin)</b>',xaxis:{title:'元件名稱'},yaxis:{title:'Margin (°C)'}},pCfg);
   }
   // DRC + Dims + Volume + Weight
   if(R.drc_failed){document.getElementById('tab2-drc').innerHTML='<div class="drc-error"><b>DRC FAILED</b><br>'+R.drc_msg+'</div>';document.getElementById('tab2-dims').innerHTML='';document.getElementById('tab2-volume').innerHTML='<div class="volume-box" style="background:#ffebee;border-color:#e74c3c;"><h3 style="color:#c0392b;">★ RRU 整機估算體積 (Estimated Volume)</h3><div class="vol-val" style="color:#e74c3c;">N/A</div></div>';document.getElementById('tab2-weight').innerHTML='';}
@@ -769,7 +837,7 @@ function renderTab3(){
     for(let i=0;i<R.Fin_Count;i++){let f0=yo+i*(G.Fin_t+G.Gap),f1=f0+G.Fin_t;if(f1>W)break;
       tr.push({type:'mesh3d',x:[0,L,L,0,0,L,L,0],y:[f0,f0,f1,f1,f0,f0,f1,f1],z:[zfs,zfs,zfs,zfs,zfe,zfe,zfe,zfe],...ijk,intensity:[0,0,0,0,1,1,1,1],cmin:0,cmax:1,colorscale:[[0,'#E67E22'],[0.45,'#BDC3C7'],[1,'#D6EAF8']],showscale:false,flatshading:true,name:i===0?'Fins':'',showlegend:i===0});}}
   let md=Math.max(L,W,R.RRU_Height)*1.1;
-  Plotly.newPlot('tab3-3d',tr,{scene:{xaxis:{title:'Length',range:[0,md]},yaxis:{title:'Width',range:[0,md]},zaxis:{title:'Height',range:[0,md]},aspectmode:'manual',aspectratio:{x:1,y:1,z:1},camera:{projection:{type:'orthographic'},eye:{x:1.2,y:1.2,z:1.2}},bgcolor:'white'},margin:{l:0,r:0,b:0,t:0},height:600});
+  Plotly.newPlot('tab3-3d',tr,{scene:{xaxis:{title:'Length',range:[0,md]},yaxis:{title:'Width',range:[0,md]},zaxis:{title:'Height',range:[0,md]},aspectmode:'manual',aspectratio:{x:1,y:1,z:1},camera:{projection:{type:'orthographic'},eye:{x:1.2,y:1.2,z:1.2}},bgcolor:'white'},margin:{l:0,r:0,b:0,t:0},height:600},{responsive:true,displaylogo:false,displayModeBar:true});
   document.getElementById('tab3-info').innerHTML='<div class="alert alert-info">📐 <b>外觀尺寸：</b>長 '+L.toFixed(1)+' x 寬 '+W.toFixed(1)+' x 高 '+R.RRU_Height.toFixed(1)+' mm</div><div class="alert alert-success">⚡ <b>鰭片規格：</b>數量 '+R.Fin_Count+' pcs | 高度 '+R.Fin_Height.toFixed(1)+' mm | 厚度 '+G.Fin_t+' mm | 間距 '+G.Gap+' mm</div>';
 
   // AI Rendering Section
@@ -816,12 +884,12 @@ function runSweep(){
   Plotly.newPlot('sa-cl',[
     {x:xv,y:res.map(r=>r.Volume),type:'bar',name:'體積 (L)',marker:{color:'rgba(52,152,219,0.8)'},yaxis:'y1',offsetgroup:1},
     {x:xv,y:res.map(r=>r.Weight),type:'bar',name:'重量 (kg)',marker:{color:'rgba(46,204,113,0.8)'},yaxis:'y2',offsetgroup:2}
-  ],{barmode:'group',title:'<b>散熱器規模 — 體積 & 重量</b>',xaxis:{title:vk==='power_scale'?'功耗縮放係數 (×)':vk+' (mm)'},yaxis:{title:'體積 (L)',titlefont:{color:'#3498db'},tickfont:{color:'#3498db'}},yaxis2:{title:'重量 (kg)',titlefont:{color:'#2ecc71'},tickfont:{color:'#2ecc71'},overlaying:'y',side:'right'},legend:{orientation:'h',x:0.5,y:1.08,xanchor:'center'},shapes:[{type:'line',x0:bv,x1:bv,y0:0,y1:1,yref:'paper',line:{dash:'dash',color:'gray'},name:'Current'}],height:420,margin:{l:50,r:50,t:50,b:50},hovermode:'x unified'});
+  ],{barmode:'group',title:'<b>散熱器規模 — 體積 & 重量</b>',xaxis:{title:vk==='power_scale'?'功耗縮放係數 (×)':vk+' (mm)'},yaxis:{title:'體積 (L)',titlefont:{color:'#3498db'},tickfont:{color:'#3498db'}},yaxis2:{title:'重量 (kg)',titlefont:{color:'#2ecc71'},tickfont:{color:'#2ecc71'},overlaying:'y',side:'right'},legend:{orientation:'h',x:0.5,y:1.08,xanchor:'center'},shapes:[{type:'line',x0:bv,x1:bv,y0:0,y1:1,yref:'paper',line:{dash:'dash',color:'gray'},name:'Current'}],height:420,margin:{l:50,r:50,t:50,b:50},hovermode:'x unified'},{responsive:true,displaylogo:false,displayModeBar:true});
   // RIGHT
   let py,pn,pc;if(vk==='Gap'){py=res.map(r=>r.AR);pn='流阻比 (AR)';pc='#e74c3c';}else{py=res.map(r=>r.Tj_Margin);pn='Bottleneck Tj_Margin (°C)';pc='#e67e22';}
   let sh2=[{type:'line',x0:bv,x1:bv,y0:0,y1:1,yref:'paper',line:{dash:'dash',color:'gray'}}];
   if(vk!=='Gap')sh2.push({type:'line',x0:xv[0],x1:xv[xv.length-1],y0:0,y1:0,line:{dash:'dot',color:'red',width:2}});
-  Plotly.newPlot('sa-cr',[{x:xv,y:py,mode:'lines+markers',name:pn,line:{color:pc,width:3},marker:{size:8}}],{title:'<b>熱流/幾何性能 — '+pn+'</b>',xaxis:{title:vk==='power_scale'?'功耗縮放係數 (×)':vk+' (mm)'},yaxis:{title:pn,titlefont:{color:pc},tickfont:{color:pc}},shapes:sh2,height:420,margin:{l:50,r:50,t:50,b:50},hovermode:'x unified'});
+  Plotly.newPlot('sa-cr',[{x:xv,y:py,mode:'lines+markers',name:pn,line:{color:pc,width:3},marker:{size:8}}],{title:'<b>熱流/幾何性能 — '+pn+'</b>',xaxis:{title:vk==='power_scale'?'功耗縮放係數 (×)':vk+' (mm)'},yaxis:{title:pn,titlefont:{color:pc},tickfont:{color:pc}},shapes:sh2,height:420,margin:{l:50,r:50,t:50,b:50},hovermode:'x unified'},{responsive:true,displaylogo:false,displayModeBar:true});
   // Detail data table
   let dh='<div class="collapsible" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';">📋 查看詳細數據 ▼</div><div class="collapsible-body"><table class="detail-table"><thead><tr><th>'+vk+'</th><th>體積 (L)</th><th>重量 (kg)</th><th>流阻比</th><th>鰭片數</th><th>Tj_Margin (°C)</th><th>Fin 高度 (mm)</th></tr></thead><tbody>';
   res.forEach(r=>dh+='<tr><td>'+r.x+'</td><td>'+r.Volume+'</td><td>'+r.Weight+'</td><td>'+r.AR+'</td><td>'+r.Fin_Count+'</td><td>'+r.Tj_Margin+'</td><td>'+r.Fin_Height+'</td></tr>');
@@ -838,13 +906,14 @@ function runTornado(){
   function mkT(data,kl,kh,kb,title,cd,ci){let bm=data.reduce((s,r)=>s+r[kb],0)/data.length;let tr=[];
     data.forEach((r,i)=>{let f=i===0;tr.push({y:[r.label],x:[r[kl]-r[kb]],base:[r[kb]],type:'bar',orientation:'h',marker:{color:cd},name:'-'+pct+'%',showlegend:f,hovertemplate:'<b>'+r.label+'</b><br>-'+pct+'%: '+r[kl].toFixed(2)+'<extra></extra>'});
       tr.push({y:[r.label],x:[r[kh]-r[kb]],base:[r[kb]],type:'bar',orientation:'h',marker:{color:ci},name:'+'+pct+'%',showlegend:f,hovertemplate:'<b>'+r.label+'</b><br>+'+pct+'%: '+r[kh].toFixed(2)+'<extra></extra>'});});
-    return{tr,layout:{barmode:'overlay',title:title,shapes:[{type:'line',x0:bm,x1:bm,y0:-0.5,y1:data.length-0.5,line:{dash:'dash',color:'gray'}}],legend:{orientation:'h',x:0.5,y:1.12,xanchor:'center'},height:380,margin:{l:20,r:20,t:55,b:40}}};}
+    return{tr,layout:{barmode:'overlay',title:{text:title,y:0.98,x:0.5,xanchor:'center'},shapes:[{type:'line',x0:bm,x1:bm,y0:-0.5,y1:data.length-0.5,line:{dash:'dash',color:'gray'}}],legend:{orientation:'h',x:0.5,y:1.15,xanchor:'center'},height:420,margin:{l:130,r:30,t:80,b:50},yaxis:{automargin:true}}};}
   let ct=document.getElementById('sa-tornado-results');let h='';
   if(met==='both'||met==='volume')h+='<div id="tv" style="flex:1;min-width:400px;"></div>';
   if(met==='both'||met==='tj')h+='<div id="tt" style="flex:1;min-width:400px;"></div>';
   ct.innerHTML='<div style="display:flex;gap:15px;flex-wrap:wrap;">'+h+'</div><div id="tornado-detail"></div>';
-  if(met==='both'||met==='volume'){let t=mkT(rows,'Vol_lo','Vol_hi','Vol_bs','<b>體積敏感度 (L)</b>','rgba(231,76,60,0.7)','rgba(52,152,219,0.7)');Plotly.newPlot('tv',t.tr,t.layout);}
-  if(met==='both'||met==='tj'){let t=mkT(rows,'Tj_lo','Tj_hi','Tj_bs','<b>Tj_Margin 敏感度 (°C)</b>','rgba(231,76,60,0.7)','rgba(46,204,113,0.7)');Plotly.newPlot('tt',t.tr,t.layout);}
+  let tCfg={responsive:true,displaylogo:false,displayModeBar:true};
+  if(met==='both'||met==='volume'){let t=mkT(rows,'Vol_lo','Vol_hi','Vol_bs','<b>體積敏感度 (L)</b>','rgba(231,76,60,0.7)','rgba(52,152,219,0.7)');Plotly.newPlot('tv',t.tr,t.layout,tCfg);}
+  if(met==='both'||met==='tj'){let t=mkT(rows,'Tj_lo','Tj_hi','Tj_bs','<b>Tj_Margin 敏感度 (°C)</b>','rgba(231,76,60,0.7)','rgba(46,204,113,0.7)');Plotly.newPlot('tt',t.tr,t.layout,tCfg);}
   // Detail
   let dh='<div class="collapsible" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';">📋 查看 Tornado 詳細數據 ▼</div><div class="collapsible-body"><table class="detail-table"><thead><tr><th>參數</th><th>體積 -'+pct+'%</th><th>體積 Base</th><th>體積 +'+pct+'%</th><th>Tj_Margin -'+pct+'%</th><th>Tj_Margin Base</th><th>Tj_Margin +'+pct+'%</th></tr></thead><tbody>';
   rows.forEach(r=>dh+='<tr><td>'+r.label+'</td><td>'+r.Vol_lo.toFixed(2)+'</td><td>'+r.Vol_bs.toFixed(2)+'</td><td>'+r.Vol_hi.toFixed(2)+'</td><td>'+r.Tj_lo.toFixed(1)+'</td><td>'+r.Tj_bs.toFixed(1)+'</td><td>'+r.Tj_hi.toFixed(1)+'</td></tr>');
@@ -866,9 +935,30 @@ function saveProject(){readGlobals();let d={meta:{version:"v4.30 (GitHub Pages)"
   let b=new Blob([JSON.stringify(d,null,4)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='RRU_Project_'+new Date().toISOString().slice(0,10)+'.json';a.click();}
 
 // =====================================================
+// LOGIN
+// =====================================================
+function doLogin(){
+  let pw=document.getElementById('login-pw').value;
+  if(pw==='tedus'){
+    document.getElementById('login-page').style.display='none';
+    document.getElementById('sidebar').style.display='';
+    document.querySelector('.main').style.display='';
+    document.getElementById('loading').style.display='flex';
+    init();
+  } else {
+    document.getElementById('login-error').style.display='block';
+  }
+}
+
+// =====================================================
 // BOOT
 // =====================================================
-window.addEventListener('DOMContentLoaded',init);
+window.addEventListener('DOMContentLoaded',function(){
+  // Hide app until login
+  document.getElementById('sidebar').style.display='none';
+  document.querySelector('.main').style.display='none';
+  document.getElementById('loading').style.display='none';
+});
 </script>
 </body>
 </html>
