@@ -967,7 +967,7 @@ function handleFileLoad(e){let f=e.target.files[0];if(!f)return;let r=new FileRe
 function saveProject(){readGlobals();let d={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},global_params:{},rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
   ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density'].forEach(k=>d.global_params[k]=G[k]);
   d.global_params.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;
-  let b=new Blob([JSON.stringify(d,null,4)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='RRU_Project_'+new Date().toISOString().slice(0,10)+'.json';a.click();}
+  let b=new Blob([JSON.stringify(d,null,4)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(b);let pn=document.getElementById('cloudProjectName').value.trim()||'Project';a.download='RRU_'+pn+'_'+new Date().toISOString().slice(0,10)+'.json';a.click();}
 
 // =====================================================
 // CLOUD PROJECT SAVE / LOAD
