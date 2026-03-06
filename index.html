@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>5G RRU Thermal Engine Pro</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+:root {
+  --primary: #007CF0;
+  --primary-light: #00DFD8;
+  --sidebar-bg: #1e293b;
+  --sidebar-text: #e2e8f0;
+  --card-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  --danger: #e74c3c;
+  --warning: #f39c12;
+  --success: #2ecc71;
+  --info: #3498db;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "Microsoft JhengHei","Segoe UI",Roboto,sans-serif; background: #f5f7fa; display: flex; min-height: 100vh; }
+
+/* === SIDEBAR === */
+.sidebar { width: 340px; min-width: 340px; background: var(--sidebar-bg); color: var(--sidebar-text); padding: 20px; overflow-y: auto; height: 100vh; position: sticky; top: 0; }
+.sidebar h2 { color: #fff; font-size: 1.1rem; margin-bottom: 15px; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+.sidebar label { display: block; font-size: 0.82rem; color: #94a3b8; margin-top: 10px; margin-bottom: 3px; }
+.sidebar input[type="number"], .sidebar select { width: 100%; padding: 6px 8px; border: 1px solid #475569; border-radius: 6px; background: #334155; color: #e2e8f0; font-size: 0.85rem; }
+.sidebar input[type="number"]:focus, .sidebar select:focus { outline: none; border-color: var(--primary); }
+.sidebar .row2 { display: flex; gap: 8px; }
+.sidebar .row2 > div { flex: 1; }
+.sidebar .section-title { color: var(--primary-light); font-size: 0.9rem; font-weight: 700; margin-top: 18px; margin-bottom: 8px; cursor: pointer; user-select: none; }
+.sidebar .section-title::before { content: "▼ "; font-size: 0.7rem; }
+.sidebar .section-title.collapsed::before { content: "▶ "; }
+.sidebar .section-body { transition: max-height 0.3s; overflow: hidden; }
+.sidebar .section-body.collapsed { max-height: 0 !important; }
+.h-display { background: #1a365d; border: 1px solid #2563eb; border-radius: 8px; padding: 10px; margin-top: 10px; text-align: center; }
+.h-display .h-val { font-size: 1.3rem; font-weight: 700; color: #60a5fa; }
+.h-display .h-sub { font-size: 0.75rem; color: #94a3b8; margin-top: 4px; }
+.ar-display { background: #1a1a2e; border: 1px solid #555; border-radius: 8px; padding: 10px; margin-top: 10px; text-align: center; }
+
+/* === MAIN CONTENT === */
+.main { flex: 1; padding: 25px 30px; overflow-y: auto; }
+.header { background: linear-gradient(135deg, var(--primary), var(--primary-light)); padding: 20px 30px; border-radius: 12px; color: #fff; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+.header h1 { font-size: 1.8rem; font-weight: 900; }
+.header .subtitle { font-size: 0.9rem; opacity: 0.9; margin-top: 5px; }
+.header .project-io { display: flex; gap: 10px; align-items: center; }
+.header .project-io button { padding: 8px 16px; border: 2px solid rgba(255,255,255,0.5); background: transparent; color: #fff; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: all 0.2s; }
+.header .project-io button:hover { background: rgba(255,255,255,0.2); border-color: #fff; }
+
+/* === TABS === */
+.tabs { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+.tab-btn { padding: 8px 18px; border: none; border-radius: 20px; background: #e2e8f0; color: #475569; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.3s; }
+.tab-btn.active { background: var(--primary); color: #fff; box-shadow: 0 4px 6px rgba(0,124,240,0.3); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* === KPI CARDS === */
+.kpi-row { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+.kpi-card { flex: 1; min-width: 180px; background: #fff; border-radius: 10px; padding: 18px; box-shadow: var(--card-shadow); text-align: center; border-left: 5px solid #ddd; }
+.kpi-card .title { color: #666; font-size: 0.85rem; font-weight: 500; }
+.kpi-card .value { font-size: 1.6rem; font-weight: 700; color: #333; margin: 6px 0; }
+.kpi-card .desc { color: #999; font-size: 0.75rem; }
+
+/* === TABLES === */
+.comp-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: var(--card-shadow); margin-bottom: 15px; font-size: 0.82rem; }
+.comp-table th { background: #f1f5f9; color: #475569; padding: 10px 8px; text-align: left; font-weight: 600; white-space: nowrap; }
+.comp-table td { padding: 8px; border-top: 1px solid #e2e8f0; }
+.comp-table td input, .comp-table td select { width: 100%; padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.82rem; background: #fff; }
+.comp-table td input:focus, .comp-table td select:focus { outline: none; border-color: var(--primary); }
+.comp-table tr:hover { background: #f8fafc; }
+
+/* Buttons */
+.btn { padding: 6px 14px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.82rem; transition: all 0.2s; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: #0066cc; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { background: #c0392b; }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover { background: #27ae60; }
+.btn-sm { padding: 4px 10px; font-size: 0.78rem; }
+
+/* Sub-tabs */
+.sub-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+.sub-tab-btn { padding: 6px 14px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #475569; font-size: 0.82rem; cursor: pointer; font-weight: 600; }
+.sub-tab-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.sub-content { display: none; }
+.sub-content.active { display: block; }
+
+/* Volume display */
+.volume-box { background: #e6fffa; padding: 30px; margin-top: 20px; border-radius: 15px; border-left: 10px solid var(--success); box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; }
+.volume-box h3 { color: #006266; font-size: 1.3rem; letter-spacing: 1px; }
+.volume-box .vol-val { color: var(--success); font-size: 3.5rem; font-weight: 800; margin: 15px 0 0; }
+.weight-box { background: #ecf0f1; padding: 25px; margin-top: 15px; border-radius: 15px; border-left: 10px solid #34495e; text-align: center; }
+
+/* Alerts */
+.alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 12px; font-size: 0.88rem; }
+.alert-danger { background: #fdeded; border-left: 4px solid var(--danger); color: #c0392b; }
+.alert-warning { background: #fff8e1; border-left: 4px solid var(--warning); color: #e67e22; }
+.alert-info { background: #e3f2fd; border-left: 4px solid var(--info); color: #1565c0; }
+.alert-success { background: #e8f5e9; border-left: 4px solid var(--success); color: #2e7d32; }
+
+/* Scale bar */
+.scale-bar { display: flex; flex-direction: column; align-items: center; margin: 10px 0 15px; }
+.scale-bar .bar { width: 100%; max-width: 600px; height: 12px; background: linear-gradient(to right, #d73027, #fee08b, #1a9850); border-radius: 6px; border: 1px solid #ddd; }
+.scale-bar .labels { display: flex; justify-content: space-between; width: 100%; max-width: 600px; font-size: 0.78rem; color: #555; font-weight: 600; margin-top: 4px; }
+
+/* Risk cards */
+.risk-row { display: flex; gap: 12px; margin-bottom: 15px; }
+.risk-card { flex: 1; background: #fff; border-radius: 8px; padding: 12px; box-shadow: var(--card-shadow); text-align: center; }
+.risk-card .rank { font-size: 0.85rem; color: #666; }
+.risk-card .rval { font-size: 1.3rem; font-weight: 700; color: #333; }
+.risk-card .rdelta { font-size: 0.78rem; color: #888; }
+
+/* Sensitivity */
+.sa-controls { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; margin-bottom: 20px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; }
+.sa-controls > div { display: flex; flex-direction: column; }
+.sa-controls label { font-size: 0.78rem; color: #666; margin-bottom: 4px; }
+.sa-controls input, .sa-controls select { padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.85rem; }
+
+.power-summary { background: #e3f2fd; border-left: 4px solid var(--info); padding: 12px 16px; border-radius: 8px; margin-top: 10px; font-weight: 600; color: #1565c0; }
+
+/* DRC */
+.drc-error { background: #ffebee; border: 2px solid var(--danger); border-radius: 10px; padding: 20px; text-align: center; color: var(--danger); }
+
+/* Loading overlay */
+#loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #1e293b, #0f172a); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; color: #e2e8f0; }
+#loading h2 { font-size: 1.8rem; margin-bottom: 15px; }
+#loading p { color: #94a3b8; margin-bottom: 20px; }
+#loading progress { width: 300px; height: 6px; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  body { flex-direction: column; }
+  .sidebar { width: 100%; height: auto; position: relative; }
+  .kpi-row { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<!-- Loading Screen -->
+<div id="loading">
+  <h2>5G RRU Thermal Engine Pro</h2>
+  <p>Initializing thermal calculation engine...</p>
+  <progress></progress>
+</div>
+
+<!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+  <h2>Parameter Controls</h2>
+
+  <!-- Section 1: Environment -->
+  <div class="section-title" onclick="toggleSection(this)">1. Environment & Coefficients</div>
+  <div class="section-body">
+    <label>Environment Temp T_amb (deg C)</label>
+    <input type="number" id="T_amb" step="1" onchange="recalc()">
+    <label>Design Safety Margin</label>
+    <input type="number" id="Margin" step="0.1" onchange="recalc()">
+    <label>Fin Tech</label>
+    <select id="fin_tech_selector_v2" onchange="recalc()">
+      <option value="Embedded Fin (0.95)">Embedded Fin (0.95)</option>
+      <option value="Die-casting Fin (0.90)">Die-casting Fin (0.90)</option>
+    </select>
+  </div>
+
+  <!-- Section 2: PCB & Structure -->
+  <div class="section-title" onclick="toggleSection(this)">2. PCB & Structure Dimensions</div>
+  <div class="section-body">
+    <label>PCB Length L_pcb (mm)</label>
+    <input type="number" id="L_pcb" step="1" onchange="recalc()">
+    <label>PCB Width W_pcb (mm)</label>
+    <input type="number" id="W_pcb" step="1" onchange="recalc()">
+    <label>Heatsink Base t_base (mm)</label>
+    <input type="number" id="t_base" step="0.5" onchange="recalc()">
+    <label>HSK Cavity Depth H_shield (mm)</label>
+    <input type="number" id="H_shield" step="1" onchange="recalc()">
+    <label>Cavity Filter Thickness H_filter (mm)</label>
+    <input type="number" id="H_filter" step="1" onchange="recalc()">
+
+    <label style="margin-top:12px;color:var(--primary-light);">Weight Parameters</label>
+    <div class="row2"><div><label>Al Density (g/cm3)</label><input type="number" id="al_density" step="0.01" onchange="recalc()"></div>
+    <div><label>Filter (g/cm3)</label><input type="number" id="filter_density" step="0.05" onchange="recalc()"></div></div>
+    <div class="row2"><div><label>Shielding (g/cm3)</label><input type="number" id="shielding_density" step="0.05" onchange="recalc()"></div>
+    <div><label>PCB (g/cm2)</label><input type="number" id="pcb_surface_density" step="0.05" onchange="recalc()"></div></div>
+
+    <label style="margin-top:12px;color:var(--primary-light);">PCB-to-Housing Margins (mm)</label>
+    <div class="row2"><div><label>Top</label><input type="number" id="Top" step="1" onchange="recalc()"></div>
+    <div><label>Bottom</label><input type="number" id="Btm" step="1" onchange="recalc()"></div></div>
+    <div class="row2"><div><label>Left</label><input type="number" id="Left" step="1" onchange="recalc()"></div>
+    <div><label>Right</label><input type="number" id="Right" step="1" onchange="recalc()"></div></div>
+
+    <label style="margin-top:12px;color:var(--primary-light);">Copper Coin Settings (mm)</label>
+    <div class="row2"><div><label>Coin L</label><input type="number" id="Coin_L_Setting" step="1" onchange="recalc()"></div>
+    <div><label>Coin W</label><input type="number" id="Coin_W_Setting" step="1" onchange="recalc()"></div></div>
+
+    <label style="margin-top:12px;color:var(--primary-light);">Fin Geometry</label>
+    <div class="row2"><div><label>Air Gap (mm)</label><input type="number" id="Gap" step="0.1" onchange="recalc()"></div>
+    <div><label>Fin Thickness (mm)</label><input type="number" id="Fin_t" step="0.1" onchange="recalc()"></div></div>
+
+    <div class="h-display" id="h-display">
+      <div class="h-val" id="h-val">--</div>
+      <div class="h-sub" id="h-sub">h = h_conv + h_rad</div>
+    </div>
+    <div class="ar-display" id="ar-display">
+      <div style="font-size:0.78rem;color:#94a3b8;">Aspect Ratio</div>
+      <div id="ar-val" style="font-size:1.1rem;font-weight:700;color:#60a5fa;">--</div>
+      <div style="font-size:0.7rem;color:#666;">Best: 4.5 ~ 6.5</div>
+    </div>
+  </div>
+
+  <!-- Section 3: Material -->
+  <div class="section-title collapsed" onclick="toggleSection(this)">3. Material Parameters</div>
+  <div class="section-body collapsed">
+    <div class="row2"><div><label>K_Via</label><input type="number" id="K_Via" step="1" onchange="recalc()"></div>
+    <div><label>Via Eff</label><input type="number" id="Via_Eff" step="0.05" onchange="recalc()"></div></div>
+    <label style="margin-top:8px;color:var(--primary-light);">TIM Materials</label>
+    <div class="row2"><div><label>K (Putty)</label><input type="number" id="K_Putty" step="0.1" onchange="recalc()"></div>
+    <div><label>t (Putty)</label><input type="number" id="t_Putty" step="0.1" onchange="recalc()"></div></div>
+    <div class="row2"><div><label>K (Pad)</label><input type="number" id="K_Pad" step="0.1" onchange="recalc()"></div>
+    <div><label>t (Pad)</label><input type="number" id="t_Pad" step="0.1" onchange="recalc()"></div></div>
+    <div class="row2"><div><label>K (Pad2)</label><input type="number" id="K_Pad2" step="0.1" onchange="recalc()"></div>
+    <div><label>t (Pad2)</label><input type="number" id="t_Pad2" step="0.1" onchange="recalc()"></div></div>
+    <div class="row2"><div><label>K (Grease)</label><input type="number" id="K_Grease" step="0.1" onchange="recalc()"></div>
+    <div><label>t (Grease)</label><input type="number" id="t_Grease" step="0.01" onchange="recalc()"></div></div>
+    <label style="margin-top:8px;color:var(--primary-light);">Solder</label>
+    <div class="row2"><div><label>K (Solder)</label><input type="number" id="K_Solder" step="1" onchange="recalc()"></div>
+    <div><label>t (Solder)</label><input type="number" id="t_Solder" step="0.05" onchange="recalc()"></div></div>
+    <label>Voiding</label>
+    <input type="number" id="Voiding" step="0.05" onchange="recalc()">
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="main">
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <h1>5G RRU Thermal Engine <span style="font-size:0.6em;opacity:0.8;">Pro</span></h1>
+      <div class="subtitle">High-Performance Thermal & Volume Estimation System | v4.30 (GitHub Pages Edition)</div>
+    </div>
+    <div class="project-io">
+      <button onclick="loadProject()">Load Project</button>
+      <button onclick="saveProject()">Save Project</button>
+      <input type="file" id="fileInput" accept=".json" style="display:none" onchange="handleFileLoad(event)">
+    </div>
+  </div>
+
+  <!-- Tab Buttons -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab(0)">COMPONENT SETUP</button>
+    <button class="tab-btn" onclick="switchTab(1)">DETAILED ANALYSIS</button>
+    <button class="tab-btn" onclick="switchTab(2)">VISUAL REPORT</button>
+    <button class="tab-btn" onclick="switchTab(3)">3D SIMULATION</button>
+    <button class="tab-btn" onclick="switchTab(4)">SENSITIVITY ANALYSIS</button>
+  </div>
+
+  <!-- Tab 0: Component Setup -->
+  <div class="tab-content active" id="tab0">
+    <h3>Component Setup</h3>
+    <p style="color:#888;font-size:0.82rem;margin-bottom:12px;">Configure RF, Digital, and Power components below.</p>
+    <div class="sub-tabs">
+      <button class="sub-tab-btn active" onclick="switchSubTab(0)">RF Component</button>
+      <button class="sub-tab-btn" onclick="switchSubTab(1)">Digital Component</button>
+      <button class="sub-tab-btn" onclick="switchSubTab(2)">PWR Component</button>
+    </div>
+    <div class="sub-content active" id="subtab0"></div>
+    <div class="sub-content" id="subtab1"></div>
+    <div class="sub-content" id="subtab2"></div>
+    <div class="power-summary" id="power-summary"></div>
+  </div>
+
+  <!-- Tab 1: Detailed Analysis -->
+  <div class="tab-content" id="tab1">
+    <h3>Detailed Analysis</h3>
+    <div id="tab1-alerts"></div>
+    <div id="tab1-risk"></div>
+    <div class="scale-bar" id="tab1-scale"></div>
+    <div id="tab1-table"></div>
+    <div class="alert alert-info" style="margin-top:12px;">
+      Allowed dT = Limit - Local_Amb - Drop. Green = safe margin, Red = thermal bottleneck.
+    </div>
+  </div>
+
+  <!-- Tab 2: Visual Report -->
+  <div class="tab-content" id="tab2">
+    <h3>Visual Report</h3>
+    <div class="kpi-row" id="tab2-kpi"></div>
+    <div id="tab2-charts"></div>
+    <hr style="margin:20px 0;">
+    <h3>Dimensions, Volume & Weight</h3>
+    <div id="tab2-drc"></div>
+    <div id="tab2-dims"></div>
+    <div id="tab2-volume"></div>
+    <div id="tab2-weight"></div>
+  </div>
+
+  <!-- Tab 3: 3D Simulation -->
+  <div class="tab-content" id="tab3">
+    <h3>3D Simulation</h3>
+    <p style="color:#888;font-size:0.82rem;margin-bottom:12px;">Real-scale model: electronics body + heatsink fins with thermal gradient coloring.</p>
+    <div id="tab3-3d" style="width:100%;height:600px;"></div>
+    <div id="tab3-info" style="margin-top:10px;"></div>
+  </div>
+
+  <!-- Tab 4: Sensitivity Analysis -->
+  <div class="tab-content" id="tab4">
+    <h3>Sensitivity Analysis</h3>
+    <div style="margin-bottom:15px;">
+      <label><input type="radio" name="sa_mode" value="sweep" checked onchange="saMode=this.value"> Single Variable Sweep</label>
+      <label style="margin-left:15px;"><input type="radio" name="sa_mode" value="tornado" onchange="saMode=this.value"> Tornado Chart</label>
+    </div>
+    <div id="sa-sweep-panel">
+      <div class="sa-controls">
+        <div><label>Variable</label><select id="sa_var"><option value="Gap">Gap (Fin Air Gap)</option><option value="T_amb">T_amb (Environment Temp)</option><option value="power_scale">Power Scale</option></select></div>
+        <div><label>Base Value</label><input type="number" id="sa_base" disabled></div>
+        <div><label>- %</label><input type="number" id="sa_minus" value="50" min="0" max="90" step="5"></div>
+        <div><label>+ %</label><input type="number" id="sa_plus" value="50" min="0" max="300" step="5"></div>
+        <div><label>Steps</label><input type="number" id="sa_steps" value="9" min="3" max="21" step="2"></div>
+        <div><button class="btn btn-primary" onclick="runSweep()">Run Analysis</button></div>
+      </div>
+      <div id="sa-sweep-results" style="display:flex;gap:15px;flex-wrap:wrap;"></div>
+    </div>
+    <div id="sa-tornado-panel" style="display:none;">
+      <div class="sa-controls">
+        <div><label>Range (+/- %)</label><input type="number" id="tornado_pct" value="20" min="5" max="50" step="5"></div>
+        <div><label>Metric</label><select id="tornado_metric"><option value="both">Both Side-by-Side</option><option value="volume">Volume (L)</option><option value="tj">Tj_Margin (deg C)</option></select></div>
+        <div><button class="btn btn-primary" onclick="runTornado()">Run Tornado</button></div>
+      </div>
+      <div id="sa-tornado-results" style="display:flex;gap:15px;flex-wrap:wrap;"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// =====================================================
+// DEFAULT CONFIG (embedded from default_config.json)
+// =====================================================
+const DEFAULT_CONFIG = {
+  "meta": {
+    "version": "v4.30 (Tab4 3D Simplified)",
+    "timestamp": "2026-03-01 00:00:00",
+    "note": "default_config.json — app startup defaults. global_params overrides DEFAULT_GLOBALS; rf/digital/pwr_data overrides hardcoded component defaults."
+  },
+  "global_params": {
+    "T_amb": 45.0,
+    "Margin": 1.0,
+    "L_pcb": 320.0,
+    "W_pcb": 256.0,
+    "t_base": 7.0,
+    "H_shield": 20.0,
+    "H_filter": 42.0,
+    "Top": 8.0,
+    "Btm": 11.0,
+    "Left": 8.0,
+    "Right": 8.0,
+    "Coin_L_Setting": 55.0,
+    "Coin_W_Setting": 35.0,
+    "Gap": 11.6,
+    "Fin_t": 1.2,
+    "K_Via": 30.0,
+    "Via_Eff": 0.9,
+    "K_Putty": 9.1,
+    "t_Putty": 0.5,
+    "K_Pad": 7.5,
+    "t_Pad": 1.7,
+    "K_Pad2": 7.5,
+    "t_Pad2": 1.0,
+    "K_Grease": 3.0,
+    "t_Grease": 0.05,
+    "K_Solder": 58.0,
+    "t_Solder": 0.3,
+    "Voiding": 0.75,
+    "fin_tech_selector_v2": "Embedded Fin (0.95)",
+    "al_density": 2.7,
+    "filter_density": 0.97,
+    "shielding_density": 0.76,
+    "pcb_surface_density": 0.95
+  },
+  "rf_data": [
+    {
+      "Component": "Final PA",
+      "Qty": 4,
+      "Power(W)": 52.99,
+      "Height(mm)": 250,
+      "Pad_L": 20.0,
+      "Pad_W": 10.0,
+      "Thick(mm)": 2.5,
+      "Board_Type": "Copper Coin",
+      "Limit(C)": 225,
+      "R_jc": 1.5,
+      "TIM_Type": "Grease"
+    },
+    {
+      "Component": "Driver PA",
+      "Qty": 4,
+      "Power(W)": 9.75,
+      "Height(mm)": 200,
+      "Pad_L": 5.0,
+      "Pad_W": 5.0,
+      "Thick(mm)": 2.0,
+      "Board_Type": "Thermal Via",
+      "Limit(C)": 200,
+      "R_jc": 1.7,
+      "TIM_Type": "None"
+    },
+    {
+      "Component": "Pre Driver",
+      "Qty": 4,
+      "Power(W)": 0.37,
+      "Height(mm)": 180,
+      "Pad_L": 2.0,
+      "Pad_W": 2.0,
+      "Thick(mm)": 2.0,
+      "Board_Type": "Thermal Via",
+      "Limit(C)": 175,
+      "R_jc": 50.0,
+      "TIM_Type": "None"
+    },
+    {
+      "Component": "Circulator",
+      "Qty": 4,
+      "Power(W)": 2.21,
+      "Height(mm)": 250,
+      "Pad_L": 10.0,
+      "Pad_W": 10.0,
+      "Thick(mm)": 2.0,
+      "Board_Type": "Thermal Via",
+      "Limit(C)": 125,
+      "R_jc": 0.0,
+      "TIM_Type": "None"
+    },
+    {
+      "Component": "Cavity Filter",
+      "Qty": 1,
+      "Power(W)": 24.85,
+      "Height(mm)": 0,
+      "Pad_L": 0.0,
+      "Pad_W": 0.0,
+      "Thick(mm)": 0.0,
+      "Board_Type": "None",
+      "Limit(C)": 200,
+      "R_jc": 0.0,
+      "TIM_Type": "None"
+    }
+  ],
+  "digital_data": [
+    {
+      "Component": "CPU (FPGA)",
+      "Qty": 1,
+      "Power(W)": 35.0,
+      "Height(mm)": 50,
+      "Pad_L": 35.0,
+      "Pad_W": 35.0,
+      "Thick(mm)": 0.0,
+      "Board_Type": "None",
+      "Limit(C)": 100,
+      "R_jc": 0.16,
+      "TIM_Type": "Putty"
+    },
+    {
+      "Component": "Si5518",
+      "Qty": 1,
+      "Power(W)": 2.0,
+      "Height(mm)": 80,
+      "Pad_L": 8.6,
+      "Pad_W": 8.6,
+      "Thick(mm)": 2.0,
+      "Board_Type": "Thermal Via",
+      "Limit(C)": 125,
+      "R_jc": 3.0,
+      "TIM_Type": "Pad"
+    },
+    {
+      "Component": "16G DDR",
+      "Qty": 2,
+      "Power(W)": 0.55,
+      "Height(mm)": 60,
+      "Pad_L": 7.5,
+      "Pad_W": 11.5,
+      "Thick(mm)": 0.0,
+      "Board_Type": "None",
+      "Limit(C)": 95,
+      "R_jc": 0.0,
+      "TIM_Type": "Putty"
+    },
+    {
+      "Component": "SFP",
+      "Qty": 1,
+      "Power(W)": 0.5,
+      "Height(mm)": 0,
+      "Pad_L": 14.0,
+      "Pad_W": 50.0,
+      "Thick(mm)": 0.0,
+      "Board_Type": "None",
+      "Limit(C)": 200,
+      "R_jc": 0.0,
+      "TIM_Type": "Putty"
+    }
+  ],
+  "pwr_data": [
+    {
+      "Component": "Power Mod",
+      "Qty": 1,
+      "Power(W)": 29.0,
+      "Height(mm)": 30,
+      "Pad_L": 58.0,
+      "Pad_W": 61.0,
+      "Thick(mm)": 0.0,
+      "Board_Type": "None",
+      "Limit(C)": 95,
+      "R_jc": 0.0,
+      "TIM_Type": "Putty"
+    }
+  ]
+};
+
+// =====================================================
+// STATE
+// =====================================================
+let G = {}; // Global parameters
+let components = { rf: [], digital: [], pwr: [] };
+let calcResults = null;
+let saMode = 'sweep';
+
+const COLS = ['Component','Qty','Power(W)','Height(mm)','Pad_L','Pad_W','Thick(mm)','Board_Type','Limit(C)','R_jc','TIM_Type'];
+const BOARD_TYPES = ['Thermal Via','Copper Coin','None'];
+const TIM_TYPES = ['Grease','Pad','Pad2','Putty','None'];
+
+const RF_DEFAULT = {Component:"New_RF",Qty:1,"Power(W)":0,"Height(mm)":250,Pad_L:10,Pad_W:10,"Thick(mm)":2.5,Board_Type:"Copper Coin","Limit(C)":200,R_jc:1.5,TIM_Type:"Grease"};
+const DIG_DEFAULT = {Component:"New_Digital",Qty:1,"Power(W)":0,"Height(mm)":50,Pad_L:10,Pad_W:10,"Thick(mm)":0,Board_Type:"Thermal Via","Limit(C)":100,R_jc:0.5,TIM_Type:"Putty"};
+const PWR_DEFAULT = {Component:"New_PWR",Qty:1,"Power(W)":0,"Height(mm)":30,Pad_L:20,Pad_W:20,"Thick(mm)":0,Board_Type:"None","Limit(C)":95,R_jc:0,TIM_Type:"Grease"};
+
+// =====================================================
+// INIT
+// =====================================================
+function init() {
+  const gp = DEFAULT_CONFIG.global_params;
+  for (let k in gp) G[k] = gp[k];
+  G.Slope = 0.03;
+
+  // Load components from config
+  components.rf = DEFAULT_CONFIG.rf_data.map(r => ({...r}));
+  components.digital = DEFAULT_CONFIG.digital_data.map(r => ({...r}));
+  components.pwr = DEFAULT_CONFIG.pwr_data.map(r => ({...r}));
+
+  // Set sidebar inputs
+  for (let k in gp) {
+    let el = document.getElementById(k);
+    if (el) {
+      if (el.tagName === 'SELECT') el.value = gp[k];
+      else el.value = gp[k];
+    }
+  }
+
+  document.getElementById('loading').style.display = 'none';
+
+  // SA variable change listener
+  document.getElementById('sa_var').addEventListener('change', updateSABase);
+  document.querySelectorAll('input[name="sa_mode"]').forEach(r => {
+    r.addEventListener('change', () => {
+      saMode = r.value;
+      document.getElementById('sa-sweep-panel').style.display = saMode==='sweep'?'':'none';
+      document.getElementById('sa-tornado-panel').style.display = saMode==='tornado'?'':'none';
+    });
+  });
+
+  updateSABase();
+  recalc();
+}
+
+// =====================================================
+// SIDEBAR HELPERS
+// =====================================================
+function toggleSection(el) {
+  el.classList.toggle('collapsed');
+  el.nextElementSibling.classList.toggle('collapsed');
+}
+
+function readGlobals() {
+  const ids = ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter',
+    'Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t',
+    'K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2',
+    'K_Grease','t_Grease','K_Solder','t_Solder','Voiding',
+    'al_density','filter_density','shielding_density','pcb_surface_density'];
+  ids.forEach(id => {
+    let el = document.getElementById(id);
+    if (el && el.tagName !== 'SELECT') G[id] = parseFloat(el.value) || 0;
+  });
+  G.fin_tech_selector_v2 = document.getElementById('fin_tech_selector_v2').value;
+  G.Slope = 0.03;
+}
+
+// =====================================================
+// CORE CALCULATION ENGINE
+// =====================================================
+function calcHValue(gap) {
+  let h_conv = 6.4 * Math.tanh(gap / 7.0);
+  let rad_factor = gap >= 10.0 ? 1.0 : Math.sqrt(gap / 10.0);
+  let h_rad = 2.4 * rad_factor;
+  return { h_value: h_conv + h_rad, h_conv, h_rad };
+}
+
+function calcFinCount(W_hsk, gap, fin_t) {
+  if (gap + fin_t <= 0) return 0;
+  let n = Math.floor((W_hsk + gap) / (gap + fin_t));
+  while (n > 0 && (n * fin_t + (n - 1) * gap) > W_hsk + 0.001) n--;
+  return Math.max(n, 0);
+}
+
+function calcThermalResistance(row, g) {
+  let base_l, base_w;
+  if (row.Component === "Final PA") {
+    base_l = g.Coin_L_Setting; base_w = g.Coin_W_Setting;
+  } else if (row['Power(W)'] === 0 || row['Thick(mm)'] === 0) {
+    base_l = 0; base_w = 0;
+  } else {
+    base_l = row.Pad_L + row['Thick(mm)']; base_w = row.Pad_W + row['Thick(mm)'];
+  }
+
+  let loc_amb = g.T_amb + row['Height(mm)'] * g.Slope;
+
+  let k_board = 0;
+  if (row.Board_Type === "Copper Coin") k_board = 380;
+  else if (row.Board_Type === "Thermal Via") k_board = g.K_Via;
+
+  let pad_area = (row.Pad_L * row.Pad_W) / 1e6;
+  let base_area = (base_l * base_w) / 1e6;
+
+  let r_int = 0;
+  if (k_board > 0 && pad_area > 0) {
+    let eff_area = base_area > 0 ? Math.sqrt(pad_area * base_area) : pad_area;
+    let r_int_val = (row['Thick(mm)'] / 1000) / (k_board * eff_area);
+    if (row.Component === "Final PA") {
+      r_int = r_int_val + ((g.t_Solder / 1000) / (g.K_Solder * pad_area * g.Voiding));
+    } else if (row.Board_Type === "Thermal Via") {
+      r_int = r_int_val / g.Via_Eff;
+    } else {
+      r_int = r_int_val;
+    }
+  }
+
+  let tim_map = {
+    Solder: {k: g.K_Solder, t: g.t_Solder},
+    Grease: {k: g.K_Grease, t: g.t_Grease},
+    Pad: {k: g.K_Pad, t: g.t_Pad},
+    Pad2: {k: g.K_Pad2, t: g.t_Pad2},
+    Putty: {k: g.K_Putty, t: g.t_Putty},
+    None: {k: 1, t: 0}
+  };
+  let tim = tim_map[row.TIM_Type] || {k:1, t:0};
+  let target_area = base_area > 0 ? base_area : pad_area;
+  let r_tim = 0;
+  if (target_area > 0 && tim.t > 0) {
+    r_tim = (tim.t / 1000) / (tim.k * target_area);
+  }
+
+  let total_w = row.Qty * row['Power(W)'];
+  let drop = row['Power(W)'] * (row.R_jc + r_int + r_tim);
+  let allowed_dt = row['Limit(C)'] - drop - loc_amb;
+
+  return { Base_L: base_l, Base_W: base_w, Loc_Amb: loc_amb, R_int: r_int, R_TIM: r_tim, Total_W: total_w, Drop: drop, Allowed_dT: allowed_dt };
+}
+
+function computeAll(params, comps, Area_fixed_m2) {
+  let p = {...params};
+  let allComps = [];
+  ['rf','digital','pwr'].forEach(cat => {
+    (comps[cat]||[]).forEach(c => allComps.push({...c, _src: cat.toUpperCase()}));
+  });
+
+  if (allComps.length === 0) return { Total_Power:0, Min_dT_Allowed:50, Bottleneck_Name:"None", Area_req:0, Fin_Height:0, Volume_L:0, total_weight_kg:0, h_value:0, Bottleneck_Tj_Margin:0, Fin_Count:0, rows:[], drc_failed:false, drc_msg:"" };
+
+  // Thermal resistance for each component
+  let rows = allComps.map(c => {
+    let tr = calcThermalResistance(c, p);
+    return {...c, ...tr, Allowed_dT: Math.max(tr.Allowed_dT, 0)};
+  });
+
+  let valid = rows.filter(r => r.Total_W > 0);
+  let Total_Watts_Sum = valid.reduce((s,r) => s + r.Total_W, 0);
+  let Min_dT_Allowed = 50, Bottleneck_Name = "None", bt_idx = -1;
+  if (valid.length > 0) {
+    let minIdx = 0;
+    valid.forEach((r,i) => { if (r.Allowed_dT < valid[minIdx].Allowed_dT) minIdx = i; });
+    Min_dT_Allowed = valid[minIdx].Allowed_dT;
+    Bottleneck_Name = valid[minIdx].Component;
+    bt_idx = minIdx;
+  }
+
+  let {h_value, h_conv, h_rad} = calcHValue(p.Gap);
+  let L_hsk = p.L_pcb + p.Left + p.Right;
+  let W_hsk = p.W_pcb + p.Top + p.Btm;
+  let base_area_m2 = (L_hsk * W_hsk) / 1e6;
+  let num_fins = calcFinCount(W_hsk, p.Gap, p.Fin_t);
+  let eff = p.fin_tech_selector_v2.includes("Embedded") ? 0.95 : 0.90;
+  let Total_Power = Total_Watts_Sum * p.Margin;
+
+  let Area_req = 0, Fin_Height = 0;
+  if (Total_Power > 0 && Min_dT_Allowed > 0) {
+    Area_req = 1 / (h_value * (Min_dT_Allowed / Total_Power) * eff);
+    try { Fin_Height = ((Area_req - base_area_m2) * 1e6) / (2 * num_fins * L_hsk); } catch(e) { Fin_Height = 0; }
+  }
+
+  let RRU_Height = p.H_shield + p.H_filter + p.t_base + Fin_Height;
+  let Volume_L = L_hsk * W_hsk * RRU_Height / 1e6;
+
+  // Weight
+  let base_vol = L_hsk * W_hsk * p.t_base / 1000;
+  let fins_vol = num_fins * p.Fin_t * Fin_Height * L_hsk / 1000;
+  let hs_weight = (base_vol + fins_vol) * p.al_density / 1000;
+  let shield_vol = Math.max(L_hsk*W_hsk*p.H_shield/1000 - p.L_pcb*p.W_pcb*p.H_shield/1000, 0);
+  let shield_weight = shield_vol * p.al_density / 1000;
+  let filter_weight = L_hsk*W_hsk*p.H_filter/1000 * p.filter_density / 1000;
+  let shielding_weight = (p.L_pcb*p.W_pcb/100)*1.2 * p.shielding_density / 1000;
+  let pcb_weight = (p.L_pcb*p.W_pcb/100) * p.pcb_surface_density / 1000;
+  let total_weight = hs_weight + shield_weight + filter_weight + shielding_weight + pcb_weight;
+
+  // Tc/Tj/Margin
+  let T_hsk_base;
+  if (Area_fixed_m2 && Area_fixed_m2 > 0) {
+    T_hsk_base = p.T_amb + Total_Power / (h_value * Area_fixed_m2 * eff);
+  } else {
+    T_hsk_base = p.T_amb + Min_dT_Allowed / p.Margin;
+  }
+
+  rows.forEach(r => {
+    r.T_hsk_eff = T_hsk_base + r['Height(mm)'] * p.Slope;
+    r.Tc = r.T_hsk_eff + r['Power(W)'] * (r.R_int + r.R_TIM);
+    r.Tj = r.Tc + r['Power(W)'] * r.R_jc;
+    let isTcLimited = r._src === 'PWR' || (r.Component||'').toLowerCase().includes('ddr');
+    r.T_ref = isTcLimited ? r.Tc : r.Tj;
+    r.Temp_Label = isTcLimited ? 'Tc' : 'Tj';
+    r.Tj_Margin = r['Limit(C)'] - r.T_ref;
+  });
+
+  let Bottleneck_Tj_Margin = 0;
+  if (valid.length > 0 && bt_idx >= 0) {
+    // Find the same component in rows
+    let btRow = rows.find(r => r.Component === Bottleneck_Name && r.Total_W > 0);
+    if (btRow) Bottleneck_Tj_Margin = Math.round(btRow.Tj_Margin * 10) / 10;
+  }
+
+  // DRC
+  let drc_failed = false, drc_msg = "", drc_warn = "";
+  let aspect_ratio = (p.Gap > 0 && Fin_Height > 0) ? Fin_Height / p.Gap : 0;
+  if (aspect_ratio > 12) { drc_failed = true; drc_msg = "Choked Flow: AR=" + aspect_ratio.toFixed(1) + " > 12"; }
+  else if (h_conv < 4) { drc_failed = true; drc_msg = "Poor Convection: h_conv=" + h_conv.toFixed(2) + " < 4.0"; }
+  else if (p.Gap < 4) { drc_failed = true; drc_msg = "Gap too small: " + p.Gap + "mm < 4mm"; }
+  else if (p.fin_tech_selector_v2.includes("Embedded") && Fin_Height > 100) { drc_failed = true; drc_msg = "Embedded Fin process limit: " + Fin_Height.toFixed(1) + "mm > 100mm"; }
+
+  return {
+    Total_Power, Min_dT_Allowed, Bottleneck_Name, Area_req, Fin_Height, Volume_L: Volume_L,
+    total_weight_kg: total_weight, h_value, h_conv, h_rad,
+    Bottleneck_Tj_Margin, Fin_Count: num_fins, rows,
+    L_hsk, W_hsk, RRU_Height, aspect_ratio,
+    drc_failed, drc_msg, drc_warn,
+    hs_weight_kg: hs_weight, shield_weight_kg: shield_weight,
+    filter_weight_kg: filter_weight, shielding_weight_kg: shielding_weight, pcb_weight_kg: pcb_weight,
+    eff, T_hsk_base
+  };
+}
+
+// =====================================================
+// MAIN RECALC
+// =====================================================
+function recalc() {
+  readGlobals();
+  calcResults = computeAll(G, components, null);
+  updateHDisplay();
+  renderTab0();
+  renderTab1();
+  renderTab2();
+  renderTab3();
+  updateSABase();
+}
+
+function updateHDisplay() {
+  let {h_value, h_conv, h_rad} = calcHValue(G.Gap);
+  let el = document.getElementById('h-val');
+  el.textContent = 'h = ' + h_value.toFixed(2);
+  el.style.color = h_conv < 4 ? '#ef4444' : '#60a5fa';
+  document.getElementById('h-sub').textContent = 'h_conv: ' + h_conv.toFixed(2) + ' + h_rad: ' + h_rad.toFixed(2);
+
+  let ar = calcResults ? calcResults.aspect_ratio : 0;
+  let arEl = document.getElementById('ar-val');
+  if (ar > 0) {
+    arEl.textContent = ar.toFixed(1);
+    arEl.style.color = ar > 12 ? '#ef4444' : (ar >= 4.5 && ar <= 6.5) ? '#00b894' : '#f39c12';
+  } else {
+    arEl.textContent = '--';
+  }
+}
+
+// =====================================================
+// TAB SWITCHING
+// =====================================================
+function switchTab(idx) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i===idx));
+  document.querySelectorAll('.tab-content').forEach((c,i) => c.classList.toggle('active', i===idx));
+  if (idx === 3) setTimeout(() => renderTab3(), 50);
+}
+
+function switchSubTab(idx) {
+  document.querySelectorAll('.sub-tab-btn').forEach((b,i) => b.classList.toggle('active', i===idx));
+  document.querySelectorAll('.sub-content').forEach((c,i) => c.classList.toggle('active', i===idx));
+}
+
+// =====================================================
+// TAB 0: COMPONENT TABLES
+// =====================================================
+function renderCompTable(arr, containerId, defaults, category) {
+  let html = '<table class="comp-table"><thead><tr>';
+  COLS.forEach(c => html += '<th>' + c + '</th>');
+  html += '<th>Actions</th></tr></thead><tbody>';
+
+  arr.forEach((row, i) => {
+    html += '<tr>';
+    COLS.forEach(col => {
+      if (col === 'Board_Type') {
+        html += '<td><select onchange="updateComp(\'' + category + '\',' + i + ',\'' + col + '\',this.value)">';
+        BOARD_TYPES.forEach(o => html += '<option' + (row[col]===o?' selected':'') + '>' + o + '</option>');
+        html += '</select></td>';
+      } else if (col === 'TIM_Type') {
+        html += '<td><select onchange="updateComp(\'' + category + '\',' + i + ',\'' + col + '\',this.value)">';
+        TIM_TYPES.forEach(o => html += '<option' + (row[col]===o?' selected':'') + '>' + o + '</option>');
+        html += '</select></td>';
+      } else if (col === 'Component') {
+        html += '<td><input type="text" value="' + (row[col]||'') + '" onchange="updateComp(\'' + category + '\',' + i + ',\'' + col + '\',this.value)"></td>';
+      } else {
+        html += '<td><input type="number" value="' + (row[col]||0) + '" step="any" onchange="updateComp(\'' + category + '\',' + i + ',\'' + col + '\',parseFloat(this.value)||0)"></td>';
+      }
+    });
+    html += '<td><button class="btn btn-sm btn-danger" onclick="removeComp(\'' + category + '\',' + i + ')">Del</button> ';
+    html += '<button class="btn btn-sm btn-primary" onclick="copyComp(\'' + category + '\',' + i + ')">Copy</button></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+
+  let pw = arr.reduce((s,r) => s + r['Power(W)'] * r.Qty, 0);
+  html = '<p style="color:#666;font-size:0.85rem;margin-bottom:8px;">Total Power: <b>' + pw.toFixed(1) + ' W</b> | ' + arr.length + ' components</p>' + html;
+  html += '<button class="btn btn-success" style="margin-top:8px;" onclick="addComp(\'' + category + '\')">+ Add Component</button>';
+
+  document.getElementById(containerId).innerHTML = html;
+}
+
+function renderTab0() {
+  renderCompTable(components.rf, 'subtab0', RF_DEFAULT, 'rf');
+  renderCompTable(components.digital, 'subtab1', DIG_DEFAULT, 'digital');
+  renderCompTable(components.pwr, 'subtab2', PWR_DEFAULT, 'pwr');
+
+  let rfP = components.rf.reduce((s,r) => s + r['Power(W)']*r.Qty, 0);
+  let digP = components.digital.reduce((s,r) => s + r['Power(W)']*r.Qty, 0);
+  let pwrP = components.pwr.reduce((s,r) => s + r['Power(W)']*r.Qty, 0);
+  let total = rfP + digP + pwrP;
+  document.getElementById('power-summary').innerHTML = 'Total System Power (before Margin): <b>' + total.toFixed(1) + ' W</b> | RF: ' + rfP.toFixed(1) + 'W, Digital: ' + digP.toFixed(1) + 'W, PWR: ' + pwrP.toFixed(1) + 'W';
+}
+
+function updateComp(cat, idx, col, val) {
+  components[cat][idx][col] = val;
+  recalc();
+}
+function removeComp(cat, idx) {
+  components[cat].splice(idx, 1);
+  recalc();
+}
+function copyComp(cat, idx) {
+  components[cat].push({...components[cat][idx]});
+  recalc();
+}
+function addComp(cat) {
+  let d = cat==='rf'?RF_DEFAULT:cat==='digital'?DIG_DEFAULT:PWR_DEFAULT;
+  components[cat].push({...d});
+  recalc();
+}
+
+// =====================================================
+// TAB 1: DETAILED ANALYSIS
+// =====================================================
+function renderTab1() {
+  if (!calcResults || !calcResults.rows.length) return;
+  let R = calcResults;
+  let html = '';
+
+  // Overheat alerts
+  let overheat = R.rows.filter(r => r.Tj_Margin < 0 && r.Total_W > 0);
+  if (overheat.length) {
+    html += '<div class="alert alert-danger"><b>OVERHEAT WARNING!</b><br>';
+    overheat.forEach(r => html += '<b>' + r.Component + '</b> over by ' + Math.abs(r.Tj_Margin).toFixed(1) + 'deg C (Tj=' + r.Tj.toFixed(1) + ', Limit=' + r['Limit(C)'] + ')<br>');
+    html += '</div>';
+  }
+  document.getElementById('tab1-alerts').innerHTML = html;
+
+  // Risk Top 3
+  let valid = R.rows.filter(r => r.Total_W > 0).sort((a,b) => a.Allowed_dT - b.Allowed_dT).slice(0,3);
+  let rhtml = '<div class="risk-row">';
+  let emojis = ['1st','2nd','3rd'];
+  valid.forEach((r,i) => {
+    rhtml += '<div class="risk-card"><div class="rank">Risk #' + (i+1) + ' ' + r.Component + '</div>';
+    rhtml += '<div class="rval">' + r.Allowed_dT.toFixed(1) + ' deg C</div>';
+    rhtml += '<div class="rdelta">Tj_Margin: ' + r.Tj_Margin.toFixed(1) + ' deg C</div></div>';
+  });
+  rhtml += '</div>';
+  document.getElementById('tab1-risk').innerHTML = rhtml;
+
+  // Scale bar
+  let minV = Math.min(...R.rows.map(r=>r.Allowed_dT));
+  let maxV = Math.max(...R.rows.map(r=>r.Allowed_dT));
+  let midV = (minV+maxV)/2;
+  document.getElementById('tab1-scale').innerHTML = '<div style="font-weight:bold;margin-bottom:5px;color:#555;font-size:0.85rem;">Allowed dT Color Scale</div><div class="bar"></div><div class="labels"><span>'+minV.toFixed(0)+'deg C (Risk)</span><span>'+midV.toFixed(0)+'deg C</span><span>'+maxV.toFixed(0)+'deg C (Safe)</span></div>';
+
+  // Table
+  let cols = ['Component','Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','Drop','R_jc','R_int','R_TIM','Limit(C)'];
+  let thtml = '<table class="comp-table"><thead><tr>';
+  cols.forEach(c => thtml += '<th>' + c + '</th>');
+  thtml += '</tr></thead><tbody>';
+  R.rows.forEach(r => {
+    thtml += '<tr>';
+    cols.forEach(c => {
+      let v = r[c];
+      let style = '';
+      if (c === 'Allowed_dT' || c === 'Tj_Margin') {
+        let ratio = maxV > minV ? (v - minV) / (maxV - minV) : 0.5;
+        let red = Math.round(255 * (1 - ratio));
+        let green = Math.round(255 * ratio);
+        style = 'background:rgba(' + red + ',' + green + ',50,0.2);';
+      }
+      if (typeof v === 'number') v = c.includes('R_') ? v.toFixed(4) : v.toFixed(1);
+      thtml += '<td style="' + style + '">' + v + '</td>';
+    });
+    thtml += '</tr>';
+  });
+  thtml += '</tbody></table>';
+  document.getElementById('tab1-table').innerHTML = thtml;
+}
+
+// =====================================================
+// TAB 2: VISUAL REPORT
+// =====================================================
+function renderTab2() {
+  if (!calcResults) return;
+  let R = calcResults;
+
+  // KPI cards
+  let khtml = '';
+  khtml += kpiCard('Total Power', R.Total_Power.toFixed(2) + ' W', 'Total Power (with Margin)', '#e74c3c');
+  khtml += kpiCard('Bottleneck', R.Bottleneck_Name, 'Margin: ' + R.Bottleneck_Tj_Margin + 'deg C', '#f39c12');
+  khtml += kpiCard('Required Area', R.Area_req.toFixed(3) + ' m2', 'Required Area', '#3498db');
+  khtml += kpiCard('Fin Count', R.Fin_Count + ' Pcs', 'Fin Count', '#9b59b6');
+  document.getElementById('tab2-kpi').innerHTML = khtml;
+
+  // Charts
+  let valid = R.rows.filter(r => r.Total_W > 0);
+  if (valid.length > 0) {
+    let chartsDiv = document.getElementById('tab2-charts');
+    chartsDiv.innerHTML = '<div id="chart-margin" style="width:100%;"></div><div style="display:flex;gap:15px;margin-top:15px;"><div id="chart-power" style="flex:1;"></div><div id="chart-tjm" style="flex:1;"></div></div>';
+
+    // Margin overview
+    let sorted = [...valid].sort((a,b) => b.Tj_Margin - a.Tj_Margin);
+    let colors = sorted.map(r => r.Tj_Margin < 0 ? '#e74c3c' : r.Tj_Margin < 10 ? '#f39c12' : r.Tj_Margin < 20 ? '#f1c40f' : '#2ecc71');
+    Plotly.newPlot('chart-margin', [
+      {y: sorted.map(r=>r.Component), x: sorted.map(r=>r['Limit(C)']), type:'bar', orientation:'h', marker:{color:'#E8E8E8'}, name:'Limit'},
+      {y: sorted.map(r=>r.Component), x: sorted.map(r=>r.T_ref), type:'bar', orientation:'h', marker:{color:colors}, name:'T_ref',
+       text: sorted.map(r=>r.Temp_Label+': '+r.T_ref.toFixed(1)+'deg C (Margin: '+r.Tj_Margin.toFixed(1)+'deg C)'), textposition:'outside'}
+    ], {barmode:'overlay', title:'<b>Temperature Margin Overview</b>', showlegend:false, height:Math.max(300,sorted.length*50+100), margin:{l:10,r:200,t:60,b:40}, yaxis:{automargin:true}});
+
+    // Power breakdown
+    let pSorted = [...valid].sort((a,b) => a.Total_W - b.Total_W);
+    Plotly.newPlot('chart-power', [
+      {y:pSorted.map(r=>r.Component), x:pSorted.map(r=>r.Total_W), type:'bar', orientation:'h', marker:{colorscale:'Oranges',color:pSorted.map(r=>r.Total_W),showscale:false}, text:pSorted.map(r=>r.Total_W.toFixed(1)+' W'), textposition:'outside'}
+    ], {title:'<b>Power Breakdown</b>', showlegend:false, margin:{l:10,r:80,t:60,b:40}, yaxis:{automargin:true}});
+
+    // Tj Margin bar
+    let mSorted = [...valid].sort((a,b) => a.Tj_Margin - b.Tj_Margin);
+    Plotly.newPlot('chart-tjm', [
+      {x:mSorted.map(r=>r.Component), y:mSorted.map(r=>r.Tj_Margin), type:'bar', marker:{colorscale:'RdYlGn',color:mSorted.map(r=>r.Tj_Margin),showscale:false}}
+    ], {title:'<b>Temperature Margin</b>', yaxis:{title:'Margin (deg C)'}});
+  }
+
+  // DRC
+  if (R.drc_failed) {
+    document.getElementById('tab2-drc').innerHTML = '<div class="drc-error"><b>DRC FAILED</b><br>' + R.drc_msg + '</div>';
+    document.getElementById('tab2-dims').innerHTML = '';
+    document.getElementById('tab2-volume').innerHTML = '<div class="volume-box" style="background:#ffebee;border-color:#e74c3c;"><h3 style="color:#c0392b;">Estimated Volume</h3><div class="vol-val" style="color:#e74c3c;">N/A</div></div>';
+    document.getElementById('tab2-weight').innerHTML = '';
+  } else {
+    document.getElementById('tab2-drc').innerHTML = '';
+    document.getElementById('tab2-dims').innerHTML = '<div class="kpi-row">' + kpiCard('Fin Height', R.Fin_Height.toFixed(2)+' mm', 'Suggested Fin Height', '#2ecc71') + kpiCard('RRU Dimensions', R.L_hsk.toFixed(0)+'x'+R.W_hsk.toFixed(0)+'x'+R.RRU_Height.toFixed(1), 'LxWxH (mm)', '#34495e') + '</div>';
+    document.getElementById('tab2-volume').innerHTML = '<div class="volume-box"><h3>Estimated Volume</h3><div class="vol-val">' + R.Volume_L.toFixed(2) + ' L</div></div>';
+    document.getElementById('tab2-weight').innerHTML = '<div class="weight-box"><h3 style="color:#2c3e50;">Estimated Weight</h3><div style="font-size:2.8rem;font-weight:800;color:#34495e;margin:10px 0;">' + R.total_weight_kg.toFixed(1) + ' kg</div><small style="color:#7f8c8d;">Heatsink '+R.hs_weight_kg.toFixed(1)+'kg | Shield '+R.shield_weight_kg.toFixed(1)+'kg | Filter '+R.filter_weight_kg.toFixed(1)+'kg | Shielding '+R.shielding_weight_kg.toFixed(1)+'kg | PCB '+R.pcb_weight_kg.toFixed(2)+'kg</small></div>';
+  }
+}
+
+function kpiCard(title, value, desc, color) {
+  return '<div class="kpi-card" style="border-left-color:'+color+';"><div class="title">'+title+'</div><div class="value">'+value+'</div><div class="desc">'+desc+'</div></div>';
+}
+
+// =====================================================
+// TAB 3: 3D SIMULATION
+// =====================================================
+function renderTab3() {
+  if (!calcResults) return;
+  let R = calcResults;
+  if (R.drc_failed || R.Fin_Height <= 0) {
+    document.getElementById('tab3-3d').innerHTML = '<div class="drc-error">Cannot render 3D model. ' + (R.drc_msg || 'Invalid dimensions.') + '</div>';
+    document.getElementById('tab3-info').innerHTML = '';
+    return;
+  }
+
+  let L=R.L_hsk, W=R.W_hsk, h_body=G.H_shield+G.H_filter, zbs=h_body, zbe=h_body+G.t_base, zfs=zbe, zfe=zbe+R.Fin_Height;
+  let ijk = {i:[7,0,0,0,4,4,6,6,4,0,3,2],j:[3,4,1,2,5,6,5,2,0,1,6,3],k:[0,7,2,3,6,7,1,1,5,5,7,6]};
+
+  let traces = [];
+  // Body
+  traces.push({type:'mesh3d',x:[0,L,L,0,0,L,L,0],y:[0,0,W,W,0,0,W,W],z:[0,0,0,0,h_body,h_body,h_body,h_body],...ijk,color:'#5D6D7E',opacity:1,flatshading:true,name:'Body',showscale:false});
+  // Base
+  traces.push({type:'mesh3d',x:[0,L,L,0,0,L,L,0],y:[0,0,W,W,0,0,W,W],z:[zbs,zbs,zbs,zbs,zbe,zbe,zbe,zbe],...ijk,color:'#BDC3C7',opacity:1,flatshading:true,name:'Base',showscale:false});
+
+  // Fins
+  if (R.Fin_Count > 0) {
+    let totalFinW = R.Fin_Count * G.Fin_t + (R.Fin_Count-1) * G.Gap;
+    let yoff = (W - totalFinW) / 2;
+    for (let i=0; i<R.Fin_Count; i++) {
+      let fy0 = yoff + i*(G.Fin_t+G.Gap), fy1 = fy0+G.Fin_t;
+      if (fy1 > W) break;
+      traces.push({type:'mesh3d',
+        x:[0,L,L,0,0,L,L,0], y:[fy0,fy0,fy1,fy1,fy0,fy0,fy1,fy1],
+        z:[zfs,zfs,zfs,zfs,zfe,zfe,zfe,zfe],
+        ...ijk, intensity:[0,0,0,0,1,1,1,1], cmin:0, cmax:1,
+        colorscale:[[0,'#E67E22'],[0.45,'#BDC3C7'],[1,'#D6EAF8']],
+        showscale:false, flatshading:true, name:i===0?'Fins':'', showlegend:i===0
+      });
+    }
+  }
+
+  let maxDim = Math.max(L,W,R.RRU_Height)*1.1;
+  Plotly.newPlot('tab3-3d', traces, {
+    scene:{xaxis:{title:'Length',range:[0,maxDim]},yaxis:{title:'Width',range:[0,maxDim]},zaxis:{title:'Height',range:[0,maxDim]},
+      aspectmode:'manual',aspectratio:{x:1,y:1,z:1},
+      camera:{projection:{type:'orthographic'},eye:{x:1.2,y:1.2,z:1.2}},bgcolor:'white'},
+    margin:{l:0,r:0,b:0,t:0}, height:600
+  });
+
+  document.getElementById('tab3-info').innerHTML = '<div class="alert alert-info"><b>Dimensions:</b> '+L.toFixed(1)+' x '+W.toFixed(1)+' x '+R.RRU_Height.toFixed(1)+' mm</div><div class="alert alert-success"><b>Fins:</b> '+R.Fin_Count+' pcs | Height: '+R.Fin_Height.toFixed(1)+' mm | Thickness: '+G.Fin_t+' mm | Gap: '+G.Gap+' mm</div>';
+}
+
+// =====================================================
+// TAB 4: SENSITIVITY ANALYSIS
+// =====================================================
+function updateSABase() {
+  let v = document.getElementById('sa_var').value;
+  let base = v === 'power_scale' ? 1.0 : (G[v] || 1.0);
+  document.getElementById('sa_base').value = base;
+}
+
+function saCalc(params, comps, varKey, xVal, areaFixed) {
+  let p = {...params};
+  let c = {rf: comps.rf.map(r=>({...r})), digital: comps.digital.map(r=>({...r})), pwr: comps.pwr.map(r=>({...r}))};
+  if (varKey === 'power_scale') {
+    ['rf','digital','pwr'].forEach(cat => c[cat].forEach(r => r['Power(W)'] *= xVal));
+  } else {
+    p[varKey] = xVal;
+  }
+  return computeAll(p, c, areaFixed);
+}
+
+function runSweep() {
+  let varKey = document.getElementById('sa_var').value;
+  let baseVal = varKey === 'power_scale' ? 1.0 : G[varKey];
+  let minusPct = parseFloat(document.getElementById('sa_minus').value);
+  let plusPct = parseFloat(document.getElementById('sa_plus').value);
+  let steps = parseInt(document.getElementById('sa_steps').value);
+
+  let vMin = baseVal * (1 - minusPct/100);
+  let vMax = baseVal * (1 + plusPct/100);
+  if (varKey === 'Gap') vMin = Math.max(vMin, 0.5);
+  if (varKey === 'power_scale') vMin = Math.max(vMin, 0.1);
+
+  let xVals = [];
+  for (let i=0; i<steps; i++) xVals.push(vMin + (vMax-vMin)*i/(steps-1));
+  let closestIdx = 0;
+  xVals.forEach((x,i) => { if (Math.abs(x-baseVal) < Math.abs(xVals[closestIdx]-baseVal)) closestIdx=i; });
+  xVals[closestIdx] = baseVal;
+
+  let baseRes = saCalc(G, components, varKey, baseVal, null);
+  let areaBase = baseRes.Area_req;
+
+  let results = xVals.map((x,i) => {
+    let res = saCalc(G, components, varKey, x, areaBase);
+    let gapNow = varKey==='Gap' ? x : G.Gap;
+    let ar = gapNow > 0 ? res.Fin_Height / gapNow : 0;
+    return {x: Math.round(x*1e4)/1e4, Volume: Math.round(res.Volume_L*100)/100, Weight: Math.round(res.total_weight_kg*100)/100, AR: Math.round(ar*10)/10, Tj_Margin: res.Bottleneck_Tj_Margin, Fin_Height: Math.round(res.Fin_Height*10)/10};
+  });
+
+  let container = document.getElementById('sa-sweep-results');
+  container.innerHTML = '<div id="sa-chart-left" style="flex:1;min-width:400px;"></div><div id="sa-chart-right" style="flex:1;min-width:400px;"></div>';
+
+  let xs = results.map(r=>r.x);
+  // Left: Volume + Weight
+  Plotly.newPlot('sa-chart-left', [
+    {x:xs, y:results.map(r=>r.Volume), type:'bar', name:'Volume (L)', marker:{color:'rgba(52,152,219,0.8)'}},
+    {x:xs, y:results.map(r=>r.Weight), type:'bar', name:'Weight (kg)', marker:{color:'rgba(46,204,113,0.8)'}, yaxis:'y2'}
+  ], {
+    barmode:'group', title:'Volume & Weight',
+    xaxis:{title:varKey}, yaxis:{title:'Volume (L)',titlefont:{color:'#3498db'},tickfont:{color:'#3498db'}},
+    yaxis2:{title:'Weight (kg)',titlefont:{color:'#2ecc71'},tickfont:{color:'#2ecc71'},overlaying:'y',side:'right'},
+    shapes:[{type:'line',x0:baseVal,x1:baseVal,y0:0,y1:1,yref:'paper',line:{dash:'dash',color:'gray'}}],
+    legend:{orientation:'h',x:0.5,y:1.08,xanchor:'center'}, height:420, margin:{l:50,r:50,t:50,b:50}
+  });
+
+  // Right: AR or Tj_Margin
+  let perfY, perfName, perfColor;
+  if (varKey === 'Gap') {
+    perfY = results.map(r=>r.AR); perfName = 'Aspect Ratio'; perfColor = '#e74c3c';
+  } else {
+    perfY = results.map(r=>r.Tj_Margin); perfName = 'Tj_Margin (deg C)'; perfColor = '#e67e22';
+  }
+  let shapes2 = [{type:'line',x0:baseVal,x1:baseVal,y0:0,y1:1,yref:'paper',line:{dash:'dash',color:'gray'}}];
+  if (varKey !== 'Gap') shapes2.push({type:'line',x0:xs[0],x1:xs[xs.length-1],y0:0,y1:0,line:{dash:'dot',color:'red',width:2}});
+
+  Plotly.newPlot('sa-chart-right', [
+    {x:xs, y:perfY, mode:'lines+markers', name:perfName, line:{color:perfColor,width:3}, marker:{size:8}}
+  ], {
+    title:perfName, xaxis:{title:varKey}, yaxis:{title:perfName,titlefont:{color:perfColor},tickfont:{color:perfColor}},
+    shapes:shapes2, height:420, margin:{l:50,r:50,t:50,b:50}
+  });
+}
+
+function runTornado() {
+  let pct = parseFloat(document.getElementById('tornado_pct').value);
+  let metric = document.getElementById('tornado_metric').value;
+
+  let vars = [
+    {key:'Gap', label:'Fin Air Gap', base: G.Gap},
+    {key:'T_amb', label:'Environment Temp', base: G.T_amb},
+    {key:'power_scale', label:'Power Scale', base: 1.0}
+  ];
+
+  let baseRes = saCalc(G, components, 'Gap', G.Gap, null);
+  let areaBase = baseRes.Area_req;
+
+  let rows = vars.map(v => {
+    let lo = Math.max(v.base*(1-pct/100), 0.1);
+    let hi = v.base*(1+pct/100);
+    let rLo = saCalc(G, components, v.key, lo, areaBase);
+    let rBs = saCalc(G, components, v.key, v.base, areaBase);
+    let rHi = saCalc(G, components, v.key, hi, areaBase);
+    return {label:v.label, Vol_lo:rLo.Volume_L, Vol_bs:rBs.Volume_L, Vol_hi:rHi.Volume_L, Tj_lo:rLo.Bottleneck_Tj_Margin, Tj_bs:rBs.Bottleneck_Tj_Margin, Tj_hi:rHi.Bottleneck_Tj_Margin};
+  });
+
+  function makeTornado(data, kLo, kHi, kBs, title, cDec, cInc) {
+    let baseMean = data.reduce((s,r)=>s+r[kBs],0)/data.length;
+    let traces = [];
+    data.forEach((r,i) => {
+      traces.push({y:[r.label],x:[r[kLo]-r[kBs]],base:[r[kBs]],type:'bar',orientation:'h',marker:{color:cDec},name:'-'+pct+'%',showlegend:i===0});
+      traces.push({y:[r.label],x:[r[kHi]-r[kBs]],base:[r[kBs]],type:'bar',orientation:'h',marker:{color:cInc},name:'+'+pct+'%',showlegend:i===0});
+    });
+    return {traces, layout:{barmode:'overlay',title:title,shapes:[{type:'line',x0:baseMean,x1:baseMean,y0:-0.5,y1:data.length-0.5,line:{dash:'dash',color:'gray'}}],legend:{orientation:'h',x:0.5,y:1.12,xanchor:'center'},height:380,margin:{l:20,r:20,t:55,b:40}}};
+  }
+
+  let container = document.getElementById('sa-tornado-results');
+  let html = '';
+  if (metric === 'both' || metric === 'volume') html += '<div id="tornado-vol" style="flex:1;min-width:400px;"></div>';
+  if (metric === 'both' || metric === 'tj') html += '<div id="tornado-tj" style="flex:1;min-width:400px;"></div>';
+  container.innerHTML = html;
+
+  if (metric === 'both' || metric === 'volume') {
+    let t = makeTornado(rows,'Vol_lo','Vol_hi','Vol_bs','Volume Sensitivity (L)','rgba(231,76,60,0.7)','rgba(52,152,219,0.7)');
+    Plotly.newPlot('tornado-vol', t.traces, t.layout);
+  }
+  if (metric === 'both' || metric === 'tj') {
+    let t = makeTornado(rows,'Tj_lo','Tj_hi','Tj_bs','Tj_Margin Sensitivity (deg C)','rgba(231,76,60,0.7)','rgba(46,204,113,0.7)');
+    Plotly.newPlot('tornado-tj', t.traces, t.layout);
+  }
+}
+
+// =====================================================
+// PROJECT I/O
+// =====================================================
+function loadProject() { document.getElementById('fileInput').click(); }
+
+function handleFileLoad(e) {
+  let file = e.target.files[0];
+  if (!file) return;
+  let reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      let data = JSON.parse(ev.target.result);
+      if (data.global_params) {
+        for (let k in data.global_params) {
+          G[k] = data.global_params[k];
+          let el = document.getElementById(k);
+          if (el) { if (el.tagName==='SELECT') el.value=data.global_params[k]; else el.value=data.global_params[k]; }
+        }
+      }
+      if (data.rf_data) components.rf = data.rf_data;
+      if (data.digital_data) components.digital = data.digital_data;
+      if (data.pwr_data) components.pwr = data.pwr_data;
+      recalc();
+      alert('Project loaded successfully!');
+    } catch(err) { alert('Error loading project: ' + err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function saveProject() {
+  readGlobals();
+  let data = {
+    meta: {version: "v4.30 (GitHub Pages)", timestamp: new Date().toISOString()},
+    global_params: {},
+    rf_data: components.rf,
+    digital_data: components.digital,
+    pwr_data: components.pwr
+  };
+  let saveKeys = ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right',
+    'Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad',
+    'K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','fin_tech_selector_v2',
+    'al_density','filter_density','shielding_density','pcb_surface_density'];
+  saveKeys.forEach(k => data.global_params[k] = G[k]);
+  data.global_params.fin_tech_selector_v2 = document.getElementById('fin_tech_selector_v2').value;
+
+  let blob = new Blob([JSON.stringify(data,null,4)], {type:'application/json'});
+  let a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'RRU_Project_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+}
+
+// =====================================================
+// BOOT
+// =====================================================
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
