@@ -555,6 +555,7 @@ async function initFirebase() {
     }
     fbOk = true;
     document.getElementById('fb-status').innerHTML = '<div class="firebase-status fb-ok">🟢 Firebase 連線成功</div>';
+    renderTab0();
   } catch(e) {
     fbOk = false;
     document.getElementById('fb-status').innerHTML = '<div class="firebase-status fb-fail">🔴 Firebase 離線 (本地模式)</div>';
