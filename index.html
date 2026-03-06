@@ -800,11 +800,12 @@ function renderTab1(){
 // =====================================================
 function kpiCard(t,v,d,c){return'<div class="kpi-card" style="border-left-color:'+c+';"><div class="title">'+t+'</div><div class="value">'+v+'</div><div class="desc">'+d+'</div></div>';}
 
+var fullscreenBtn={name:'fullscreen',title:'全螢幕',icon:{width:24,height:24,path:'M5 5h5V3H3v7h2V5zm14 0h-5V3h7v7h-2V5zM5 19h5v2H3v-7h2v5zm14 0h-5v2h7v-7h-2v5z'},click:function(gd){var el=gd.closest('.js-plotly-plot')||gd;if(!document.fullscreenElement){el.requestFullscreen().then(function(){el.style.background='#fff';Plotly.Plots.resize(gd);});}else{document.exitFullscreen();}}};
 function renderTab2(){
   if(!calcResults)return;let R=calcResults;
   document.getElementById('tab2-kpi').innerHTML=kpiCard('整機總熱耗',R.Total_Power.toFixed(2)+' W','Total Power','#e74c3c')+kpiCard('系統瓶頸元件',R.Bottleneck_Name,'Margin: '+R.Bottleneck_Tj_Margin+'°C','#f39c12')+kpiCard('所需散熱面積',R.Area_req.toFixed(3)+' m²','Required Area','#3498db')+kpiCard('預估鰭片數量',R.Fin_Count+' Pcs','Fin Count','#9b59b6');
   let valid=R.rows.filter(r=>r.Total_W>0);
-  let pCfg={responsive:true,displaylogo:false,modeBarButtonsToAdd:['toggleSpikelines'],displayModeBar:true};
+  let pCfg={responsive:true,displaylogo:false,modeBarButtonsToAdd:['toggleSpikelines',fullscreenBtn],displayModeBar:true};
   if(valid.length){
     let cd=document.getElementById('tab2-charts');cd.innerHTML='<div id="chart-margin" style="width:100%;"></div><div style="display:flex;gap:15px;margin-top:15px;"><div id="chart-power" style="flex:1;"></div><div id="chart-tjm" style="flex:1;"></div></div>';
     let sorted=[...valid].sort((a,b)=>b.Tj_Margin-a.Tj_Margin);let colors=sorted.map(r=>r.Tj_Margin<0?'#e74c3c':r.Tj_Margin<10?'#f39c12':r.Tj_Margin<20?'#f1c40f':'#2ecc71');
@@ -837,7 +838,7 @@ function renderTab3(){
     for(let i=0;i<R.Fin_Count;i++){let f0=yo+i*(G.Fin_t+G.Gap),f1=f0+G.Fin_t;if(f1>W)break;
       tr.push({type:'mesh3d',x:[0,L,L,0,0,L,L,0],y:[f0,f0,f1,f1,f0,f0,f1,f1],z:[zfs,zfs,zfs,zfs,zfe,zfe,zfe,zfe],...ijk,intensity:[0,0,0,0,1,1,1,1],cmin:0,cmax:1,colorscale:[[0,'#E67E22'],[0.45,'#BDC3C7'],[1,'#D6EAF8']],showscale:false,flatshading:true,name:i===0?'Fins':'',showlegend:i===0});}}
   let md=Math.max(L,W,R.RRU_Height)*1.1;
-  Plotly.newPlot('tab3-3d',tr,{scene:{xaxis:{title:'Length',range:[0,md]},yaxis:{title:'Width',range:[0,md]},zaxis:{title:'Height',range:[0,md]},aspectmode:'manual',aspectratio:{x:1,y:1,z:1},camera:{projection:{type:'orthographic'},eye:{x:1.2,y:1.2,z:1.2}},bgcolor:'white'},margin:{l:0,r:0,b:0,t:0},height:600},{responsive:true,displaylogo:false,displayModeBar:true});
+  Plotly.newPlot('tab3-3d',tr,{scene:{xaxis:{title:'Length',range:[0,md]},yaxis:{title:'Width',range:[0,md]},zaxis:{title:'Height',range:[0,md]},aspectmode:'manual',aspectratio:{x:1,y:1,z:1},camera:{projection:{type:'orthographic'},eye:{x:1.2,y:1.2,z:1.2}},bgcolor:'white'},margin:{l:0,r:0,b:0,t:0},height:600},{responsive:true,displaylogo:false,modeBarButtonsToAdd:[fullscreenBtn],displayModeBar:true});
   document.getElementById('tab3-info').innerHTML='<div class="alert alert-info">📐 <b>外觀尺寸：</b>長 '+L.toFixed(1)+' x 寬 '+W.toFixed(1)+' x 高 '+R.RRU_Height.toFixed(1)+' mm</div><div class="alert alert-success">⚡ <b>鰭片規格：</b>數量 '+R.Fin_Count+' pcs | 高度 '+R.Fin_Height.toFixed(1)+' mm | 厚度 '+G.Fin_t+' mm | 間距 '+G.Gap+' mm</div>';
 
   // AI Rendering Section
@@ -884,12 +885,12 @@ function runSweep(){
   Plotly.newPlot('sa-cl',[
     {x:xv,y:res.map(r=>r.Volume),type:'bar',name:'體積 (L)',marker:{color:'rgba(52,152,219,0.8)'},yaxis:'y1',offsetgroup:1},
     {x:xv,y:res.map(r=>r.Weight),type:'bar',name:'重量 (kg)',marker:{color:'rgba(46,204,113,0.8)'},yaxis:'y2',offsetgroup:2}
-  ],{barmode:'group',title:'<b>散熱器規模 — 體積 & 重量</b>',xaxis:{title:vk==='power_scale'?'功耗縮放係數 (×)':vk+' (mm)'},yaxis:{title:'體積 (L)',titlefont:{color:'#3498db'},tickfont:{color:'#3498db'}},yaxis2:{title:'重量 (kg)',titlefont:{color:'#2ecc71'},tickfont:{color:'#2ecc71'},overlaying:'y',side:'right'},legend:{orientation:'h',x:0.5,y:1.08,xanchor:'center'},shapes:[{type:'line',x0:bv,x1:bv,y0:0,y1:1,yref:'paper',line:{dash:'dash',color:'gray'},name:'Current'}],height:420,margin:{l:50,r:50,t:50,b:50},hovermode:'x unified'},{responsive:true,displaylogo:false,displayModeBar:true});
+  ],{barmode:'group',title:'<b>散熱器規模 — 體積 & 重量</b>',xaxis:{title:vk==='power_scale'?'功耗縮放係數 (×)':vk+' (mm)'},yaxis:{title:'體積 (L)',titlefont:{color:'#3498db'},tickfont:{color:'#3498db'}},yaxis2:{title:'重量 (kg)',titlefont:{color:'#2ecc71'},tickfont:{color:'#2ecc71'},overlaying:'y',side:'right'},legend:{orientation:'h',x:0.5,y:1.08,xanchor:'center'},shapes:[{type:'line',x0:bv,x1:bv,y0:0,y1:1,yref:'paper',line:{dash:'dash',color:'gray'},name:'Current'}],height:420,margin:{l:50,r:50,t:50,b:50},hovermode:'x unified'},{responsive:true,displaylogo:false,modeBarButtonsToAdd:[fullscreenBtn],displayModeBar:true});
   // RIGHT
   let py,pn,pc;if(vk==='Gap'){py=res.map(r=>r.AR);pn='流阻比 (AR)';pc='#e74c3c';}else{py=res.map(r=>r.Tj_Margin);pn='Bottleneck Tj_Margin (°C)';pc='#e67e22';}
   let sh2=[{type:'line',x0:bv,x1:bv,y0:0,y1:1,yref:'paper',line:{dash:'dash',color:'gray'}}];
   if(vk!=='Gap')sh2.push({type:'line',x0:xv[0],x1:xv[xv.length-1],y0:0,y1:0,line:{dash:'dot',color:'red',width:2}});
-  Plotly.newPlot('sa-cr',[{x:xv,y:py,mode:'lines+markers',name:pn,line:{color:pc,width:3},marker:{size:8}}],{title:'<b>熱流/幾何性能 — '+pn+'</b>',xaxis:{title:vk==='power_scale'?'功耗縮放係數 (×)':vk+' (mm)'},yaxis:{title:pn,titlefont:{color:pc},tickfont:{color:pc}},shapes:sh2,height:420,margin:{l:50,r:50,t:50,b:50},hovermode:'x unified'},{responsive:true,displaylogo:false,displayModeBar:true});
+  Plotly.newPlot('sa-cr',[{x:xv,y:py,mode:'lines+markers',name:pn,line:{color:pc,width:3},marker:{size:8}}],{title:'<b>熱流/幾何性能 — '+pn+'</b>',xaxis:{title:vk==='power_scale'?'功耗縮放係數 (×)':vk+' (mm)'},yaxis:{title:pn,titlefont:{color:pc},tickfont:{color:pc}},shapes:sh2,height:420,margin:{l:50,r:50,t:50,b:50},hovermode:'x unified'},{responsive:true,displaylogo:false,modeBarButtonsToAdd:[fullscreenBtn],displayModeBar:true});
   // Detail data table
   let dh='<div class="collapsible" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';">📋 查看詳細數據 ▼</div><div class="collapsible-body"><table class="detail-table"><thead><tr><th>'+vk+'</th><th>體積 (L)</th><th>重量 (kg)</th><th>流阻比</th><th>鰭片數</th><th>Tj_Margin (°C)</th><th>Fin 高度 (mm)</th></tr></thead><tbody>';
   res.forEach(r=>dh+='<tr><td>'+r.x+'</td><td>'+r.Volume+'</td><td>'+r.Weight+'</td><td>'+r.AR+'</td><td>'+r.Fin_Count+'</td><td>'+r.Tj_Margin+'</td><td>'+r.Fin_Height+'</td></tr>');
@@ -911,7 +912,7 @@ function runTornado(){
   if(met==='both'||met==='volume')h+='<div id="tv" style="flex:1;min-width:400px;"></div>';
   if(met==='both'||met==='tj')h+='<div id="tt" style="flex:1;min-width:400px;"></div>';
   ct.innerHTML='<div style="display:flex;gap:15px;flex-wrap:wrap;">'+h+'</div><div id="tornado-detail"></div>';
-  let tCfg={responsive:true,displaylogo:false,displayModeBar:true};
+  let tCfg={responsive:true,displaylogo:false,modeBarButtonsToAdd:[fullscreenBtn],displayModeBar:true};
   if(met==='both'||met==='volume'){let t=mkT(rows,'Vol_lo','Vol_hi','Vol_bs','<b>體積敏感度 (L)</b>','rgba(231,76,60,0.7)','rgba(52,152,219,0.7)');Plotly.newPlot('tv',t.tr,t.layout,tCfg);}
   if(met==='both'||met==='tj'){let t=mkT(rows,'Tj_lo','Tj_hi','Tj_bs','<b>Tj_Margin 敏感度 (°C)</b>','rgba(231,76,60,0.7)','rgba(46,204,113,0.7)');Plotly.newPlot('tt',t.tr,t.layout,tCfg);}
   // Detail
