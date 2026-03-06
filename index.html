@@ -194,8 +194,8 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
     <div class="ar-display" id="ar-display"><div style="font-size:0.78rem;color:#94a3b8;">📐 流阻比 (Aspect Ratio)</div><div id="ar-val" style="font-size:1.1rem;font-weight:700;color:#60a5fa;">--</div><div id="ar-msg" style="font-size:0.7rem;color:#888;">✅ 最佳建議：4.5 ~ 6.5</div></div>
   </div>
 
-  <div class="section-title collapsed" onclick="toggleSection(this)">3. 材料參數 (含 Via K值)</div>
-  <div class="section-body collapsed">
+  <div class="section-title" onclick="toggleSection(this)">3. 材料參數 (含 Via K值)</div>
+  <div class="section-body">
     <div class="row2"><div><label>Via 等效 K 值</label><input type="number" id="K_Via" step="1" onchange="recalc()"></div><div><label>Via 製程係數</label><input type="number" id="Via_Eff" step="0.05" onchange="recalc()"></div></div>
     <label style="margin-top:8px;color:var(--primary-light);">🔷 熱介面材料 (TIM)</label>
     <div class="row2"><div><label>K (Putty)</label><input type="number" id="K_Putty" step="0.1" onchange="recalc()"></div><div><label>t (Putty)</label><input type="number" id="t_Putty" step="0.1" onchange="recalc()"></div></div>
@@ -814,7 +814,7 @@ function renderTab2(){
     let pS=[...valid].sort((a,b)=>a.Total_W-b.Total_W);
     Plotly.newPlot('chart-power',[{y:pS.map(r=>r.Component),x:pS.map(r=>r.Total_W),type:'bar',orientation:'h',marker:{colorscale:'Oranges',color:pS.map(r=>r.Total_W),showscale:true,colorbar:{title:'W'}},text:pS.map(r=>r.Total_W.toFixed(1)+' W'),textposition:'outside'}],{title:'<b>各元件功耗分佈 (Power Breakdown)</b>',showlegend:false,margin:{l:10,r:80,t:60,b:40},xaxis:{title:'功耗 (W)'},yaxis:{automargin:true},annotations:[{text:'Total: '+R.Total_Power.toFixed(2)+' W',xref:'paper',yref:'paper',x:0.95,y:1.06,showarrow:false,font:{size:13,color:'#888'}}]},pCfg);
     let mS=[...valid].sort((a,b)=>a.Tj_Margin-b.Tj_Margin);
-    Plotly.newPlot('chart-tjm',[{x:mS.map(r=>r.Component),y:mS.map(r=>r.Tj_Margin),type:'bar',marker:{colorscale:'RdYlGn',color:mS.map(r=>r.Tj_Margin),showscale:true,colorbar:{title:'°C'}}}],{title:'<b>各元件溫度裕度 (Temperature Margin)</b>',xaxis:{title:'元件名稱'},yaxis:{title:'Margin (°C)'}},pCfg);
+    Plotly.newPlot('chart-tjm',[{x:mS.map(r=>r.Component),y:mS.map(r=>r.Tj_Margin),type:'bar',marker:{colorscale:'RdYlGn',color:mS.map(r=>r.Tj_Margin),showscale:true,colorbar:{title:'Margin (°C)'}}}],{title:'<b>各元件溫度裕度 (Temperature Margin)</b>',xaxis:{title:'元件名稱'},yaxis:{title:'Margin (°C)'}},pCfg);
   }
   // DRC + Dims + Volume + Weight
   if(R.drc_failed){document.getElementById('tab2-drc').innerHTML='<div class="drc-error"><b>DRC FAILED</b><br>'+R.drc_msg+'</div>';document.getElementById('tab2-dims').innerHTML='';document.getElementById('tab2-volume').innerHTML='<div class="volume-box" style="background:#ffebee;border-color:#e74c3c;"><h3 style="color:#c0392b;">★ RRU 整機估算體積 (Estimated Volume)</h3><div class="vol-val" style="color:#e74c3c;">N/A</div></div>';document.getElementById('tab2-weight').innerHTML='';}
