@@ -30,9 +30,30 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
 .main{flex:1;padding:25px 30px;overflow-y:auto;}
 .header{background:linear-gradient(135deg,var(--primary),var(--primary-light));padding:20px 30px;border-radius:12px;color:#fff;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:15px;}
 .header h1{font-size:1.8rem;font-weight:900;}.header .subtitle{font-size:0.9rem;opacity:0.9;margin-top:5px;}
-.header .project-io{display:flex;gap:10px;align-items:center;}
+.header .project-io{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
 .header .project-io button{padding:8px 16px;border:2px solid rgba(255,255,255,0.5);background:transparent;color:#fff;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.85rem;transition:all 0.2s;}
 .header .project-io button:hover{background:rgba(255,255,255,0.2);border-color:#fff;}
+.header .project-io .cloud-btn{border-color:rgba(255,220,100,0.7);color:#ffe082;}
+.header .project-io .cloud-btn:hover{background:rgba(255,220,100,0.2);border-color:#ffe082;}
+.header .project-io input[type="text"]{padding:7px 12px;border:2px solid rgba(255,255,255,0.5);background:rgba(255,255,255,0.15);color:#fff;border-radius:8px;font-size:0.85rem;font-weight:600;width:160px;outline:none;}
+.header .project-io input[type="text"]::placeholder{color:rgba(255,255,255,0.5);}
+.header .project-io input[type="text"]:focus{border-color:#fff;background:rgba(255,255,255,0.25);}
+.header .project-io .divider{width:1px;height:28px;background:rgba(255,255,255,0.3);margin:0 2px;}
+.cloud-modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;}
+.cloud-modal-overlay.active{display:flex;}
+.cloud-modal{background:#fff;border-radius:16px;padding:30px;width:420px;max-width:90vw;max-height:70vh;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+.cloud-modal h3{margin:0 0 16px;color:#1e3a5f;font-size:1.2rem;}
+.cloud-modal .cloud-list{max-height:40vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:10px;}
+.cloud-modal .cloud-item{padding:12px 16px;border-bottom:1px solid #f1f5f9;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background 0.15s;}
+.cloud-modal .cloud-item:last-child{border-bottom:none;}
+.cloud-modal .cloud-item:hover{background:#f0f9ff;}
+.cloud-modal .cloud-item .ci-name{font-weight:700;color:#1e3a5f;}
+.cloud-modal .cloud-item .ci-time{font-size:0.78rem;color:#94a3b8;}
+.cloud-modal .cloud-item .ci-del{color:#e74c3c;font-size:0.8rem;cursor:pointer;padding:4px 8px;border-radius:6px;border:1px solid #fecaca;background:#fff5f5;}
+.cloud-modal .cloud-item .ci-del:hover{background:#fee2e2;}
+.cloud-modal .cloud-empty{padding:30px;text-align:center;color:#94a3b8;font-size:0.95rem;}
+.cloud-modal .cloud-close{margin-top:16px;padding:8px 20px;border:none;background:#e2e8f0;color:#475569;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.9rem;}
+.cloud-modal .cloud-close:hover{background:#cbd5e1;}
 .tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;}
 .tab-btn{padding:8px 18px;border:none;border-radius:20px;background:#e2e8f0;color:#475569;font-weight:600;font-size:0.85rem;cursor:pointer;transition:all 0.3s;}
 .tab-btn.active{background:var(--primary);color:#fff;box-shadow:0 4px 6px rgba(0,124,240,0.3);}
@@ -219,6 +240,17 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
       <button onclick="loadProject()">📂 載入專案</button>
       <button onclick="saveProject()">💾 儲存專案</button>
       <input type="file" id="fileInput" accept=".json" style="display:none" onchange="handleFileLoad(event)">
+      <div class="divider"></div>
+      <input type="text" id="cloudProjectName" placeholder="專案名稱 ...">
+      <button class="cloud-btn" onclick="cloudSaveProject()">☁️ 雲端儲存</button>
+      <button class="cloud-btn" onclick="cloudLoadProject()">☁️ 雲端載入</button>
+    </div>
+    <div class="cloud-modal-overlay" id="cloudModal">
+      <div class="cloud-modal">
+        <h3>☁️ 雲端專案列表</h3>
+        <div id="cloudList"></div>
+        <button class="cloud-close" onclick="closeCloudModal()">關閉</button>
+      </div>
     </div>
   </div>
 
@@ -936,6 +968,70 @@ function saveProject(){readGlobals();let d={meta:{version:"v4.30 (GitHub Pages)"
   ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density'].forEach(k=>d.global_params[k]=G[k]);
   d.global_params.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;
   let b=new Blob([JSON.stringify(d,null,4)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='RRU_Project_'+new Date().toISOString().slice(0,10)+'.json';a.click();}
+
+// =====================================================
+// CLOUD PROJECT SAVE / LOAD
+// =====================================================
+async function cloudSaveProject(){
+  let name=document.getElementById('cloudProjectName').value.trim();
+  if(!name){alert('⚠️ 請先輸入專案名稱！');document.getElementById('cloudProjectName').focus();return;}
+  if(!fbOk||!db){alert('⚠️ Firebase 未連線，無法使用雲端儲存。');return;}
+  let docId=name.replace(/ /g,'_').replace(/[^a-zA-Z0-9_\-\u4e00-\u9fff]/g,'');
+  if(!docId){alert('⚠️ 專案名稱無效，請使用中英文或數字。');return;}
+  // Check if exists
+  try{
+    let existing=await db.collection('projects').doc(docId).get();
+    if(existing.exists&&!confirm('「'+name+'」已存在雲端，確定要覆蓋？'))return;
+  }catch(e){}
+  readGlobals();
+  let d={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},project_name:name,global_params:{},rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
+  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density'].forEach(k=>d.global_params[k]=G[k]);
+  d.global_params.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;
+  try{
+    await db.collection('projects').doc(docId).set(d);
+    alert('✅ 專案「'+name+'」已儲存至雲端！');
+  }catch(e){alert('❌ 雲端儲存失敗: '+e.message);}
+}
+
+async function cloudLoadProject(){
+  if(!fbOk||!db){alert('⚠️ Firebase 未連線，無法使用雲端載入。');return;}
+  try{
+    let snap=await db.collection('projects').orderBy('meta.timestamp','desc').get();
+    let list=document.getElementById('cloudList');
+    if(snap.empty){list.innerHTML='<div class="cloud-empty">尚無雲端專案</div>';}
+    else{
+      let html='<div class="cloud-list">';
+      snap.forEach(doc=>{
+        let d=doc.data();let t=d.meta&&d.meta.timestamp?new Date(d.meta.timestamp).toLocaleString('zh-TW'):'';
+        html+='<div class="cloud-item" onclick="cloudLoadOne(\''+doc.id+'\')"><div><div class="ci-name">'+
+          (d.project_name||doc.id)+'</div><div class="ci-time">'+t+'</div></div>'+
+          '<span class="ci-del" onclick="event.stopPropagation();cloudDeleteOne(\''+doc.id+'\',\''+(d.project_name||doc.id)+'\')">🗑️</span></div>';
+      });
+      html+='</div>';list.innerHTML=html;
+    }
+    document.getElementById('cloudModal').classList.add('active');
+  }catch(e){alert('❌ 讀取雲端專案列表失敗: '+e.message);}
+}
+
+async function cloudLoadOne(docId){
+  try{
+    let doc=await db.collection('projects').doc(docId).get();
+    if(!doc.exists){alert('專案不存在');return;}
+    let d=doc.data();
+    if(d.global_params){for(let k in d.global_params){G[k]=d.global_params[k];let el=document.getElementById(k);if(el){el.value=d.global_params[k];}}}
+    if(d.rf_data)components.rf=d.rf_data;if(d.digital_data)components.digital=d.digital_data;if(d.pwr_data)components.pwr=d.pwr_data;
+    if(d.project_name)document.getElementById('cloudProjectName').value=d.project_name;
+    closeCloudModal();recalc();alert('✅ 專案「'+(d.project_name||docId)+'」已從雲端載入！');
+  }catch(e){alert('❌ 載入失敗: '+e.message);}
+}
+
+async function cloudDeleteOne(docId,name){
+  if(!confirm('確定要刪除雲端專案「'+name+'」？此操作無法復原！'))return;
+  try{await db.collection('projects').doc(docId).delete();alert('🗑️ 已刪除「'+name+'」');cloudLoadProject();}
+  catch(e){alert('❌ 刪除失敗: '+e.message);}
+}
+
+function closeCloudModal(){document.getElementById('cloudModal').classList.remove('active');}
 
 // =====================================================
 // LOGIN
