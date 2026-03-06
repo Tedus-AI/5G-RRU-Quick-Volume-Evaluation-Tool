@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>📡 5G RRU 體積估算引擎 Pro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
@@ -68,7 +69,7 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
 .scale-bar .labels{display:flex;justify-content:space-between;width:100%;max-width:600px;font-size:0.78rem;color:#555;font-weight:600;margin-top:4px;}
 .risk-row{display:flex;gap:12px;margin-bottom:15px;flex-wrap:wrap;}
 .risk-card{flex:1;min-width:160px;background:#fff;border-radius:8px;padding:12px;box-shadow:var(--card-shadow);text-align:center;}
-.risk-card .rank{font-size:0.85rem;color:#666;}.risk-card .rval{font-size:1.3rem;font-weight:700;color:#333;}.risk-card .rdelta{font-size:0.78rem;color:#888;}
+.risk-card .rank{font-size:0.85rem;color:#666;}.risk-card .rval{font-family:"Nunito",sans-serif;font-size:1.3rem;font-weight:800;color:#333;}.risk-card .rdelta{font-size:0.78rem;color:#888;}
 .sa-controls{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:18px;margin-bottom:20px;display:flex;gap:15px;align-items:flex-end;flex-wrap:wrap;}
 .sa-controls>div{display:flex;flex-direction:column;}.sa-controls label{font-size:0.78rem;color:#666;margin-bottom:4px;}
 .sa-controls input,.sa-controls select{padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:0.85rem;}
@@ -88,7 +89,7 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
 .fb-ok{background:#e8f5e9;color:#2e7d32;}.fb-fail{background:#ffebee;color:#c0392b;}
 #loading{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#1e293b,#0f172a);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;color:#e2e8f0;}
 #loading h2{font-size:1.8rem;margin-bottom:15px;}#loading p{color:#94a3b8;margin-bottom:20px;}#loading progress{width:300px;height:6px;}
-.kpi-card .value{font-family:"Segoe UI","Roboto","Helvetica Neue",Arial,sans-serif;font-size:1.8rem;font-weight:700;color:#333;margin:6px 0;}
+.kpi-card .value{font-family:"Nunito","Segoe UI","Roboto","Helvetica Neue",Arial,sans-serif;font-size:1.8rem;font-weight:800;color:#333;margin:6px 0;}
 /* Login Page */
 #login-page{position:fixed;top:0;left:0;width:100%;height:100%;background:#f5f7fa;z-index:10000;overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:30px 30px;}
 #login-page .login-header{background:linear-gradient(135deg,#007CF0,#00DFD8);padding:30px;border-radius:15px;color:#fff;text-align:center;margin-bottom:30px;box-shadow:0 6px 12px rgba(0,0,0,0.2);width:100%;}
