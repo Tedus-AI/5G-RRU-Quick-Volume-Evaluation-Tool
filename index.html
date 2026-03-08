@@ -830,9 +830,9 @@ function renderTab1(){
   let mn=Math.min(...R.rows.map(r=>r.Allowed_dT)),mx=Math.max(...R.rows.map(r=>r.Allowed_dT)),md=(mn+mx)/2;
   document.getElementById('tab1-scale').innerHTML='<div style="font-weight:bold;margin-bottom:5px;color:#555;font-size:0.85rem;">允許溫升 (Allowed dT) 色階參考</div><div class="bar"></div><div class="labels"><span>'+mn.toFixed(0)+'°C (Risk)</span><span>'+md.toFixed(0)+'°C</span><span>'+mx.toFixed(0)+'°C (Safe)</span></div>';
   // Column toggle
-  let ctHtml='<details class="col-toggle"><summary>⚙️ 自訂顯示欄位</summary><div class="col-checks">';
+  let ctHtml='<div class="col-toggle"><div style="font-weight:600;font-size:0.85rem;color:#475569;margin-bottom:8px;">⚙️ 自訂顯示欄位</div><div class="col-checks">';
   ALL_TAB1_COLS.forEach(c=>{let lb=TAB2_LABELS[c]||c;let ck=tab1SelectedCols.includes(c)?'checked':'';ctHtml+='<label><input type="checkbox" '+ck+' onchange="toggleTab1Col(\''+c+'\',this.checked)"> '+lb+' ('+c+')</label>';});
-  ctHtml+='</div></details>';document.getElementById('tab1-col-toggle').innerHTML=ctHtml;
+  ctHtml+='</div></div>';document.getElementById('tab1-col-toggle').innerHTML=ctHtml;
   // Table with tooltips
   let cols=['Component'].concat(tab1SelectedCols.filter(c=>ALL_TAB1_COLS.includes(c)));
   let th='<table class="comp-table"><thead><tr>';
