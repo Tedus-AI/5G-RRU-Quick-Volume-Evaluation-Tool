@@ -107,6 +107,12 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
 .prompt-box{width:100%;min-height:250px;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:0.85rem;font-family:inherit;resize:vertical;}
 .copy-btn{background:#fff;border:1px solid #d1d5db;border-radius:4px;padding:8px 16px;font-size:0.85rem;cursor:pointer;font-weight:600;transition:all 0.2s;}
 .copy-btn:hover{border-color:var(--danger);color:var(--danger);}
+.col-toggle{background:#f8f9fa;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:12px;}
+.col-toggle summary{cursor:pointer;font-weight:600;font-size:0.85rem;color:#475569;user-select:none;}
+.col-toggle summary:hover{color:var(--primary);}
+.col-toggle .col-checks{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;}
+.col-toggle .col-checks label{font-size:0.82rem;color:#555;cursor:pointer;display:flex;align-items:center;gap:4px;}
+.col-toggle .col-checks input[type="checkbox"]{accent-color:var(--primary);}
 .firebase-status{font-size:0.75rem;padding:4px 8px;border-radius:4px;display:inline-block;margin-top:5px;}
 .fb-ok{background:#e8f5e9;color:#2e7d32;}.fb-fail{background:#ffebee;color:#c0392b;}
 #loading{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#1e293b,#0f172a);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;color:#e2e8f0;}
@@ -285,6 +291,7 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
     <div id="tab1-alerts"></div>
     <div id="tab1-risk"></div>
     <div class="scale-bar" id="tab1-scale"></div>
+    <div id="tab1-col-toggle"></div>
     <div id="tab1-table"></div>
     <div class="alert alert-info" style="margin-top:12px;">ℹ️ <b>名詞解釋 - 允許溫升 (Allowed dT)</b>：此數值代表「散熱器可用的溫升裕度」(Limit - Local Ambient - Drop)。🟩 綠色 (數值高)：散熱裕度充足。🟥 紅色 (數值低)：該元件是系統的熱瓶頸。</div>
   </div>
@@ -568,6 +575,9 @@ const TAB2_TIPS = {
   'R_TIM':'元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)','Limit(C)':'元件允許最高運作溫度'
 };
 const TAB2_LABELS = {'Allowed_dT':'允許溫升','Tj_Margin':'Tj 裕度','Tj':'Tj','Tc':'Tc','Total_W':'總功耗','Loc_Amb':'局部環溫','Drop':'內部溫降','R_jc':'Rjc','R_int':'基板熱阻','R_TIM':'介面熱阻','Limit(C)':'限溫'};
+const ALL_TAB1_COLS = ['Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','Drop','R_jc','R_int','R_TIM','Limit(C)'];
+var tab1SelectedCols = ['Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','Drop','R_jc','R_int','R_TIM','Limit(C)'];
+function toggleTab1Col(col,checked){if(checked&&!tab1SelectedCols.includes(col))tab1SelectedCols.push(col);else if(!checked)tab1SelectedCols=tab1SelectedCols.filter(c=>c!==col);renderTab1();}
 
 const BOARD_TYPES = ['Thermal Via','Copper Coin','None'];
 const TIM_TYPES = ['Grease','Pad','Pad2','Putty','None'];
@@ -770,8 +780,8 @@ function renderCompTable(arr,containerId,defaults,category){
   arr.forEach((row,i)=>{
     lhtml+='<tr>';
     COLS.forEach(col=>{
-      if(col==='Board_Type'){lhtml+='<td><select onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">';BOARD_TYPES.forEach(o=>lhtml+='<option'+(row[col]===o?' selected':'')+'>'+o+'</option>');lhtml+='</select></td>';}
-      else if(col==='TIM_Type'){lhtml+='<td><select onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">';TIM_TYPES.forEach(o=>lhtml+='<option'+(row[col]===o?' selected':'')+'>'+o+'</option>');lhtml+='</select></td>';}
+      if(col==='Board_Type'){lhtml+='<td><select style="min-width:110px;" onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">';BOARD_TYPES.forEach(o=>lhtml+='<option'+(row[col]===o?' selected':'')+'>'+o+'</option>');lhtml+='</select></td>';}
+      else if(col==='TIM_Type'){lhtml+='<td><select style="min-width:110px;" onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">';TIM_TYPES.forEach(o=>lhtml+='<option'+(row[col]===o?' selected':'')+'>'+o+'</option>');lhtml+='</select></td>';}
       else if(col==='Component'){lhtml+='<td><input type="text" value="'+(row[col]||'')+'" onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)"></td>';}
       else{lhtml+='<td><input type="number" value="'+(row[col]||0)+'" step="any" onchange="updateComp(\''+category+'\','+i+',\''+col+'\',parseFloat(this.value)||0)"></td>';}
     });
@@ -819,8 +829,12 @@ function renderTab1(){
   // Scale bar
   let mn=Math.min(...R.rows.map(r=>r.Allowed_dT)),mx=Math.max(...R.rows.map(r=>r.Allowed_dT)),md=(mn+mx)/2;
   document.getElementById('tab1-scale').innerHTML='<div style="font-weight:bold;margin-bottom:5px;color:#555;font-size:0.85rem;">允許溫升 (Allowed dT) 色階參考</div><div class="bar"></div><div class="labels"><span>'+mn.toFixed(0)+'°C (Risk)</span><span>'+md.toFixed(0)+'°C</span><span>'+mx.toFixed(0)+'°C (Safe)</span></div>';
+  // Column toggle
+  let ctHtml='<details class="col-toggle"><summary>⚙️ 自訂顯示欄位</summary><div class="col-checks">';
+  ALL_TAB1_COLS.forEach(c=>{let lb=TAB2_LABELS[c]||c;let ck=tab1SelectedCols.includes(c)?'checked':'';ctHtml+='<label><input type="checkbox" '+ck+' onchange="toggleTab1Col(\''+c+'\',this.checked)"> '+lb+' ('+c+')</label>';});
+  ctHtml+='</div></details>';document.getElementById('tab1-col-toggle').innerHTML=ctHtml;
   // Table with tooltips
-  let cols=['Component','Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','Drop','R_jc','R_int','R_TIM','Limit(C)'];
+  let cols=['Component'].concat(tab1SelectedCols.filter(c=>ALL_TAB1_COLS.includes(c)));
   let th='<table class="comp-table"><thead><tr>';
   cols.forEach(c=>{let lb=TAB2_LABELS[c]||c;let tp=TAB2_TIPS[c]||'';th+='<th title="'+tp+'">'+lb+'</th>';});
   th+='</tr></thead><tbody>';
