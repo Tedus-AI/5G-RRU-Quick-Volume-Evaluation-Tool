@@ -1,0 +1,191 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "5G RRU Volume Evaluation Tool - Component & Firebase Schema",
+  "description": "RF / Digital / PWR 三類元件清單的完整欄位定義、資料型別與 Firebase 資料結構，供外部工具串接使用。",
+  "version": "v4.30",
+
+  "definitions": {
+
+    "ComponentRecord": {
+      "type": "object",
+      "description": "單一元件的輸入欄位（RF / Digital / PWR 共用相同 schema）",
+      "properties": {
+        "Component":   { "type": "string",  "description": "元件型號或代號 (e.g. 'PA_GaN_28', 'FPGA_XC7K', 'LDO_3V3')" },
+        "Qty":         { "type": "integer", "minimum": 1, "description": "元件數量" },
+        "Power(W)":    { "type": "number",  "minimum": 0, "description": "單顆元件功耗 (瓦特)" },
+        "Height(mm)":  { "type": "number",  "minimum": 0, "description": "元件安裝高度，距 PCB 底面 (mm)。影響局部環溫計算 Loc_Amb = T_amb + Height × 0.03" },
+        "Pad_L":       { "type": "number",  "minimum": 0, "description": "元件散熱墊長度 (mm)，用於計算接觸面積與 TIM / Board 熱阻" },
+        "Pad_W":       { "type": "number",  "minimum": 0, "description": "元件散熱墊寬度 (mm)" },
+        "Thick(mm)":   { "type": "number",  "minimum": 0, "description": "Copper Coin 厚度 (mm)。僅 Board_Type='Copper Coin' 時有效" },
+        "Board_Type":  { "type": "string",  "enum": ["Thermal Via", "Copper Coin", "None"], "description": "PCB 導熱方式" },
+        "Limit(C)":    { "type": "number",  "description": "元件允許最高運作溫度 (°C)。RF 類通常為 Tj limit，PWR/DDR 類為 Tc limit" },
+        "R_jc":        { "type": "number",  "minimum": 0, "description": "結點到殼的內部熱阻 Junction-to-Case (°C/W)" },
+        "TIM_Type":    { "type": "string",  "enum": ["Grease", "Pad", "Pad2", "Putty", "None"], "description": "介面材料 (Thermal Interface Material) 類型" }
+      },
+      "required": ["Component", "Qty", "Power(W)", "Height(mm)", "Pad_L", "Pad_W", "Thick(mm)", "Board_Type", "Limit(C)", "R_jc", "TIM_Type"]
+    },
+
+    "ComponentDefaults": {
+      "description": "三類元件的新增預設值",
+      "type": "object",
+      "properties": {
+        "RF": {
+          "description": "RF 類元件預設值 (PA, LNA, Transceiver, Duplexer 等)",
+          "allOf": [{ "$ref": "#/definitions/ComponentRecord" }],
+          "default": {
+            "Component": "New_RF",
+            "Qty": 1,
+            "Power(W)": 0,
+            "Height(mm)": 250,
+            "Pad_L": 10,
+            "Pad_W": 10,
+            "Thick(mm)": 2.5,
+            "Board_Type": "Copper Coin",
+            "Limit(C)": 200,
+            "R_jc": 1.5,
+            "TIM_Type": "Grease"
+          }
+        },
+        "Digital": {
+          "description": "Digital 類元件預設值 (FPGA, ASIC, SoC, DDR 等)",
+          "allOf": [{ "$ref": "#/definitions/ComponentRecord" }],
+          "default": {
+            "Component": "New_Digital",
+            "Qty": 1,
+            "Power(W)": 0,
+            "Height(mm)": 50,
+            "Pad_L": 10,
+            "Pad_W": 10,
+            "Thick(mm)": 0,
+            "Board_Type": "Thermal Via",
+            "Limit(C)": 100,
+            "R_jc": 0.5,
+            "TIM_Type": "Putty"
+          }
+        },
+        "PWR": {
+          "description": "Power 類元件預設值 (DC-DC, LDO, PMIC 等)",
+          "allOf": [{ "$ref": "#/definitions/ComponentRecord" }],
+          "default": {
+            "Component": "New_PWR",
+            "Qty": 1,
+            "Power(W)": 0,
+            "Height(mm)": 30,
+            "Pad_L": 20,
+            "Pad_W": 20,
+            "Thick(mm)": 0,
+            "Board_Type": "None",
+            "Limit(C)": 95,
+            "R_jc": 0,
+            "TIM_Type": "Grease"
+          }
+        }
+      }
+    },
+
+    "ComputedFields": {
+      "type": "object",
+      "description": "由計算引擎 computeAll() 產生的衍生欄位（唯讀，不存入 Firebase）",
+      "properties": {
+        "_src":        { "type": "string",  "enum": ["RF", "DIGITAL", "PWR"], "description": "元件來源分類標記，計算時自動附加" },
+        "Total_W":     { "type": "number",  "description": "總功耗 = Power(W) × Qty (W)" },
+        "R_int":       { "type": "number",  "description": "基板熱阻 (°C/W)。依 Board_Type 計算：Copper Coin = Thick/(K_copper × Area), Thermal Via = 1/(K_Via × Via_Eff × Area), None = 極大值" },
+        "R_TIM":       { "type": "number",  "description": "介面材料熱阻 (°C/W)。依 TIM_Type 計算：t_TIM / (K_TIM × Area × (1-Voiding))" },
+        "Allowed_dT":  { "type": "number",  "description": "允許溫升 = Limit - Loc_Amb - Drop (°C)。數值越小 = 越接近瓶頸" },
+        "Loc_Amb":     { "type": "number",  "description": "局部環境溫度 = T_amb + Height(mm) × 0.03 (°C)" },
+        "Drop":        { "type": "number",  "description": "內部溫降 = Power(W) × (R_jc + R_int + R_TIM) (°C)" },
+        "T_hsk_eff":   { "type": "number",  "description": "該元件位置的散熱器表面有效溫度 (°C)" },
+        "Tc":          { "type": "number",  "description": "元件外殼溫度 = T_hsk_eff + Power(W) × (R_int + R_TIM) (°C)" },
+        "Tj":          { "type": "number",  "description": "元件接面溫度 = Tc + Power(W) × R_jc (°C)" },
+        "T_ref":       { "type": "number",  "description": "參考溫度。PWR 類及 DDR 用 Tc，其餘用 Tj (°C)" },
+        "Temp_Label":  { "type": "string",  "enum": ["Tc", "Tj"], "description": "溫度標籤。PWR/DDR = 'Tc'，其餘 = 'Tj'" },
+        "Tj_Margin":   { "type": "number",  "description": "溫度裕度 = Limit(C) - T_ref (°C)。負值 = 超溫" }
+      }
+    }
+  },
+
+  "firebase": {
+    "description": "Firebase Firestore 資料結構",
+
+    "collections": {
+
+      "rf_library": {
+        "description": "RF 元件庫。每個 document = 一個 RF 元件規格。",
+        "document_id_rule": "Component 名稱，空格→'_'，斜線→'-'，移除括號",
+        "document_schema": { "$ref": "#/definitions/ComponentRecord" }
+      },
+
+      "digital_library": {
+        "description": "Digital 元件庫。每個 document = 一個 Digital 元件規格。",
+        "document_id_rule": "Component 名稱，空格→'_'，斜線→'-'，移除括號",
+        "document_schema": { "$ref": "#/definitions/ComponentRecord" }
+      },
+
+      "pwr_library": {
+        "description": "Power 元件庫。每個 document = 一個 PWR 元件規格。",
+        "document_id_rule": "Component 名稱，空格→'_'，斜線→'-'，移除括號",
+        "document_schema": { "$ref": "#/definitions/ComponentRecord" }
+      },
+
+      "projects": {
+        "description": "專案存檔。每個 document = 一份完整專案快照。",
+        "document_id_rule": "專案名稱，空格→'_'，移除非中英數字元",
+        "document_schema": {
+          "type": "object",
+          "properties": {
+            "project_name": { "type": "string", "description": "專案顯示名稱" },
+            "meta": {
+              "type": "object",
+              "properties": {
+                "version":   { "type": "string", "description": "App 版本 (e.g. 'v4.30 (GitHub Pages)')" },
+                "timestamp": { "type": "string", "format": "date-time", "description": "ISO 8601 儲存時間" }
+              }
+            },
+            "global_params": {
+              "type": "object",
+              "description": "全域散熱參數",
+              "properties": {
+                "T_amb":              { "type": "number", "description": "環境溫度 (°C)" },
+                "Margin":             { "type": "number", "description": "功耗安全係數 (e.g. 1.15 = +15%)" },
+                "L_pcb":              { "type": "number", "description": "PCB 長度 (mm)" },
+                "W_pcb":              { "type": "number", "description": "PCB 寬度 (mm)" },
+                "t_base":             { "type": "number", "description": "散熱器底板厚度 (mm)" },
+                "H_shield":           { "type": "number", "description": "遮罩高度 (mm)" },
+                "H_filter":           { "type": "number", "description": "濾波器高度 (mm)" },
+                "Top":                { "type": "number", "description": "上方邊距 (mm)" },
+                "Btm":                { "type": "number", "description": "下方邊距 (mm)" },
+                "Left":               { "type": "number", "description": "左方邊距 (mm)" },
+                "Right":              { "type": "number", "description": "右方邊距 (mm)" },
+                "Coin_L_Setting":     { "type": "number", "description": "Copper Coin 長度設定 (mm)" },
+                "Coin_W_Setting":     { "type": "number", "description": "Copper Coin 寬度設定 (mm)" },
+                "Gap":                { "type": "number", "description": "鰭片間距 (mm)" },
+                "Fin_t":              { "type": "number", "description": "鰭片厚度 (mm)" },
+                "K_Via":              { "type": "number", "description": "Thermal Via 導熱係數 (W/m·K)" },
+                "Via_Eff":            { "type": "number", "description": "Via 填充率 (0~1)" },
+                "K_Putty":            { "type": "number", "description": "Putty 導熱係數 (W/m·K)" },
+                "t_Putty":            { "type": "number", "description": "Putty 厚度 (mm)" },
+                "K_Pad":              { "type": "number", "description": "Pad 導熱係數 (W/m·K)" },
+                "t_Pad":              { "type": "number", "description": "Pad 厚度 (mm)" },
+                "K_Pad2":             { "type": "number", "description": "Pad2 導熱係數 (W/m·K)" },
+                "t_Pad2":             { "type": "number", "description": "Pad2 厚度 (mm)" },
+                "K_Grease":           { "type": "number", "description": "Grease 導熱係數 (W/m·K)" },
+                "t_Grease":           { "type": "number", "description": "Grease 厚度 (mm)" },
+                "K_Solder":           { "type": "number", "description": "Solder 導熱係數 (W/m·K)" },
+                "t_Solder":           { "type": "number", "description": "Solder 厚度 (mm)" },
+                "Voiding":            { "type": "number", "description": "焊接空洞率 (0~1)" },
+                "al_density":         { "type": "number", "description": "鋁合金密度 (g/cm³)" },
+                "filter_density":     { "type": "number", "description": "濾波器密度 (g/cm³)" },
+                "shielding_density":  { "type": "number", "description": "屏蔽材料密度 (g/cm³)" },
+                "pcb_surface_density":{ "type": "number", "description": "PCB 面密度 (g/cm²)" },
+                "fin_tech_selector_v2":{ "type": "string", "enum": ["CNC", "Extrusion", "Forging", "Die Casting", "Skived"], "description": "鰭片製程選擇" }
+              }
+            },
+            "rf_data":      { "type": "array", "items": { "$ref": "#/definitions/ComponentRecord" }, "description": "RF 元件清單" },
+            "digital_data": { "type": "array", "items": { "$ref": "#/definitions/ComponentRecord" }, "description": "Digital 元件清單" },
+            "pwr_data":     { "type": "array", "items": { "$ref": "#/definitions/ComponentRecord" }, "description": "PWR 元件清單" }
+          }
+        }
+      }
+    }
+  }
+}
