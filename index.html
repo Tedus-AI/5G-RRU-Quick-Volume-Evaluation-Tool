@@ -8,6 +8,8 @@
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js"></script>
 <style>
 :root{--primary:#007CF0;--primary-light:#00DFD8;--sidebar-bg:#1e293b;--sidebar-text:#e2e8f0;--card-shadow:0 4px 6px rgba(0,0,0,0.1);--danger:#e74c3c;--warning:#f39c12;--success:#2ecc71;--info:#3498db;}
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -251,6 +253,8 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
       <input type="text" id="cloudProjectName" placeholder="專案名稱 ...">
       <button class="cloud-btn" onclick="cloudSaveProject()">☁️ 雲端儲存</button>
       <button class="cloud-btn" onclick="cloudLoadProject()">☁️ 雲端載入</button>
+      <div class="divider"></div>
+      <button class="cloud-btn" onclick="generatePDFReport()" id="pdf-btn" style="border-color:#ff6b6b;background:rgba(255,107,107,0.15);">📄 PDF 報告</button>
     </div>
     <div class="cloud-modal-overlay" id="cloudModal">
       <div class="cloud-modal">
@@ -1061,6 +1065,517 @@ function doLogin(){
     init();
   } else {
     document.getElementById('login-error').style.display='block';
+  }
+}
+
+// =====================================================
+// PDF REPORT GENERATION (pdfmake + Plotly.toImage)
+// =====================================================
+let pdfFontReady = false;
+let pdfFontData = null;
+
+async function loadCJKFont() {
+  if (pdfFontReady) return true;
+  try {
+    const url = 'https://cdn.jsdelivr.net/fontsource/fonts/noto-sans-tc@latest/chinese-traditional-400-normal.woff';
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('Font fetch failed: ' + resp.status);
+    const buf = await resp.arrayBuffer();
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+    // Also load bold
+    let boldB64 = b64; // fallback
+    try {
+      const boldResp = await fetch('https://cdn.jsdelivr.net/fontsource/fonts/noto-sans-tc@latest/chinese-traditional-700-normal.woff');
+      if (boldResp.ok) {
+        const boldBuf = await boldResp.arrayBuffer();
+        boldB64 = btoa(String.fromCharCode(...new Uint8Array(boldBuf)));
+      }
+    } catch(e) {}
+    pdfmake.fonts = {
+      NotoSansTC: {
+        normal: {content: b64, encoding: 'Identity-H'},
+        bold: {content: boldB64, encoding: 'Identity-H'},
+        italics: {content: b64, encoding: 'Identity-H'},
+        bolditalics: {content: boldB64, encoding: 'Identity-H'}
+      }
+    };
+    pdfFontReady = true;
+    return true;
+  } catch(e) {
+    console.warn('CJK font load failed, using Roboto fallback:', e);
+    pdfFontReady = false;
+    return false;
+  }
+}
+
+async function captureChartImage(divId, w, h) {
+  const el = document.getElementById(divId);
+  if (!el || !el.querySelector('.js-plotly-plot')) return null;
+  try {
+    const gd = el.querySelector('.js-plotly-plot') || el;
+    const img = await Plotly.toImage(gd, {format:'png', width: w||900, height: h||400, scale:2});
+    return img;
+  } catch(e) { console.warn('Chart capture failed for', divId, e); return null; }
+}
+
+async function generatePDFReport() {
+  if (!calcResults || !calcResults.rows.length) {
+    alert('⚠️ 尚無計算結果，請先輸入元件數據！');
+    return;
+  }
+  const btn = document.getElementById('pdf-btn');
+  btn.textContent = '⏳ 產生中...';
+  btn.disabled = true;
+
+  try {
+    // Load CJK font
+    const hasCJK = await loadCJKFont();
+    const fontName = hasCJK ? 'NotoSansTC' : 'Roboto';
+
+    // Capture chart images in parallel
+    const R = calcResults;
+    const valid = R.rows.filter(r => r.Total_W > 0);
+
+    // Ensure Tab 2 charts are rendered
+    const currentTab = document.querySelector('.tab-btn.active');
+    const wasTab2 = currentTab && currentTab.textContent.includes('視覺化');
+
+    // Capture existing charts (they are rendered on recalc)
+    let chartImages = {};
+    const chartDivs = ['chart-margin', 'chart-power', 'chart-tjm'];
+    const chartPromises = chartDivs.map(async id => {
+      const el = document.getElementById(id);
+      if (el && el.classList.contains('js-plotly-plot')) {
+        try {
+          const img = await Plotly.toImage(el, {format:'png', width:900, height:400, scale:2});
+          chartImages[id] = img;
+        } catch(e) {}
+      }
+    });
+    // Capture 3D
+    const el3d = document.getElementById('tab3-3d');
+    if (el3d && el3d.querySelector('.js-plotly-plot')) {
+      chartPromises.push((async () => {
+        try {
+          const gd = el3d.querySelector('.js-plotly-plot') || el3d;
+          chartImages['3d'] = await Plotly.toImage(gd, {format:'png', width:900, height:600, scale:2});
+        } catch(e) {}
+      })());
+    }
+    // Capture sensitivity charts
+    ['sa-cl','sa-cr','tv','tt'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.querySelector('.js-plotly-plot')) {
+        chartPromises.push((async () => {
+          try {
+            const gd = el.querySelector('.js-plotly-plot');
+            chartImages[id] = await Plotly.toImage(gd, {format:'png', width:800, height:400, scale:2});
+          } catch(e) {}
+        })());
+      }
+    });
+
+    await Promise.all(chartPromises);
+
+    // Build PDF document definition
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('zh-TW', {year:'numeric',month:'2-digit',day:'2-digit'});
+    const timeStr = now.toLocaleTimeString('zh-TW', {hour:'2-digit',minute:'2-digit'});
+    const projectName = document.getElementById('cloudProjectName').value.trim() || '5G RRU Project';
+
+    // Color palette
+    const cPrimary = '#007CF0';
+    const cDark = '#1e293b';
+    const cDanger = '#e74c3c';
+    const cWarning = '#f39c12';
+    const cSuccess = '#2ecc71';
+    const cInfo = '#3498db';
+    const cGray = '#666666';
+
+    // Helper: build component table for pdfmake
+    function compTable(arr, category) {
+      if (!arr || !arr.length) return null;
+      const headers = ['Component','Qty','Power(W)','Height(mm)','Pad_L','Pad_W','Thick(mm)','Board_Type','Limit(C)','R_jc','TIM_Type'];
+      const headerLabels = ['Component','Qty','Power\n(W)','Height\n(mm)','Pad_L','Pad_W','Thick\n(mm)','Board\nType','Limit\n(C)','R_jc','TIM\nType'];
+      const body = [headerLabels.map(h => ({text:h, bold:true, fontSize:7, fillColor:'#f1f5f9', color:'#475569', alignment:'center'}))];
+      arr.forEach(row => {
+        body.push(headers.map(h => ({text: String(row[h] != null ? row[h] : ''), fontSize:7, alignment: typeof row[h]==='number'?'center':'left'})));
+      });
+      const totalP = arr.reduce((s,r) => s + (r['Power(W)']||0) * (r.Qty||0), 0);
+      return [
+        {text: category.toUpperCase() + ' Components', style:'sectionTitle', margin:[0,10,0,4]},
+        {text: 'Total: ' + totalP.toFixed(1) + ' W | ' + arr.length + ' component(s)', fontSize:8, color:cGray, margin:[0,0,0,4]},
+        {table: {headerRows:1, widths: Array(11).fill('auto'), body}, layout: {
+          hLineWidth:()=>0.5, vLineWidth:()=>0.3, hLineColor:()=>'#e2e8f0', vLineColor:()=>'#e2e8f0',
+          paddingLeft:()=>3, paddingRight:()=>3, paddingTop:()=>2, paddingBottom:()=>2
+        }}
+      ];
+    }
+
+    // Helper: KPI box
+    function kpiBox(label, value, desc, color) {
+      return {
+        stack: [
+          {text: label, fontSize:7, color:cGray, alignment:'center'},
+          {text: value, fontSize:14, bold:true, color: color||cDark, alignment:'center', margin:[0,2,0,1]},
+          {text: desc, fontSize:6, color:'#999', alignment:'center'}
+        ],
+        margin: [0,0,0,0]
+      };
+    }
+
+    // Build detailed analysis table
+    function detailTable() {
+      const cols = ['Component','Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','Drop','R_jc','R_int','R_TIM','Limit(C)'];
+      const labels = ['Component','Allowed\ndT','Tj\nMargin','Tj','Tc','Total\nW','Loc\nAmb','Drop','R_jc','R_int','R_TIM','Limit\n(C)'];
+      const body = [labels.map(h => ({text:h, bold:true, fontSize:7, fillColor:'#f1f5f9', color:'#475569', alignment:'center'}))];
+      R.rows.forEach(row => {
+        body.push(cols.map(c => {
+          let v = row[c];
+          let fillColor = null;
+          if ((c === 'Allowed_dT' || c === 'Tj_Margin') && typeof v === 'number') {
+            fillColor = v < 0 ? '#ffebee' : v < 10 ? '#fff8e1' : v < 20 ? '#fffde7' : '#e8f5e9';
+          }
+          if (typeof v === 'number') v = (c.includes('R_') && c !== 'R_jc') ? v.toFixed(4) : v.toFixed(1);
+          return {text: String(v != null ? v : ''), fontSize:7, alignment: c==='Component'?'left':'center', fillColor};
+        }));
+      });
+      return {table: {headerRows:1, widths: ['auto','auto','auto','auto','auto','auto','auto','auto','auto','auto','auto','auto'], body}, layout: {
+        hLineWidth:()=>0.5, vLineWidth:()=>0.3, hLineColor:()=>'#e2e8f0', vLineColor:()=>'#e2e8f0',
+        paddingLeft:()=>3, paddingRight:()=>3, paddingTop:()=>2, paddingBottom:()=>2
+      }};
+    }
+
+    // Top 3 risk components
+    let riskComps = valid.sort((a,b) => a.Allowed_dT - b.Allowed_dT).slice(0,3);
+
+    // ─── Assemble Document ───
+    let content = [];
+
+    // ══ COVER PAGE ══
+    content.push({text: '\n\n\n\n\n\n\n\n', fontSize:10});
+    content.push({text: '5G RRU Thermal & Volume', style:'coverTitle', alignment:'center'});
+    content.push({text: 'Evaluation Report', style:'coverTitle', alignment:'center', margin:[0,0,0,20]});
+    content.push({canvas: [{type:'line', x1:150, y1:0, x2:370, y2:0, lineWidth:3, lineColor:cPrimary}], margin:[0,0,0,20]});
+    content.push({text: projectName, fontSize:16, bold:true, color:cDark, alignment:'center', margin:[0,0,0,8]});
+    content.push({text: dateStr + ' ' + timeStr, fontSize:11, color:cGray, alignment:'center', margin:[0,0,0,6]});
+    content.push({text: 'v4.30 (GitHub Pages Edition)', fontSize:9, color:'#999', alignment:'center', margin:[0,0,0,6]});
+    content.push({text: 'Generated by 5G RRU Thermal Engine Pro', fontSize:8, color:'#bbb', alignment:'center'});
+    content.push({text: '', pageBreak:'after'});
+
+    // ══ 1. EXECUTIVE SUMMARY (KPI) ══
+    content.push({text: '1. Executive Summary', style:'heading1'});
+    content.push({text: 'Key Performance Indicators / \u95dc\u9375\u6307\u6a19\u6458\u8981', fontSize:9, color:cGray, margin:[0,0,0,10]});
+
+    content.push({
+      columns: [
+        kpiBox('Total Power / \u6574\u6a5f\u7e3d\u71b1\u8017', R.Total_Power.toFixed(2) + ' W', 'with Margin ' + G.Margin, cDanger),
+        kpiBox('Bottleneck / \u7f3d\u9838\u5143\u4ef6', R.Bottleneck_Name, 'Margin: ' + R.Bottleneck_Tj_Margin + '\u00b0C', cWarning),
+        kpiBox('Required Area / \u6240\u9700\u9762\u7a4d', R.Area_req.toFixed(3) + ' m\u00b2', 'Heatsink Surface', cInfo),
+        kpiBox('Fin Count / \u9c2d\u7247\u6578', R.Fin_Count + ' pcs', 'Gap: ' + G.Gap + 'mm, t: ' + G.Fin_t + 'mm', '#9b59b6')
+      ],
+      columnGap: 10,
+      margin: [0,0,0,15]
+    });
+
+    // Design parameters summary
+    content.push({text: 'Design Parameters / \u8a2d\u8a08\u53c3\u6578', style:'heading2'});
+    content.push({
+      columns: [
+        {width:'50%', stack:[
+          {text: 'Environmental / \u74b0\u5883\u689d\u4ef6', fontSize:8, bold:true, color:cPrimary, margin:[0,0,0,3]},
+          {table:{body:[
+            [{text:'T_amb',bold:true,fontSize:7},{text:G.T_amb+'\u00b0C',fontSize:7}],
+            [{text:'Margin',bold:true,fontSize:7},{text:G.Margin+'x',fontSize:7}],
+            [{text:'Fin Tech',bold:true,fontSize:7},{text:G.fin_tech_selector_v2,fontSize:7}]
+          ],widths:['40%','60%']},layout:'noBorders',margin:[0,0,10,0]}
+        ]},
+        {width:'50%', stack:[
+          {text: 'Geometry / \u5e7e\u4f55\u5c3a\u5bf8', fontSize:8, bold:true, color:cPrimary, margin:[0,0,0,3]},
+          {table:{body:[
+            [{text:'PCB (LxW)',bold:true,fontSize:7},{text:G.L_pcb+'x'+G.W_pcb+' mm',fontSize:7}],
+            [{text:'Base Thick',bold:true,fontSize:7},{text:G.t_base+' mm',fontSize:7}],
+            [{text:'H_shield',bold:true,fontSize:7},{text:G.H_shield+' mm',fontSize:7}],
+            [{text:'H_filter',bold:true,fontSize:7},{text:G.H_filter+' mm',fontSize:7}],
+            [{text:'Fin Gap',bold:true,fontSize:7},{text:G.Gap+' mm',fontSize:7}],
+            [{text:'Fin Thick',bold:true,fontSize:7},{text:G.Fin_t+' mm',fontSize:7}]
+          ],widths:['40%','60%']},layout:'noBorders'}
+        ]}
+      ],
+      margin:[0,0,0,15]
+    });
+
+    // h value
+    let {h_value, h_conv, h_rad} = calcHValue(G.Gap);
+    content.push({
+      table:{body:[[
+        {text:'h_total = ' + h_value.toFixed(2) + ' W/m\u00b2K', bold:true, fontSize:8, color:cPrimary},
+        {text:'h_conv = ' + h_conv.toFixed(2), fontSize:8, color:cGray},
+        {text:'h_rad = ' + h_rad.toFixed(2), fontSize:8, color:cGray},
+        {text:'Aspect Ratio = ' + R.aspect_ratio.toFixed(1), fontSize:8, color: R.aspect_ratio>12?cDanger:R.aspect_ratio>=4.5&&R.aspect_ratio<=6.5?cSuccess:cWarning}
+      ]]},
+      layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingLeft:()=>6, paddingRight:()=>6, paddingTop:()=>4, paddingBottom:()=>4, fillColor:()=>'#f0f9ff'},
+      margin:[0,0,0,10]
+    });
+
+    // ══ 2. COMPONENT LIST ══
+    content.push({text: '', pageBreak:'after'});
+    content.push({text: '2. Component List / \u5143\u4ef6\u6e05\u55ae', style:'heading1'});
+
+    let rfTable = compTable(components.rf, 'RF');
+    let digTable = compTable(components.digital, 'Digital');
+    let pwrTable = compTable(components.pwr, 'PWR');
+    if (rfTable) content.push(...rfTable);
+    if (digTable) content.push(...digTable);
+    if (pwrTable) content.push(...pwrTable);
+
+    // Total summary
+    let rfP = components.rf.reduce((s,r) => s+r['Power(W)']*r.Qty, 0);
+    let digP = components.digital.reduce((s,r) => s+r['Power(W)']*r.Qty, 0);
+    let pwrP = components.pwr.reduce((s,r) => s+r['Power(W)']*r.Qty, 0);
+    content.push({
+      table:{body:[[
+        {text:'Total Power (before Margin): ' + (rfP+digP+pwrP).toFixed(1) + ' W', bold:true, fontSize:8},
+        {text:'RF: '+rfP.toFixed(1)+'W', fontSize:8, color:cGray},
+        {text:'Digital: '+digP.toFixed(1)+'W', fontSize:8, color:cGray},
+        {text:'PWR: '+pwrP.toFixed(1)+'W', fontSize:8, color:cGray}
+      ]]},
+      layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingLeft:()=>6, paddingRight:()=>6, paddingTop:()=>4, paddingBottom:()=>4, fillColor:()=>'#e3f2fd'},
+      margin:[0,10,0,0]
+    });
+
+    // ══ 3. DETAILED ANALYSIS ══
+    content.push({text: '', pageBreak:'after'});
+    content.push({text: '3. Detailed Analysis / \u8a73\u7d30\u5206\u6790', style:'heading1'});
+
+    // Overheat warnings
+    let ohComps = R.rows.filter(r => r.Tj_Margin < 0 && r.Total_W > 0);
+    if (ohComps.length) {
+      content.push({
+        table:{body:[[{text:'\u26a0\ufe0f OVERHEAT WARNING: ' + ohComps.map(r=>r.Component+' ('+Math.abs(r.Tj_Margin).toFixed(1)+'\u00b0C over)').join(', '), fontSize:8, color:'#fff', bold:true}]]},
+        layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingLeft:()=>8, paddingRight:()=>8, paddingTop:()=>6, paddingBottom:()=>6, fillColor:()=>cDanger},
+        margin:[0,0,0,8]
+      });
+    }
+
+    // Risk Top 3
+    if (riskComps.length) {
+      content.push({text: 'Top 3 Thermal Risk / \u71b1\u98a8\u96aa\u6392\u540d', style:'heading2'});
+      let medals = ['\ud83e\udd47','\ud83e\udd48','\ud83e\udd49'];
+      content.push({
+        columns: riskComps.map((r,i) => ({
+          stack:[
+            {text: (i===0?'1st':i===1?'2nd':'3rd') + ' Risk', fontSize:7, color:cGray, alignment:'center'},
+            {text: r.Component, fontSize:10, bold:true, alignment:'center', margin:[0,2,0,1]},
+            {text: 'Allowed dT: '+r.Allowed_dT.toFixed(1)+'\u00b0C', fontSize:8, alignment:'center', color: r.Allowed_dT<5?cDanger:cWarning},
+            {text: 'Tj_Margin: '+r.Tj_Margin.toFixed(1)+'\u00b0C', fontSize:7, alignment:'center', color:cGray}
+          ],
+          width: '*'
+        })),
+        columnGap:8,
+        margin:[0,0,0,10]
+      });
+    }
+
+    content.push(detailTable());
+
+    // ══ 4. VISUAL CHARTS ══
+    content.push({text: '', pageBreak:'after'});
+    content.push({text: '4. Visual Report / \u8996\u89ba\u5316\u5831\u544a', style:'heading1'});
+
+    if (chartImages['chart-margin']) {
+      content.push({text: 'Temperature Margin Overview / \u6eab\u5ea6\u88d5\u5ea6\u7e3d\u89bd', style:'heading2'});
+      content.push({image: chartImages['chart-margin'], width: 500, margin:[0,0,0,10]});
+    }
+    if (chartImages['chart-power'] || chartImages['chart-tjm']) {
+      content.push({
+        columns: [
+          chartImages['chart-power'] ? {image: chartImages['chart-power'], width: 245} : {},
+          chartImages['chart-tjm'] ? {image: chartImages['chart-tjm'], width: 245} : {}
+        ],
+        columnGap: 10,
+        margin:[0,0,0,10]
+      });
+    }
+
+    // ══ 5. VOLUME & WEIGHT ══
+    content.push({text: '5. Volume & Weight Estimation / \u9ad4\u7a4d\u8207\u91cd\u91cf\u4f30\u7b97', style:'heading1', margin:[0,15,0,8]});
+
+    if (R.drc_failed) {
+      content.push({
+        table:{body:[[{text:'DRC FAILED: ' + R.drc_msg, fontSize:10, color:'#fff', bold:true, alignment:'center'}]]},
+        layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingLeft:()=>12, paddingRight:()=>12, paddingTop:()=>10, paddingBottom:()=>10, fillColor:()=>cDanger},
+        margin:[0,0,0,10]
+      });
+    } else {
+      content.push({
+        columns: [
+          {width:'50%', stack:[
+            {text:'Dimensions / \u5c3a\u5bf8', fontSize:8, bold:true, color:cPrimary, margin:[0,0,0,4]},
+            {table:{body:[
+              [{text:'Length (L)',bold:true,fontSize:8},{text:R.L_hsk.toFixed(1)+' mm',fontSize:8}],
+              [{text:'Width (W)',bold:true,fontSize:8},{text:R.W_hsk.toFixed(1)+' mm',fontSize:8}],
+              [{text:'Height (H)',bold:true,fontSize:8},{text:R.RRU_Height.toFixed(1)+' mm',fontSize:8}],
+              [{text:'Fin Height',bold:true,fontSize:8},{text:R.Fin_Height.toFixed(2)+' mm',fontSize:8}],
+              [{text:'Fin Count',bold:true,fontSize:8},{text:R.Fin_Count+' pcs',fontSize:8}]
+            ],widths:['45%','55%']},layout:'noBorders'}
+          ]},
+          {width:'50%', stack:[
+            {table:{body:[[
+              {text:'Estimated Volume / \u9810\u4f30\u9ad4\u7a4d', fontSize:8, color:cGray, alignment:'center', colSpan:1}
+            ],[
+              {text:R.Volume_L.toFixed(2) + ' L', fontSize:28, bold:true, color:cSuccess, alignment:'center'}
+            ]]}, layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingTop:()=>4, paddingBottom:()=>4, fillColor:(i)=>i===1?'#e6fffa':null}, margin:[10,0,0,8]},
+            {table:{body:[[
+              {text:'Estimated Weight / \u9810\u4f30\u91cd\u91cf', fontSize:8, color:cGray, alignment:'center'}
+            ],[
+              {text:R.total_weight_kg.toFixed(1) + ' kg', fontSize:22, bold:true, color:cDark, alignment:'center'}
+            ]]}, layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingTop:()=>4, paddingBottom:()=>4, fillColor:(i)=>i===1?'#f0f0f0':null}, margin:[10,0,0,0]}
+          ]}
+        ],
+        margin:[0,0,0,10]
+      });
+
+      // Weight breakdown
+      content.push({text:'Weight Breakdown / \u91cd\u91cf\u5206\u9805', fontSize:8, bold:true, color:cPrimary, margin:[0,5,0,4]});
+      content.push({
+        table:{body:[
+          [{text:'Item',bold:true,fontSize:7,fillColor:'#f1f5f9'},{text:'Weight (kg)',bold:true,fontSize:7,fillColor:'#f1f5f9',alignment:'center'},{text:'Ratio',bold:true,fontSize:7,fillColor:'#f1f5f9',alignment:'center'}],
+          [{text:'Heatsink (Base+Fins)',fontSize:7},{text:R.hs_weight_kg.toFixed(2),fontSize:7,alignment:'center'},{text:(R.hs_weight_kg/R.total_weight_kg*100).toFixed(1)+'%',fontSize:7,alignment:'center'}],
+          [{text:'Shield',fontSize:7},{text:R.shield_weight_kg.toFixed(2),fontSize:7,alignment:'center'},{text:(R.shield_weight_kg/R.total_weight_kg*100).toFixed(1)+'%',fontSize:7,alignment:'center'}],
+          [{text:'Cavity Filter',fontSize:7},{text:R.filter_weight_kg.toFixed(2),fontSize:7,alignment:'center'},{text:(R.filter_weight_kg/R.total_weight_kg*100).toFixed(1)+'%',fontSize:7,alignment:'center'}],
+          [{text:'Shielding Case',fontSize:7},{text:R.shielding_weight_kg.toFixed(2),fontSize:7,alignment:'center'},{text:(R.shielding_weight_kg/R.total_weight_kg*100).toFixed(1)+'%',fontSize:7,alignment:'center'}],
+          [{text:'PCB',fontSize:7},{text:R.pcb_weight_kg.toFixed(3),fontSize:7,alignment:'center'},{text:(R.pcb_weight_kg/R.total_weight_kg*100).toFixed(1)+'%',fontSize:7,alignment:'center'}],
+          [{text:'TOTAL',bold:true,fontSize:7,fillColor:'#e3f2fd'},{text:R.total_weight_kg.toFixed(2),bold:true,fontSize:7,alignment:'center',fillColor:'#e3f2fd'},{text:'100%',bold:true,fontSize:7,alignment:'center',fillColor:'#e3f2fd'}]
+        ],widths:['50%','25%','25%']},
+        layout:{hLineWidth:()=>0.5, vLineWidth:()=>0.3, hLineColor:()=>'#e2e8f0', vLineColor:()=>'#e2e8f0', paddingLeft:()=>4, paddingRight:()=>4, paddingTop:()=>3, paddingBottom:()=>3},
+        margin:[0,0,0,10]
+      });
+    }
+
+    // ══ 6. 3D MODEL ══
+    if (chartImages['3d']) {
+      content.push({text: '', pageBreak:'after'});
+      content.push({text: '6. 3D Simulation / 3D \u6a21\u64ec\u8996\u5716', style:'heading1'});
+      content.push({image: chartImages['3d'], width: 480, alignment:'center', margin:[0,10,0,10]});
+      content.push({
+        table:{body:[[
+          {text:'L: '+R.L_hsk.toFixed(1)+' mm', fontSize:8, alignment:'center'},
+          {text:'W: '+R.W_hsk.toFixed(1)+' mm', fontSize:8, alignment:'center'},
+          {text:'H: '+R.RRU_Height.toFixed(1)+' mm', fontSize:8, alignment:'center'},
+          {text:'Fins: '+R.Fin_Count+' pcs x '+R.Fin_Height.toFixed(1)+'mm', fontSize:8, alignment:'center'}
+        ]]},
+        layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingLeft:()=>8, paddingRight:()=>8, paddingTop:()=>4, paddingBottom:()=>4, fillColor:()=>'#f0f9ff'},
+        margin:[0,0,0,0]
+      });
+    }
+
+    // ══ 7. SENSITIVITY ANALYSIS ══
+    let hasSA = chartImages['sa-cl'] || chartImages['sa-cr'] || chartImages['tv'] || chartImages['tt'];
+    if (hasSA) {
+      content.push({text: '', pageBreak:'after'});
+      content.push({text: '7. Sensitivity Analysis / \u654f\u611f\u5ea6\u5206\u6790', style:'heading1'});
+      if (chartImages['sa-cl']) {
+        content.push({text: 'Sweep Analysis / \u55ae\u8b8a\u6578\u6383\u63cf', style:'heading2'});
+        content.push({
+          columns: [
+            chartImages['sa-cl'] ? {image: chartImages['sa-cl'], width: 245} : {},
+            chartImages['sa-cr'] ? {image: chartImages['sa-cr'], width: 245} : {}
+          ],
+          columnGap: 10,
+          margin:[0,0,0,15]
+        });
+      }
+      if (chartImages['tv'] || chartImages['tt']) {
+        content.push({text: 'Tornado Analysis / \u9f8d\u6372\u98a8\u5716', style:'heading2'});
+        content.push({
+          columns: [
+            chartImages['tv'] ? {image: chartImages['tv'], width: 245} : {},
+            chartImages['tt'] ? {image: chartImages['tt'], width: 245} : {}
+          ],
+          columnGap: 10,
+          margin:[0,0,0,10]
+        });
+      }
+    }
+
+    // ══ 8. CONCLUSION ══
+    content.push({text: '', pageBreak:'after'});
+    let conclusionSection = hasSA ? '8' : (chartImages['3d'] ? '7' : '6');
+    content.push({text: conclusionSection + '. Conclusion / \u7d50\u8ad6', style:'heading1'});
+
+    let statusText, statusColor;
+    if (R.drc_failed) { statusText = 'DESIGN INVALID - DRC FAILED'; statusColor = cDanger; }
+    else if (ohComps.length) { statusText = 'WARNING - ' + ohComps.length + ' component(s) overheating'; statusColor = cDanger; }
+    else if (R.Bottleneck_Tj_Margin < 5) { statusText = 'MARGINAL - Low thermal margin'; statusColor = cWarning; }
+    else { statusText = 'PASS - Design within thermal limits'; statusColor = cSuccess; }
+
+    content.push({
+      table:{body:[[{text: statusText, fontSize:14, bold:true, color:'#fff', alignment:'center'}]]},
+      layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingLeft:()=>15, paddingRight:()=>15, paddingTop:()=>12, paddingBottom:()=>12, fillColor:()=>statusColor},
+      margin:[0,10,0,15]
+    });
+
+    content.push({
+      table:{body:[
+        [{text:'Item',bold:true,fontSize:9,fillColor:'#f1f5f9'},{text:'Value',bold:true,fontSize:9,fillColor:'#f1f5f9'},{text:'Status',bold:true,fontSize:9,fillColor:'#f1f5f9'}],
+        [{text:'Total Power',fontSize:9},{text:R.Total_Power.toFixed(2)+' W',fontSize:9},{text:'-',fontSize:9,alignment:'center'}],
+        [{text:'Bottleneck Component',fontSize:9},{text:R.Bottleneck_Name,fontSize:9},{text:'Margin: '+R.Bottleneck_Tj_Margin+'\u00b0C',fontSize:9,color:R.Bottleneck_Tj_Margin<5?cDanger:R.Bottleneck_Tj_Margin<15?cWarning:cSuccess}],
+        [{text:'Estimated Volume',fontSize:9},{text:R.drc_failed?'N/A':R.Volume_L.toFixed(2)+' L',fontSize:9},{text:R.drc_failed?'DRC Failed':'OK',fontSize:9,color:R.drc_failed?cDanger:cSuccess}],
+        [{text:'Estimated Weight',fontSize:9},{text:R.drc_failed?'N/A':R.total_weight_kg.toFixed(1)+' kg',fontSize:9},{text:'-',fontSize:9,alignment:'center'}],
+        [{text:'Aspect Ratio',fontSize:9},{text:R.aspect_ratio.toFixed(1),fontSize:9},{text:R.aspect_ratio>12?'FAIL':R.aspect_ratio>=4.5&&R.aspect_ratio<=6.5?'Good':'Fair',fontSize:9,color:R.aspect_ratio>12?cDanger:R.aspect_ratio>=4.5&&R.aspect_ratio<=6.5?cSuccess:cWarning}],
+        [{text:'h_total',fontSize:9},{text:h_value.toFixed(2)+' W/m\u00b2K',fontSize:9},{text:h_conv<4?'Too Low':'OK',fontSize:9,color:h_conv<4?cDanger:cSuccess}]
+      ],widths:['35%','35%','30%']},
+      layout:{hLineWidth:()=>0.5, vLineWidth:()=>0.3, hLineColor:()=>'#e2e8f0', vLineColor:()=>'#e2e8f0', paddingLeft:()=>6, paddingRight:()=>6, paddingTop:()=>4, paddingBottom:()=>4},
+      margin:[0,0,0,20]
+    });
+
+    content.push({text:'Disclaimer / \u514d\u8cac\u8072\u660e', fontSize:8, bold:true, color:cGray, margin:[0,10,0,4]});
+    content.push({text:'This report is generated by 5G RRU Thermal Engine Pro for quick volume evaluation purposes. Results are based on semi-empirical models and should be cross-validated with CFD simulation or experimental measurements. The h-value model has been calibrated against multiple RRU products with typical error within \u00b18%.', fontSize:7, color:'#999', margin:[0,0,0,4]});
+    content.push({text:'\u672c\u5831\u544a\u7531 5G RRU \u71b1\u6d41\u5f15\u64ce Pro \u81ea\u52d5\u7522\u751f\uff0c\u50c5\u4f9b\u5feb\u901f\u6982\u5ff5\u8a2d\u8a08\u8207\u5c3a\u5bf8\u8a55\u4f30\u4e4b\u7528\u3002\u8a08\u7b97\u7d50\u679c\u57fa\u65bc\u534a\u7d93\u9a57\u6a21\u578b\uff0c\u5efa\u8b70\u8207 CFD \u6a21\u64ec\u6216\u5be6\u6e2c\u6578\u64da\u9032\u884c\u4ea4\u53c9\u9a57\u8b49\u3002', fontSize:7, color:'#999'});
+
+    // ── Document Definition ──
+    const docDefinition = {
+      pageSize: 'A4',
+      pageMargins: [40, 60, 40, 50],
+      defaultStyle: { font: fontName, fontSize: 9 },
+      styles: {
+        coverTitle: { fontSize: 28, bold: true, color: cPrimary },
+        heading1: { fontSize: 16, bold: true, color: cDark, margin: [0, 0, 0, 8] },
+        heading2: { fontSize: 11, bold: true, color: cPrimary, margin: [0, 8, 0, 5] },
+        sectionTitle: { fontSize: 10, bold: true, color: cDark }
+      },
+      header: function(currentPage, pageCount) {
+        if (currentPage === 1) return null;
+        return {
+          columns: [
+            {text: '5G RRU Thermal Report - ' + projectName, fontSize:7, color:'#bbb', margin:[40,20,0,0]},
+            {text: dateStr, fontSize:7, color:'#bbb', alignment:'right', margin:[0,20,40,0]}
+          ]
+        };
+      },
+      footer: function(currentPage, pageCount) {
+        if (currentPage === 1) return null;
+        return {
+          columns: [
+            {text: 'Confidential', fontSize:7, color:'#ccc', margin:[40,0,0,0]},
+            {text: 'Page ' + currentPage + ' / ' + pageCount, fontSize:7, color:'#999', alignment:'right', margin:[0,0,40,0]}
+          ]
+        };
+      },
+      content: content
+    };
+
+    // Generate and download
+    const fileName = 'RRU_Report_' + (projectName.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'_')) + '_' + now.toISOString().slice(0,10) + '.pdf';
+    pdfmake.createPdf(docDefinition).download(fileName);
+
+  } catch(e) {
+    console.error('PDF generation error:', e);
+    alert('\u274c PDF \u7522\u751f\u5931\u6557: ' + e.message);
+  } finally {
+    btn.textContent = '\ud83d\udcc4 PDF \u5831\u544a';
+    btn.disabled = false;
   }
 }
 
