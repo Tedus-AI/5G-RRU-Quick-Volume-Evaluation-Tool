@@ -1195,7 +1195,7 @@ async function generatePDFReport() {
       if (el && el.classList.contains('js-plotly-plot')) {
         try {
           // chart-margin needs wider capture to avoid clipping right-side bar labels
-          const w = (id === 'chart-margin') ? 1400 : 900;
+          const w = (id === 'chart-margin') ? 1800 : 900;
           const h = (id === 'chart-margin') ? Math.max(400, R.rows.filter(r=>r.Total_W>0).length * 50 + 100) : 400;
           const img = await Plotly.toImage(el, {format:'png', width:w, height:h, scale:2});
           chartImages[id] = img;
@@ -1353,8 +1353,8 @@ async function generatePDFReport() {
       const cols = ['Component','Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','Drop','R_jc','R_int','R_TIM','Limit(C)'];
       // Risk component highlight colors (matching the Top 3 cards above)
       let riskNames = riskComps.map(r => r.Component);
-      let riskHighlightBg = ['#fdecea', '#fef5e7', '#fef9e7'];  // pastel red, orange, yellow (hex for pdfmake)
-      let riskHighlightBorder = [cDanger, cWarning, '#f1c40f'];
+      let riskHighlightBg = ['#fadbd8', '#d4e6f1', '#fdebd0'];  // pastel: red, blue, orange
+      let riskHighlightBorder = ['#c0392b', '#2980b9', '#e67e22'];
       // Bilingual header labels
       const headerRow = cols.map(c => ({
         text: [{text: c.replace('_','\n') + '\n', bold:true, fontSize:6, color:'#334155'}, {text: detailColAnnotations[c] || '', fontSize:5, color:'#94a3b8', italics:true}],
@@ -1372,9 +1372,6 @@ async function generatePDFReport() {
           let fillColor = ri % 2 === 1 ? '#fafbfc' : null;
           // Highlight entire row for top 3 risk components
           if (isRisk) fillColor = riskHighlightBg[riskIdx];
-          if ((c === 'Allowed_dT' || c === 'Tj_Margin') && typeof v === 'number') {
-            fillColor = thermalColor(v, mn, mx);
-          }
           let fontColor = null;
           if (c === 'Tj_Margin' && typeof v === 'number' && v < 0) fontColor = cDanger;
           // Bold component name for risk rows + show rank marker
@@ -1389,7 +1386,6 @@ async function generatePDFReport() {
         }));
       });
       return [
-        {text: [{text: '* Allowed_dT / Tj_Margin ', fontSize:7, italics:true, color:'#64748b'}, {text: '欄位使用紅(危險)→黃(注意)→綠(安全) 色階對應溫度裕度', fontSize:7, italics:true, color:'#94a3b8'}], margin:[0,0,0,5]},
         {table: {headerRows:1, widths: ['auto','auto','auto','auto','auto','auto','auto','auto','auto','auto','auto','auto'], body}, layout: {
           hLineWidth: function(i,node){return i===0||i===1||i===node.table.body.length?0.8:0.3;},
           vLineWidth:()=>0.3,
@@ -1522,7 +1518,7 @@ async function generatePDFReport() {
     if (riskComps.length) {
       content.push({text: 'Top 3 Thermal Risk / 熱風險排名', style:'heading2'});
       let rankLabels = ['#1 最高風險', '#2 次高風險', '#3 第三風險'];
-      let rankColors = [cDanger, cWarning, '#f1c40f'];
+      let rankColors = ['#c0392b', '#2980b9', '#e67e22'];
       content.push({
         columns: riskComps.map((r,i) => ({
           stack:[
