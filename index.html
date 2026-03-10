@@ -3,265 +3,282 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>5G RRU Thermal Engine Pro</title>
+<title>📡 5G RRU 體積估算引擎 Pro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 <style>
-:root {
-  --primary: #007CF0;
-  --primary-light: #00DFD8;
-  --sidebar-bg: #1e293b;
-  --sidebar-text: #e2e8f0;
-  --card-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  --danger: #e74c3c;
-  --warning: #f39c12;
-  --success: #2ecc71;
-  --info: #3498db;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: "Microsoft JhengHei","Segoe UI",Roboto,sans-serif; background: #f5f7fa; display: flex; min-height: 100vh; }
-
-/* === SIDEBAR === */
-.sidebar { width: 340px; min-width: 340px; background: var(--sidebar-bg); color: var(--sidebar-text); padding: 20px; overflow-y: auto; height: 100vh; position: sticky; top: 0; }
-.sidebar h2 { color: #fff; font-size: 1.1rem; margin-bottom: 15px; border-bottom: 1px solid #334155; padding-bottom: 10px; }
-.sidebar label { display: block; font-size: 0.82rem; color: #94a3b8; margin-top: 10px; margin-bottom: 3px; }
-.sidebar input[type="number"], .sidebar select { width: 100%; padding: 6px 8px; border: 1px solid #475569; border-radius: 6px; background: #334155; color: #e2e8f0; font-size: 0.85rem; }
-.sidebar input[type="number"]:focus, .sidebar select:focus { outline: none; border-color: var(--primary); }
-.sidebar .row2 { display: flex; gap: 8px; }
-.sidebar .row2 > div { flex: 1; }
-.sidebar .section-title { color: var(--primary-light); font-size: 0.9rem; font-weight: 700; margin-top: 18px; margin-bottom: 8px; cursor: pointer; user-select: none; }
-.sidebar .section-title::before { content: "▼ "; font-size: 0.7rem; }
-.sidebar .section-title.collapsed::before { content: "▶ "; }
-.sidebar .section-body { transition: max-height 0.3s; overflow: hidden; }
-.sidebar .section-body.collapsed { max-height: 0 !important; }
-.h-display { background: #1a365d; border: 1px solid #2563eb; border-radius: 8px; padding: 10px; margin-top: 10px; text-align: center; }
-.h-display .h-val { font-size: 1.3rem; font-weight: 700; color: #60a5fa; }
-.h-display .h-sub { font-size: 0.75rem; color: #94a3b8; margin-top: 4px; }
-.ar-display { background: #1a1a2e; border: 1px solid #555; border-radius: 8px; padding: 10px; margin-top: 10px; text-align: center; }
-
-/* === MAIN CONTENT === */
-.main { flex: 1; padding: 25px 30px; overflow-y: auto; }
-.header { background: linear-gradient(135deg, var(--primary), var(--primary-light)); padding: 20px 30px; border-radius: 12px; color: #fff; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-.header h1 { font-size: 1.8rem; font-weight: 900; }
-.header .subtitle { font-size: 0.9rem; opacity: 0.9; margin-top: 5px; }
-.header .project-io { display: flex; gap: 10px; align-items: center; }
-.header .project-io button { padding: 8px 16px; border: 2px solid rgba(255,255,255,0.5); background: transparent; color: #fff; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: all 0.2s; }
-.header .project-io button:hover { background: rgba(255,255,255,0.2); border-color: #fff; }
-
-/* === TABS === */
-.tabs { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
-.tab-btn { padding: 8px 18px; border: none; border-radius: 20px; background: #e2e8f0; color: #475569; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.3s; }
-.tab-btn.active { background: var(--primary); color: #fff; box-shadow: 0 4px 6px rgba(0,124,240,0.3); }
-.tab-content { display: none; }
-.tab-content.active { display: block; }
-
-/* === KPI CARDS === */
-.kpi-row { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
-.kpi-card { flex: 1; min-width: 180px; background: #fff; border-radius: 10px; padding: 18px; box-shadow: var(--card-shadow); text-align: center; border-left: 5px solid #ddd; }
-.kpi-card .title { color: #666; font-size: 0.85rem; font-weight: 500; }
-.kpi-card .value { font-size: 1.6rem; font-weight: 700; color: #333; margin: 6px 0; }
-.kpi-card .desc { color: #999; font-size: 0.75rem; }
-
-/* === TABLES === */
-.comp-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: var(--card-shadow); margin-bottom: 15px; font-size: 0.82rem; }
-.comp-table th { background: #f1f5f9; color: #475569; padding: 10px 8px; text-align: left; font-weight: 600; white-space: nowrap; }
-.comp-table td { padding: 8px; border-top: 1px solid #e2e8f0; }
-.comp-table td input, .comp-table td select { width: 100%; padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.82rem; background: #fff; }
-.comp-table td input:focus, .comp-table td select:focus { outline: none; border-color: var(--primary); }
-.comp-table tr:hover { background: #f8fafc; }
-
-/* Buttons */
-.btn { padding: 6px 14px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.82rem; transition: all 0.2s; }
-.btn-primary { background: var(--primary); color: #fff; }
-.btn-primary:hover { background: #0066cc; }
-.btn-danger { background: var(--danger); color: #fff; }
-.btn-danger:hover { background: #c0392b; }
-.btn-success { background: var(--success); color: #fff; }
-.btn-success:hover { background: #27ae60; }
-.btn-sm { padding: 4px 10px; font-size: 0.78rem; }
-
-/* Sub-tabs */
-.sub-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
-.sub-tab-btn { padding: 6px 14px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #475569; font-size: 0.82rem; cursor: pointer; font-weight: 600; }
-.sub-tab-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
-.sub-content { display: none; }
-.sub-content.active { display: block; }
-
-/* Volume display */
-.volume-box { background: #e6fffa; padding: 30px; margin-top: 20px; border-radius: 15px; border-left: 10px solid var(--success); box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; }
-.volume-box h3 { color: #006266; font-size: 1.3rem; letter-spacing: 1px; }
-.volume-box .vol-val { color: var(--success); font-size: 3.5rem; font-weight: 800; margin: 15px 0 0; }
-.weight-box { background: #ecf0f1; padding: 25px; margin-top: 15px; border-radius: 15px; border-left: 10px solid #34495e; text-align: center; }
-
-/* Alerts */
-.alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 12px; font-size: 0.88rem; }
-.alert-danger { background: #fdeded; border-left: 4px solid var(--danger); color: #c0392b; }
-.alert-warning { background: #fff8e1; border-left: 4px solid var(--warning); color: #e67e22; }
-.alert-info { background: #e3f2fd; border-left: 4px solid var(--info); color: #1565c0; }
-.alert-success { background: #e8f5e9; border-left: 4px solid var(--success); color: #2e7d32; }
-
-/* Scale bar */
-.scale-bar { display: flex; flex-direction: column; align-items: center; margin: 10px 0 15px; }
-.scale-bar .bar { width: 100%; max-width: 600px; height: 12px; background: linear-gradient(to right, #d73027, #fee08b, #1a9850); border-radius: 6px; border: 1px solid #ddd; }
-.scale-bar .labels { display: flex; justify-content: space-between; width: 100%; max-width: 600px; font-size: 0.78rem; color: #555; font-weight: 600; margin-top: 4px; }
-
-/* Risk cards */
-.risk-row { display: flex; gap: 12px; margin-bottom: 15px; }
-.risk-card { flex: 1; background: #fff; border-radius: 8px; padding: 12px; box-shadow: var(--card-shadow); text-align: center; }
-.risk-card .rank { font-size: 0.85rem; color: #666; }
-.risk-card .rval { font-size: 1.3rem; font-weight: 700; color: #333; }
-.risk-card .rdelta { font-size: 0.78rem; color: #888; }
-
-/* Sensitivity */
-.sa-controls { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; margin-bottom: 20px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; }
-.sa-controls > div { display: flex; flex-direction: column; }
-.sa-controls label { font-size: 0.78rem; color: #666; margin-bottom: 4px; }
-.sa-controls input, .sa-controls select { padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.85rem; }
-
-.power-summary { background: #e3f2fd; border-left: 4px solid var(--info); padding: 12px 16px; border-radius: 8px; margin-top: 10px; font-weight: 600; color: #1565c0; }
-
-/* DRC */
-.drc-error { background: #ffebee; border: 2px solid var(--danger); border-radius: 10px; padding: 20px; text-align: center; color: var(--danger); }
-
-/* Loading overlay */
-#loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #1e293b, #0f172a); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; color: #e2e8f0; }
-#loading h2 { font-size: 1.8rem; margin-bottom: 15px; }
-#loading p { color: #94a3b8; margin-bottom: 20px; }
-#loading progress { width: 300px; height: 6px; }
-
-/* Responsive */
-@media (max-width: 900px) {
-  body { flex-direction: column; }
-  .sidebar { width: 100%; height: auto; position: relative; }
-  .kpi-row { flex-direction: column; }
-}
+:root{--primary:#007CF0;--primary-light:#00DFD8;--sidebar-bg:#1e293b;--sidebar-text:#e2e8f0;--card-shadow:0 4px 6px rgba(0,0,0,0.1);--danger:#e74c3c;--warning:#f39c12;--success:#2ecc71;--info:#3498db;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f5f7fa;display:flex;min-height:100vh;}
+.sidebar{width:340px;min-width:340px;background:var(--sidebar-bg);color:var(--sidebar-text);padding:20px;overflow-y:auto;height:100vh;position:sticky;top:0;}
+.sidebar h2{color:#fff;font-size:1.1rem;margin-bottom:15px;border-bottom:1px solid #334155;padding-bottom:10px;}
+.sidebar label{display:block;font-size:0.82rem;color:#94a3b8;margin-top:10px;margin-bottom:3px;}
+.sidebar input[type="number"],.sidebar select{width:100%;padding:6px 8px;border:1px solid #475569;border-radius:6px;background:#334155;color:#e2e8f0;font-size:0.85rem;}
+.sidebar input[type="number"]:focus,.sidebar select:focus{outline:none;border-color:var(--primary);}
+.sidebar .row2{display:flex;gap:8px;}.sidebar .row2>div{flex:1;}
+.sidebar .section-title{color:var(--primary-light);font-size:0.9rem;font-weight:700;margin-top:18px;margin-bottom:8px;cursor:pointer;user-select:none;}
+.sidebar .section-title::before{content:"▼ ";font-size:0.7rem;}
+.sidebar .section-title.collapsed::before{content:"▶ ";}
+.sidebar .section-body{transition:max-height 0.3s;overflow:hidden;}
+.sidebar .section-body.collapsed{max-height:0!important;}
+.h-display{background:#1a365d;border:1px solid #2563eb;border-radius:8px;padding:10px;margin-top:10px;text-align:center;}
+.h-display .h-val{font-size:1.3rem;font-weight:700;color:#60a5fa;}
+.h-display .h-sub{font-size:0.75rem;color:#94a3b8;margin-top:4px;}
+.ar-display{background:#1a1a2e;border:1px solid #555;border-radius:8px;padding:10px;margin-top:10px;text-align:center;}
+.main{flex:1;padding:25px 30px;overflow-y:auto;}
+.header{background:linear-gradient(135deg,var(--primary),var(--primary-light));padding:20px 30px;border-radius:12px;color:#fff;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:15px;}
+.header h1{font-family:"Nunito",sans-serif;font-size:1.8rem;font-weight:900;}.header .subtitle{font-size:0.9rem;opacity:0.9;margin-top:5px;}
+.header .project-io{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.header .project-io button{padding:8px 16px;border:2px solid rgba(255,255,255,0.5);background:transparent;color:#fff;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.85rem;transition:all 0.2s;}
+.header .project-io button:hover{background:rgba(255,255,255,0.2);border-color:#fff;}
+.header .project-io .cloud-btn{border-color:#fff;color:#fff;background:rgba(255,255,255,0.15);}
+.header .project-io .cloud-btn:hover{background:rgba(255,255,255,0.35);}
+.header .project-io input[type="text"]{padding:7px 12px;border:2px solid rgba(255,255,255,0.5);background:rgba(255,255,255,0.15);color:#fff;border-radius:8px;font-size:0.85rem;font-weight:600;width:160px;outline:none;}
+.header .project-io input[type="text"]::placeholder{color:rgba(255,255,255,0.5);}
+.header .project-io input[type="text"]:focus{border-color:#fff;background:rgba(255,255,255,0.25);}
+.header .project-io .divider{width:1px;height:28px;background:rgba(255,255,255,0.3);margin:0 2px;}
+.cloud-modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;}
+.cloud-modal-overlay.active{display:flex;}
+.cloud-modal{background:#fff;border-radius:16px;padding:30px;width:420px;max-width:90vw;max-height:70vh;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+.cloud-modal h3{margin:0 0 16px;color:#1e3a5f;font-size:1.2rem;}
+.cloud-modal .cloud-list{max-height:40vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:10px;}
+.cloud-modal .cloud-item{padding:12px 16px;border-bottom:1px solid #f1f5f9;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background 0.15s;}
+.cloud-modal .cloud-item:last-child{border-bottom:none;}
+.cloud-modal .cloud-item:hover{background:#f0f9ff;}
+.cloud-modal .cloud-item .ci-name{font-weight:700;color:#1e3a5f;}
+.cloud-modal .cloud-item .ci-time{font-size:0.78rem;color:#94a3b8;}
+.cloud-modal .cloud-item .ci-del{color:#e74c3c;font-size:0.8rem;cursor:pointer;padding:4px 8px;border-radius:6px;border:1px solid #fecaca;background:#fff5f5;}
+.cloud-modal .cloud-item .ci-del:hover{background:#fee2e2;}
+.cloud-modal .cloud-empty{padding:30px;text-align:center;color:#94a3b8;font-size:0.95rem;}
+.cloud-modal .cloud-close{margin-top:16px;padding:8px 20px;border:none;background:#e2e8f0;color:#475569;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.9rem;}
+.cloud-modal .cloud-close:hover{background:#cbd5e1;}
+.tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;}
+.tab-btn{padding:8px 18px;border:none;border-radius:20px;background:#e2e8f0;color:#475569;font-weight:600;font-size:0.85rem;cursor:pointer;transition:all 0.3s;}
+.tab-btn.active{background:var(--primary);color:#fff;box-shadow:0 4px 6px rgba(0,124,240,0.3);}
+.tab-content{display:none;}.tab-content.active{display:block;}
+.kpi-row{display:flex;gap:15px;margin-bottom:20px;flex-wrap:wrap;}
+.kpi-card{flex:1;min-width:180px;background:#fff;border-radius:10px;padding:18px;box-shadow:var(--card-shadow);text-align:center;border-left:5px solid #ddd;}
+.kpi-card .title{color:#666;font-size:0.85rem;font-weight:500;}.kpi-card .value{font-size:1.6rem;font-weight:700;color:#333;margin:6px 0;}.kpi-card .desc{color:#999;font-size:0.75rem;}
+.comp-table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:var(--card-shadow);margin-bottom:15px;font-size:0.82rem;}
+.comp-table th{background:#f1f5f9;color:#475569;padding:10px 8px;text-align:left;font-weight:600;white-space:nowrap;cursor:help;}
+.comp-table td{padding:8px;border-top:1px solid #e2e8f0;}
+.comp-table td input,.comp-table td select{width:100%;padding:4px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:0.82rem;background:#fff;}
+.comp-table td input[type="number"]{width:50%;min-width:50px;}
+.comp-table td input:focus,.comp-table td select:focus{outline:none;border-color:var(--primary);}
+.comp-table tr:hover{background:#f8fafc;}
+.btn{padding:6px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.82rem;transition:all 0.2s;}
+.btn-primary{background:var(--primary);color:#fff;}.btn-primary:hover{background:#0066cc;}
+.btn-danger{background:var(--danger);color:#fff;}.btn-danger:hover{background:#c0392b;}
+.btn-success{background:var(--success);color:#fff;}.btn-success:hover{background:#27ae60;}
+.btn-warning{background:var(--warning);color:#fff;}.btn-warning:hover{background:#e67e22;}
+.btn-sm{padding:4px 10px;font-size:0.78rem;}
+.sub-tabs{display:flex;gap:4px;margin-bottom:12px;}
+.sub-tab-btn{padding:6px 14px;border:1px solid #d1d5db;border-radius:8px;background:#fff;color:#475569;font-size:0.82rem;cursor:pointer;font-weight:600;}
+.sub-tab-btn.active{background:var(--primary);color:#fff;border-color:var(--primary);}
+.sub-content{display:none;}.sub-content.active{display:block;}
+.volume-box{background:#e6fffa;padding:30px;margin-top:20px;border-radius:15px;border-left:10px solid var(--success);box-shadow:0 4px 15px rgba(0,0,0,0.1);text-align:center;}
+.volume-box h3{color:#006266;font-size:1.3rem;letter-spacing:1px;}.volume-box .vol-val{font-family:"Nunito",sans-serif;color:var(--success);font-size:3.5rem;font-weight:800;margin:15px 0 0;}
+.weight-box{background:#ecf0f1;padding:25px;margin-top:15px;border-radius:15px;border-left:10px solid #34495e;text-align:center;}
+.alert{padding:12px 16px;border-radius:8px;margin-bottom:12px;font-size:0.88rem;}
+.alert-danger{background:#fdeded;border-left:4px solid var(--danger);color:#c0392b;}
+.alert-warning{background:#fff8e1;border-left:4px solid var(--warning);color:#e67e22;}
+.alert-info{background:#e3f2fd;border-left:4px solid var(--info);color:#1565c0;}
+.alert-success{background:#e8f5e9;border-left:4px solid var(--success);color:#2e7d32;}
+.scale-bar{display:flex;flex-direction:column;align-items:center;margin:10px 0 15px;}
+.scale-bar .bar{width:100%;max-width:600px;height:12px;background:linear-gradient(to right,#d73027,#fee08b,#1a9850);border-radius:6px;border:1px solid #ddd;}
+.scale-bar .labels{display:flex;justify-content:space-between;width:100%;max-width:600px;font-size:0.78rem;color:#555;font-weight:600;margin-top:4px;}
+.risk-row{display:flex;gap:12px;margin-bottom:15px;flex-wrap:wrap;}
+.risk-card{flex:1;min-width:160px;background:#fff;border-radius:8px;padding:12px;box-shadow:var(--card-shadow);text-align:center;}
+.risk-card .rank{font-size:0.85rem;color:#666;}.risk-card .rval{font-family:"Nunito",sans-serif;font-size:1.3rem;font-weight:800;color:#333;}.risk-card .rdelta{font-size:0.78rem;color:#888;}
+.sa-controls{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:18px;margin-bottom:20px;display:flex;gap:15px;align-items:flex-end;flex-wrap:wrap;}
+.sa-controls>div{display:flex;flex-direction:column;}.sa-controls label{font-size:0.78rem;color:#666;margin-bottom:4px;}
+.sa-controls input,.sa-controls select{padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:0.85rem;}
+.power-summary{background:#e3f2fd;border-left:4px solid var(--info);padding:12px 16px;border-radius:8px;margin-top:10px;font-weight:600;color:#1565c0;}
+.drc-error{background:#ffebee;border:2px solid var(--danger);border-radius:10px;padding:20px;text-align:center;color:var(--danger);}
+.lib-section{background:#f8f9fa;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:12px;}
+.lib-section select{padding:5px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:0.82rem;min-width:200px;}
+.detail-table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:var(--card-shadow);margin-top:15px;font-size:0.8rem;}
+.detail-table th{background:#f1f5f9;padding:8px;text-align:center;font-weight:600;color:#475569;}.detail-table td{padding:6px 8px;text-align:center;border-top:1px solid #e2e8f0;}
+.collapsible{cursor:pointer;background:#f1f5f9;padding:10px 15px;border:1px solid #e2e8f0;border-radius:8px;margin-top:15px;font-weight:600;color:#475569;}
+.collapsible:hover{background:#e2e8f0;}.collapsible-body{display:none;padding:10px 0;}
+.ai-section{background:#f8f9fa;border:1px solid #e9ecef;border-radius:10px;padding:20px;margin-top:20px;}
+.prompt-box{width:100%;min-height:250px;padding:12px;border:1px solid #d1d5db;border-radius:8px;font-size:0.85rem;font-family:inherit;resize:vertical;}
+.copy-btn{background:#fff;border:1px solid #d1d5db;border-radius:4px;padding:8px 16px;font-size:0.85rem;cursor:pointer;font-weight:600;transition:all 0.2s;}
+.copy-btn:hover{border-color:var(--danger);color:var(--danger);}
+.col-toggle{background:#f8f9fa;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:12px;}
+.col-toggle summary{cursor:pointer;font-weight:600;font-size:0.85rem;color:#475569;user-select:none;}
+.col-toggle summary:hover{color:var(--primary);}
+.col-toggle .col-checks{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;}
+.col-toggle .col-checks label{font-size:0.82rem;color:#555;cursor:pointer;display:flex;align-items:center;gap:4px;}
+.col-toggle .col-checks input[type="checkbox"]{accent-color:var(--primary);}
+.firebase-status{font-size:0.75rem;padding:4px 8px;border-radius:4px;display:inline-block;margin-top:5px;}
+.fb-ok{background:#e8f5e9;color:#2e7d32;}.fb-fail{background:#ffebee;color:#c0392b;}
+#loading{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#1e293b,#0f172a);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;color:#e2e8f0;}
+#loading h2{font-size:1.8rem;margin-bottom:15px;}#loading p{color:#94a3b8;margin-bottom:20px;}#loading progress{width:300px;height:6px;}
+.kpi-card .value{font-family:"Nunito","Segoe UI","Roboto","Helvetica Neue",Arial,sans-serif;font-size:1.8rem;font-weight:800;color:#333;margin:6px 0;}
+/* Login Page */
+#login-page{position:fixed;top:0;left:0;width:100%;height:100%;background:#f5f7fa;z-index:10000;overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:30px 30px;}
+#login-page .login-header{background:linear-gradient(135deg,#007CF0,#00DFD8);padding:30px;border-radius:15px;color:#fff;text-align:center;margin-bottom:30px;box-shadow:0 6px 12px rgba(0,0,0,0.2);width:100%;}
+#login-page .login-header h1{font-family:"Nunito",sans-serif;margin:0;font-size:2.8rem;font-weight:900;}
+#login-page .login-header p{font-size:1.3rem;margin:10px 0 0;opacity:0.95;}
+#login-page .login-header .ver{font-size:1rem;margin-top:15px;opacity:0.9;}
+#login-page .login-box{width:100%;max-width:700px;text-align:center;margin-bottom:30px;}
+#login-page .login-box h2{color:#2c3e50;margin-bottom:20px;}
+#login-page .login-box input{width:100%;padding:12px;border:2px solid #ddd;border-radius:8px;font-size:1rem;text-align:center;outline:none;transition:border 0.3s;}
+#login-page .login-box input:focus{border-color:#007CF0;}
+#login-page .login-box .error{color:#e74c3c;margin-top:10px;font-weight:600;display:none;}
+#login-page .login-box button{width:100%;padding:12px;margin-top:15px;background:linear-gradient(135deg,#007CF0,#00DFD8);color:#fff;border:none;border-radius:8px;font-size:1.1rem;font-weight:700;cursor:pointer;transition:opacity 0.2s;}
+#login-page .login-box button:hover{opacity:0.9;}
+#login-page .info-cards{width:100%;}
+#login-page .info-card{padding:25px;border-radius:12px;margin-bottom:20px;line-height:1.8;}
+#login-page .info-card h3{margin-top:0;padding-bottom:8px;}
+#login-page .info-card ul{padding-left:20px;}
+@media(max-width:900px){body{flex-direction:column;}.sidebar{width:100%;height:auto;position:relative;}.kpi-row{flex-direction:column;}}
 </style>
 </head>
 <body>
-
-<!-- Loading Screen -->
-<div id="loading">
-  <h2>5G RRU Thermal Engine Pro</h2>
-  <p>Initializing thermal calculation engine...</p>
-  <progress></progress>
+<!-- Login Page -->
+<div id="login-page">
+  <div class="login-header">
+    <h1>📡 5G RRU 熱流引擎 Pro</h1>
+    <p>High-Performance Thermal & Volume Estimation System</p>
+    <div class="ver">v4.30 (GitHub Pages Edition)</div>
+  </div>
+  <div class="login-box">
+    <h2>🔐 請輸入授權金鑰</h2>
+    <input type="password" id="login-pw" placeholder="輸入密碼後按 Enter" onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()">登入</button>
+    <div class="error" id="login-error">❌ 密碼錯誤，請重新輸入</div>
+  </div>
+  <div class="info-cards">
+    <div class="info-card" style="background:#e9f7ef;border-left:6px solid #2ecc71;">
+      <h3 style="color:#27ae60;">🛠️ 主要功能一覽</h3>
+      <ul style="color:#34495e;">
+        <li><strong>元件熱源管理</strong>：動態新增/編輯/複製/刪除元件清單，支援 Copper Coin、Thermal Via、多種 TIM（含雙組自訂 Pad / Pad2 規格）</li>
+        <li><strong>雲端元件資料庫</strong>：整合 Firebase Firestore，RF / Digital / PWR 三類元件庫可雲端共用</li>
+        <li><strong>精準熱阻計算</strong>：自動計算 Rjc + Rint + Rtim，考慮局部環溫與高度效應</li>
+        <li><strong>Tj_Margin 裕度分析</strong>：全元件 Tj / Tc 裕量色階顯示，超溫自動觸發紅色警告</li>
+        <li><strong>散熱器尺寸優化</strong>：根據瓶頸元件裕度與安全係數，自動推算所需鰭片高度、數量與整機體積</li>
+        <li><strong>重量預估</strong>：含散熱器、Shield、Filter、Shielding、PCB 等分項重量</li>
+        <li><strong>敏感度分析 & Tornado Chart</strong>：支援 Gap / T_amb / Power Scale 變數掃描</li>
+        <li><strong>3D 模擬視圖</strong>：真實比例展示電子艙 + 散熱器 + 鰭片結構</li>
+        <li><strong>AI 寫實渲染輔助</strong>：一鍵生成精確提示詞</li>
+        <li><strong>專案存取</strong>：JSON 格式載入/儲存</li>
+      </ul>
+    </div>
+    <div class="info-card" style="background:#e8f4fd;border-left:6px solid #3498db;">
+      <h3 style="color:#2980b9;">🔥 綜合熱傳係數 h 的計算原理</h3>
+      <p style="color:#2c3e50;">本工具的 h 值採用<strong>半經驗模型</strong>，經多款實際 RRU 產品的 CFD 模擬結果校正而得：<br>
+      • <strong>h_conv</strong> = 6.4 × tanh(Gap / 7.0)　→ 模擬自然對流隨鰭片間距的飽和行為<br>
+      • <strong>h_rad</strong> = 2.4 × (Gap / 10)<sup>0.5</sup>　→ 考慮鰭片間輻射交換隨間距衰減<br>
+      • <strong>h_total</strong> = h_conv + h_rad<br>
+      該模型已在多個專案中與 FloTHERM 結果比對，誤差通常在 <strong>±8%</strong> 以內。</p>
+    </div>
+    <div class="info-card" style="background:#fffacd;border-left:6px solid #f39c12;">
+      <h3 style="color:#d35400;">⚠️ 使用注意事項</h3>
+      <ul style="color:#34495e;">
+        <li>本工具為<strong>快速概念設計與尺寸評估</strong>用途，非最終驗證級熱模擬</li>
+        <li>計算結果高度依賴輸入參數準確度，請使用實際量測或 Datasheet 數值</li>
+        <li>自然對流模型基於垂直鰭片、無風環境，室外高風速情境需另行評估</li>
+        <li>建議將計算結果與 CFD 或實測進行交叉驗證</li>
+      </ul>
+    </div>
+  </div>
 </div>
 
-<!-- Sidebar -->
+<div id="loading" style="display:none;"><h2>📡 5G RRU 熱流引擎 Pro</h2><p>⚙️ 初始化熱流引擎中，請稍候...</p><progress></progress></div>
+
 <div class="sidebar" id="sidebar">
-  <h2>Parameter Controls</h2>
+  <h2>🛠️ 參數控制台</h2>
+  <div id="fb-status"></div>
 
-  <!-- Section 1: Environment -->
-  <div class="section-title" onclick="toggleSection(this)">1. Environment & Coefficients</div>
+  <div class="section-title" onclick="toggleSection(this)">1. 環境與係數</div>
   <div class="section-body">
-    <label>Environment Temp T_amb (deg C)</label>
-    <input type="number" id="T_amb" step="1" onchange="recalc()">
-    <label>Design Safety Margin</label>
-    <input type="number" id="Margin" step="0.1" onchange="recalc()">
-    <label>Fin Tech</label>
-    <select id="fin_tech_selector_v2" onchange="recalc()">
-      <option value="Embedded Fin (0.95)">Embedded Fin (0.95)</option>
-      <option value="Die-casting Fin (0.90)">Die-casting Fin (0.90)</option>
-    </select>
+    <label>🌡️ 環境溫度 T_amb (°C)</label><input type="number" id="T_amb" step="1" onchange="recalc()">
+    <label>🔒 設計安全係數 (Margin)</label><input type="number" id="Margin" step="0.1" onchange="recalc()">
+    <label>🔨 鰭片製程 (Fin Tech)</label>
+    <select id="fin_tech_selector_v2" onchange="recalc()"><option value="Embedded Fin (0.95)">Embedded Fin (0.95)</option><option value="Die-casting Fin (0.90)">Die-casting Fin (0.90)</option></select>
   </div>
 
-  <!-- Section 2: PCB & Structure -->
-  <div class="section-title" onclick="toggleSection(this)">2. PCB & Structure Dimensions</div>
+  <div class="section-title" onclick="toggleSection(this)">2. PCB 與機構尺寸</div>
   <div class="section-body">
-    <label>PCB Length L_pcb (mm)</label>
-    <input type="number" id="L_pcb" step="1" onchange="recalc()">
-    <label>PCB Width W_pcb (mm)</label>
-    <input type="number" id="W_pcb" step="1" onchange="recalc()">
-    <label>Heatsink Base t_base (mm)</label>
-    <input type="number" id="t_base" step="0.5" onchange="recalc()">
-    <label>HSK Cavity Depth H_shield (mm)</label>
-    <input type="number" id="H_shield" step="1" onchange="recalc()">
-    <label>Cavity Filter Thickness H_filter (mm)</label>
-    <input type="number" id="H_filter" step="1" onchange="recalc()">
-
-    <label style="margin-top:12px;color:var(--primary-light);">Weight Parameters</label>
-    <div class="row2"><div><label>Al Density (g/cm3)</label><input type="number" id="al_density" step="0.01" onchange="recalc()"></div>
-    <div><label>Filter (g/cm3)</label><input type="number" id="filter_density" step="0.05" onchange="recalc()"></div></div>
-    <div class="row2"><div><label>Shielding (g/cm3)</label><input type="number" id="shielding_density" step="0.05" onchange="recalc()"></div>
-    <div><label>PCB (g/cm2)</label><input type="number" id="pcb_surface_density" step="0.05" onchange="recalc()"></div></div>
-
-    <label style="margin-top:12px;color:var(--primary-light);">PCB-to-Housing Margins (mm)</label>
-    <div class="row2"><div><label>Top</label><input type="number" id="Top" step="1" onchange="recalc()"></div>
-    <div><label>Bottom</label><input type="number" id="Btm" step="1" onchange="recalc()"></div></div>
-    <div class="row2"><div><label>Left</label><input type="number" id="Left" step="1" onchange="recalc()"></div>
-    <div><label>Right</label><input type="number" id="Right" step="1" onchange="recalc()"></div></div>
-
-    <label style="margin-top:12px;color:var(--primary-light);">Copper Coin Settings (mm)</label>
-    <div class="row2"><div><label>Coin L</label><input type="number" id="Coin_L_Setting" step="1" onchange="recalc()"></div>
-    <div><label>Coin W</label><input type="number" id="Coin_W_Setting" step="1" onchange="recalc()"></div></div>
-
-    <label style="margin-top:12px;color:var(--primary-light);">Fin Geometry</label>
-    <div class="row2"><div><label>Air Gap (mm)</label><input type="number" id="Gap" step="0.1" onchange="recalc()"></div>
-    <div><label>Fin Thickness (mm)</label><input type="number" id="Fin_t" step="0.1" onchange="recalc()"></div></div>
-
-    <div class="h-display" id="h-display">
-      <div class="h-val" id="h-val">--</div>
-      <div class="h-sub" id="h-sub">h = h_conv + h_rad</div>
-    </div>
-    <div class="ar-display" id="ar-display">
-      <div style="font-size:0.78rem;color:#94a3b8;">Aspect Ratio</div>
-      <div id="ar-val" style="font-size:1.1rem;font-weight:700;color:#60a5fa;">--</div>
-      <div style="font-size:0.7rem;color:#666;">Best: 4.5 ~ 6.5</div>
-    </div>
+    <label>📏 PCB 長度 L_pcb (mm)</label><input type="number" id="L_pcb" step="1" onchange="recalc()">
+    <label>📏 PCB 寬度 W_pcb (mm)</label><input type="number" id="W_pcb" step="1" onchange="recalc()">
+    <label>散熱器基板厚 t_base (mm)</label><input type="number" id="t_base" step="0.5" onchange="recalc()">
+    <label>HSK 內腔深度 H_shield (mm)</label><input type="number" id="H_shield" step="1" onchange="recalc()">
+    <label>Cavity Filter 厚度 H_filter (mm)</label><input type="number" id="H_filter" step="1" onchange="recalc()">
+    <label style="margin-top:12px;color:var(--primary-light);">⚖️ 重量估算參數</label>
+    <div class="row2"><div><label>鋁材密度 (g/cm³)</label><input type="number" id="al_density" step="0.01" onchange="recalc()"></div><div><label>Filter (g/cm³)</label><input type="number" id="filter_density" step="0.05" onchange="recalc()"></div></div>
+    <div class="row2"><div><label>Shielding (g/cm³)</label><input type="number" id="shielding_density" step="0.05" onchange="recalc()"></div><div><label>PCB (g/cm²)</label><input type="number" id="pcb_surface_density" step="0.05" onchange="recalc()"></div></div>
+    <label style="margin-top:12px;color:var(--primary-light);">📏 PCB 板離外殼邊距 (防水)</label>
+    <div class="row2"><div><label>Top (mm)</label><input type="number" id="Top" step="1" onchange="recalc()"></div><div><label>Bottom (mm)</label><input type="number" id="Btm" step="1" onchange="recalc()"></div></div>
+    <div class="row2"><div><label>Left (mm)</label><input type="number" id="Left" step="1" onchange="recalc()"></div><div><label>Right (mm)</label><input type="number" id="Right" step="1" onchange="recalc()"></div></div>
+    <label style="margin-top:12px;color:var(--primary-light);">🔶 Final PA 銅塊設定</label>
+    <div class="row2"><div><label>銅塊長 (mm)</label><input type="number" id="Coin_L_Setting" step="1" onchange="recalc()"></div><div><label>銅塊寬 (mm)</label><input type="number" id="Coin_W_Setting" step="1" onchange="recalc()"></div></div>
+    <label style="margin-top:12px;color:var(--primary-light);">🌊 鰭片幾何</label>
+    <div class="row2"><div><label>鰭片 Air Gap (mm)</label><input type="number" id="Gap" step="0.1" onchange="recalc()"></div><div><label>鰭片厚度 (mm)</label><input type="number" id="Fin_t" step="0.1" onchange="recalc()"></div></div>
+    <div class="h-display" id="h-display"><div class="h-val" id="h-val">--</div><div class="h-sub" id="h-sub">h = h_conv + h_rad</div></div>
+    <div class="ar-display" id="ar-display"><div style="font-size:0.78rem;color:#94a3b8;">📐 流阻比 (Aspect Ratio)</div><div id="ar-val" style="font-size:1.1rem;font-weight:700;color:#60a5fa;">--</div><div id="ar-msg" style="font-size:0.7rem;color:#888;">✅ 最佳建議：4.5 ~ 6.5</div><div id="ar-tip" style="font-size:0.65rem;color:#64748b;margin-top:4px;line-height:1.4;">最佳建議：4.5 ~ 6.5（建議值內，無風 AR 往低趨勢設計，反之亦然）</div></div>
   </div>
 
-  <!-- Section 3: Material -->
-  <div class="section-title collapsed" onclick="toggleSection(this)">3. Material Parameters</div>
-  <div class="section-body collapsed">
-    <div class="row2"><div><label>K_Via</label><input type="number" id="K_Via" step="1" onchange="recalc()"></div>
-    <div><label>Via Eff</label><input type="number" id="Via_Eff" step="0.05" onchange="recalc()"></div></div>
-    <label style="margin-top:8px;color:var(--primary-light);">TIM Materials</label>
-    <div class="row2"><div><label>K (Putty)</label><input type="number" id="K_Putty" step="0.1" onchange="recalc()"></div>
-    <div><label>t (Putty)</label><input type="number" id="t_Putty" step="0.1" onchange="recalc()"></div></div>
-    <div class="row2"><div><label>K (Pad)</label><input type="number" id="K_Pad" step="0.1" onchange="recalc()"></div>
-    <div><label>t (Pad)</label><input type="number" id="t_Pad" step="0.1" onchange="recalc()"></div></div>
-    <div class="row2"><div><label>K (Pad2)</label><input type="number" id="K_Pad2" step="0.1" onchange="recalc()"></div>
-    <div><label>t (Pad2)</label><input type="number" id="t_Pad2" step="0.1" onchange="recalc()"></div></div>
-    <div class="row2"><div><label>K (Grease)</label><input type="number" id="K_Grease" step="0.1" onchange="recalc()"></div>
-    <div><label>t (Grease)</label><input type="number" id="t_Grease" step="0.01" onchange="recalc()"></div></div>
-    <label style="margin-top:8px;color:var(--primary-light);">Solder</label>
-    <div class="row2"><div><label>K (Solder)</label><input type="number" id="K_Solder" step="1" onchange="recalc()"></div>
-    <div><label>t (Solder)</label><input type="number" id="t_Solder" step="0.05" onchange="recalc()"></div></div>
-    <label>Voiding</label>
-    <input type="number" id="Voiding" step="0.05" onchange="recalc()">
+  <div class="section-title" onclick="toggleSection(this)">3. 材料參數 (含 Via K值)</div>
+  <div class="section-body">
+    <div class="row2"><div><label>Via 等效 K 值</label><input type="number" id="K_Via" step="1" onchange="recalc()"></div><div><label>Via 製程係數</label><input type="number" id="Via_Eff" step="0.05" onchange="recalc()"></div></div>
+    <label style="margin-top:8px;color:var(--primary-light);">🔷 熱介面材料 (TIM)</label>
+    <div class="row2"><div><label>K (Putty)</label><input type="number" id="K_Putty" step="0.1" onchange="recalc()"></div><div><label>t (Putty)</label><input type="number" id="t_Putty" step="0.1" onchange="recalc()"></div></div>
+    <div class="row2"><div><label>K (Pad)</label><input type="number" id="K_Pad" step="0.1" onchange="recalc()"></div><div><label>t (Pad)</label><input type="number" id="t_Pad" step="0.1" onchange="recalc()"></div></div>
+    <div class="row2"><div><label>K (Pad 2)</label><input type="number" id="K_Pad2" step="0.1" onchange="recalc()"></div><div><label>t (Pad 2)</label><input type="number" id="t_Pad2" step="0.1" onchange="recalc()"></div></div>
+    <div class="row2"><div><label>K (Grease)</label><input type="number" id="K_Grease" step="0.1" onchange="recalc()"></div><div><label>t (Grease)</label><input type="number" id="t_Grease" step="0.01" onchange="recalc()"></div></div>
+    <label style="margin-top:8px;color:var(--primary-light);">🔘 Solder (錫片)</label>
+    <div class="row2"><div><label>K (錫片)</label><input type="number" id="K_Solder" step="1" onchange="recalc()"></div><div><label>t (錫片)</label><input type="number" id="t_Solder" step="0.05" onchange="recalc()"></div></div>
+    <label>錫片空洞率 (Voiding)</label><input type="number" id="Voiding" step="0.05" onchange="recalc()">
   </div>
 </div>
 
-<!-- Main Content -->
 <div class="main">
-  <!-- Header -->
   <div class="header">
     <div>
-      <h1>5G RRU Thermal Engine <span style="font-size:0.6em;opacity:0.8;">Pro</span></h1>
+      <h1>📡 5G RRU 體積估算引擎 <span style="font-size:0.6em;opacity:0.8;">Pro</span></h1>
       <div class="subtitle">High-Performance Thermal & Volume Estimation System | v4.30 (GitHub Pages Edition)</div>
     </div>
     <div class="project-io">
-      <button onclick="loadProject()">Load Project</button>
-      <button onclick="saveProject()">Save Project</button>
+      <button onclick="loadProject()">📂 載入專案</button>
+      <button onclick="saveProject()">💾 儲存專案</button>
       <input type="file" id="fileInput" accept=".json" style="display:none" onchange="handleFileLoad(event)">
+      <div class="divider"></div>
+      <input type="text" id="cloudProjectName" placeholder="專案名稱 ...">
+      <button class="cloud-btn" onclick="cloudSaveProject()">☁️ 雲端儲存</button>
+      <button class="cloud-btn" onclick="cloudLoadProject()">☁️ 雲端載入</button>
+      <div class="divider"></div>
+      <button class="cloud-btn" onclick="generatePDFReport()" id="pdf-btn" style="border-color:#ff6b6b;background:rgba(255,107,107,0.15);">📄 PDF 報告</button>
+    </div>
+    <div class="cloud-modal-overlay" id="cloudModal">
+      <div class="cloud-modal">
+        <h3>☁️ 雲端專案列表</h3>
+        <div id="cloudList"></div>
+        <button class="cloud-close" onclick="closeCloudModal()">關閉</button>
+      </div>
     </div>
   </div>
 
-  <!-- Tab Buttons -->
   <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab(0)">COMPONENT SETUP</button>
-    <button class="tab-btn" onclick="switchTab(1)">DETAILED ANALYSIS</button>
-    <button class="tab-btn" onclick="switchTab(2)">VISUAL REPORT</button>
-    <button class="tab-btn" onclick="switchTab(3)">3D SIMULATION</button>
-    <button class="tab-btn" onclick="switchTab(4)">SENSITIVITY ANALYSIS</button>
+    <button class="tab-btn active" onclick="switchTab(0)">📝 元件設定</button>
+    <button class="tab-btn" onclick="switchTab(1)">🔢 詳細分析</button>
+    <button class="tab-btn" onclick="switchTab(2)">📊 視覺化報告</button>
+    <button class="tab-btn" onclick="switchTab(3)">🧊 3D 模擬視圖</button>
+    <button class="tab-btn" onclick="switchTab(4)">📈 敏感度分析</button>
   </div>
 
-  <!-- Tab 0: Component Setup -->
+  <!-- Tab 0: 元件設定 -->
   <div class="tab-content active" id="tab0">
-    <h3>Component Setup</h3>
-    <p style="color:#888;font-size:0.82rem;margin-bottom:12px;">Configure RF, Digital, and Power components below.</p>
+    <h3>🔥 元件熱源清單設定</h3>
+    <p style="color:#888;font-size:0.82rem;margin-bottom:12px;">💡 提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。</p>
     <div class="sub-tabs">
-      <button class="sub-tab-btn active" onclick="switchSubTab(0)">RF Component</button>
-      <button class="sub-tab-btn" onclick="switchSubTab(1)">Digital Component</button>
-      <button class="sub-tab-btn" onclick="switchSubTab(2)">PWR Component</button>
+      <button class="sub-tab-btn active" onclick="switchSubTab(0)">📡 RF Component</button>
+      <button class="sub-tab-btn" onclick="switchSubTab(1)">💻 Digital Component</button>
+      <button class="sub-tab-btn" onclick="switchSubTab(2)">⚡ PWR Component</button>
     </div>
     <div class="sub-content active" id="subtab0"></div>
     <div class="sub-content" id="subtab1"></div>
@@ -269,72 +286,88 @@ body { font-family: "Microsoft JhengHei","Segoe UI",Roboto,sans-serif; backgroun
     <div class="power-summary" id="power-summary"></div>
   </div>
 
-  <!-- Tab 1: Detailed Analysis -->
+  <!-- Tab 1: 詳細分析 -->
   <div class="tab-content" id="tab1">
-    <h3>Detailed Analysis</h3>
+    <h3>🔢 DETAILED ANALYSIS (詳細分析)</h3>
+    <p style="color:#888;font-size:0.82rem;margin-bottom:12px;">💡 提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。</p>
     <div id="tab1-alerts"></div>
     <div id="tab1-risk"></div>
     <div class="scale-bar" id="tab1-scale"></div>
+    <div id="tab1-col-toggle"></div>
     <div id="tab1-table"></div>
-    <div class="alert alert-info" style="margin-top:12px;">
-      Allowed dT = Limit - Local_Amb - Drop. Green = safe margin, Red = thermal bottleneck.
-    </div>
+    <div class="alert alert-info" style="margin-top:12px;">ℹ️ <b>名詞解釋 - 允許溫升 (Allowed dT)</b>：此數值代表「散熱器可用的溫升裕度」(Limit - Local Ambient - Drop)。🟩 綠色 (數值高)：散熱裕度充足。🟥 紅色 (數值低)：該元件是系統的熱瓶頸。</div>
   </div>
 
-  <!-- Tab 2: Visual Report -->
+  <!-- Tab 2: 視覺化報告 -->
   <div class="tab-content" id="tab2">
-    <h3>Visual Report</h3>
+    <h3>📊 VISUAL REPORT (視覺化報告)</h3>
     <div class="kpi-row" id="tab2-kpi"></div>
     <div id="tab2-charts"></div>
     <hr style="margin:20px 0;">
-    <h3>Dimensions, Volume & Weight</h3>
+    <h3>📏 尺寸、體積、重量估算</h3>
     <div id="tab2-drc"></div>
     <div id="tab2-dims"></div>
     <div id="tab2-volume"></div>
     <div id="tab2-weight"></div>
   </div>
 
-  <!-- Tab 3: 3D Simulation -->
+  <!-- Tab 3: 3D 模擬視圖 -->
   <div class="tab-content" id="tab3">
-    <h3>3D Simulation</h3>
-    <p style="color:#888;font-size:0.82rem;margin-bottom:12px;">Real-scale model: electronics body + heatsink fins with thermal gradient coloring.</p>
+    <h3>🧊 3D SIMULATION (3D 模擬視圖)</h3>
+    <p style="color:#888;font-size:0.82rem;margin-bottom:12px;">模型展示：底部電子艙 + 頂部散熱鰭片，鰭片數量與間距皆為真實比例。鰭片含底部→頂部熱梯度配色。</p>
     <div id="tab3-3d" style="width:100%;height:600px;"></div>
     <div id="tab3-info" style="margin-top:10px;"></div>
+    <div id="tab3-ai"></div>
   </div>
 
-  <!-- Tab 4: Sensitivity Analysis -->
+  <!-- Tab 4: 敏感度分析 -->
   <div class="tab-content" id="tab4">
-    <h3>Sensitivity Analysis</h3>
+    <h3>📈 敏感度分析 (Sensitivity Analysis)</h3>
     <div style="margin-bottom:15px;">
-      <label><input type="radio" name="sa_mode" value="sweep" checked onchange="saMode=this.value"> Single Variable Sweep</label>
-      <label style="margin-left:15px;"><input type="radio" name="sa_mode" value="tornado" onchange="saMode=this.value"> Tornado Chart</label>
+      <label><input type="radio" name="sa_mode" value="sweep" checked onchange="toggleSAMode()"> 🔬 單變數掃描</label>
+      <label style="margin-left:15px;"><input type="radio" name="sa_mode" value="tornado" onchange="toggleSAMode()"> 🌪️ Tornado Chart (全局敏感度)</label>
     </div>
+    <hr style="margin-bottom:15px;">
     <div id="sa-sweep-panel">
       <div class="sa-controls">
-        <div><label>Variable</label><select id="sa_var"><option value="Gap">Gap (Fin Air Gap)</option><option value="T_amb">T_amb (Environment Temp)</option><option value="power_scale">Power Scale</option></select></div>
-        <div><label>Base Value</label><input type="number" id="sa_base" disabled></div>
-        <div><label>- %</label><input type="number" id="sa_minus" value="50" min="0" max="90" step="5"></div>
-        <div><label>+ %</label><input type="number" id="sa_plus" value="50" min="0" max="300" step="5"></div>
-        <div><label>Steps</label><input type="number" id="sa_steps" value="9" min="3" max="21" step="2"></div>
-        <div><button class="btn btn-primary" onclick="runSweep()">Run Analysis</button></div>
+        <div><label>1. 分析變數</label><select id="sa_var" onchange="updateSABase()"><option value="Gap">Gap (Fin Air Gap)</option><option value="T_amb">T_amb (環境溫度)</option><option value="power_scale">Power Scale (功耗縮放)</option></select></div>
+        <div><label>2. 基準值</label><input type="number" id="sa_base" disabled></div>
+        <div><label>3. 減少 (-%)</label><input type="number" id="sa_minus" value="50" min="0" max="90" step="5"></div>
+        <div><label>4. 增加 (+%)</label><input type="number" id="sa_plus" value="50" min="0" max="300" step="5"></div>
+        <div><label>5. 計算點數</label><input type="number" id="sa_steps" value="9" min="3" max="21" step="2"></div>
+        <div><button class="btn btn-primary" onclick="runSweep()" style="margin-top:18px;">🚀 執行分析</button></div>
       </div>
-      <div id="sa-sweep-results" style="display:flex;gap:15px;flex-wrap:wrap;"></div>
+      <div id="sa-sweep-results"></div>
     </div>
     <div id="sa-tornado-panel" style="display:none;">
       <div class="sa-controls">
-        <div><label>Range (+/- %)</label><input type="number" id="tornado_pct" value="20" min="5" max="50" step="5"></div>
-        <div><label>Metric</label><select id="tornado_metric"><option value="both">Both Side-by-Side</option><option value="volume">Volume (L)</option><option value="tj">Tj_Margin (deg C)</option></select></div>
-        <div><button class="btn btn-primary" onclick="runTornado()">Run Tornado</button></div>
+        <div><label>敏感度範圍 (±%)</label><input type="number" id="tornado_pct" value="20" min="5" max="50" step="5"></div>
+        <div><label>分析指標</label><select id="tornado_metric"><option value="both">兩者並排</option><option value="volume">體積 (L)</option><option value="tj">Bottleneck Tj_Margin (°C)</option></select></div>
+        <div><button class="btn btn-primary" onclick="runTornado()" style="margin-top:18px;">🌪️ 執行 Tornado 分析</button></div>
       </div>
-      <div id="sa-tornado-results" style="display:flex;gap:15px;flex-wrap:wrap;"></div>
+      <div id="sa-tornado-results"></div>
     </div>
   </div>
-
 </div>
-
 <script>
 // =====================================================
-// DEFAULT CONFIG (embedded from default_config.json)
+// FIREBASE CONFIG
+// =====================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyCXRb5WNCl7otxPwjMCVsutvT0VHQEseUU",
+  authDomain: "g-quick-volume-evaluation.firebaseapp.com",
+  projectId: "g-quick-volume-evaluation",
+  storageBucket: "g-quick-volume-evaluation.firebasestorage.app",
+  messagingSenderId: "325375750956",
+  appId: "1:325375750956:web:cfae2ed9cc05501a0bb289",
+  measurementId: "G-HJBCDHTZPZ"
+};
+let db = null;
+let fbOk = false;
+let compLib = {rf_library:[], digital_library:[], pwr_library:[]};
+
+// =====================================================
+// DEFAULT CONFIG
 // =====================================================
 const DEFAULT_CONFIG = {
   "meta": {
@@ -518,719 +551,1073 @@ const DEFAULT_CONFIG = {
 // =====================================================
 // STATE
 // =====================================================
-let G = {}; // Global parameters
+let G = {};
 let components = { rf: [], digital: [], pwr: [] };
 let calcResults = null;
-let saMode = 'sweep';
 
 const COLS = ['Component','Qty','Power(W)','Height(mm)','Pad_L','Pad_W','Thick(mm)','Board_Type','Limit(C)','R_jc','TIM_Type'];
+const COL_LABELS = {'Component':'元件名稱','Qty':'數量','Power(W)':'單顆功耗 (W)','Height(mm)':'高度 (mm)','Pad_L':'Pad 長 (mm)','Pad_W':'Pad 寬 (mm)','Thick(mm)':'板厚 (mm)','Board_Type':'導熱方式','Limit(C)':'限溫 (°C)','R_jc':'熱阻 Rjc','TIM_Type':'介面材料'};
+const COL_TIPS = {
+  'Component':'元件型號或代號','Qty':'該元件的使用數量',
+  'Power(W)':'單一顆元件的發熱瓦數 (TDP)',
+  'Height(mm)':'元件距離 PCB 底部的垂直高度。公式：全域環溫 + (元件高度 × 0.03)',
+  'Pad_L':'IC E-PAD 長度或 PA 封裝底部長度或元件散熱端的長度 (mm)','Pad_W':'IC E-PAD 寬度或 PA 封裝底部寬度或元件散熱端的寬度 (mm)',
+  'Thick(mm)':'熱需傳導穿過的 PCB 或銅塊厚度',
+  'Board_Type':'元件導熱到 HSK 表面的方式',
+  'TIM_Type':'元件底部與散熱器之間的 TIM。Final PA 的 Solder die attach 已內建於 R_int，此欄填 Grease 即可',
+  'R_jc':'結點到殼的內部熱阻 (°C/W)','Limit(C)':'元件允許最高運作溫度'
+};
+const TAB2_TIPS = {
+  'Component':'元件型號或代號','Allowed_dT':'散熱器剩餘可用的溫升裕度。數值越小代表該元件越容易過熱 (瓶頸)。公式：Limit - Loc_Amb - Drop',
+  'Tj_Margin':'距溫度上限的裕度。公式：Limit - Tj (或 Tc)。負值代表超溫！',
+  'Tj':'元件晶片接面溫度。公式：Tc + Q×Rjc','Tc':'元件外殼溫度。公式：T_hsk_eff + Q×(Rint+Rtim)',
+  'Total_W':'該元件的總發熱量 (單顆功耗 × 數量)','Loc_Amb':'該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)',
+  'Drop':'熱量從晶片核心傳導到散熱器表面的溫差。公式：Power × (Rjc + Rint + Rtim)',
+  'R_jc':'結點到殼的內部熱阻','R_int':'元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值',
+  'R_TIM':'元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)','Limit(C)':'元件允許最高運作溫度'
+};
+const TAB2_LABELS = {'Allowed_dT':'允許溫升','Tj_Margin':'Tj 裕度','Tj':'Tj','Tc':'Tc','Total_W':'總功耗','Loc_Amb':'局部環溫','Drop':'內部溫降','R_jc':'Rjc','R_int':'基板熱阻','R_TIM':'介面熱阻','Limit(C)':'限溫'};
+const ALL_TAB1_COLS = ['Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','Drop','R_jc','R_int','R_TIM','Limit(C)'];
+var tab1SelectedCols = ['Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','Drop','R_jc','R_int','R_TIM','Limit(C)'];
+function toggleTab1Col(col,checked){if(checked&&!tab1SelectedCols.includes(col))tab1SelectedCols.push(col);else if(!checked)tab1SelectedCols=tab1SelectedCols.filter(c=>c!==col);renderTab1();}
+
 const BOARD_TYPES = ['Thermal Via','Copper Coin','None'];
 const TIM_TYPES = ['Grease','Pad','Pad2','Putty','None'];
-
 const RF_DEFAULT = {Component:"New_RF",Qty:1,"Power(W)":0,"Height(mm)":250,Pad_L:10,Pad_W:10,"Thick(mm)":2.5,Board_Type:"Copper Coin","Limit(C)":200,R_jc:1.5,TIM_Type:"Grease"};
 const DIG_DEFAULT = {Component:"New_Digital",Qty:1,"Power(W)":0,"Height(mm)":50,Pad_L:10,Pad_W:10,"Thick(mm)":0,Board_Type:"Thermal Via","Limit(C)":100,R_jc:0.5,TIM_Type:"Putty"};
 const PWR_DEFAULT = {Component:"New_PWR",Qty:1,"Power(W)":0,"Height(mm)":30,Pad_L:20,Pad_W:20,"Thick(mm)":0,Board_Type:"None","Limit(C)":95,R_jc:0,TIM_Type:"Grease"};
 
 // =====================================================
+// FIREBASE INIT
+// =====================================================
+async function initFirebase() {
+  try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    // Load libraries
+    for (let col of ['rf_library','digital_library','pwr_library']) {
+      let snap = await db.collection(col).get();
+      compLib[col] = snap.docs.map(d => d.data());
+    }
+    fbOk = true;
+    document.getElementById('fb-status').innerHTML = '<div class="firebase-status fb-ok">🟢 Firebase 連線成功</div>';
+    renderTab0();
+  } catch(e) {
+    fbOk = false;
+    document.getElementById('fb-status').innerHTML = '<div class="firebase-status fb-fail">🔴 Firebase 離線 (本地模式)</div>';
+    console.warn('Firebase init failed:', e);
+  }
+}
+
+async function saveToLib(cat, row) {
+  let colName = cat + '_library';
+  let docId = row.Component.replace(/ /g,'_').replace(/\//g,'-').replace(/[()]/g,'');
+  let existing = compLib[colName].find(r => r.Component === row.Component);
+  if (existing) {
+    if (!confirm('「' + row.Component + '」已存在資料庫，確定要覆蓋？')) return;
+    compLib[colName] = compLib[colName].map(r => r.Component===row.Component ? row : r);
+  } else {
+    compLib[colName].push(row);
+  }
+  if (fbOk && db) {
+    try { await db.collection(colName).doc(docId).set(row); } catch(e) { alert('存入失敗: '+e.message); return; }
+  }
+  alert('✅ 「' + row.Component + '」已存入 ' + cat.toUpperCase() + ' 資料庫！');
+  recalc();
+}
+
+async function deleteFromLib(cat, compName) {
+  if (!confirm('確定要從 ' + cat.toUpperCase() + ' 資料庫刪除「' + compName + '」？此操作無法復原！')) return;
+  let colName = cat + '_library';
+  compLib[colName] = compLib[colName].filter(r => r.Component !== compName);
+  if (fbOk && db) {
+    let docId = compName.replace(/ /g,'_').replace(/\//g,'-').replace(/[()]/g,'');
+    try { await db.collection(colName).doc(docId).delete(); } catch(e) { console.warn(e); }
+  }
+  alert('🗑️ 「' + compName + '」已從資料庫刪除！');
+  recalc();
+}
+
+function addFromLib(cat, compName) {
+  let colName = cat + '_library';
+  let item = compLib[colName].find(r => r.Component === compName);
+  if (item) { components[cat].push({...item}); recalc(); }
+}
+
+// =====================================================
 // INIT
 // =====================================================
 function init() {
-  const gp = DEFAULT_CONFIG.global_params;
+  let gp = DEFAULT_CONFIG.global_params;
   for (let k in gp) G[k] = gp[k];
   G.Slope = 0.03;
-
-  // Load components from config
-  components.rf = DEFAULT_CONFIG.rf_data.map(r => ({...r}));
-  components.digital = DEFAULT_CONFIG.digital_data.map(r => ({...r}));
-  components.pwr = DEFAULT_CONFIG.pwr_data.map(r => ({...r}));
-
-  // Set sidebar inputs
-  for (let k in gp) {
-    let el = document.getElementById(k);
-    if (el) {
-      if (el.tagName === 'SELECT') el.value = gp[k];
-      else el.value = gp[k];
-    }
-  }
-
-  document.getElementById('loading').style.display = 'none';
-
-  // SA variable change listener
-  document.getElementById('sa_var').addEventListener('change', updateSABase);
-  document.querySelectorAll('input[name="sa_mode"]').forEach(r => {
-    r.addEventListener('change', () => {
-      saMode = r.value;
-      document.getElementById('sa-sweep-panel').style.display = saMode==='sweep'?'':'none';
-      document.getElementById('sa-tornado-panel').style.display = saMode==='tornado'?'':'none';
-    });
-  });
-
+  components.rf = DEFAULT_CONFIG.rf_data.map(r=>({...r}));
+  components.digital = DEFAULT_CONFIG.digital_data.map(r=>({...r}));
+  components.pwr = DEFAULT_CONFIG.pwr_data.map(r=>({...r}));
+  for (let k in gp) { let el=document.getElementById(k); if(el){if(el.tagName==='SELECT')el.value=gp[k];else el.value=gp[k];} }
+  document.getElementById('loading').style.display='none';
   updateSABase();
   recalc();
+  initFirebase();
 }
 
 // =====================================================
 // SIDEBAR HELPERS
 // =====================================================
-function toggleSection(el) {
-  el.classList.toggle('collapsed');
-  el.nextElementSibling.classList.toggle('collapsed');
-}
+function toggleSection(el){el.classList.toggle('collapsed');el.nextElementSibling.classList.toggle('collapsed');}
+function toggleSAMode(){let m=document.querySelector('input[name="sa_mode"]:checked').value;document.getElementById('sa-sweep-panel').style.display=m==='sweep'?'':'none';document.getElementById('sa-tornado-panel').style.display=m==='tornado'?'':'none';}
 
-function readGlobals() {
-  const ids = ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter',
-    'Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t',
-    'K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2',
-    'K_Grease','t_Grease','K_Solder','t_Solder','Voiding',
-    'al_density','filter_density','shielding_density','pcb_surface_density'];
-  ids.forEach(id => {
-    let el = document.getElementById(id);
-    if (el && el.tagName !== 'SELECT') G[id] = parseFloat(el.value) || 0;
-  });
-  G.fin_tech_selector_v2 = document.getElementById('fin_tech_selector_v2').value;
-  G.Slope = 0.03;
+function readGlobals(){
+  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density'].forEach(id=>{let el=document.getElementById(id);if(el&&el.tagName!=='SELECT')G[id]=parseFloat(el.value)||0;});
+  G.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;G.Slope=0.03;
 }
 
 // =====================================================
-// CORE CALCULATION ENGINE
+// CORE CALCULATION ENGINE (exact port from Python)
 // =====================================================
-function calcHValue(gap) {
-  let h_conv = 6.4 * Math.tanh(gap / 7.0);
-  let rad_factor = gap >= 10.0 ? 1.0 : Math.sqrt(gap / 10.0);
-  let h_rad = 2.4 * rad_factor;
-  return { h_value: h_conv + h_rad, h_conv, h_rad };
+function calcHValue(gap){let hc=6.4*Math.tanh(gap/7.0);let rf=gap>=10?1:Math.sqrt(gap/10);let hr=2.4*rf;return{h_value:hc+hr,h_conv:hc,h_rad:hr};}
+function calcFinCount(W,gap,ft){if(gap+ft<=0)return 0;let n=Math.floor((W+gap)/(gap+ft));while(n>0&&(n*ft+(n-1)*gap)>W+0.001)n--;return Math.max(n,0);}
+
+function calcThermalResistance(row,g){
+  let bl,bw;
+  if(row.Component==="Final PA"){bl=g.Coin_L_Setting;bw=g.Coin_W_Setting;}
+  else if(row['Power(W)']===0||row['Thick(mm)']===0){bl=0;bw=0;}
+  else{bl=row.Pad_L+row['Thick(mm)'];bw=row.Pad_W+row['Thick(mm)'];}
+  let la=g.T_amb+row['Height(mm)']*g.Slope;
+  let kb=0;if(row.Board_Type==="Copper Coin")kb=380;else if(row.Board_Type==="Thermal Via")kb=g.K_Via;
+  let pa=(row.Pad_L*row.Pad_W)/1e6,ba=(bl*bw)/1e6;
+  let ri=0;
+  if(kb>0&&pa>0){let ea=ba>0?Math.sqrt(pa*ba):pa;let rv=(row['Thick(mm)']/1000)/(kb*ea);
+    if(row.Component==="Final PA")ri=rv+((g.t_Solder/1000)/(g.K_Solder*pa*g.Voiding));
+    else if(row.Board_Type==="Thermal Via")ri=rv/g.Via_Eff;else ri=rv;}
+  let tm={Solder:{k:g.K_Solder,t:g.t_Solder},Grease:{k:g.K_Grease,t:g.t_Grease},Pad:{k:g.K_Pad,t:g.t_Pad},Pad2:{k:g.K_Pad2,t:g.t_Pad2},Putty:{k:g.K_Putty,t:g.t_Putty},None:{k:1,t:0}};
+  let ti=tm[row.TIM_Type]||{k:1,t:0};let ta=ba>0?ba:pa;let rt=0;if(ta>0&&ti.t>0)rt=(ti.t/1000)/(ti.k*ta);
+  let tw=row.Qty*row['Power(W)'];let dr=row['Power(W)']*(row.R_jc+ri+rt);let adt=row['Limit(C)']-dr-la;
+  return{Base_L:bl,Base_W:bw,Loc_Amb:la,R_int:ri,R_TIM:rt,Total_W:tw,Drop:dr,Allowed_dT:adt};
 }
 
-function calcFinCount(W_hsk, gap, fin_t) {
-  if (gap + fin_t <= 0) return 0;
-  let n = Math.floor((W_hsk + gap) / (gap + fin_t));
-  while (n > 0 && (n * fin_t + (n - 1) * gap) > W_hsk + 0.001) n--;
-  return Math.max(n, 0);
-}
-
-function calcThermalResistance(row, g) {
-  let base_l, base_w;
-  if (row.Component === "Final PA") {
-    base_l = g.Coin_L_Setting; base_w = g.Coin_W_Setting;
-  } else if (row['Power(W)'] === 0 || row['Thick(mm)'] === 0) {
-    base_l = 0; base_w = 0;
-  } else {
-    base_l = row.Pad_L + row['Thick(mm)']; base_w = row.Pad_W + row['Thick(mm)'];
-  }
-
-  let loc_amb = g.T_amb + row['Height(mm)'] * g.Slope;
-
-  let k_board = 0;
-  if (row.Board_Type === "Copper Coin") k_board = 380;
-  else if (row.Board_Type === "Thermal Via") k_board = g.K_Via;
-
-  let pad_area = (row.Pad_L * row.Pad_W) / 1e6;
-  let base_area = (base_l * base_w) / 1e6;
-
-  let r_int = 0;
-  if (k_board > 0 && pad_area > 0) {
-    let eff_area = base_area > 0 ? Math.sqrt(pad_area * base_area) : pad_area;
-    let r_int_val = (row['Thick(mm)'] / 1000) / (k_board * eff_area);
-    if (row.Component === "Final PA") {
-      r_int = r_int_val + ((g.t_Solder / 1000) / (g.K_Solder * pad_area * g.Voiding));
-    } else if (row.Board_Type === "Thermal Via") {
-      r_int = r_int_val / g.Via_Eff;
-    } else {
-      r_int = r_int_val;
-    }
-  }
-
-  let tim_map = {
-    Solder: {k: g.K_Solder, t: g.t_Solder},
-    Grease: {k: g.K_Grease, t: g.t_Grease},
-    Pad: {k: g.K_Pad, t: g.t_Pad},
-    Pad2: {k: g.K_Pad2, t: g.t_Pad2},
-    Putty: {k: g.K_Putty, t: g.t_Putty},
-    None: {k: 1, t: 0}
-  };
-  let tim = tim_map[row.TIM_Type] || {k:1, t:0};
-  let target_area = base_area > 0 ? base_area : pad_area;
-  let r_tim = 0;
-  if (target_area > 0 && tim.t > 0) {
-    r_tim = (tim.t / 1000) / (tim.k * target_area);
-  }
-
-  let total_w = row.Qty * row['Power(W)'];
-  let drop = row['Power(W)'] * (row.R_jc + r_int + r_tim);
-  let allowed_dt = row['Limit(C)'] - drop - loc_amb;
-
-  return { Base_L: base_l, Base_W: base_w, Loc_Amb: loc_amb, R_int: r_int, R_TIM: r_tim, Total_W: total_w, Drop: drop, Allowed_dT: allowed_dt };
-}
-
-function computeAll(params, comps, Area_fixed_m2) {
-  let p = {...params};
-  let allComps = [];
-  ['rf','digital','pwr'].forEach(cat => {
-    (comps[cat]||[]).forEach(c => allComps.push({...c, _src: cat.toUpperCase()}));
-  });
-
-  if (allComps.length === 0) return { Total_Power:0, Min_dT_Allowed:50, Bottleneck_Name:"None", Area_req:0, Fin_Height:0, Volume_L:0, total_weight_kg:0, h_value:0, Bottleneck_Tj_Margin:0, Fin_Count:0, rows:[], drc_failed:false, drc_msg:"" };
-
-  // Thermal resistance for each component
-  let rows = allComps.map(c => {
-    let tr = calcThermalResistance(c, p);
-    return {...c, ...tr, Allowed_dT: Math.max(tr.Allowed_dT, 0)};
-  });
-
-  let valid = rows.filter(r => r.Total_W > 0);
-  let Total_Watts_Sum = valid.reduce((s,r) => s + r.Total_W, 0);
-  let Min_dT_Allowed = 50, Bottleneck_Name = "None", bt_idx = -1;
-  if (valid.length > 0) {
-    let minIdx = 0;
-    valid.forEach((r,i) => { if (r.Allowed_dT < valid[minIdx].Allowed_dT) minIdx = i; });
-    Min_dT_Allowed = valid[minIdx].Allowed_dT;
-    Bottleneck_Name = valid[minIdx].Component;
-    bt_idx = minIdx;
-  }
-
-  let {h_value, h_conv, h_rad} = calcHValue(p.Gap);
-  let L_hsk = p.L_pcb + p.Left + p.Right;
-  let W_hsk = p.W_pcb + p.Top + p.Btm;
-  let base_area_m2 = (L_hsk * W_hsk) / 1e6;
-  let num_fins = calcFinCount(W_hsk, p.Gap, p.Fin_t);
-  let eff = p.fin_tech_selector_v2.includes("Embedded") ? 0.95 : 0.90;
-  let Total_Power = Total_Watts_Sum * p.Margin;
-
-  let Area_req = 0, Fin_Height = 0;
-  if (Total_Power > 0 && Min_dT_Allowed > 0) {
-    Area_req = 1 / (h_value * (Min_dT_Allowed / Total_Power) * eff);
-    try { Fin_Height = ((Area_req - base_area_m2) * 1e6) / (2 * num_fins * L_hsk); } catch(e) { Fin_Height = 0; }
-  }
-
-  let RRU_Height = p.H_shield + p.H_filter + p.t_base + Fin_Height;
-  let Volume_L = L_hsk * W_hsk * RRU_Height / 1e6;
-
+function computeAll(params,comps,Area_fixed_m2){
+  let p={...params};let all=[];
+  ['rf','digital','pwr'].forEach(cat=>(comps[cat]||[]).forEach(c=>all.push({...c,_src:cat.toUpperCase()})));
+  if(!all.length)return{Total_Power:0,Min_dT_Allowed:50,Bottleneck_Name:"None",Area_req:0,Fin_Height:0,Volume_L:0,total_weight_kg:0,h_value:0,Bottleneck_Tj_Margin:0,Fin_Count:0,rows:[],drc_failed:false,drc_msg:"",L_hsk:0,W_hsk:0,RRU_Height:0,aspect_ratio:0};
+  let rows=all.map(c=>{let tr=calcThermalResistance(c,p);return{...c,...tr,Allowed_dT:Math.max(tr.Allowed_dT,0)};});
+  let valid=rows.filter(r=>r.Total_W>0);let TWS=valid.reduce((s,r)=>s+r.Total_W,0);
+  let MDA=50,BN="None",bti=-1;
+  if(valid.length){let mi=0;valid.forEach((r,i)=>{if(r.Allowed_dT<valid[mi].Allowed_dT)mi=i;});MDA=valid[mi].Allowed_dT;BN=valid[mi].Component;bti=mi;}
+  let{h_value,h_conv,h_rad}=calcHValue(p.Gap);
+  let LH=p.L_pcb+p.Left+p.Right,WH=p.W_pcb+p.Top+p.Btm,bam2=(LH*WH)/1e6;
+  let nf=calcFinCount(WH,p.Gap,p.Fin_t);let eff=p.fin_tech_selector_v2.includes("Embedded")?0.95:0.90;
+  let TP=TWS*p.Margin,AR=0,FH=0;
+  if(TP>0&&MDA>0){AR=1/(h_value*(MDA/TP)*eff);try{FH=((AR-bam2)*1e6)/(2*nf*LH);}catch(e){FH=0;}}
+  let RH=p.H_shield+p.H_filter+p.t_base+FH,VL=LH*WH*RH/1e6;
   // Weight
-  let base_vol = L_hsk * W_hsk * p.t_base / 1000;
-  let fins_vol = num_fins * p.Fin_t * Fin_Height * L_hsk / 1000;
-  let hs_weight = (base_vol + fins_vol) * p.al_density / 1000;
-  let shield_vol = Math.max(L_hsk*W_hsk*p.H_shield/1000 - p.L_pcb*p.W_pcb*p.H_shield/1000, 0);
-  let shield_weight = shield_vol * p.al_density / 1000;
-  let filter_weight = L_hsk*W_hsk*p.H_filter/1000 * p.filter_density / 1000;
-  let shielding_weight = (p.L_pcb*p.W_pcb/100)*1.2 * p.shielding_density / 1000;
-  let pcb_weight = (p.L_pcb*p.W_pcb/100) * p.pcb_surface_density / 1000;
-  let total_weight = hs_weight + shield_weight + filter_weight + shielding_weight + pcb_weight;
-
-  // Tc/Tj/Margin
-  let T_hsk_base;
-  if (Area_fixed_m2 && Area_fixed_m2 > 0) {
-    T_hsk_base = p.T_amb + Total_Power / (h_value * Area_fixed_m2 * eff);
-  } else {
-    T_hsk_base = p.T_amb + Min_dT_Allowed / p.Margin;
-  }
-
-  rows.forEach(r => {
-    r.T_hsk_eff = T_hsk_base + r['Height(mm)'] * p.Slope;
-    r.Tc = r.T_hsk_eff + r['Power(W)'] * (r.R_int + r.R_TIM);
-    r.Tj = r.Tc + r['Power(W)'] * r.R_jc;
-    let isTcLimited = r._src === 'PWR' || (r.Component||'').toLowerCase().includes('ddr');
-    r.T_ref = isTcLimited ? r.Tc : r.Tj;
-    r.Temp_Label = isTcLimited ? 'Tc' : 'Tj';
-    r.Tj_Margin = r['Limit(C)'] - r.T_ref;
-  });
-
-  let Bottleneck_Tj_Margin = 0;
-  if (valid.length > 0 && bt_idx >= 0) {
-    // Find the same component in rows
-    let btRow = rows.find(r => r.Component === Bottleneck_Name && r.Total_W > 0);
-    if (btRow) Bottleneck_Tj_Margin = Math.round(btRow.Tj_Margin * 10) / 10;
-  }
-
+  let bv=LH*WH*p.t_base/1000,fv=nf*p.Fin_t*FH*LH/1000,hw=(bv+fv)*p.al_density/1000;
+  let sv=Math.max(LH*WH*p.H_shield/1000-p.L_pcb*p.W_pcb*p.H_shield/1000,0),sw=sv*p.al_density/1000;
+  let fw=LH*WH*p.H_filter/1000*p.filter_density/1000;
+  let shw=(p.L_pcb*p.W_pcb/100)*1.2*p.shielding_density/1000;
+  let pw=(p.L_pcb*p.W_pcb/100)*p.pcb_surface_density/1000;
+  let tw=hw+sw+fw+shw+pw;
+  // Tc/Tj
+  let THB;if(Area_fixed_m2&&Area_fixed_m2>0)THB=p.T_amb+TP/(h_value*Area_fixed_m2*eff);else THB=p.T_amb+MDA/p.Margin;
+  rows.forEach(r=>{r.T_hsk_eff=THB+r['Height(mm)']*p.Slope;r.Tc=r.T_hsk_eff+r['Power(W)']*(r.R_int+r.R_TIM);r.Tj=r.Tc+r['Power(W)']*r.R_jc;let isTc=r._src==='PWR'||(r.Component||'').toLowerCase().includes('ddr');r.T_ref=isTc?r.Tc:r.Tj;r.Temp_Label=isTc?'Tc':'Tj';r.Tj_Margin=r['Limit(C)']-r.T_ref;});
+  let BTM=0;if(valid.length&&bti>=0){let br=rows.find(r=>r.Component===BN&&r.Total_W>0);if(br)BTM=Math.round(br.Tj_Margin*10)/10;}
   // DRC
-  let drc_failed = false, drc_msg = "", drc_warn = "";
-  let aspect_ratio = (p.Gap > 0 && Fin_Height > 0) ? Fin_Height / p.Gap : 0;
-  if (aspect_ratio > 12) { drc_failed = true; drc_msg = "Choked Flow: AR=" + aspect_ratio.toFixed(1) + " > 12"; }
-  else if (h_conv < 4) { drc_failed = true; drc_msg = "Poor Convection: h_conv=" + h_conv.toFixed(2) + " < 4.0"; }
-  else if (p.Gap < 4) { drc_failed = true; drc_msg = "Gap too small: " + p.Gap + "mm < 4mm"; }
-  else if (p.fin_tech_selector_v2.includes("Embedded") && Fin_Height > 100) { drc_failed = true; drc_msg = "Embedded Fin process limit: " + Fin_Height.toFixed(1) + "mm > 100mm"; }
-
-  return {
-    Total_Power, Min_dT_Allowed, Bottleneck_Name, Area_req, Fin_Height, Volume_L: Volume_L,
-    total_weight_kg: total_weight, h_value, h_conv, h_rad,
-    Bottleneck_Tj_Margin, Fin_Count: num_fins, rows,
-    L_hsk, W_hsk, RRU_Height, aspect_ratio,
-    drc_failed, drc_msg, drc_warn,
-    hs_weight_kg: hs_weight, shield_weight_kg: shield_weight,
-    filter_weight_kg: filter_weight, shielding_weight_kg: shielding_weight, pcb_weight_kg: pcb_weight,
-    eff, T_hsk_base
-  };
+  let drc=false,dm="",dw="";let ar=(p.Gap>0&&FH>0)?FH/p.Gap:0;
+  if(ar>12){drc=true;dm="⛔ 設計無效 (Choked Flow)：流阻比 "+ar.toFixed(1)+" > 12";}
+  else if(h_conv<4){drc=true;dm="⛔ 設計無效：h_conv="+h_conv.toFixed(2)+" < 4.0，Gap 過小";}
+  else if(p.Gap<4){drc=true;dm="⛔ 鰭片間距 "+p.Gap+"mm < 4mm 物理極限";}
+  else if(p.fin_tech_selector_v2.includes("Embedded")&&FH>100){drc=true;dm="⛔ Embedded Fin 製程限制："+FH.toFixed(1)+"mm > 100mm";}
+  return{Total_Power:TP,Min_dT_Allowed:MDA,Bottleneck_Name:BN,Area_req:AR,Fin_Height:FH,Volume_L:VL,total_weight_kg:tw,h_value,h_conv,h_rad,Bottleneck_Tj_Margin:BTM,Fin_Count:nf,rows,L_hsk:LH,W_hsk:WH,RRU_Height:RH,aspect_ratio:ar,drc_failed:drc,drc_msg:dm,drc_warn:dw,hs_weight_kg:hw,shield_weight_kg:sw,filter_weight_kg:fw,shielding_weight_kg:shw,pcb_weight_kg:pw,eff,T_hsk_base:THB};
 }
 
 // =====================================================
 // MAIN RECALC
 // =====================================================
-function recalc() {
-  readGlobals();
-  calcResults = computeAll(G, components, null);
-  updateHDisplay();
-  renderTab0();
-  renderTab1();
-  renderTab2();
-  renderTab3();
-  updateSABase();
-}
+function recalc(){readGlobals();calcResults=computeAll(G,components,null);updateHDisplay();renderTab0();renderTab1();renderTab2();renderTab3();updateSABase();}
 
-function updateHDisplay() {
-  let {h_value, h_conv, h_rad} = calcHValue(G.Gap);
-  let el = document.getElementById('h-val');
-  el.textContent = 'h = ' + h_value.toFixed(2);
-  el.style.color = h_conv < 4 ? '#ef4444' : '#60a5fa';
-  document.getElementById('h-sub').textContent = 'h_conv: ' + h_conv.toFixed(2) + ' + h_rad: ' + h_rad.toFixed(2);
-
-  let ar = calcResults ? calcResults.aspect_ratio : 0;
-  let arEl = document.getElementById('ar-val');
-  if (ar > 0) {
-    arEl.textContent = ar.toFixed(1);
-    arEl.style.color = ar > 12 ? '#ef4444' : (ar >= 4.5 && ar <= 6.5) ? '#00b894' : '#f39c12';
-  } else {
-    arEl.textContent = '--';
-  }
+function updateHDisplay(){
+  let{h_value,h_conv,h_rad}=calcHValue(G.Gap);let el=document.getElementById('h-val');
+  el.textContent='🔥 自動計算 h: '+h_value.toFixed(2);el.style.color=h_conv<4?'#ef4444':'#60a5fa';
+  document.getElementById('h-sub').textContent='h_conv: '+h_conv.toFixed(2)+' + h_rad: '+h_rad.toFixed(2);
+  let ar=calcResults?calcResults.aspect_ratio:0;let arEl=document.getElementById('ar-val');let arMsg=document.getElementById('ar-msg');
+  if(ar>0){arEl.textContent=ar.toFixed(1);
+    if(ar>12){arEl.style.color='#e74c3c';arMsg.textContent='⛔ 過高 (High)';arMsg.style.color='#e74c3c';}
+    else if(ar>=4.5&&ar<=6.5){arEl.style.color='#00b894';arMsg.textContent='✅ 良好 (Good)';arMsg.style.color='#00b894';}
+    else{arEl.style.color='#f39c12';arMsg.textContent='⚠️ 不佳 (Poor)';arMsg.style.color='#f39c12';}
+  } else {arEl.textContent='--';arMsg.textContent='等待計算...';}
 }
 
 // =====================================================
 // TAB SWITCHING
 // =====================================================
-function switchTab(idx) {
-  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i===idx));
-  document.querySelectorAll('.tab-content').forEach((c,i) => c.classList.toggle('active', i===idx));
-  if (idx === 3) setTimeout(() => renderTab3(), 50);
-}
-
-function switchSubTab(idx) {
-  document.querySelectorAll('.sub-tab-btn').forEach((b,i) => b.classList.toggle('active', i===idx));
-  document.querySelectorAll('.sub-content').forEach((c,i) => c.classList.toggle('active', i===idx));
-}
+function switchTab(i){document.querySelectorAll('.tab-btn').forEach((b,j)=>b.classList.toggle('active',j===i));document.querySelectorAll('.tab-content').forEach((c,j)=>c.classList.toggle('active',j===i));if(i===3)setTimeout(()=>renderTab3(),50);setTimeout(function(){var tab=document.getElementById('tab'+i);if(tab){tab.querySelectorAll('.js-plotly-plot').forEach(function(gd){Plotly.Plots.resize(gd);});}},80);}
+function switchSubTab(i){document.querySelectorAll('.sub-tab-btn').forEach((b,j)=>b.classList.toggle('active',j===i));document.querySelectorAll('.sub-content').forEach((c,j)=>c.classList.toggle('active',j===i));}
 
 // =====================================================
-// TAB 0: COMPONENT TABLES
+// TAB 0: COMPONENT TABLES + FIREBASE LIBRARY
 // =====================================================
-function renderCompTable(arr, containerId, defaults, category) {
-  let html = '<table class="comp-table"><thead><tr>';
-  COLS.forEach(c => html += '<th>' + c + '</th>');
-  html += '<th>Actions</th></tr></thead><tbody>';
+function renderCompTable(arr,containerId,defaults,category){
+  let libName=category+'_library';let lib=compLib[libName]||[];
+  // Library quick-select section
+  let lhtml='<div class="lib-section">';
+  if(lib.length){
+    lhtml+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span style="font-weight:600;">📚 從 '+category.toUpperCase()+' 資料庫快選：</span>';
+    lhtml+='<select id="lib_sel_'+category+'"><option value="">（請選擇）</option>';
+    lib.forEach(item=>lhtml+='<option value="'+item.Component+'">'+item.Component+' ('+item['Power(W)']+'W)</option>');
+    lhtml+='</select>';
+    lhtml+='<button class="btn btn-sm btn-primary" onclick="let v=document.getElementById(\'lib_sel_'+category+'\').value;if(v)addFromLib(\''+category+'\',v);">➕ 新增</button>';
+    lhtml+='<button class="btn btn-sm btn-danger" onclick="let v=document.getElementById(\'lib_sel_'+category+'\').value;if(v)deleteFromLib(\''+category+'\',v);">🗑️ 刪除</button>';
+    lhtml+='</div>';
+  } else { lhtml+='<span style="color:#888;">📚 '+category.toUpperCase()+' 資料庫目前為空，請先在下方表格建立元件後存入。</span>'; }
+  lhtml+='</div>';
 
-  arr.forEach((row, i) => {
-    html += '<tr>';
-    COLS.forEach(col => {
-      if (col === 'Board_Type') {
-        html += '<td><select onchange="updateComp(\'' + category + '\',' + i + ',\'' + col + '\',this.value)">';
-        BOARD_TYPES.forEach(o => html += '<option' + (row[col]===o?' selected':'') + '>' + o + '</option>');
-        html += '</select></td>';
-      } else if (col === 'TIM_Type') {
-        html += '<td><select onchange="updateComp(\'' + category + '\',' + i + ',\'' + col + '\',this.value)">';
-        TIM_TYPES.forEach(o => html += '<option' + (row[col]===o?' selected':'') + '>' + o + '</option>');
-        html += '</select></td>';
-      } else if (col === 'Component') {
-        html += '<td><input type="text" value="' + (row[col]||'') + '" onchange="updateComp(\'' + category + '\',' + i + ',\'' + col + '\',this.value)"></td>';
-      } else {
-        html += '<td><input type="number" value="' + (row[col]||0) + '" step="any" onchange="updateComp(\'' + category + '\',' + i + ',\'' + col + '\',parseFloat(this.value)||0)"></td>';
-      }
+  // Power summary
+  let pw=arr.reduce((s,r)=>s+r['Power(W)']*r.Qty,0);
+  lhtml+='<p style="color:#666;font-size:0.85rem;margin-bottom:8px;">📊 '+category.toUpperCase()+' 類總功耗：<b>'+pw.toFixed(1)+' W</b> | 共 <b>'+arr.length+'</b> 種元件</p>';
+
+  // Table
+  lhtml+='<table class="comp-table"><thead><tr>';
+  COLS.forEach(c=>lhtml+='<th title="'+COL_TIPS[c]+'">'+COL_LABELS[c]+'</th>');
+  lhtml+='<th>操作</th></tr></thead><tbody>';
+  arr.forEach((row,i)=>{
+    lhtml+='<tr>';
+    COLS.forEach(col=>{
+      if(col==='Board_Type'){lhtml+='<td><select style="min-width:110px;" onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">';BOARD_TYPES.forEach(o=>lhtml+='<option'+(row[col]===o?' selected':'')+'>'+o+'</option>');lhtml+='</select></td>';}
+      else if(col==='TIM_Type'){lhtml+='<td><select style="min-width:110px;" onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">';TIM_TYPES.forEach(o=>lhtml+='<option'+(row[col]===o?' selected':'')+'>'+o+'</option>');lhtml+='</select></td>';}
+      else if(col==='Component'){lhtml+='<td><input type="text" value="'+(row[col]||'')+'" onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)"></td>';}
+      else{lhtml+='<td><input type="number" value="'+(row[col]||0)+'" step="any" onchange="updateComp(\''+category+'\','+i+',\''+col+'\',parseFloat(this.value)||0)"></td>';}
     });
-    html += '<td><button class="btn btn-sm btn-danger" onclick="removeComp(\'' + category + '\',' + i + ')">Del</button> ';
-    html += '<button class="btn btn-sm btn-primary" onclick="copyComp(\'' + category + '\',' + i + ')">Copy</button></td>';
-    html += '</tr>';
+    lhtml+='<td style="white-space:nowrap;">';
+    lhtml+='<button class="btn btn-sm btn-danger" onclick="removeComp(\''+category+'\','+i+')">🗑️</button> ';
+    lhtml+='<button class="btn btn-sm btn-primary" onclick="copyComp(\''+category+'\','+i+')">📋</button> ';
+    lhtml+='<button class="btn btn-sm btn-success" onclick="saveCompToLib(\''+category+'\','+i+')">💾</button>';
+    lhtml+='</td></tr>';
   });
-  html += '</tbody></table>';
-
-  let pw = arr.reduce((s,r) => s + r['Power(W)'] * r.Qty, 0);
-  html = '<p style="color:#666;font-size:0.85rem;margin-bottom:8px;">Total Power: <b>' + pw.toFixed(1) + ' W</b> | ' + arr.length + ' components</p>' + html;
-  html += '<button class="btn btn-success" style="margin-top:8px;" onclick="addComp(\'' + category + '\')">+ Add Component</button>';
-
-  document.getElementById(containerId).innerHTML = html;
+  lhtml+='</tbody></table>';
+  lhtml+='<button class="btn btn-success" style="margin-top:8px;" onclick="addComp(\''+category+'\')">➕ 新增元件</button>';
+  document.getElementById(containerId).innerHTML=lhtml;
 }
 
-function renderTab0() {
-  renderCompTable(components.rf, 'subtab0', RF_DEFAULT, 'rf');
-  renderCompTable(components.digital, 'subtab1', DIG_DEFAULT, 'digital');
-  renderCompTable(components.pwr, 'subtab2', PWR_DEFAULT, 'pwr');
-
-  let rfP = components.rf.reduce((s,r) => s + r['Power(W)']*r.Qty, 0);
-  let digP = components.digital.reduce((s,r) => s + r['Power(W)']*r.Qty, 0);
-  let pwrP = components.pwr.reduce((s,r) => s + r['Power(W)']*r.Qty, 0);
-  let total = rfP + digP + pwrP;
-  document.getElementById('power-summary').innerHTML = 'Total System Power (before Margin): <b>' + total.toFixed(1) + ' W</b> | RF: ' + rfP.toFixed(1) + 'W, Digital: ' + digP.toFixed(1) + 'W, PWR: ' + pwrP.toFixed(1) + 'W';
+function renderTab0(){
+  renderCompTable(components.rf,'subtab0',RF_DEFAULT,'rf');
+  renderCompTable(components.digital,'subtab1',DIG_DEFAULT,'digital');
+  renderCompTable(components.pwr,'subtab2',PWR_DEFAULT,'pwr');
+  let rfP=components.rf.reduce((s,r)=>s+r['Power(W)']*r.Qty,0);
+  let digP=components.digital.reduce((s,r)=>s+r['Power(W)']*r.Qty,0);
+  let pwrP=components.pwr.reduce((s,r)=>s+r['Power(W)']*r.Qty,0);
+  document.getElementById('power-summary').innerHTML='⚡ 整機總功耗（未含 Margin）：<b>'+( rfP+digP+pwrP).toFixed(1)+' W</b> | RF：'+rfP.toFixed(1)+'W　Digital：'+digP.toFixed(1)+'W　Power：'+pwrP.toFixed(1)+'W';
 }
 
-function updateComp(cat, idx, col, val) {
-  components[cat][idx][col] = val;
-  recalc();
-}
-function removeComp(cat, idx) {
-  components[cat].splice(idx, 1);
-  recalc();
-}
-function copyComp(cat, idx) {
-  components[cat].push({...components[cat][idx]});
-  recalc();
-}
-function addComp(cat) {
-  let d = cat==='rf'?RF_DEFAULT:cat==='digital'?DIG_DEFAULT:PWR_DEFAULT;
-  components[cat].push({...d});
-  recalc();
-}
+function updateComp(cat,i,col,val){components[cat][i][col]=val;recalc();}
+function removeComp(cat,i){components[cat].splice(i,1);recalc();}
+function copyComp(cat,i){components[cat].push({...components[cat][i]});recalc();}
+function addComp(cat){let d=cat==='rf'?RF_DEFAULT:cat==='digital'?DIG_DEFAULT:PWR_DEFAULT;components[cat].push({...d});recalc();}
+function saveCompToLib(cat,i){let row={};COLS.forEach(c=>row[c]=components[cat][i][c]);saveToLib(cat,row);}
 
 // =====================================================
 // TAB 1: DETAILED ANALYSIS
 // =====================================================
-function renderTab1() {
-  if (!calcResults || !calcResults.rows.length) return;
-  let R = calcResults;
-  let html = '';
-
+function renderTab1(){
+  if(!calcResults||!calcResults.rows.length)return;let R=calcResults;
   // Overheat alerts
-  let overheat = R.rows.filter(r => r.Tj_Margin < 0 && r.Total_W > 0);
-  if (overheat.length) {
-    html += '<div class="alert alert-danger"><b>OVERHEAT WARNING!</b><br>';
-    overheat.forEach(r => html += '<b>' + r.Component + '</b> over by ' + Math.abs(r.Tj_Margin).toFixed(1) + 'deg C (Tj=' + r.Tj.toFixed(1) + ', Limit=' + r['Limit(C)'] + ')<br>');
-    html += '</div>';
-  }
-  document.getElementById('tab1-alerts').innerHTML = html;
-
+  let oh=R.rows.filter(r=>r.Tj_Margin<0&&r.Total_W>0);let html='';
+  if(oh.length){html+='<div class="alert alert-danger">🔥 <b>超溫警告！以下元件已超過溫度上限：</b><br>';oh.forEach(r=>html+='<b>'+r.Component+'</b> 超溫 <b>'+Math.abs(r.Tj_Margin).toFixed(1)+'°C</b> (Tj='+r.Tj.toFixed(1)+'°C, Limit='+r['Limit(C)']+'°C)<br>');html+='</div>';}
+  document.getElementById('tab1-alerts').innerHTML=html;
   // Risk Top 3
-  let valid = R.rows.filter(r => r.Total_W > 0).sort((a,b) => a.Allowed_dT - b.Allowed_dT).slice(0,3);
-  let rhtml = '<div class="risk-row">';
-  let emojis = ['1st','2nd','3rd'];
-  valid.forEach((r,i) => {
-    rhtml += '<div class="risk-card"><div class="rank">Risk #' + (i+1) + ' ' + r.Component + '</div>';
-    rhtml += '<div class="rval">' + r.Allowed_dT.toFixed(1) + ' deg C</div>';
-    rhtml += '<div class="rdelta">Tj_Margin: ' + r.Tj_Margin.toFixed(1) + ' deg C</div></div>';
-  });
-  rhtml += '</div>';
-  document.getElementById('tab1-risk').innerHTML = rhtml;
-
+  let valid=R.rows.filter(r=>r.Total_W>0).sort((a,b)=>a.Allowed_dT-b.Allowed_dT).slice(0,3);
+  let rh='<div class="risk-row">';let emj=['🥇','🥈','🥉'];
+  valid.forEach((r,i)=>{rh+='<div class="risk-card"><div class="rank">'+emj[i]+' 風險 #'+(i+1)+' '+r.Component+'</div><div class="rval">'+r.Allowed_dT.toFixed(1)+' °C</div><div class="rdelta">Tj_Margin: '+r.Tj_Margin.toFixed(1)+'°C</div></div>';});
+  rh+='</div>';document.getElementById('tab1-risk').innerHTML=rh;
   // Scale bar
-  let minV = Math.min(...R.rows.map(r=>r.Allowed_dT));
-  let maxV = Math.max(...R.rows.map(r=>r.Allowed_dT));
-  let midV = (minV+maxV)/2;
-  document.getElementById('tab1-scale').innerHTML = '<div style="font-weight:bold;margin-bottom:5px;color:#555;font-size:0.85rem;">Allowed dT Color Scale</div><div class="bar"></div><div class="labels"><span>'+minV.toFixed(0)+'deg C (Risk)</span><span>'+midV.toFixed(0)+'deg C</span><span>'+maxV.toFixed(0)+'deg C (Safe)</span></div>';
-
-  // Table
-  let cols = ['Component','Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','Drop','R_jc','R_int','R_TIM','Limit(C)'];
-  let thtml = '<table class="comp-table"><thead><tr>';
-  cols.forEach(c => thtml += '<th>' + c + '</th>');
-  thtml += '</tr></thead><tbody>';
-  R.rows.forEach(r => {
-    thtml += '<tr>';
-    cols.forEach(c => {
-      let v = r[c];
-      let style = '';
-      if (c === 'Allowed_dT' || c === 'Tj_Margin') {
-        let ratio = maxV > minV ? (v - minV) / (maxV - minV) : 0.5;
-        let red = Math.round(255 * (1 - ratio));
-        let green = Math.round(255 * ratio);
-        style = 'background:rgba(' + red + ',' + green + ',50,0.2);';
-      }
-      if (typeof v === 'number') v = c.includes('R_') ? v.toFixed(4) : v.toFixed(1);
-      thtml += '<td style="' + style + '">' + v + '</td>';
-    });
-    thtml += '</tr>';
-  });
-  thtml += '</tbody></table>';
-  document.getElementById('tab1-table').innerHTML = thtml;
+  let mn=Math.min(...R.rows.map(r=>r.Allowed_dT)),mx=Math.max(...R.rows.map(r=>r.Allowed_dT)),md=(mn+mx)/2;
+  document.getElementById('tab1-scale').innerHTML='<div style="font-weight:bold;margin-bottom:5px;color:#555;font-size:0.85rem;">允許溫升 (Allowed dT) 色階參考</div><div class="bar"></div><div class="labels"><span>'+mn.toFixed(0)+'°C (Risk)</span><span>'+md.toFixed(0)+'°C</span><span>'+mx.toFixed(0)+'°C (Safe)</span></div>';
+  // Column toggle
+  let ctHtml='<div class="col-toggle"><div style="font-weight:600;font-size:0.85rem;color:#475569;margin-bottom:8px;">⚙️ 自訂顯示欄位</div><div class="col-checks">';
+  ALL_TAB1_COLS.forEach(c=>{let lb=TAB2_LABELS[c]||c;let ck=tab1SelectedCols.includes(c)?'checked':'';ctHtml+='<label><input type="checkbox" '+ck+' onchange="toggleTab1Col(\''+c+'\',this.checked)"> '+lb+' ('+c+')</label>';});
+  ctHtml+='</div></div>';document.getElementById('tab1-col-toggle').innerHTML=ctHtml;
+  // Table with tooltips
+  let cols=['Component'].concat(tab1SelectedCols.filter(c=>ALL_TAB1_COLS.includes(c)));
+  let th='<table class="comp-table"><thead><tr>';
+  cols.forEach(c=>{let lb=TAB2_LABELS[c]||c;let tp=TAB2_TIPS[c]||'';th+='<th title="'+tp+'">'+lb+'</th>';});
+  th+='</tr></thead><tbody>';
+  R.rows.forEach(r=>{th+='<tr>';cols.forEach(c=>{let v=r[c];let st='';
+    if(c==='Allowed_dT'||c==='Tj_Margin'){let ratio=mx>mn?(v-mn)/(mx-mn):0.5;let rd=Math.round(215*(1-ratio)+40),gr=Math.round(215*ratio+40);st='background:rgba('+rd+','+gr+',50,0.15);';}
+    if(typeof v==='number')v=(c.includes('R_')&&c!=='R_jc')?v.toFixed(4):v.toFixed(1);th+='<td style="'+st+'">'+v+'</td>';});th+='</tr>';});
+  th+='</tbody></table>';document.getElementById('tab1-table').innerHTML=th;
 }
 
 // =====================================================
 // TAB 2: VISUAL REPORT
 // =====================================================
-function renderTab2() {
-  if (!calcResults) return;
-  let R = calcResults;
+function kpiCard(t,v,d,c){return'<div class="kpi-card" style="border-left-color:'+c+';"><div class="title">'+t+'</div><div class="value">'+v+'</div><div class="desc">'+d+'</div></div>';}
 
-  // KPI cards
-  let khtml = '';
-  khtml += kpiCard('Total Power', R.Total_Power.toFixed(2) + ' W', 'Total Power (with Margin)', '#e74c3c');
-  khtml += kpiCard('Bottleneck', R.Bottleneck_Name, 'Margin: ' + R.Bottleneck_Tj_Margin + 'deg C', '#f39c12');
-  khtml += kpiCard('Required Area', R.Area_req.toFixed(3) + ' m2', 'Required Area', '#3498db');
-  khtml += kpiCard('Fin Count', R.Fin_Count + ' Pcs', 'Fin Count', '#9b59b6');
-  document.getElementById('tab2-kpi').innerHTML = khtml;
-
-  // Charts
-  let valid = R.rows.filter(r => r.Total_W > 0);
-  if (valid.length > 0) {
-    let chartsDiv = document.getElementById('tab2-charts');
-    chartsDiv.innerHTML = '<div id="chart-margin" style="width:100%;"></div><div style="display:flex;gap:15px;margin-top:15px;"><div id="chart-power" style="flex:1;"></div><div id="chart-tjm" style="flex:1;"></div></div>';
-
-    // Margin overview
-    let sorted = [...valid].sort((a,b) => b.Tj_Margin - a.Tj_Margin);
-    let colors = sorted.map(r => r.Tj_Margin < 0 ? '#e74c3c' : r.Tj_Margin < 10 ? '#f39c12' : r.Tj_Margin < 20 ? '#f1c40f' : '#2ecc71');
-    Plotly.newPlot('chart-margin', [
-      {y: sorted.map(r=>r.Component), x: sorted.map(r=>r['Limit(C)']), type:'bar', orientation:'h', marker:{color:'#E8E8E8'}, name:'Limit'},
-      {y: sorted.map(r=>r.Component), x: sorted.map(r=>r.T_ref), type:'bar', orientation:'h', marker:{color:colors}, name:'T_ref',
-       text: sorted.map(r=>r.Temp_Label+': '+r.T_ref.toFixed(1)+'deg C (Margin: '+r.Tj_Margin.toFixed(1)+'deg C)'), textposition:'outside'}
-    ], {barmode:'overlay', title:'<b>Temperature Margin Overview</b>', showlegend:false, height:Math.max(300,sorted.length*50+100), margin:{l:10,r:200,t:60,b:40}, yaxis:{automargin:true}});
-
-    // Power breakdown
-    let pSorted = [...valid].sort((a,b) => a.Total_W - b.Total_W);
-    Plotly.newPlot('chart-power', [
-      {y:pSorted.map(r=>r.Component), x:pSorted.map(r=>r.Total_W), type:'bar', orientation:'h', marker:{colorscale:'Oranges',color:pSorted.map(r=>r.Total_W),showscale:false}, text:pSorted.map(r=>r.Total_W.toFixed(1)+' W'), textposition:'outside'}
-    ], {title:'<b>Power Breakdown</b>', showlegend:false, margin:{l:10,r:80,t:60,b:40}, yaxis:{automargin:true}});
-
-    // Tj Margin bar
-    let mSorted = [...valid].sort((a,b) => a.Tj_Margin - b.Tj_Margin);
-    Plotly.newPlot('chart-tjm', [
-      {x:mSorted.map(r=>r.Component), y:mSorted.map(r=>r.Tj_Margin), type:'bar', marker:{colorscale:'RdYlGn',color:mSorted.map(r=>r.Tj_Margin),showscale:false}}
-    ], {title:'<b>Temperature Margin</b>', yaxis:{title:'Margin (deg C)'}});
+var fullscreenBtn={name:'fullscreen',title:'全螢幕',icon:{width:24,height:24,path:'M5 5h5V3H3v7h2V5zm14 0h-5V3h7v7h-2V5zM5 19h5v2H3v-7h2v5zm14 0h-5v2h7v-7h-2v5z'},click:function(gd){if(!document.fullscreenElement){var el=gd.closest('.js-plotly-plot')||gd;var origData=JSON.parse(JSON.stringify(gd.data));var origLayout=JSON.parse(JSON.stringify(gd.layout));delete origLayout.width;delete origLayout.height;var origConfig={responsive:true,displaylogo:false,modeBarButtonsToAdd:['toggleSpikelines',fullscreenBtn],displayModeBar:true};var parent=el.parentNode;var elRect=el.getBoundingClientRect();var placeholder=document.createElement('div');placeholder.id='_fs_placeholder';placeholder.style.cssText='flex:1;min-width:'+elRect.width+'px;min-height:'+elRect.height+'px;';parent.insertBefore(placeholder,el);var wrapper=document.createElement('div');wrapper.id='_fs_wrapper';wrapper.style.cssText='background:#fff;width:100%;height:100%;';wrapper.appendChild(el);document.body.appendChild(wrapper);wrapper.requestFullscreen().then(function(){Plotly.relayout(gd,{width:window.screen.width,height:window.screen.height});});var onExit=function(){if(!document.fullscreenElement){document.removeEventListener('fullscreenchange',onExit);var ph=document.getElementById('_fs_placeholder');if(ph){ph.parentNode.insertBefore(el,ph);ph.remove();}var wr=document.getElementById('_fs_wrapper');if(wr)wr.remove();Plotly.purge(gd);Plotly.newPlot(gd,origData,origLayout,origConfig).then(function(){var flexParent=el.parentNode;if(flexParent){flexParent.querySelectorAll('.js-plotly-plot').forEach(function(sib){if(sib!==el)Plotly.Plots.resize(sib);});}});}};document.addEventListener('fullscreenchange',onExit);}else{document.exitFullscreen();}}};
+function renderTab2(){
+  if(!calcResults)return;let R=calcResults;
+  document.getElementById('tab2-kpi').innerHTML=kpiCard('整機總熱耗',R.Total_Power.toFixed(2)+' W','Total Power','#e74c3c')+kpiCard('系統瓶頸元件',R.Bottleneck_Name,'Margin: '+R.Bottleneck_Tj_Margin+'°C','#f39c12')+kpiCard('所需散熱面積',R.Area_req.toFixed(3)+' m²','Required Area','#3498db')+kpiCard('預估鰭片數量',R.Fin_Count+' Pcs','Fin Count','#9b59b6');
+  let valid=R.rows.filter(r=>r.Total_W>0);
+  let pCfg={responsive:true,displaylogo:false,modeBarButtonsToAdd:['toggleSpikelines',fullscreenBtn],displayModeBar:true};
+  if(valid.length){
+    let cd=document.getElementById('tab2-charts');cd.innerHTML='<div id="chart-margin" style="width:100%;"></div><div style="display:flex;gap:15px;margin-top:15px;"><div id="chart-power" style="flex:1;"></div><div id="chart-tjm" style="flex:1;"></div></div>';
+    let sorted=[...valid].sort((a,b)=>b.Tj_Margin-a.Tj_Margin);let colors=sorted.map(r=>r.Tj_Margin<0?'#e74c3c':r.Tj_Margin<10?'#f39c12':r.Tj_Margin<20?'#f1c40f':'#2ecc71');
+    Plotly.newPlot('chart-margin',[{y:sorted.map(r=>r.Component),x:sorted.map(r=>r['Limit(C)']),type:'bar',orientation:'h',marker:{color:'#E8E8E8'},name:'Limit',hovertemplate:'Limit: %{x}°C<extra></extra>'},{y:sorted.map(r=>r.Component),x:sorted.map(r=>r.T_ref),type:'bar',orientation:'h',marker:{color:colors},name:'T_ref',text:sorted.map(r=>r.Temp_Label+': '+r.T_ref.toFixed(1)+'°C / Limit: '+r['Limit(C)'].toFixed(0)+'°C  (Margin: '+r.Tj_Margin.toFixed(1)+'°C)'),textposition:'outside',hovertemplate:'%{text}<extra></extra>'}],{barmode:'overlay',title:'<b>溫度裕度總覽 (Temperature Margin Overview)</b>',showlegend:false,height:Math.max(300,sorted.length*50+100),margin:{l:10,r:250,t:60,b:40},yaxis:{automargin:true}},pCfg);
+    let pS=[...valid].sort((a,b)=>a.Total_W-b.Total_W);
+    Plotly.newPlot('chart-power',[{y:pS.map(r=>r.Component),x:pS.map(r=>r.Total_W),type:'bar',orientation:'h',marker:{colorscale:'Oranges',color:pS.map(r=>r.Total_W),showscale:true,colorbar:{title:'功耗 (W)'}},text:pS.map(r=>r.Total_W.toFixed(1)+' W'),textposition:'outside'}],{title:'<b>各元件功耗分佈 (Power Breakdown)</b>',showlegend:false,margin:{l:10,r:80,t:60,b:40},xaxis:{title:'功耗 (W)'},yaxis:{automargin:true},annotations:[{text:'Total: '+R.Total_Power.toFixed(2)+' W',xref:'paper',yref:'paper',x:0.95,y:1.06,showarrow:false,font:{size:13,color:'#888'}}]},pCfg);
+    let mS=[...valid].sort((a,b)=>a.Tj_Margin-b.Tj_Margin);
+    Plotly.newPlot('chart-tjm',[{x:mS.map(r=>r.Component),y:mS.map(r=>r.Tj_Margin),type:'bar',marker:{colorscale:[[0,'#d73027'],[0.15,'#f46d43'],[0.3,'#fdae61'],[0.45,'#fee08b'],[0.6,'#d9ef8b'],[0.75,'#a6d96a'],[0.9,'#66bd63'],[1,'#1a9850']],color:mS.map(r=>r.Tj_Margin),showscale:true,colorbar:{title:'Margin (°C)'}}}],{title:'<b>各元件溫度裕度 (Temperature Margin)</b>',xaxis:{title:'元件名稱'},yaxis:{title:'Margin (°C)'}},pCfg);
   }
-
-  // DRC
-  if (R.drc_failed) {
-    document.getElementById('tab2-drc').innerHTML = '<div class="drc-error"><b>DRC FAILED</b><br>' + R.drc_msg + '</div>';
-    document.getElementById('tab2-dims').innerHTML = '';
-    document.getElementById('tab2-volume').innerHTML = '<div class="volume-box" style="background:#ffebee;border-color:#e74c3c;"><h3 style="color:#c0392b;">Estimated Volume</h3><div class="vol-val" style="color:#e74c3c;">N/A</div></div>';
-    document.getElementById('tab2-weight').innerHTML = '';
-  } else {
-    document.getElementById('tab2-drc').innerHTML = '';
-    document.getElementById('tab2-dims').innerHTML = '<div class="kpi-row">' + kpiCard('Fin Height', R.Fin_Height.toFixed(2)+' mm', 'Suggested Fin Height', '#2ecc71') + kpiCard('RRU Dimensions', R.L_hsk.toFixed(0)+'x'+R.W_hsk.toFixed(0)+'x'+R.RRU_Height.toFixed(1), 'LxWxH (mm)', '#34495e') + '</div>';
-    document.getElementById('tab2-volume').innerHTML = '<div class="volume-box"><h3>Estimated Volume</h3><div class="vol-val">' + R.Volume_L.toFixed(2) + ' L</div></div>';
-    document.getElementById('tab2-weight').innerHTML = '<div class="weight-box"><h3 style="color:#2c3e50;">Estimated Weight</h3><div style="font-size:2.8rem;font-weight:800;color:#34495e;margin:10px 0;">' + R.total_weight_kg.toFixed(1) + ' kg</div><small style="color:#7f8c8d;">Heatsink '+R.hs_weight_kg.toFixed(1)+'kg | Shield '+R.shield_weight_kg.toFixed(1)+'kg | Filter '+R.filter_weight_kg.toFixed(1)+'kg | Shielding '+R.shielding_weight_kg.toFixed(1)+'kg | PCB '+R.pcb_weight_kg.toFixed(2)+'kg</small></div>';
+  // DRC + Dims + Volume + Weight
+  if(R.drc_failed){document.getElementById('tab2-drc').innerHTML='<div class="drc-error"><b>DRC FAILED</b><br>'+R.drc_msg+'</div>';document.getElementById('tab2-dims').innerHTML='';document.getElementById('tab2-volume').innerHTML='<div class="volume-box" style="background:#ffebee;border-color:#e74c3c;"><h3 style="color:#c0392b;">★ RRU 整機估算體積 (Estimated Volume)</h3><div class="vol-val" style="color:#e74c3c;">N/A</div></div>';document.getElementById('tab2-weight').innerHTML='';}
+  else{document.getElementById('tab2-drc').innerHTML='';document.getElementById('tab2-dims').innerHTML='<div class="kpi-row">'+kpiCard('建議鰭片高度',R.Fin_Height.toFixed(2)+' mm','Suggested Fin Height','#2ecc71')+kpiCard('RRU 整機尺寸 (LxWxH)',R.L_hsk.toFixed(0)+' x '+R.W_hsk.toFixed(0)+' x '+R.RRU_Height.toFixed(1),'Estimated Dimensions','#34495e')+'</div>';
+    document.getElementById('tab2-volume').innerHTML='<div class="volume-box"><h3>★ RRU 整機估算體積 (Estimated Volume)</h3><div class="vol-val">'+R.Volume_L.toFixed(2)+' L</div></div>';
+    document.getElementById('tab2-weight').innerHTML='<div class="weight-box"><h3 style="color:#2c3e50;">⚖️ 整機估算重量 (Estimated Weight)</h3><div style="font-family:Nunito,sans-serif;font-size:2.8rem;font-weight:800;color:#34495e;margin:10px 0;">'+R.total_weight_kg.toFixed(1)+' kg</div><small style="color:#7f8c8d;">Heatsink ≈ '+R.hs_weight_kg.toFixed(1)+'kg | Shield ≈ '+R.shield_weight_kg.toFixed(1)+'kg | Filter ≈ '+R.filter_weight_kg.toFixed(1)+'kg | Shielding ≈ '+R.shielding_weight_kg.toFixed(1)+'kg | PCB ≈ '+R.pcb_weight_kg.toFixed(2)+'kg</small></div>';
   }
-}
-
-function kpiCard(title, value, desc, color) {
-  return '<div class="kpi-card" style="border-left-color:'+color+';"><div class="title">'+title+'</div><div class="value">'+value+'</div><div class="desc">'+desc+'</div></div>';
 }
 
 // =====================================================
-// TAB 3: 3D SIMULATION
+// TAB 3: 3D + AI RENDERING SECTION
 // =====================================================
-function renderTab3() {
-  if (!calcResults) return;
-  let R = calcResults;
-  if (R.drc_failed || R.Fin_Height <= 0) {
-    document.getElementById('tab3-3d').innerHTML = '<div class="drc-error">Cannot render 3D model. ' + (R.drc_msg || 'Invalid dimensions.') + '</div>';
-    document.getElementById('tab3-info').innerHTML = '';
-    return;
-  }
+function renderTab3(){
+  if(!calcResults)return;let R=calcResults;
+  if(R.drc_failed||R.Fin_Height<=0){document.getElementById('tab3-3d').innerHTML='<div class="drc-error">🚫 '+(R.drc_msg||'無效尺寸')+'</div>';document.getElementById('tab3-info').innerHTML='';document.getElementById('tab3-ai').innerHTML='';return;}
+  let L=R.L_hsk,W=R.W_hsk,hb=G.H_shield+G.H_filter,zbs=hb,zbe=hb+G.t_base,zfs=zbe,zfe=zbe+R.Fin_Height;
+  let ijk={i:[7,0,0,0,4,4,6,6,4,0,3,2],j:[3,4,1,2,5,6,5,2,0,1,6,3],k:[0,7,2,3,6,7,1,1,5,5,7,6]};
+  let tr=[];
+  tr.push({type:'mesh3d',x:[0,L,L,0,0,L,L,0],y:[0,0,W,W,0,0,W,W],z:[0,0,0,0,hb,hb,hb,hb],...ijk,color:'#5D6D7E',opacity:1,flatshading:true,name:'Electronics Body',showscale:false});
+  tr.push({type:'mesh3d',x:[0,L,L,0,0,L,L,0],y:[0,0,W,W,0,0,W,W],z:[zbs,zbs,zbs,zbs,zbe,zbe,zbe,zbe],...ijk,color:'#BDC3C7',opacity:1,flatshading:true,name:'Heatsink Base',showscale:false});
+  if(R.Fin_Count>0){let tfw=R.Fin_Count*G.Fin_t+(R.Fin_Count-1)*G.Gap;let yo=(W-tfw)/2;
+    for(let i=0;i<R.Fin_Count;i++){let f0=yo+i*(G.Fin_t+G.Gap),f1=f0+G.Fin_t;if(f1>W)break;
+      tr.push({type:'mesh3d',x:[0,L,L,0,0,L,L,0],y:[f0,f0,f1,f1,f0,f0,f1,f1],z:[zfs,zfs,zfs,zfs,zfe,zfe,zfe,zfe],...ijk,intensity:[0,0,0,0,1,1,1,1],cmin:0,cmax:1,colorscale:[[0,'#E67E22'],[0.45,'#BDC3C7'],[1,'#D6EAF8']],showscale:false,flatshading:true,name:i===0?'Fins':'',showlegend:i===0});}}
+  let md=Math.max(L,W,R.RRU_Height)*1.1;
+  Plotly.newPlot('tab3-3d',tr,{scene:{xaxis:{title:'Length',range:[0,md]},yaxis:{title:'Width',range:[0,md]},zaxis:{title:'Height',range:[0,md]},aspectmode:'manual',aspectratio:{x:1,y:1,z:1},camera:{projection:{type:'orthographic'},eye:{x:1.2,y:1.2,z:1.2}},bgcolor:'white'},margin:{l:0,r:0,b:0,t:0},height:600},{responsive:true,displaylogo:false,modeBarButtonsToAdd:[fullscreenBtn],displayModeBar:true});
+  document.getElementById('tab3-info').innerHTML='<div class="alert alert-info">📐 <b>外觀尺寸：</b>長 '+L.toFixed(1)+' x 寬 '+W.toFixed(1)+' x 高 '+R.RRU_Height.toFixed(1)+' mm</div><div class="alert alert-success">⚡ <b>鰭片規格：</b>數量 '+R.Fin_Count+' pcs | 高度 '+R.Fin_Height.toFixed(1)+' mm | 厚度 '+G.Fin_t+' mm | 間距 '+G.Gap+' mm</div>';
 
-  let L=R.L_hsk, W=R.W_hsk, h_body=G.H_shield+G.H_filter, zbs=h_body, zbe=h_body+G.t_base, zfs=zbe, zfe=zbe+R.Fin_Height;
-  let ijk = {i:[7,0,0,0,4,4,6,6,4,0,3,2],j:[3,4,1,2,5,6,5,2,0,1,6,3],k:[0,7,2,3,6,7,1,1,5,5,7,6]};
-
-  let traces = [];
-  // Body
-  traces.push({type:'mesh3d',x:[0,L,L,0,0,L,L,0],y:[0,0,W,W,0,0,W,W],z:[0,0,0,0,h_body,h_body,h_body,h_body],...ijk,color:'#5D6D7E',opacity:1,flatshading:true,name:'Body',showscale:false});
-  // Base
-  traces.push({type:'mesh3d',x:[0,L,L,0,0,L,L,0],y:[0,0,W,W,0,0,W,W],z:[zbs,zbs,zbs,zbs,zbe,zbe,zbe,zbe],...ijk,color:'#BDC3C7',opacity:1,flatshading:true,name:'Base',showscale:false});
-
-  // Fins
-  if (R.Fin_Count > 0) {
-    let totalFinW = R.Fin_Count * G.Fin_t + (R.Fin_Count-1) * G.Gap;
-    let yoff = (W - totalFinW) / 2;
-    for (let i=0; i<R.Fin_Count; i++) {
-      let fy0 = yoff + i*(G.Fin_t+G.Gap), fy1 = fy0+G.Fin_t;
-      if (fy1 > W) break;
-      traces.push({type:'mesh3d',
-        x:[0,L,L,0,0,L,L,0], y:[fy0,fy0,fy1,fy1,fy0,fy0,fy1,fy1],
-        z:[zfs,zfs,zfs,zfs,zfe,zfe,zfe,zfe],
-        ...ijk, intensity:[0,0,0,0,1,1,1,1], cmin:0, cmax:1,
-        colorscale:[[0,'#E67E22'],[0.45,'#BDC3C7'],[1,'#D6EAF8']],
-        showscale:false, flatshading:true, name:i===0?'Fins':'', showlegend:i===0
-      });
-    }
-  }
-
-  let maxDim = Math.max(L,W,R.RRU_Height)*1.1;
-  Plotly.newPlot('tab3-3d', traces, {
-    scene:{xaxis:{title:'Length',range:[0,maxDim]},yaxis:{title:'Width',range:[0,maxDim]},zaxis:{title:'Height',range:[0,maxDim]},
-      aspectmode:'manual',aspectratio:{x:1,y:1,z:1},
-      camera:{projection:{type:'orthographic'},eye:{x:1.2,y:1.2,z:1.2}},bgcolor:'white'},
-    margin:{l:0,r:0,b:0,t:0}, height:600
-  });
-
-  document.getElementById('tab3-info').innerHTML = '<div class="alert alert-info"><b>Dimensions:</b> '+L.toFixed(1)+' x '+W.toFixed(1)+' x '+R.RRU_Height.toFixed(1)+' mm</div><div class="alert alert-success"><b>Fins:</b> '+R.Fin_Count+' pcs | Height: '+R.Fin_Height.toFixed(1)+' mm | Thickness: '+G.Fin_t+' mm | Gap: '+G.Gap+' mm</div>';
+  // AI Rendering Section
+  let prompt=`5G RRU 無線射頻單元工業設計渲染圖\n\n核心結構（極其嚴格參照圖 1 的幾何形狀）：\n請務必精確生成 ${R.Fin_Count} 片散熱鰭片。關鍵要求：這些鰭片必須是「平直、互相平行且垂直於底面」的長方形薄板結構。嚴禁生成尖刺狀、錐形或任何斜向角度的鰭片。\n\n外觀細節與材質（參考圖 2）：\n材質採用白色粉體烤漆壓鑄鋁（霧面質感）。\n\n技術規格：\n整體尺寸約 ${L.toFixed(0)}x${W.toFixed(0)}x${R.RRU_Height.toFixed(0)}mm。\n\n光線設定：\n專業攝影棚打光，強調對比與柔和陰影。使用邊緣光（Rim Lighting）來勾勒並凸顯每一片散熱鰭片的俐落線條。\n\n視覺規格：\n一律生成3D等角視圖，純白背景，8k 高解析度，照片級真實影像渲染。`;
+  let aiHtml=`<hr style="margin:20px 0;"><h3>🎨 RRU 寫實渲染生成流程 (AI)</h3>
+  <div class="ai-section"><h4>準備工作</h4>
+  <div style="display:flex;gap:15px;margin:15px 0;flex-wrap:wrap;">
+    <div style="flex:1;min-width:250px;"><h4>Step 1. 下載 3D 模擬圖</h4><div class="alert alert-info">請將滑鼠移至上方 3D 圖表的右上角，點擊相機圖示 (Download plot as a png) 下載目前的模型底圖。</div></div>
+    <div style="flex:1;min-width:250px;"><h4>Step 2. 下載 I/O 寫實參考圖</h4><div class="alert alert-info">請準備一張 5G RRU 的 I/O 介面參考圖。</div></div>
+  </div>
+  <h4>Step 3. 複製提示詞 (Prompt)</h4>
+  <textarea class="prompt-box" id="ai-prompt">${prompt}</textarea>
+  <div style="margin-top:10px;"><button class="copy-btn" onclick="copyPrompt()">📋 複製提示詞 (Copy Prompt)</button> <span id="copy-status" style="color:#00b894;font-weight:600;"></span></div>
+  <h4 style="margin-top:15px;">Step 4. 執行 AI 生成</h4>
+  <div class="alert alert-success">1. 開啟 <b>Gemini</b> 對話視窗。<br>2. 確認模型設定為 <b>思考型 (Thinking) + Nano Banana (Imagen 3)</b>。<br>3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。<br>4. 貼上提示詞並送出。</div>
+  </div>`;
+  document.getElementById('tab3-ai').innerHTML=aiHtml;
 }
+
+function copyPrompt(){let t=document.getElementById('ai-prompt').value;navigator.clipboard.writeText(t).then(()=>{document.getElementById('copy-status').textContent='✅ 已複製！';setTimeout(()=>document.getElementById('copy-status').textContent='',2000);}).catch(()=>{let ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);document.getElementById('copy-status').textContent='✅ 已複製！';setTimeout(()=>document.getElementById('copy-status').textContent='',2000);});}
 
 // =====================================================
-// TAB 4: SENSITIVITY ANALYSIS
+// SENSITIVITY ANALYSIS
 // =====================================================
-function updateSABase() {
-  let v = document.getElementById('sa_var').value;
-  let base = v === 'power_scale' ? 1.0 : (G[v] || 1.0);
-  document.getElementById('sa_base').value = base;
+function updateSABase(){let v=document.getElementById('sa_var').value;document.getElementById('sa_base').value=v==='power_scale'?1.0:(G[v]||1.0);}
+
+function saCalc(p,c,vk,xv,af){let pp={...p};let cc={rf:c.rf.map(r=>({...r})),digital:c.digital.map(r=>({...r})),pwr:c.pwr.map(r=>({...r}))};
+  if(vk==='power_scale')['rf','digital','pwr'].forEach(cat=>cc[cat].forEach(r=>r['Power(W)']*=xv));else pp[vk]=xv;return computeAll(pp,cc,af);}
+
+function runSweep(){
+  let vk=document.getElementById('sa_var').value;let bv=vk==='power_scale'?1.0:G[vk];
+  let mp=parseFloat(document.getElementById('sa_minus').value),pp=parseFloat(document.getElementById('sa_plus').value),st=parseInt(document.getElementById('sa_steps').value);
+  let vn=bv*(1-mp/100),vx=bv*(1+pp/100);if(vk==='Gap')vn=Math.max(vn,0.5);if(vk==='power_scale')vn=Math.max(vn,0.1);
+  let xs=[];for(let i=0;i<st;i++)xs.push(vn+(vx-vn)*i/(st-1));let ci=0;xs.forEach((x,i)=>{if(Math.abs(x-bv)<Math.abs(xs[ci]-bv))ci=i;});xs[ci]=bv;
+  let br=saCalc(G,components,vk,bv,null);let ab=br.Area_req;
+  let basePower=(components.rf.reduce((s,r)=>s+r['Power(W)']*r.Qty,0)+components.digital.reduce((s,r)=>s+r['Power(W)']*r.Qty,0)+components.pwr.reduce((s,r)=>s+r['Power(W)']*r.Qty,0))*G.Margin;
+  let res=xs.map((x,i)=>{let r=saCalc(G,components,vk,x,ab);let gn=vk==='Gap'?x:G.Gap;let ar=gn>0?r.Fin_Height/gn:0;
+    return{x:Math.round(x*1e4)/1e4,Volume:Math.round(r.Volume_L*100)/100,Weight:Math.round(r.total_weight_kg*100)/100,AR:Math.round(ar*10)/10,Fin_Count:r.Fin_Count,Tj_Margin:r.Bottleneck_Tj_Margin,Fin_Height:Math.round(r.Fin_Height*10)/10};});
+
+  let ct=document.getElementById('sa-sweep-results');
+  ct.innerHTML='<div style="display:flex;gap:15px;width:100%;flex-wrap:wrap;"><div id="sa-cl" style="flex:1;min-width:400px;"></div><div id="sa-cr" style="flex:1;min-width:400px;"></div></div><div id="sa-detail"></div>';
+  let xv=res.map(r=>r.x);
+  // LEFT: Volume + Weight (GROUPED bars, not overlapping)
+  Plotly.newPlot('sa-cl',[
+    {x:xv,y:res.map(r=>r.Volume),type:'bar',name:'體積 (L)',marker:{color:'rgba(52,152,219,0.8)'},yaxis:'y1',offsetgroup:1},
+    {x:xv,y:res.map(r=>r.Weight),type:'bar',name:'重量 (kg)',marker:{color:'rgba(46,204,113,0.8)'},yaxis:'y2',offsetgroup:2}
+  ],{barmode:'group',title:'<b>散熱器規模 — 體積 & 重量</b>',xaxis:{title:vk==='power_scale'?'功耗縮放係數 (×)':vk+' (mm)'},yaxis:{title:'體積 (L)',titlefont:{color:'#3498db'},tickfont:{color:'#3498db'}},yaxis2:{title:'重量 (kg)',titlefont:{color:'#2ecc71'},tickfont:{color:'#2ecc71'},overlaying:'y',side:'right'},legend:{orientation:'h',x:0.5,y:1.08,xanchor:'center'},shapes:[{type:'line',x0:bv,x1:bv,y0:0,y1:1,yref:'paper',line:{dash:'dash',color:'gray'},name:'Current'}],height:420,margin:{l:50,r:50,t:50,b:50},hovermode:'x unified'},{responsive:true,displaylogo:false,modeBarButtonsToAdd:[fullscreenBtn],displayModeBar:true});
+  // RIGHT
+  let py,pn,pc;if(vk==='Gap'){py=res.map(r=>r.AR);pn='流阻比 (AR)';pc='#e74c3c';}else{py=res.map(r=>r.Tj_Margin);pn='Bottleneck Tj_Margin (°C)';pc='#e67e22';}
+  let sh2=[{type:'line',x0:bv,x1:bv,y0:0,y1:1,yref:'paper',line:{dash:'dash',color:'gray'}}];
+  if(vk!=='Gap')sh2.push({type:'line',x0:xv[0],x1:xv[xv.length-1],y0:0,y1:0,line:{dash:'dot',color:'red',width:2}});
+  Plotly.newPlot('sa-cr',[{x:xv,y:py,mode:'lines+markers',name:pn,line:{color:pc,width:3},marker:{size:8}}],{title:'<b>熱流/幾何性能 — '+pn+'</b>',xaxis:{title:vk==='power_scale'?'功耗縮放係數 (×)':vk+' (mm)'},yaxis:{title:pn,titlefont:{color:pc},tickfont:{color:pc}},shapes:sh2,height:420,margin:{l:50,r:50,t:50,b:50},hovermode:'x unified'},{responsive:true,displaylogo:false,modeBarButtonsToAdd:[fullscreenBtn],displayModeBar:true});
+  // Detail data table
+  let dh='<div class="collapsible" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';">📋 查看詳細數據 ▼</div><div class="collapsible-body"><table class="detail-table"><thead><tr><th>'+vk+'</th><th>體積 (L)</th><th>重量 (kg)</th><th>流阻比</th><th>鰭片數</th><th>Tj_Margin (°C)</th><th>Fin 高度 (mm)</th></tr></thead><tbody>';
+  res.forEach(r=>dh+='<tr><td>'+r.x+'</td><td>'+r.Volume+'</td><td>'+r.Weight+'</td><td>'+r.AR+'</td><td>'+r.Fin_Count+'</td><td>'+r.Tj_Margin+'</td><td>'+r.Fin_Height+'</td></tr>');
+  dh+='</tbody></table></div>';document.getElementById('sa-detail').innerHTML=dh;
 }
 
-function saCalc(params, comps, varKey, xVal, areaFixed) {
-  let p = {...params};
-  let c = {rf: comps.rf.map(r=>({...r})), digital: comps.digital.map(r=>({...r})), pwr: comps.pwr.map(r=>({...r}))};
-  if (varKey === 'power_scale') {
-    ['rf','digital','pwr'].forEach(cat => c[cat].forEach(r => r['Power(W)'] *= xVal));
-  } else {
-    p[varKey] = xVal;
-  }
-  return computeAll(p, c, areaFixed);
-}
-
-function runSweep() {
-  let varKey = document.getElementById('sa_var').value;
-  let baseVal = varKey === 'power_scale' ? 1.0 : G[varKey];
-  let minusPct = parseFloat(document.getElementById('sa_minus').value);
-  let plusPct = parseFloat(document.getElementById('sa_plus').value);
-  let steps = parseInt(document.getElementById('sa_steps').value);
-
-  let vMin = baseVal * (1 - minusPct/100);
-  let vMax = baseVal * (1 + plusPct/100);
-  if (varKey === 'Gap') vMin = Math.max(vMin, 0.5);
-  if (varKey === 'power_scale') vMin = Math.max(vMin, 0.1);
-
-  let xVals = [];
-  for (let i=0; i<steps; i++) xVals.push(vMin + (vMax-vMin)*i/(steps-1));
-  let closestIdx = 0;
-  xVals.forEach((x,i) => { if (Math.abs(x-baseVal) < Math.abs(xVals[closestIdx]-baseVal)) closestIdx=i; });
-  xVals[closestIdx] = baseVal;
-
-  let baseRes = saCalc(G, components, varKey, baseVal, null);
-  let areaBase = baseRes.Area_req;
-
-  let results = xVals.map((x,i) => {
-    let res = saCalc(G, components, varKey, x, areaBase);
-    let gapNow = varKey==='Gap' ? x : G.Gap;
-    let ar = gapNow > 0 ? res.Fin_Height / gapNow : 0;
-    return {x: Math.round(x*1e4)/1e4, Volume: Math.round(res.Volume_L*100)/100, Weight: Math.round(res.total_weight_kg*100)/100, AR: Math.round(ar*10)/10, Tj_Margin: res.Bottleneck_Tj_Margin, Fin_Height: Math.round(res.Fin_Height*10)/10};
-  });
-
-  let container = document.getElementById('sa-sweep-results');
-  container.innerHTML = '<div id="sa-chart-left" style="flex:1;min-width:400px;"></div><div id="sa-chart-right" style="flex:1;min-width:400px;"></div>';
-
-  let xs = results.map(r=>r.x);
-  // Left: Volume + Weight
-  Plotly.newPlot('sa-chart-left', [
-    {x:xs, y:results.map(r=>r.Volume), type:'bar', name:'Volume (L)', marker:{color:'rgba(52,152,219,0.8)'}},
-    {x:xs, y:results.map(r=>r.Weight), type:'bar', name:'Weight (kg)', marker:{color:'rgba(46,204,113,0.8)'}, yaxis:'y2'}
-  ], {
-    barmode:'group', title:'Volume & Weight',
-    xaxis:{title:varKey}, yaxis:{title:'Volume (L)',titlefont:{color:'#3498db'},tickfont:{color:'#3498db'}},
-    yaxis2:{title:'Weight (kg)',titlefont:{color:'#2ecc71'},tickfont:{color:'#2ecc71'},overlaying:'y',side:'right'},
-    shapes:[{type:'line',x0:baseVal,x1:baseVal,y0:0,y1:1,yref:'paper',line:{dash:'dash',color:'gray'}}],
-    legend:{orientation:'h',x:0.5,y:1.08,xanchor:'center'}, height:420, margin:{l:50,r:50,t:50,b:50}
-  });
-
-  // Right: AR or Tj_Margin
-  let perfY, perfName, perfColor;
-  if (varKey === 'Gap') {
-    perfY = results.map(r=>r.AR); perfName = 'Aspect Ratio'; perfColor = '#e74c3c';
-  } else {
-    perfY = results.map(r=>r.Tj_Margin); perfName = 'Tj_Margin (deg C)'; perfColor = '#e67e22';
-  }
-  let shapes2 = [{type:'line',x0:baseVal,x1:baseVal,y0:0,y1:1,yref:'paper',line:{dash:'dash',color:'gray'}}];
-  if (varKey !== 'Gap') shapes2.push({type:'line',x0:xs[0],x1:xs[xs.length-1],y0:0,y1:0,line:{dash:'dot',color:'red',width:2}});
-
-  Plotly.newPlot('sa-chart-right', [
-    {x:xs, y:perfY, mode:'lines+markers', name:perfName, line:{color:perfColor,width:3}, marker:{size:8}}
-  ], {
-    title:perfName, xaxis:{title:varKey}, yaxis:{title:perfName,titlefont:{color:perfColor},tickfont:{color:perfColor}},
-    shapes:shapes2, height:420, margin:{l:50,r:50,t:50,b:50}
-  });
-}
-
-function runTornado() {
-  let pct = parseFloat(document.getElementById('tornado_pct').value);
-  let metric = document.getElementById('tornado_metric').value;
-
-  let vars = [
-    {key:'Gap', label:'Fin Air Gap', base: G.Gap},
-    {key:'T_amb', label:'Environment Temp', base: G.T_amb},
-    {key:'power_scale', label:'Power Scale', base: 1.0}
-  ];
-
-  let baseRes = saCalc(G, components, 'Gap', G.Gap, null);
-  let areaBase = baseRes.Area_req;
-
-  let rows = vars.map(v => {
-    let lo = Math.max(v.base*(1-pct/100), 0.1);
-    let hi = v.base*(1+pct/100);
-    let rLo = saCalc(G, components, v.key, lo, areaBase);
-    let rBs = saCalc(G, components, v.key, v.base, areaBase);
-    let rHi = saCalc(G, components, v.key, hi, areaBase);
-    return {label:v.label, Vol_lo:rLo.Volume_L, Vol_bs:rBs.Volume_L, Vol_hi:rHi.Volume_L, Tj_lo:rLo.Bottleneck_Tj_Margin, Tj_bs:rBs.Bottleneck_Tj_Margin, Tj_hi:rHi.Bottleneck_Tj_Margin};
-  });
-
-  function makeTornado(data, kLo, kHi, kBs, title, cDec, cInc) {
-    let baseMean = data.reduce((s,r)=>s+r[kBs],0)/data.length;
-    let traces = [];
-    data.forEach((r,i) => {
-      traces.push({y:[r.label],x:[r[kLo]-r[kBs]],base:[r[kBs]],type:'bar',orientation:'h',marker:{color:cDec},name:'-'+pct+'%',showlegend:i===0});
-      traces.push({y:[r.label],x:[r[kHi]-r[kBs]],base:[r[kBs]],type:'bar',orientation:'h',marker:{color:cInc},name:'+'+pct+'%',showlegend:i===0});
-    });
-    return {traces, layout:{barmode:'overlay',title:title,shapes:[{type:'line',x0:baseMean,x1:baseMean,y0:-0.5,y1:data.length-0.5,line:{dash:'dash',color:'gray'}}],legend:{orientation:'h',x:0.5,y:1.12,xanchor:'center'},height:380,margin:{l:20,r:20,t:55,b:40}}};
-  }
-
-  let container = document.getElementById('sa-tornado-results');
-  let html = '';
-  if (metric === 'both' || metric === 'volume') html += '<div id="tornado-vol" style="flex:1;min-width:400px;"></div>';
-  if (metric === 'both' || metric === 'tj') html += '<div id="tornado-tj" style="flex:1;min-width:400px;"></div>';
-  container.innerHTML = html;
-
-  if (metric === 'both' || metric === 'volume') {
-    let t = makeTornado(rows,'Vol_lo','Vol_hi','Vol_bs','Volume Sensitivity (L)','rgba(231,76,60,0.7)','rgba(52,152,219,0.7)');
-    Plotly.newPlot('tornado-vol', t.traces, t.layout);
-  }
-  if (metric === 'both' || metric === 'tj') {
-    let t = makeTornado(rows,'Tj_lo','Tj_hi','Tj_bs','Tj_Margin Sensitivity (deg C)','rgba(231,76,60,0.7)','rgba(46,204,113,0.7)');
-    Plotly.newPlot('tornado-tj', t.traces, t.layout);
-  }
+function runTornado(){
+  let pct=parseFloat(document.getElementById('tornado_pct').value);let met=document.getElementById('tornado_metric').value;
+  let vars=[{key:'Gap',label:'Fin Air Gap',base:G.Gap},{key:'T_amb',label:'環境溫度',base:G.T_amb},{key:'power_scale',label:'功耗縮放係數',base:1.0}];
+  let br=saCalc(G,components,'Gap',G.Gap,null);let ab=br.Area_req;
+  let rows=vars.map(v=>{let lo=Math.max(v.base*(1-pct/100),0.1),hi=v.base*(1+pct/100);
+    let rl=saCalc(G,components,v.key,lo,ab),rb=saCalc(G,components,v.key,v.base,ab),rh=saCalc(G,components,v.key,hi,ab);
+    return{label:v.label,Vol_lo:rl.Volume_L,Vol_bs:rb.Volume_L,Vol_hi:rh.Volume_L,Tj_lo:rl.Bottleneck_Tj_Margin,Tj_bs:rb.Bottleneck_Tj_Margin,Tj_hi:rh.Bottleneck_Tj_Margin};});
+  function mkT(data,kl,kh,kb,title,cd,ci){let bm=data.reduce((s,r)=>s+r[kb],0)/data.length;let tr=[];
+    data.forEach((r,i)=>{let f=i===0;tr.push({y:[r.label],x:[r[kl]-r[kb]],base:[r[kb]],type:'bar',orientation:'h',marker:{color:cd},name:'-'+pct+'%',showlegend:f,hovertemplate:'<b>'+r.label+'</b><br>-'+pct+'%: '+r[kl].toFixed(2)+'<extra></extra>'});
+      tr.push({y:[r.label],x:[r[kh]-r[kb]],base:[r[kb]],type:'bar',orientation:'h',marker:{color:ci},name:'+'+pct+'%',showlegend:f,hovertemplate:'<b>'+r.label+'</b><br>+'+pct+'%: '+r[kh].toFixed(2)+'<extra></extra>'});});
+    return{tr,layout:{barmode:'overlay',title:{text:title,y:0.98,x:0.5,xanchor:'center'},shapes:[{type:'line',x0:bm,x1:bm,y0:-0.5,y1:data.length-0.5,line:{dash:'dash',color:'gray'}}],legend:{orientation:'h',x:0.5,y:1.15,xanchor:'center'},height:420,margin:{l:130,r:30,t:80,b:50},yaxis:{automargin:true}}};}
+  let ct=document.getElementById('sa-tornado-results');let h='';
+  if(met==='both'||met==='volume')h+='<div id="tv" style="flex:1;min-width:400px;"></div>';
+  if(met==='both'||met==='tj')h+='<div id="tt" style="flex:1;min-width:400px;"></div>';
+  ct.innerHTML='<div style="display:flex;gap:15px;flex-wrap:wrap;">'+h+'</div><div id="tornado-detail"></div>';
+  let tCfg={responsive:true,displaylogo:false,modeBarButtonsToAdd:[fullscreenBtn],displayModeBar:true};
+  if(met==='both'||met==='volume'){let t=mkT(rows,'Vol_lo','Vol_hi','Vol_bs','<b>體積敏感度 (L)</b>','rgba(231,76,60,0.7)','rgba(52,152,219,0.7)');Plotly.newPlot('tv',t.tr,t.layout,tCfg);}
+  if(met==='both'||met==='tj'){let t=mkT(rows,'Tj_lo','Tj_hi','Tj_bs','<b>Tj_Margin 敏感度 (°C)</b>','rgba(231,76,60,0.7)','rgba(46,204,113,0.7)');Plotly.newPlot('tt',t.tr,t.layout,tCfg);}
+  // Detail
+  let dh='<div class="collapsible" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';">📋 查看 Tornado 詳細數據 ▼</div><div class="collapsible-body"><table class="detail-table"><thead><tr><th>參數</th><th>體積 -'+pct+'%</th><th>體積 Base</th><th>體積 +'+pct+'%</th><th>Tj_Margin -'+pct+'%</th><th>Tj_Margin Base</th><th>Tj_Margin +'+pct+'%</th></tr></thead><tbody>';
+  rows.forEach(r=>dh+='<tr><td>'+r.label+'</td><td>'+r.Vol_lo.toFixed(2)+'</td><td>'+r.Vol_bs.toFixed(2)+'</td><td>'+r.Vol_hi.toFixed(2)+'</td><td>'+r.Tj_lo.toFixed(1)+'</td><td>'+r.Tj_bs.toFixed(1)+'</td><td>'+r.Tj_hi.toFixed(1)+'</td></tr>');
+  dh+='</tbody></table></div>';document.getElementById('tornado-detail').innerHTML=dh;
 }
 
 // =====================================================
 // PROJECT I/O
 // =====================================================
-function loadProject() { document.getElementById('fileInput').click(); }
+function loadProject(){document.getElementById('fileInput').click();}
+function handleFileLoad(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=function(ev){try{let d=JSON.parse(ev.target.result);
+  if(d.global_params){for(let k in d.global_params){G[k]=d.global_params[k];let el=document.getElementById(k);if(el){if(el.tagName==='SELECT')el.value=d.global_params[k];else el.value=d.global_params[k];}}}
+  if(d.rf_data)components.rf=d.rf_data;if(d.digital_data)components.digital=d.digital_data;if(d.pwr_data)components.pwr=d.pwr_data;
+  recalc();alert('✅ 專案載入成功！');}catch(err){alert('Error: '+err.message);}};r.readAsText(f);e.target.value='';}
 
-function handleFileLoad(e) {
-  let file = e.target.files[0];
-  if (!file) return;
-  let reader = new FileReader();
-  reader.onload = function(ev) {
-    try {
-      let data = JSON.parse(ev.target.result);
-      if (data.global_params) {
-        for (let k in data.global_params) {
-          G[k] = data.global_params[k];
-          let el = document.getElementById(k);
-          if (el) { if (el.tagName==='SELECT') el.value=data.global_params[k]; else el.value=data.global_params[k]; }
-        }
-      }
-      if (data.rf_data) components.rf = data.rf_data;
-      if (data.digital_data) components.digital = data.digital_data;
-      if (data.pwr_data) components.pwr = data.pwr_data;
-      recalc();
-      alert('Project loaded successfully!');
-    } catch(err) { alert('Error loading project: ' + err.message); }
-  };
-  reader.readAsText(file);
-  e.target.value = '';
+function saveProject(){readGlobals();let d={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},global_params:{},rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
+  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density'].forEach(k=>d.global_params[k]=G[k]);
+  d.global_params.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;
+  let b=new Blob([JSON.stringify(d,null,4)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(b);let pn=document.getElementById('cloudProjectName').value.trim()||'Project';a.download='RRU_'+pn+'_'+new Date().toISOString().slice(0,10)+'.json';a.click();}
+
+// =====================================================
+// CLOUD PROJECT SAVE / LOAD
+// =====================================================
+async function cloudSaveProject(){
+  let name=document.getElementById('cloudProjectName').value.trim();
+  if(!name){alert('⚠️ 請先輸入專案名稱！');document.getElementById('cloudProjectName').focus();return;}
+  if(!fbOk||!db){alert('⚠️ Firebase 未連線，無法使用雲端儲存。');return;}
+  let docId=name.replace(/ /g,'_').replace(/[^a-zA-Z0-9_\-\u4e00-\u9fff]/g,'');
+  if(!docId){alert('⚠️ 專案名稱無效，請使用中英文或數字。');return;}
+  // Check if exists
+  try{
+    let existing=await db.collection('projects').doc(docId).get();
+    if(existing.exists&&!confirm('「'+name+'」已存在雲端，確定要覆蓋？'))return;
+  }catch(e){}
+  readGlobals();
+  let d={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},project_name:name,global_params:{},rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
+  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density'].forEach(k=>d.global_params[k]=G[k]);
+  d.global_params.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;
+  try{
+    await db.collection('projects').doc(docId).set(d);
+    alert('✅ 專案「'+name+'」已儲存至雲端！');
+  }catch(e){alert('❌ 雲端儲存失敗: '+e.message);}
 }
 
-function saveProject() {
-  readGlobals();
-  let data = {
-    meta: {version: "v4.30 (GitHub Pages)", timestamp: new Date().toISOString()},
-    global_params: {},
-    rf_data: components.rf,
-    digital_data: components.digital,
-    pwr_data: components.pwr
-  };
-  let saveKeys = ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right',
-    'Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad',
-    'K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','fin_tech_selector_v2',
-    'al_density','filter_density','shielding_density','pcb_surface_density'];
-  saveKeys.forEach(k => data.global_params[k] = G[k]);
-  data.global_params.fin_tech_selector_v2 = document.getElementById('fin_tech_selector_v2').value;
+async function cloudLoadProject(){
+  if(!fbOk||!db){alert('⚠️ Firebase 未連線，無法使用雲端載入。');return;}
+  try{
+    let snap=await db.collection('projects').orderBy('meta.timestamp','desc').get();
+    let list=document.getElementById('cloudList');
+    if(snap.empty){list.innerHTML='<div class="cloud-empty">尚無雲端專案</div>';}
+    else{
+      let html='<div class="cloud-list">';
+      snap.forEach(doc=>{
+        let d=doc.data();let t=d.meta&&d.meta.timestamp?new Date(d.meta.timestamp).toLocaleString('zh-TW'):'';
+        html+='<div class="cloud-item" onclick="cloudLoadOne(\''+doc.id+'\')"><div><div class="ci-name">'+
+          (d.project_name||doc.id)+'</div><div class="ci-time">'+t+'</div></div>'+
+          '<span class="ci-del" onclick="event.stopPropagation();cloudDeleteOne(\''+doc.id+'\',\''+(d.project_name||doc.id)+'\')">🗑️</span></div>';
+      });
+      html+='</div>';list.innerHTML=html;
+    }
+    document.getElementById('cloudModal').classList.add('active');
+  }catch(e){alert('❌ 讀取雲端專案列表失敗: '+e.message);}
+}
 
-  let blob = new Blob([JSON.stringify(data,null,4)], {type:'application/json'});
-  let a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'RRU_Project_' + new Date().toISOString().slice(0,10) + '.json';
-  a.click();
+async function cloudLoadOne(docId){
+  try{
+    let doc=await db.collection('projects').doc(docId).get();
+    if(!doc.exists){alert('專案不存在');return;}
+    let d=doc.data();
+    if(d.global_params){for(let k in d.global_params){G[k]=d.global_params[k];let el=document.getElementById(k);if(el){el.value=d.global_params[k];}}}
+    if(d.rf_data)components.rf=d.rf_data;if(d.digital_data)components.digital=d.digital_data;if(d.pwr_data)components.pwr=d.pwr_data;
+    if(d.project_name)document.getElementById('cloudProjectName').value=d.project_name;
+    closeCloudModal();recalc();alert('✅ 專案「'+(d.project_name||docId)+'」已從雲端載入！');
+  }catch(e){alert('❌ 載入失敗: '+e.message);}
+}
+
+async function cloudDeleteOne(docId,name){
+  if(!confirm('確定要刪除雲端專案「'+name+'」？此操作無法復原！'))return;
+  try{await db.collection('projects').doc(docId).delete();alert('🗑️ 已刪除「'+name+'」');cloudLoadProject();}
+  catch(e){alert('❌ 刪除失敗: '+e.message);}
+}
+
+function closeCloudModal(){document.getElementById('cloudModal').classList.remove('active');}
+
+// =====================================================
+// LOGIN
+// =====================================================
+function doLogin(){
+  let pw=document.getElementById('login-pw').value;
+  if(pw==='tedus'){
+    document.getElementById('login-page').style.display='none';
+    document.getElementById('sidebar').style.display='';
+    document.querySelector('.main').style.display='';
+    document.getElementById('loading').style.display='flex';
+    init();
+  } else {
+    document.getElementById('login-error').style.display='block';
+  }
+}
+
+// =====================================================
+// PDF REPORT GENERATION (pdfmake + Plotly.toImage)
+// =====================================================
+let pdfFontReady = false;
+let pdfFontData = null;
+let pdfmakeLoaded = false;
+
+function loadScript(src) {
+  return new Promise(function(resolve, reject) {
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = function() { reject(new Error('Failed to load: ' + src)); };
+    document.head.appendChild(s);
+  });
+}
+
+async function ensurePdfmake() {
+  if (typeof pdfMake !== 'undefined') return;
+  if (pdfmakeLoaded) return;
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js');
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js');
+  pdfmakeLoaded = true;
+}
+
+async function loadCJKFont() {
+  if (pdfFontReady) return true;
+  try {
+    // Helper: convert ArrayBuffer to base64 without stack overflow
+    function arrayBufferToBase64(buffer) {
+      var bytes = new Uint8Array(buffer);
+      var binary = '';
+      var chunkSize = 8192;
+      for (var i = 0; i < bytes.length; i += chunkSize) {
+        var chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+        binary += String.fromCharCode.apply(null, chunk);
+      }
+      return btoa(binary);
+    }
+    const url = 'https://cdn.jsdelivr.net/fontsource/fonts/noto-sans-tc@latest/chinese-traditional-400-normal.woff';
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('Font fetch failed: ' + resp.status);
+    const buf = await resp.arrayBuffer();
+    const b64 = arrayBufferToBase64(buf);
+    // Also load bold
+    let boldB64 = b64; // fallback
+    try {
+      const boldResp = await fetch('https://cdn.jsdelivr.net/fontsource/fonts/noto-sans-tc@latest/chinese-traditional-700-normal.woff');
+      if (boldResp.ok) {
+        const boldBuf = await boldResp.arrayBuffer();
+        boldB64 = arrayBufferToBase64(boldBuf);
+      }
+    } catch(e) {}
+    pdfMake.fonts = {
+      NotoSansTC: {
+        normal: {content: b64, encoding: 'Identity-H'},
+        bold: {content: boldB64, encoding: 'Identity-H'},
+        italics: {content: b64, encoding: 'Identity-H'},
+        bolditalics: {content: boldB64, encoding: 'Identity-H'}
+      }
+    };
+    pdfFontReady = true;
+    return true;
+  } catch(e) {
+    console.warn('CJK font load failed, using Roboto fallback:', e);
+    pdfFontReady = false;
+    return false;
+  }
+}
+
+async function captureChartImage(divId, w, h) {
+  const el = document.getElementById(divId);
+  if (!el || !el.querySelector('.js-plotly-plot')) return null;
+  try {
+    const gd = el.querySelector('.js-plotly-plot') || el;
+    const img = await Plotly.toImage(gd, {format:'png', width: w||900, height: h||400, scale:2});
+    return img;
+  } catch(e) { console.warn('Chart capture failed for', divId, e); return null; }
+}
+
+async function generatePDFReport() {
+  if (!calcResults || !calcResults.rows.length) {
+    alert('⚠️ 尚無計算結果，請先輸入元件數據！');
+    return;
+  }
+  const btn = document.getElementById('pdf-btn');
+  btn.textContent = '⏳ 產生中...';
+  btn.disabled = true;
+
+  try {
+    // Load pdfmake dynamically
+    await ensurePdfmake();
+    // Load CJK font
+    const hasCJK = await loadCJKFont();
+    const fontName = hasCJK ? 'NotoSansTC' : 'Roboto';
+
+    // Capture chart images in parallel
+    const R = calcResults;
+    const valid = R.rows.filter(r => r.Total_W > 0);
+
+    // Ensure Tab 2 charts are rendered
+    const currentTab = document.querySelector('.tab-btn.active');
+    const wasTab2 = currentTab && currentTab.textContent.includes('視覺化');
+
+    // Capture existing charts (they are rendered on recalc)
+    let chartImages = {};
+    const chartDivs = ['chart-margin', 'chart-power', 'chart-tjm'];
+    const chartPromises = chartDivs.map(async id => {
+      const el = document.getElementById(id);
+      if (el && el.classList.contains('js-plotly-plot')) {
+        try {
+          const img = await Plotly.toImage(el, {format:'png', width:900, height:400, scale:2});
+          chartImages[id] = img;
+        } catch(e) {}
+      }
+    });
+    // Capture 3D
+    const el3d = document.getElementById('tab3-3d');
+    if (el3d && el3d.querySelector('.js-plotly-plot')) {
+      chartPromises.push((async () => {
+        try {
+          const gd = el3d.querySelector('.js-plotly-plot') || el3d;
+          chartImages['3d'] = await Plotly.toImage(gd, {format:'png', width:900, height:600, scale:2});
+        } catch(e) {}
+      })());
+    }
+    // Capture sensitivity charts
+    ['sa-cl','sa-cr','tv','tt'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.querySelector('.js-plotly-plot')) {
+        chartPromises.push((async () => {
+          try {
+            const gd = el.querySelector('.js-plotly-plot');
+            chartImages[id] = await Plotly.toImage(gd, {format:'png', width:800, height:400, scale:2});
+          } catch(e) {}
+        })());
+      }
+    });
+
+    await Promise.all(chartPromises);
+
+    // Build PDF document definition
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('zh-TW', {year:'numeric',month:'2-digit',day:'2-digit'});
+    const timeStr = now.toLocaleTimeString('zh-TW', {hour:'2-digit',minute:'2-digit'});
+    const projectName = document.getElementById('cloudProjectName').value.trim() || '5G RRU Project';
+
+    // Color palette
+    const cPrimary = '#007CF0';
+    const cDark = '#1e293b';
+    const cDanger = '#e74c3c';
+    const cWarning = '#f39c12';
+    const cSuccess = '#2ecc71';
+    const cInfo = '#3498db';
+    const cGray = '#666666';
+
+    // Helper: build component table for pdfmake
+    function compTable(arr, category) {
+      if (!arr || !arr.length) return null;
+      const headers = ['Component','Qty','Power(W)','Height(mm)','Pad_L','Pad_W','Thick(mm)','Board_Type','Limit(C)','R_jc','TIM_Type'];
+      const headerLabels = ['Component','Qty','Power\n(W)','Height\n(mm)','Pad_L','Pad_W','Thick\n(mm)','Board\nType','Limit\n(C)','R_jc','TIM\nType'];
+      const body = [headerLabels.map(h => ({text:h, bold:true, fontSize:7, fillColor:'#f1f5f9', color:'#475569', alignment:'center'}))];
+      arr.forEach(row => {
+        body.push(headers.map(h => ({text: String(row[h] != null ? row[h] : ''), fontSize:7, alignment: typeof row[h]==='number'?'center':'left'})));
+      });
+      const totalP = arr.reduce((s,r) => s + (r['Power(W)']||0) * (r.Qty||0), 0);
+      return [
+        {text: category.toUpperCase() + ' Components', style:'sectionTitle', margin:[0,10,0,4]},
+        {text: 'Total: ' + totalP.toFixed(1) + ' W | ' + arr.length + ' component(s)', fontSize:8, color:cGray, margin:[0,0,0,4]},
+        {table: {headerRows:1, widths: Array(11).fill('auto'), body}, layout: {
+          hLineWidth:()=>0.5, vLineWidth:()=>0.3, hLineColor:()=>'#e2e8f0', vLineColor:()=>'#e2e8f0',
+          paddingLeft:()=>3, paddingRight:()=>3, paddingTop:()=>2, paddingBottom:()=>2
+        }}
+      ];
+    }
+
+    // Helper: KPI box
+    function kpiBox(label, value, desc, color) {
+      return {
+        stack: [
+          {text: label, fontSize:7, color:cGray, alignment:'center'},
+          {text: value, fontSize:14, bold:true, color: color||cDark, alignment:'center', margin:[0,2,0,1]},
+          {text: desc, fontSize:6, color:'#999', alignment:'center'}
+        ],
+        margin: [0,0,0,0]
+      };
+    }
+
+    // Build detailed analysis table
+    function detailTable() {
+      const cols = ['Component','Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','Drop','R_jc','R_int','R_TIM','Limit(C)'];
+      const labels = ['Component','Allowed\ndT','Tj\nMargin','Tj','Tc','Total\nW','Loc\nAmb','Drop','R_jc','R_int','R_TIM','Limit\n(C)'];
+      const body = [labels.map(h => ({text:h, bold:true, fontSize:7, fillColor:'#f1f5f9', color:'#475569', alignment:'center'}))];
+      R.rows.forEach(row => {
+        body.push(cols.map(c => {
+          let v = row[c];
+          let fillColor = null;
+          if ((c === 'Allowed_dT' || c === 'Tj_Margin') && typeof v === 'number') {
+            fillColor = v < 0 ? '#ffebee' : v < 10 ? '#fff8e1' : v < 20 ? '#fffde7' : '#e8f5e9';
+          }
+          if (typeof v === 'number') v = (c.includes('R_') && c !== 'R_jc') ? v.toFixed(4) : v.toFixed(1);
+          return {text: String(v != null ? v : ''), fontSize:7, alignment: c==='Component'?'left':'center', fillColor};
+        }));
+      });
+      return {table: {headerRows:1, widths: ['auto','auto','auto','auto','auto','auto','auto','auto','auto','auto','auto','auto'], body}, layout: {
+        hLineWidth:()=>0.5, vLineWidth:()=>0.3, hLineColor:()=>'#e2e8f0', vLineColor:()=>'#e2e8f0',
+        paddingLeft:()=>3, paddingRight:()=>3, paddingTop:()=>2, paddingBottom:()=>2
+      }};
+    }
+
+    // Top 3 risk components
+    let riskComps = valid.sort((a,b) => a.Allowed_dT - b.Allowed_dT).slice(0,3);
+
+    // ─── Assemble Document ───
+    let content = [];
+
+    // ══ COVER PAGE ══
+    content.push({text: '\n\n\n\n\n\n\n\n', fontSize:10});
+    content.push({text: '5G RRU Thermal & Volume', style:'coverTitle', alignment:'center'});
+    content.push({text: 'Evaluation Report', style:'coverTitle', alignment:'center', margin:[0,0,0,20]});
+    content.push({canvas: [{type:'line', x1:150, y1:0, x2:370, y2:0, lineWidth:3, lineColor:cPrimary}], margin:[0,0,0,20]});
+    content.push({text: projectName, fontSize:16, bold:true, color:cDark, alignment:'center', margin:[0,0,0,8]});
+    content.push({text: dateStr + ' ' + timeStr, fontSize:11, color:cGray, alignment:'center', margin:[0,0,0,6]});
+    content.push({text: 'v4.30 (GitHub Pages Edition)', fontSize:9, color:'#999', alignment:'center', margin:[0,0,0,6]});
+    content.push({text: 'Generated by 5G RRU Thermal Engine Pro', fontSize:8, color:'#bbb', alignment:'center'});
+    content.push({text: '', pageBreak:'after'});
+
+    // ══ 1. EXECUTIVE SUMMARY (KPI) ══
+    content.push({text: '1. Executive Summary', style:'heading1'});
+    content.push({text: 'Key Performance Indicators / \u95dc\u9375\u6307\u6a19\u6458\u8981', fontSize:9, color:cGray, margin:[0,0,0,10]});
+
+    content.push({
+      columns: [
+        kpiBox('Total Power / \u6574\u6a5f\u7e3d\u71b1\u8017', R.Total_Power.toFixed(2) + ' W', 'with Margin ' + G.Margin, cDanger),
+        kpiBox('Bottleneck / \u7f3d\u9838\u5143\u4ef6', R.Bottleneck_Name, 'Margin: ' + R.Bottleneck_Tj_Margin + '\u00b0C', cWarning),
+        kpiBox('Required Area / \u6240\u9700\u9762\u7a4d', R.Area_req.toFixed(3) + ' m\u00b2', 'Heatsink Surface', cInfo),
+        kpiBox('Fin Count / \u9c2d\u7247\u6578', R.Fin_Count + ' pcs', 'Gap: ' + G.Gap + 'mm, t: ' + G.Fin_t + 'mm', '#9b59b6')
+      ],
+      columnGap: 10,
+      margin: [0,0,0,15]
+    });
+
+    // Design parameters summary
+    content.push({text: 'Design Parameters / \u8a2d\u8a08\u53c3\u6578', style:'heading2'});
+    content.push({
+      columns: [
+        {width:'50%', stack:[
+          {text: 'Environmental / \u74b0\u5883\u689d\u4ef6', fontSize:8, bold:true, color:cPrimary, margin:[0,0,0,3]},
+          {table:{body:[
+            [{text:'T_amb',bold:true,fontSize:7},{text:G.T_amb+'\u00b0C',fontSize:7}],
+            [{text:'Margin',bold:true,fontSize:7},{text:G.Margin+'x',fontSize:7}],
+            [{text:'Fin Tech',bold:true,fontSize:7},{text:G.fin_tech_selector_v2,fontSize:7}]
+          ],widths:['40%','60%']},layout:'noBorders',margin:[0,0,10,0]}
+        ]},
+        {width:'50%', stack:[
+          {text: 'Geometry / \u5e7e\u4f55\u5c3a\u5bf8', fontSize:8, bold:true, color:cPrimary, margin:[0,0,0,3]},
+          {table:{body:[
+            [{text:'PCB (LxW)',bold:true,fontSize:7},{text:G.L_pcb+'x'+G.W_pcb+' mm',fontSize:7}],
+            [{text:'Base Thick',bold:true,fontSize:7},{text:G.t_base+' mm',fontSize:7}],
+            [{text:'H_shield',bold:true,fontSize:7},{text:G.H_shield+' mm',fontSize:7}],
+            [{text:'H_filter',bold:true,fontSize:7},{text:G.H_filter+' mm',fontSize:7}],
+            [{text:'Fin Gap',bold:true,fontSize:7},{text:G.Gap+' mm',fontSize:7}],
+            [{text:'Fin Thick',bold:true,fontSize:7},{text:G.Fin_t+' mm',fontSize:7}]
+          ],widths:['40%','60%']},layout:'noBorders'}
+        ]}
+      ],
+      margin:[0,0,0,15]
+    });
+
+    // h value
+    let {h_value, h_conv, h_rad} = calcHValue(G.Gap);
+    content.push({
+      table:{body:[[
+        {text:'h_total = ' + h_value.toFixed(2) + ' W/m\u00b2K', bold:true, fontSize:8, color:cPrimary},
+        {text:'h_conv = ' + h_conv.toFixed(2), fontSize:8, color:cGray},
+        {text:'h_rad = ' + h_rad.toFixed(2), fontSize:8, color:cGray},
+        {text:'Aspect Ratio = ' + R.aspect_ratio.toFixed(1), fontSize:8, color: R.aspect_ratio>12?cDanger:R.aspect_ratio>=4.5&&R.aspect_ratio<=6.5?cSuccess:cWarning}
+      ]]},
+      layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingLeft:()=>6, paddingRight:()=>6, paddingTop:()=>4, paddingBottom:()=>4, fillColor:()=>'#f0f9ff'},
+      margin:[0,0,0,10]
+    });
+
+    // ══ 2. COMPONENT LIST ══
+    content.push({text: '', pageBreak:'after'});
+    content.push({text: '2. Component List / \u5143\u4ef6\u6e05\u55ae', style:'heading1'});
+
+    let rfTable = compTable(components.rf, 'RF');
+    let digTable = compTable(components.digital, 'Digital');
+    let pwrTable = compTable(components.pwr, 'PWR');
+    if (rfTable) content.push(...rfTable);
+    if (digTable) content.push(...digTable);
+    if (pwrTable) content.push(...pwrTable);
+
+    // Total summary
+    let rfP = components.rf.reduce((s,r) => s+r['Power(W)']*r.Qty, 0);
+    let digP = components.digital.reduce((s,r) => s+r['Power(W)']*r.Qty, 0);
+    let pwrP = components.pwr.reduce((s,r) => s+r['Power(W)']*r.Qty, 0);
+    content.push({
+      table:{body:[[
+        {text:'Total Power (before Margin): ' + (rfP+digP+pwrP).toFixed(1) + ' W', bold:true, fontSize:8},
+        {text:'RF: '+rfP.toFixed(1)+'W', fontSize:8, color:cGray},
+        {text:'Digital: '+digP.toFixed(1)+'W', fontSize:8, color:cGray},
+        {text:'PWR: '+pwrP.toFixed(1)+'W', fontSize:8, color:cGray}
+      ]]},
+      layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingLeft:()=>6, paddingRight:()=>6, paddingTop:()=>4, paddingBottom:()=>4, fillColor:()=>'#e3f2fd'},
+      margin:[0,10,0,0]
+    });
+
+    // ══ 3. DETAILED ANALYSIS ══
+    content.push({text: '', pageBreak:'after'});
+    content.push({text: '3. Detailed Analysis / \u8a73\u7d30\u5206\u6790', style:'heading1'});
+
+    // Overheat warnings
+    let ohComps = R.rows.filter(r => r.Tj_Margin < 0 && r.Total_W > 0);
+    if (ohComps.length) {
+      content.push({
+        table:{body:[[{text:'OVERHEAT WARNING: ' + ohComps.map(r=>r.Component+' ('+Math.abs(r.Tj_Margin).toFixed(1)+'\u00b0C over)').join(', '), fontSize:8, color:'#fff', bold:true}]]},
+        layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingLeft:()=>8, paddingRight:()=>8, paddingTop:()=>6, paddingBottom:()=>6, fillColor:()=>cDanger},
+        margin:[0,0,0,8]
+      });
+    }
+
+    // Risk Top 3
+    if (riskComps.length) {
+      content.push({text: 'Top 3 Thermal Risk / \u71b1\u98a8\u96aa\u6392\u540d', style:'heading2'});
+      // medals removed - emoji not supported in PDF fonts
+      content.push({
+        columns: riskComps.map((r,i) => ({
+          stack:[
+            {text: (i===0?'1st':i===1?'2nd':'3rd') + ' Risk', fontSize:7, color:cGray, alignment:'center'},
+            {text: r.Component, fontSize:10, bold:true, alignment:'center', margin:[0,2,0,1]},
+            {text: 'Allowed dT: '+r.Allowed_dT.toFixed(1)+'\u00b0C', fontSize:8, alignment:'center', color: r.Allowed_dT<5?cDanger:cWarning},
+            {text: 'Tj_Margin: '+r.Tj_Margin.toFixed(1)+'\u00b0C', fontSize:7, alignment:'center', color:cGray}
+          ],
+          width: '*'
+        })),
+        columnGap:8,
+        margin:[0,0,0,10]
+      });
+    }
+
+    content.push(detailTable());
+
+    // ══ 4. VISUAL CHARTS ══
+    content.push({text: '', pageBreak:'after'});
+    content.push({text: '4. Visual Report / \u8996\u89ba\u5316\u5831\u544a', style:'heading1'});
+
+    if (chartImages['chart-margin']) {
+      content.push({text: 'Temperature Margin Overview / \u6eab\u5ea6\u88d5\u5ea6\u7e3d\u89bd', style:'heading2'});
+      content.push({image: chartImages['chart-margin'], width: 500, margin:[0,0,0,10]});
+    }
+    if (chartImages['chart-power'] || chartImages['chart-tjm']) {
+      content.push({
+        columns: [
+          chartImages['chart-power'] ? {image: chartImages['chart-power'], width: 245} : {},
+          chartImages['chart-tjm'] ? {image: chartImages['chart-tjm'], width: 245} : {}
+        ],
+        columnGap: 10,
+        margin:[0,0,0,10]
+      });
+    }
+
+    // ══ 5. VOLUME & WEIGHT ══
+    content.push({text: '5. Volume & Weight Estimation / \u9ad4\u7a4d\u8207\u91cd\u91cf\u4f30\u7b97', style:'heading1', margin:[0,15,0,8]});
+
+    if (R.drc_failed) {
+      content.push({
+        table:{body:[[{text:'DRC FAILED: ' + R.drc_msg, fontSize:10, color:'#fff', bold:true, alignment:'center'}]]},
+        layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingLeft:()=>12, paddingRight:()=>12, paddingTop:()=>10, paddingBottom:()=>10, fillColor:()=>cDanger},
+        margin:[0,0,0,10]
+      });
+    } else {
+      content.push({
+        columns: [
+          {width:'50%', stack:[
+            {text:'Dimensions / \u5c3a\u5bf8', fontSize:8, bold:true, color:cPrimary, margin:[0,0,0,4]},
+            {table:{body:[
+              [{text:'Length (L)',bold:true,fontSize:8},{text:R.L_hsk.toFixed(1)+' mm',fontSize:8}],
+              [{text:'Width (W)',bold:true,fontSize:8},{text:R.W_hsk.toFixed(1)+' mm',fontSize:8}],
+              [{text:'Height (H)',bold:true,fontSize:8},{text:R.RRU_Height.toFixed(1)+' mm',fontSize:8}],
+              [{text:'Fin Height',bold:true,fontSize:8},{text:R.Fin_Height.toFixed(2)+' mm',fontSize:8}],
+              [{text:'Fin Count',bold:true,fontSize:8},{text:R.Fin_Count+' pcs',fontSize:8}]
+            ],widths:['45%','55%']},layout:'noBorders'}
+          ]},
+          {width:'50%', stack:[
+            {table:{body:[[
+              {text:'Estimated Volume / \u9810\u4f30\u9ad4\u7a4d', fontSize:8, color:cGray, alignment:'center', colSpan:1}
+            ],[
+              {text:R.Volume_L.toFixed(2) + ' L', fontSize:28, bold:true, color:cSuccess, alignment:'center'}
+            ]]}, layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingTop:()=>4, paddingBottom:()=>4, fillColor:(i)=>i===1?'#e6fffa':null}, margin:[10,0,0,8]},
+            {table:{body:[[
+              {text:'Estimated Weight / \u9810\u4f30\u91cd\u91cf', fontSize:8, color:cGray, alignment:'center'}
+            ],[
+              {text:R.total_weight_kg.toFixed(1) + ' kg', fontSize:22, bold:true, color:cDark, alignment:'center'}
+            ]]}, layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingTop:()=>4, paddingBottom:()=>4, fillColor:(i)=>i===1?'#f0f0f0':null}, margin:[10,0,0,0]}
+          ]}
+        ],
+        margin:[0,0,0,10]
+      });
+
+      // Weight breakdown
+      content.push({text:'Weight Breakdown / \u91cd\u91cf\u5206\u9805', fontSize:8, bold:true, color:cPrimary, margin:[0,5,0,4]});
+      content.push({
+        table:{body:[
+          [{text:'Item',bold:true,fontSize:7,fillColor:'#f1f5f9'},{text:'Weight (kg)',bold:true,fontSize:7,fillColor:'#f1f5f9',alignment:'center'},{text:'Ratio',bold:true,fontSize:7,fillColor:'#f1f5f9',alignment:'center'}],
+          [{text:'Heatsink (Base+Fins)',fontSize:7},{text:R.hs_weight_kg.toFixed(2),fontSize:7,alignment:'center'},{text:(R.hs_weight_kg/R.total_weight_kg*100).toFixed(1)+'%',fontSize:7,alignment:'center'}],
+          [{text:'Shield',fontSize:7},{text:R.shield_weight_kg.toFixed(2),fontSize:7,alignment:'center'},{text:(R.shield_weight_kg/R.total_weight_kg*100).toFixed(1)+'%',fontSize:7,alignment:'center'}],
+          [{text:'Cavity Filter',fontSize:7},{text:R.filter_weight_kg.toFixed(2),fontSize:7,alignment:'center'},{text:(R.filter_weight_kg/R.total_weight_kg*100).toFixed(1)+'%',fontSize:7,alignment:'center'}],
+          [{text:'Shielding Case',fontSize:7},{text:R.shielding_weight_kg.toFixed(2),fontSize:7,alignment:'center'},{text:(R.shielding_weight_kg/R.total_weight_kg*100).toFixed(1)+'%',fontSize:7,alignment:'center'}],
+          [{text:'PCB',fontSize:7},{text:R.pcb_weight_kg.toFixed(3),fontSize:7,alignment:'center'},{text:(R.pcb_weight_kg/R.total_weight_kg*100).toFixed(1)+'%',fontSize:7,alignment:'center'}],
+          [{text:'TOTAL',bold:true,fontSize:7,fillColor:'#e3f2fd'},{text:R.total_weight_kg.toFixed(2),bold:true,fontSize:7,alignment:'center',fillColor:'#e3f2fd'},{text:'100%',bold:true,fontSize:7,alignment:'center',fillColor:'#e3f2fd'}]
+        ],widths:['50%','25%','25%']},
+        layout:{hLineWidth:()=>0.5, vLineWidth:()=>0.3, hLineColor:()=>'#e2e8f0', vLineColor:()=>'#e2e8f0', paddingLeft:()=>4, paddingRight:()=>4, paddingTop:()=>3, paddingBottom:()=>3},
+        margin:[0,0,0,10]
+      });
+    }
+
+    // ══ 6. 3D MODEL ══
+    if (chartImages['3d']) {
+      content.push({text: '', pageBreak:'after'});
+      content.push({text: '6. 3D Simulation / 3D \u6a21\u64ec\u8996\u5716', style:'heading1'});
+      content.push({image: chartImages['3d'], width: 480, alignment:'center', margin:[0,10,0,10]});
+      content.push({
+        table:{body:[[
+          {text:'L: '+R.L_hsk.toFixed(1)+' mm', fontSize:8, alignment:'center'},
+          {text:'W: '+R.W_hsk.toFixed(1)+' mm', fontSize:8, alignment:'center'},
+          {text:'H: '+R.RRU_Height.toFixed(1)+' mm', fontSize:8, alignment:'center'},
+          {text:'Fins: '+R.Fin_Count+' pcs x '+R.Fin_Height.toFixed(1)+'mm', fontSize:8, alignment:'center'}
+        ]]},
+        layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingLeft:()=>8, paddingRight:()=>8, paddingTop:()=>4, paddingBottom:()=>4, fillColor:()=>'#f0f9ff'},
+        margin:[0,0,0,0]
+      });
+    }
+
+    // ══ 7. SENSITIVITY ANALYSIS ══
+    let hasSA = chartImages['sa-cl'] || chartImages['sa-cr'] || chartImages['tv'] || chartImages['tt'];
+    if (hasSA) {
+      content.push({text: '', pageBreak:'after'});
+      content.push({text: '7. Sensitivity Analysis / \u654f\u611f\u5ea6\u5206\u6790', style:'heading1'});
+      if (chartImages['sa-cl']) {
+        content.push({text: 'Sweep Analysis / \u55ae\u8b8a\u6578\u6383\u63cf', style:'heading2'});
+        content.push({
+          columns: [
+            chartImages['sa-cl'] ? {image: chartImages['sa-cl'], width: 245} : {},
+            chartImages['sa-cr'] ? {image: chartImages['sa-cr'], width: 245} : {}
+          ],
+          columnGap: 10,
+          margin:[0,0,0,15]
+        });
+      }
+      if (chartImages['tv'] || chartImages['tt']) {
+        content.push({text: 'Tornado Analysis / \u9f8d\u6372\u98a8\u5716', style:'heading2'});
+        content.push({
+          columns: [
+            chartImages['tv'] ? {image: chartImages['tv'], width: 245} : {},
+            chartImages['tt'] ? {image: chartImages['tt'], width: 245} : {}
+          ],
+          columnGap: 10,
+          margin:[0,0,0,10]
+        });
+      }
+    }
+
+    // ══ 8. CONCLUSION ══
+    content.push({text: '', pageBreak:'after'});
+    let conclusionSection = hasSA ? '8' : (chartImages['3d'] ? '7' : '6');
+    content.push({text: conclusionSection + '. Conclusion / \u7d50\u8ad6', style:'heading1'});
+
+    let statusText, statusColor;
+    if (R.drc_failed) { statusText = 'DESIGN INVALID - DRC FAILED'; statusColor = cDanger; }
+    else if (ohComps.length) { statusText = 'WARNING - ' + ohComps.length + ' component(s) overheating'; statusColor = cDanger; }
+    else if (R.Bottleneck_Tj_Margin < 5) { statusText = 'MARGINAL - Low thermal margin'; statusColor = cWarning; }
+    else { statusText = 'PASS - Design within thermal limits'; statusColor = cSuccess; }
+
+    content.push({
+      table:{body:[[{text: statusText, fontSize:14, bold:true, color:'#fff', alignment:'center'}]]},
+      layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingLeft:()=>15, paddingRight:()=>15, paddingTop:()=>12, paddingBottom:()=>12, fillColor:()=>statusColor},
+      margin:[0,10,0,15]
+    });
+
+    content.push({
+      table:{body:[
+        [{text:'Item',bold:true,fontSize:9,fillColor:'#f1f5f9'},{text:'Value',bold:true,fontSize:9,fillColor:'#f1f5f9'},{text:'Status',bold:true,fontSize:9,fillColor:'#f1f5f9'}],
+        [{text:'Total Power',fontSize:9},{text:R.Total_Power.toFixed(2)+' W',fontSize:9},{text:'-',fontSize:9,alignment:'center'}],
+        [{text:'Bottleneck Component',fontSize:9},{text:R.Bottleneck_Name,fontSize:9},{text:'Margin: '+R.Bottleneck_Tj_Margin+'\u00b0C',fontSize:9,color:R.Bottleneck_Tj_Margin<5?cDanger:R.Bottleneck_Tj_Margin<15?cWarning:cSuccess}],
+        [{text:'Estimated Volume',fontSize:9},{text:R.drc_failed?'N/A':R.Volume_L.toFixed(2)+' L',fontSize:9},{text:R.drc_failed?'DRC Failed':'OK',fontSize:9,color:R.drc_failed?cDanger:cSuccess}],
+        [{text:'Estimated Weight',fontSize:9},{text:R.drc_failed?'N/A':R.total_weight_kg.toFixed(1)+' kg',fontSize:9},{text:'-',fontSize:9,alignment:'center'}],
+        [{text:'Aspect Ratio',fontSize:9},{text:R.aspect_ratio.toFixed(1),fontSize:9},{text:R.aspect_ratio>12?'FAIL':R.aspect_ratio>=4.5&&R.aspect_ratio<=6.5?'Good':'Fair',fontSize:9,color:R.aspect_ratio>12?cDanger:R.aspect_ratio>=4.5&&R.aspect_ratio<=6.5?cSuccess:cWarning}],
+        [{text:'h_total',fontSize:9},{text:h_value.toFixed(2)+' W/m\u00b2K',fontSize:9},{text:h_conv<4?'Too Low':'OK',fontSize:9,color:h_conv<4?cDanger:cSuccess}]
+      ],widths:['35%','35%','30%']},
+      layout:{hLineWidth:()=>0.5, vLineWidth:()=>0.3, hLineColor:()=>'#e2e8f0', vLineColor:()=>'#e2e8f0', paddingLeft:()=>6, paddingRight:()=>6, paddingTop:()=>4, paddingBottom:()=>4},
+      margin:[0,0,0,20]
+    });
+
+    content.push({text:'Disclaimer / \u514d\u8cac\u8072\u660e', fontSize:8, bold:true, color:cGray, margin:[0,10,0,4]});
+    content.push({text:'This report is generated by 5G RRU Thermal Engine Pro for quick volume evaluation purposes. Results are based on semi-empirical models and should be cross-validated with CFD simulation or experimental measurements. The h-value model has been calibrated against multiple RRU products with typical error within \u00b18%.', fontSize:7, color:'#999', margin:[0,0,0,4]});
+    content.push({text:'\u672c\u5831\u544a\u7531 5G RRU \u71b1\u6d41\u5f15\u64ce Pro \u81ea\u52d5\u7522\u751f\uff0c\u50c5\u4f9b\u5feb\u901f\u6982\u5ff5\u8a2d\u8a08\u8207\u5c3a\u5bf8\u8a55\u4f30\u4e4b\u7528\u3002\u8a08\u7b97\u7d50\u679c\u57fa\u65bc\u534a\u7d93\u9a57\u6a21\u578b\uff0c\u5efa\u8b70\u8207 CFD \u6a21\u64ec\u6216\u5be6\u6e2c\u6578\u64da\u9032\u884c\u4ea4\u53c9\u9a57\u8b49\u3002', fontSize:7, color:'#999'});
+
+    // ── Document Definition ──
+    const docDefinition = {
+      pageSize: 'A4',
+      pageMargins: [40, 60, 40, 50],
+      defaultStyle: { font: fontName, fontSize: 9 },
+      styles: {
+        coverTitle: { fontSize: 28, bold: true, color: cPrimary },
+        heading1: { fontSize: 16, bold: true, color: cDark, margin: [0, 0, 0, 8] },
+        heading2: { fontSize: 11, bold: true, color: cPrimary, margin: [0, 8, 0, 5] },
+        sectionTitle: { fontSize: 10, bold: true, color: cDark }
+      },
+      header: function(currentPage, pageCount) {
+        if (currentPage === 1) return null;
+        return {
+          columns: [
+            {text: '5G RRU Thermal Report - ' + projectName, fontSize:7, color:'#bbb', margin:[40,20,0,0]},
+            {text: dateStr, fontSize:7, color:'#bbb', alignment:'right', margin:[0,20,40,0]}
+          ]
+        };
+      },
+      footer: function(currentPage, pageCount) {
+        if (currentPage === 1) return null;
+        return {
+          columns: [
+            {text: 'Confidential', fontSize:7, color:'#ccc', margin:[40,0,0,0]},
+            {text: 'Page ' + currentPage + ' / ' + pageCount, fontSize:7, color:'#999', alignment:'right', margin:[0,0,40,0]}
+          ]
+        };
+      },
+      content: content
+    };
+
+    // Generate and download
+    const fileName = 'RRU_Report_' + (projectName.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'_')) + '_' + now.toISOString().slice(0,10) + '.pdf';
+    pdfMake.createPdf(docDefinition).download(fileName);
+
+  } catch(e) {
+    console.error('PDF generation error:', e);
+    alert('\u274c PDF \u7522\u751f\u5931\u6557: ' + e.message);
+  } finally {
+    btn.textContent = '\ud83d\udcc4 PDF \u5831\u544a';
+    btn.disabled = false;
+  }
 }
 
 // =====================================================
 // BOOT
 // =====================================================
-window.addEventListener('DOMContentLoaded', init);
+window.addEventListener('DOMContentLoaded',function(){
+  // Hide app until login
+  document.getElementById('sidebar').style.display='none';
+  document.querySelector('.main').style.display='none';
+  document.getElementById('loading').style.display='none';
+});
 </script>
 </body>
 </html>
