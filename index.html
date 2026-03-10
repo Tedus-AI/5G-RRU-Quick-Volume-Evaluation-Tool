@@ -889,10 +889,31 @@ function renderTab3(){
     for(let i=0;i<R.Fin_Count;i++){let f0=yo+i*(G.Fin_t+G.Gap),f1=f0+G.Fin_t;if(f1>W)break;
       tr.push({type:'mesh3d',x:[0,L,L,0,0,L,L,0],y:[f0,f0,f1,f1,f0,f0,f1,f1],z:[zfs,zfs,zfs,zfs,zfe,zfe,zfe,zfe],...ijk,intensity:[0,0,0,0,1,1,1,1],cmin:0,cmax:1,colorscale:[[0,'#E67E22'],[0.45,'#BDC3C7'],[1,'#D6EAF8']],showscale:false,flatshading:true,name:i===0?'Fins':'',showlegend:i===0});}}
   let md=Math.max(L,W,R.RRU_Height)*1.1;
-  Plotly.newPlot('tab3-3d',tr,{scene:{xaxis:{title:'Length',range:[0,md]},yaxis:{title:'Width',range:[0,md]},zaxis:{title:'Height',range:[0,md]},aspectmode:'manual',aspectratio:{x:1,y:1,z:1},camera:{projection:{type:'orthographic'},eye:{x:1.2,y:1.2,z:1.2}},bgcolor:'white'},margin:{l:0,r:0,b:0,t:0},height:600},{responsive:true,displaylogo:false,scrollZoom:false,modeBarButtonsToAdd:[fullscreenBtn],displayModeBar:true});
-  // Reduce scroll zoom sensitivity: intercept wheel, scale deltaY down
-  var el3d=document.getElementById('tab3-3d');
-  el3d.addEventListener('wheel',function(e){e.preventDefault();e.stopPropagation();var gd=el3d;if(!gd._fullLayout)return;var scene=gd._fullLayout.scene._scene;if(!scene)return;var factor=e.deltaY>0?1.03:0.97;var cam=gd._fullLayout.scene.camera;if(cam&&cam.eye){var eye={x:cam.eye.x*factor,y:cam.eye.y*factor,z:cam.eye.z*factor};Plotly.relayout(gd,{'scene.camera.eye':eye});}},{passive:false});
+  Plotly.newPlot('tab3-3d',tr,{scene:{xaxis:{title:'Length',range:[0,md]},yaxis:{title:'Width',range:[0,md]},zaxis:{title:'Height',range:[0,md]},aspectmode:'manual',aspectratio:{x:1,y:1,z:1},camera:{projection:{type:'orthographic'},eye:{x:1.2,y:1.2,z:1.2}},bgcolor:'white'},margin:{l:0,r:0,b:0,t:0},height:600},{responsive:true,displaylogo:false,modeBarButtonsToAdd:[fullscreenBtn],displayModeBar:true});
+  // Reduce scroll zoom sensitivity by intercepting wheel at capture phase,
+  // replacing with a smaller deltaY so Plotly's native handler zooms gently
+  (function(){
+    var el=document.getElementById('tab3-3d');
+    if(el._wheelFixed)return;
+    el._wheelFixed=true;
+    el.addEventListener('wheel',function(e){
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      var reduced=new WheelEvent('wheel',{
+        deltaX:e.deltaX,
+        deltaY:e.deltaY*0.15,
+        deltaZ:e.deltaZ,
+        deltaMode:e.deltaMode,
+        clientX:e.clientX,clientY:e.clientY,
+        screenX:e.screenX,screenY:e.screenY,
+        ctrlKey:e.ctrlKey,shiftKey:e.shiftKey,altKey:e.altKey,metaKey:e.metaKey,
+        bubbles:true,cancelable:true
+      });
+      el._wheelFixed=false;
+      el.dispatchEvent(reduced);
+      el._wheelFixed=true;
+    },{capture:true,passive:false});
+  })();
   document.getElementById('tab3-info').innerHTML='<div class="alert alert-info">📐 <b>外觀尺寸：</b>長 '+L.toFixed(1)+' x 寬 '+W.toFixed(1)+' x 高 '+R.RRU_Height.toFixed(1)+' mm</div><div class="alert alert-success">⚡ <b>鰭片規格：</b>數量 '+R.Fin_Count+' pcs | 高度 '+R.Fin_Height.toFixed(1)+' mm | 厚度 '+G.Fin_t+' mm | 間距 '+G.Gap+' mm</div>';
 
   // AI Rendering Section
