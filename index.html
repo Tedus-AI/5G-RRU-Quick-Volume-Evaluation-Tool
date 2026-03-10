@@ -222,7 +222,7 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
     <label style="margin-top:12px;color:var(--primary-light);">🌊 鰭片幾何</label>
     <div class="row2"><div><label>鰭片 Air Gap (mm)</label><input type="number" id="Gap" step="0.1" onchange="recalc()"></div><div><label>鰭片厚度 (mm)</label><input type="number" id="Fin_t" step="0.1" onchange="recalc()"></div></div>
     <div class="h-display" id="h-display"><div class="h-val" id="h-val">--</div><div class="h-sub" id="h-sub">h = h_conv + h_rad</div></div>
-    <div class="ar-display" id="ar-display"><div style="font-size:0.78rem;color:#94a3b8;">📐 流阻比 (Aspect Ratio)</div><div id="ar-val" style="font-size:1.1rem;font-weight:700;color:#60a5fa;">--</div><div id="ar-msg" style="font-size:0.7rem;color:#888;">✅ 最佳建議：4.5 ~ 6.5</div></div>
+    <div class="ar-display" id="ar-display"><div style="font-size:0.78rem;color:#94a3b8;">📐 流阻比 (Aspect Ratio)</div><div id="ar-val" style="font-size:1.1rem;font-weight:700;color:#60a5fa;">--</div><div id="ar-msg" style="font-size:0.7rem;color:#888;">✅ 最佳建議：4.5 ~ 6.5</div><div id="ar-tip" style="font-size:0.65rem;color:#64748b;margin-top:4px;line-height:1.4;">最佳建議：4.5 ~ 6.5（建議值內，無風 AR 往低趨勢設計，反之亦然）</div></div>
   </div>
 
   <div class="section-title" onclick="toggleSection(this)">3. 材料參數 (含 Via K值)</div>
