@@ -1094,18 +1094,29 @@ async function ensurePdfmake() {
 async function loadCJKFont() {
   if (pdfFontReady) return true;
   try {
+    // Helper: convert ArrayBuffer to base64 without stack overflow
+    function arrayBufferToBase64(buffer) {
+      var bytes = new Uint8Array(buffer);
+      var binary = '';
+      var chunkSize = 8192;
+      for (var i = 0; i < bytes.length; i += chunkSize) {
+        var chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+        binary += String.fromCharCode.apply(null, chunk);
+      }
+      return btoa(binary);
+    }
     const url = 'https://cdn.jsdelivr.net/fontsource/fonts/noto-sans-tc@latest/chinese-traditional-400-normal.woff';
     const resp = await fetch(url);
     if (!resp.ok) throw new Error('Font fetch failed: ' + resp.status);
     const buf = await resp.arrayBuffer();
-    const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+    const b64 = arrayBufferToBase64(buf);
     // Also load bold
     let boldB64 = b64; // fallback
     try {
       const boldResp = await fetch('https://cdn.jsdelivr.net/fontsource/fonts/noto-sans-tc@latest/chinese-traditional-700-normal.woff');
       if (boldResp.ok) {
         const boldBuf = await boldResp.arrayBuffer();
-        boldB64 = btoa(String.fromCharCode(...new Uint8Array(boldBuf)));
+        boldB64 = arrayBufferToBase64(boldBuf);
       }
     } catch(e) {}
     pdfMake.fonts = {
@@ -1371,7 +1382,7 @@ async function generatePDFReport() {
     let ohComps = R.rows.filter(r => r.Tj_Margin < 0 && r.Total_W > 0);
     if (ohComps.length) {
       content.push({
-        table:{body:[[{text:'\u26a0\ufe0f OVERHEAT WARNING: ' + ohComps.map(r=>r.Component+' ('+Math.abs(r.Tj_Margin).toFixed(1)+'\u00b0C over)').join(', '), fontSize:8, color:'#fff', bold:true}]]},
+        table:{body:[[{text:'OVERHEAT WARNING: ' + ohComps.map(r=>r.Component+' ('+Math.abs(r.Tj_Margin).toFixed(1)+'\u00b0C over)').join(', '), fontSize:8, color:'#fff', bold:true}]]},
         layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingLeft:()=>8, paddingRight:()=>8, paddingTop:()=>6, paddingBottom:()=>6, fillColor:()=>cDanger},
         margin:[0,0,0,8]
       });
@@ -1380,7 +1391,7 @@ async function generatePDFReport() {
     // Risk Top 3
     if (riskComps.length) {
       content.push({text: 'Top 3 Thermal Risk / \u71b1\u98a8\u96aa\u6392\u540d', style:'heading2'});
-      let medals = ['\ud83e\udd47','\ud83e\udd48','\ud83e\udd49'];
+      // medals removed - emoji not supported in PDF fonts
       content.push({
         columns: riskComps.map((r,i) => ({
           stack:[
