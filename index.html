@@ -1386,7 +1386,7 @@ async function generatePDFReport() {
         }));
       });
       return [
-        {table: {headerRows:1, widths: ['auto','auto','auto','auto','auto','auto','auto','auto','auto','auto','auto','auto'], body}, layout: {
+        {table: {headerRows:1, widths: [85,'auto','auto','auto','auto','auto','auto','auto','auto','auto','auto','auto'], body}, layout: {
           hLineWidth: function(i,node){return i===0||i===1||i===node.table.body.length?0.8:0.3;},
           vLineWidth:()=>0.3,
           hLineColor: function(i){return i===1?'#94a3b8':'#e2e8f0';},
