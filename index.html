@@ -8,8 +8,6 @@
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js"></script>
 <style>
 :root{--primary:#007CF0;--primary-light:#00DFD8;--sidebar-bg:#1e293b;--sidebar-text:#e2e8f0;--card-shadow:0 4px 6px rgba(0,0,0,0.1);--danger:#e74c3c;--warning:#f39c12;--success:#2ecc71;--info:#3498db;}
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -1073,6 +1071,25 @@ function doLogin(){
 // =====================================================
 let pdfFontReady = false;
 let pdfFontData = null;
+let pdfmakeLoaded = false;
+
+function loadScript(src) {
+  return new Promise(function(resolve, reject) {
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = function() { reject(new Error('Failed to load: ' + src)); };
+    document.head.appendChild(s);
+  });
+}
+
+async function ensurePdfmake() {
+  if (typeof pdfMake !== 'undefined') return;
+  if (pdfmakeLoaded) return;
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js');
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js');
+  pdfmakeLoaded = true;
+}
 
 async function loadCJKFont() {
   if (pdfFontReady) return true;
@@ -1091,7 +1108,7 @@ async function loadCJKFont() {
         boldB64 = btoa(String.fromCharCode(...new Uint8Array(boldBuf)));
       }
     } catch(e) {}
-    pdfmake.fonts = {
+    pdfMake.fonts = {
       NotoSansTC: {
         normal: {content: b64, encoding: 'Identity-H'},
         bold: {content: boldB64, encoding: 'Identity-H'},
@@ -1128,6 +1145,8 @@ async function generatePDFReport() {
   btn.disabled = true;
 
   try {
+    // Load pdfmake dynamically
+    await ensurePdfmake();
     // Load CJK font
     const hasCJK = await loadCJKFont();
     const fontName = hasCJK ? 'NotoSansTC' : 'Roboto';
@@ -1568,7 +1587,7 @@ async function generatePDFReport() {
 
     // Generate and download
     const fileName = 'RRU_Report_' + (projectName.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'_')) + '_' + now.toISOString().slice(0,10) + '.pdf';
-    pdfmake.createPdf(docDefinition).download(fileName);
+    pdfMake.createPdf(docDefinition).download(fileName);
 
   } catch(e) {
     console.error('PDF generation error:', e);
