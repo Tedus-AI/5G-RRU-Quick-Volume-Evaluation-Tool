@@ -1194,7 +1194,10 @@ async function generatePDFReport() {
       const el = document.getElementById(id);
       if (el && el.classList.contains('js-plotly-plot')) {
         try {
-          const img = await Plotly.toImage(el, {format:'png', width:900, height:400, scale:2});
+          // chart-margin needs wider capture to avoid clipping right-side bar labels
+          const w = (id === 'chart-margin') ? 1200 : 900;
+          const h = (id === 'chart-margin') ? Math.max(400, R.rows.filter(r=>r.Total_W>0).length * 50 + 100) : 400;
+          const img = await Plotly.toImage(el, {format:'png', width:w, height:h, scale:2});
           chartImages[id] = img;
         } catch(e) {}
       }
@@ -1340,9 +1343,13 @@ async function generatePDFReport() {
       };
     }
 
-    // Build detailed analysis table with gradient colors
+    // Build detailed analysis table with gradient colors + risk highlight
     function detailTable() {
       const cols = ['Component','Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','Drop','R_jc','R_int','R_TIM','Limit(C)'];
+      // Risk component highlight colors (matching the Top 3 cards above)
+      let riskNames = riskComps.map(r => r.Component);
+      let riskHighlightBg = ['rgba(231,76,60,0.10)', 'rgba(243,156,18,0.10)', 'rgba(241,196,15,0.10)'];
+      let riskHighlightBorder = [cDanger, cWarning, '#f1c40f'];
       // Bilingual header labels
       const headerRow = cols.map(c => ({
         text: [{text: c.replace('_','\n') + '\n', bold:true, fontSize:6, color:'#334155'}, {text: detailColAnnotations[c] || '', fontSize:5, color:'#94a3b8', italics:true}],
@@ -1353,16 +1360,27 @@ async function generatePDFReport() {
       let allVals = R.rows.map(r => r.Allowed_dT).concat(R.rows.map(r => r.Tj_Margin)).filter(v => typeof v === 'number');
       let mn = Math.min(...allVals), mx = Math.max(...allVals);
       R.rows.forEach((row, ri) => {
+        let riskIdx = riskNames.indexOf(row.Component);
+        let isRisk = riskIdx >= 0;
         body.push(cols.map(c => {
           let v = row[c];
           let fillColor = ri % 2 === 1 ? '#fafbfc' : null;
+          // Highlight entire row for top 3 risk components
+          if (isRisk) fillColor = riskHighlightBg[riskIdx];
           if ((c === 'Allowed_dT' || c === 'Tj_Margin') && typeof v === 'number') {
             fillColor = thermalColor(v, mn, mx);
           }
           let fontColor = null;
           if (c === 'Tj_Margin' && typeof v === 'number' && v < 0) fontColor = cDanger;
-          if (typeof v === 'number') v = (c.includes('R_') && c !== 'R_jc') ? v.toFixed(4) : v.toFixed(1);
-          return {text: String(v != null ? v : ''), fontSize:6.5, alignment: c==='Component'?'left':'center', fillColor, color: fontColor || '#334155'};
+          // Bold component name for risk rows + show rank marker
+          let cellText;
+          if (c === 'Component' && isRisk) {
+            cellText = [{text: '[#' + (riskIdx+1) + '] ', fontSize:6, bold:true, color: riskHighlightBorder[riskIdx]}, {text: String(v||''), fontSize:6.5}];
+          } else {
+            if (typeof v === 'number') v = (c.includes('R_') && c !== 'R_jc') ? v.toFixed(4) : v.toFixed(1);
+            cellText = String(v != null ? v : '');
+          }
+          return {text: cellText, fontSize:6.5, alignment: c==='Component'?'left':'center', fillColor, color: fontColor || '#334155'};
         }));
       });
       return [
@@ -1433,7 +1451,7 @@ async function generatePDFReport() {
             paramRow('Base Thick', '散熱器基板厚度', G.t_base+' mm'),
             paramRow('H_shield', '屏蔽罩高度', G.H_shield+' mm'),
             paramRow('H_filter', '腔體濾波器高度', G.H_filter+' mm'),
-            paramRow('Fin Gap', '鰭片間距', G.Gap+' mm'),
+            paramRow('Fin Gap', '鰭片間空氣間隙 (Air Gap)', G.Gap+' mm'),
             paramRow('Fin Thick', '鰭片厚度', G.Fin_t+' mm')
           ],widths:['55%','45%']},layout:{hLineWidth:()=>0.3,vLineWidth:()=>0,hLineColor:()=>'#f1f5f9',paddingTop:()=>2,paddingBottom:()=>2,paddingLeft:()=>4,paddingRight:()=>2}}
         ]}
@@ -1449,7 +1467,7 @@ async function generatePDFReport() {
         {text:h_value.toFixed(2) + ' W/m\u00b2K', bold:true, fontSize:9, color:cPrimary},
         {text:[{text:'h_conv (對流)\n',fontSize:7,color:cGray},{text:h_conv.toFixed(2),fontSize:8}]},
         {text:[{text:'h_rad (輻射)\n',fontSize:7,color:cGray},{text:h_rad.toFixed(2),fontSize:8}]},
-        {text:[{text:'Aspect Ratio (鰭片流阻比)\n',fontSize:7,color:cGray},{text:R.aspect_ratio.toFixed(1),fontSize:9,bold:true,color:R.aspect_ratio>12?cDanger:R.aspect_ratio>=4.5&&R.aspect_ratio<=6.5?cSuccess:cWarning}]}
+        {text:[{text:'Aspect Ratio (鰭片流阻比)\n',fontSize:7,color:cGray},{text:R.aspect_ratio.toFixed(1),fontSize:9,bold:true,color:R.aspect_ratio>12?cDanger:R.aspect_ratio>=4.5&&R.aspect_ratio<=6.5?cSuccess:cWarning},{text:'  (最佳範圍 4.5~6.5)',fontSize:6.5,color:'#94a3b8',italics:true}]}
       ]]},
       layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingLeft:()=>6, paddingRight:()=>6, paddingTop:()=>5, paddingBottom:()=>5, fillColor:()=>'#f0f9ff'},
       margin:[0,0,0,10]
@@ -1538,7 +1556,8 @@ async function generatePDFReport() {
     }
 
     // ══ 5. VOLUME & WEIGHT ══
-    content.push({text: '5. Volume & Weight Estimation / \u9ad4\u7a4d\u8207\u91cd\u91cf\u4f30\u7b97', style:'heading1', margin:[0,15,0,8]});
+    content.push({text: '', pageBreak:'after'});
+    content.push({text: '5. Volume & Weight Estimation / 體積與重量估算', style:'heading1'});
 
     if (R.drc_failed) {
       content.push({
@@ -1666,10 +1685,10 @@ async function generatePDFReport() {
         [{text:'項目 / Item',bold:true,fontSize:8.5,fillColor:'#f1f5f9'},{text:'數值 / Value',bold:true,fontSize:8.5,fillColor:'#f1f5f9'},{text:'狀態 / Status',bold:true,fontSize:8.5,fillColor:'#f1f5f9'}],
         [{text:[{text:'Total Power\n',fontSize:8},{text:'整機總功耗 (含 Margin)',fontSize:6.5,color:'#94a3b8',italics:true}]},{text:R.Total_Power.toFixed(2)+' W',fontSize:9},{text:'-',fontSize:9,alignment:'center'}],
         [{text:[{text:'Bottleneck\n',fontSize:8},{text:'瓶頸元件 (溫度裕度最小)',fontSize:6.5,color:'#94a3b8',italics:true}]},{text:R.Bottleneck_Name,fontSize:9},{text:'Margin: '+R.Bottleneck_Tj_Margin+'\u00b0C',fontSize:9,color:R.Bottleneck_Tj_Margin<5?cDanger:R.Bottleneck_Tj_Margin<15?cWarning:cSuccess}],
-        [{text:[{text:'Volume\n',fontSize:8},{text:'預估整機體積',fontSize:6.5,color:'#94a3b8',italics:true}]},{text:R.drc_failed?'N/A':R.Volume_L.toFixed(2)+' L',fontSize:9},{text:R.drc_failed?'DRC Failed':'OK',fontSize:9,color:R.drc_failed?cDanger:cSuccess}],
+        [{text:[{text:'Volume\n',fontSize:8},{text:'預估整機體積',fontSize:6.5,color:'#94a3b8',italics:true}]},{text:R.drc_failed?'N/A':R.Volume_L.toFixed(2)+' L',fontSize:9},{text:R.drc_failed?'DRC Failed':'-',fontSize:9,color:R.drc_failed?cDanger:'#334155',alignment:'center'}],
         [{text:[{text:'Weight\n',fontSize:8},{text:'預估整機重量',fontSize:6.5,color:'#94a3b8',italics:true}]},{text:R.drc_failed?'N/A':R.total_weight_kg.toFixed(1)+' kg',fontSize:9},{text:'-',fontSize:9,alignment:'center'}],
         [{text:[{text:'Aspect Ratio\n',fontSize:8},{text:'鰭片流阻比 (建議 4.5~6.5)',fontSize:6.5,color:'#94a3b8',italics:true}]},{text:R.aspect_ratio.toFixed(1),fontSize:9},{text:R.aspect_ratio>12?'FAIL':R.aspect_ratio>=4.5&&R.aspect_ratio<=6.5?'Good':'Fair',fontSize:9,color:R.aspect_ratio>12?cDanger:R.aspect_ratio>=4.5&&R.aspect_ratio<=6.5?cSuccess:cWarning}],
-        [{text:[{text:'h_total\n',fontSize:8},{text:'散熱器表面熱傳係數',fontSize:6.5,color:'#94a3b8',italics:true}]},{text:h_value.toFixed(2)+' W/m\u00b2K',fontSize:9},{text:h_conv<4?'Too Low':'OK',fontSize:9,color:h_conv<4?cDanger:cSuccess}]
+        [{text:[{text:'h_total\n',fontSize:8},{text:'散熱器表面熱傳係數',fontSize:6.5,color:'#94a3b8',italics:true}]},{text:h_value.toFixed(2)+' W/m\u00b2K',fontSize:9},{text:[{text:'h_conv: '+h_conv.toFixed(2)+'\n',fontSize:8,color:'#334155'},{text:'h_rad: '+h_rad.toFixed(2),fontSize:8,color:'#64748b'}]}]
       ],widths:['35%','35%','30%']},
       layout:{
         hLineWidth: function(i,node){return i===0||i===1||i===node.table.body.length?0.8:0.4;},
