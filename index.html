@@ -889,7 +889,10 @@ function renderTab3(){
     for(let i=0;i<R.Fin_Count;i++){let f0=yo+i*(G.Fin_t+G.Gap),f1=f0+G.Fin_t;if(f1>W)break;
       tr.push({type:'mesh3d',x:[0,L,L,0,0,L,L,0],y:[f0,f0,f1,f1,f0,f0,f1,f1],z:[zfs,zfs,zfs,zfs,zfe,zfe,zfe,zfe],...ijk,intensity:[0,0,0,0,1,1,1,1],cmin:0,cmax:1,colorscale:[[0,'#E67E22'],[0.45,'#BDC3C7'],[1,'#D6EAF8']],showscale:false,flatshading:true,name:i===0?'Fins':'',showlegend:i===0});}}
   let md=Math.max(L,W,R.RRU_Height)*1.1;
-  Plotly.newPlot('tab3-3d',tr,{scene:{xaxis:{title:'Length',range:[0,md]},yaxis:{title:'Width',range:[0,md]},zaxis:{title:'Height',range:[0,md]},aspectmode:'manual',aspectratio:{x:1,y:1,z:1},camera:{projection:{type:'orthographic'},eye:{x:1.2,y:1.2,z:1.2}},bgcolor:'white'},margin:{l:0,r:0,b:0,t:0},height:600},{responsive:true,displaylogo:false,modeBarButtonsToAdd:[fullscreenBtn],displayModeBar:true});
+  Plotly.newPlot('tab3-3d',tr,{scene:{xaxis:{title:'Length',range:[0,md]},yaxis:{title:'Width',range:[0,md]},zaxis:{title:'Height',range:[0,md]},aspectmode:'manual',aspectratio:{x:1,y:1,z:1},camera:{projection:{type:'orthographic'},eye:{x:1.2,y:1.2,z:1.2}},bgcolor:'white'},margin:{l:0,r:0,b:0,t:0},height:600},{responsive:true,displaylogo:false,scrollZoom:false,modeBarButtonsToAdd:[fullscreenBtn],displayModeBar:true});
+  // Reduce scroll zoom sensitivity: intercept wheel, scale deltaY down
+  var el3d=document.getElementById('tab3-3d');
+  el3d.addEventListener('wheel',function(e){e.preventDefault();e.stopPropagation();var gd=el3d;if(!gd._fullLayout)return;var scene=gd._fullLayout.scene._scene;if(!scene)return;var factor=e.deltaY>0?1.03:0.97;var cam=gd._fullLayout.scene.camera;if(cam&&cam.eye){var eye={x:cam.eye.x*factor,y:cam.eye.y*factor,z:cam.eye.z*factor};Plotly.relayout(gd,{'scene.camera.eye':eye});}},{passive:false});
   document.getElementById('tab3-info').innerHTML='<div class="alert alert-info">📐 <b>外觀尺寸：</b>長 '+L.toFixed(1)+' x 寬 '+W.toFixed(1)+' x 高 '+R.RRU_Height.toFixed(1)+' mm</div><div class="alert alert-success">⚡ <b>鰭片規格：</b>數量 '+R.Fin_Count+' pcs | 高度 '+R.Fin_Height.toFixed(1)+' mm | 厚度 '+G.Fin_t+' mm | 間距 '+G.Gap+' mm</div>';
 
   // AI Rendering Section
@@ -969,7 +972,52 @@ function runTornado(){
   // Detail
   let dh='<div class="collapsible" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';">📋 查看 Tornado 詳細數據 ▼</div><div class="collapsible-body"><table class="detail-table"><thead><tr><th>參數</th><th>體積 -'+pct+'%</th><th>體積 Base</th><th>體積 +'+pct+'%</th><th>Tj_Margin -'+pct+'%</th><th>Tj_Margin Base</th><th>Tj_Margin +'+pct+'%</th></tr></thead><tbody>';
   rows.forEach(r=>dh+='<tr><td>'+r.label+'</td><td>'+r.Vol_lo.toFixed(2)+'</td><td>'+r.Vol_bs.toFixed(2)+'</td><td>'+r.Vol_hi.toFixed(2)+'</td><td>'+r.Tj_lo.toFixed(1)+'</td><td>'+r.Tj_bs.toFixed(1)+'</td><td>'+r.Tj_hi.toFixed(1)+'</td></tr>');
-  dh+='</tbody></table></div>';document.getElementById('tornado-detail').innerHTML=dh;
+  dh+='</tbody></table></div>';
+  // Tornado Chart interpretation guide
+  dh+='<div class="collapsible" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';" style="margin-top:10px;">📖 如何解讀 Tornado Chart？ ▼</div>';
+  dh+='<div class="collapsible-body" style="display:none;font-size:0.88rem;line-height:1.7;color:#334155;">';
+  dh+='<h4 style="margin:8px 0 4px;">一、這張圖在問什麼？</h4>';
+  dh+='<blockquote style="margin:4px 0 10px 0;padding:6px 12px;border-left:3px solid #3498db;background:#f0f9ff;color:#1e293b;font-style:italic;">「如果我把某個參數改變 ±'+pct+'%，整機的散熱器體積與熱裕度會跑多遠？」</blockquote>';
+  dh+='<p>把三個參數 (Gap / 環境溫度 / 功耗縮放係數) 各自偏移 ±'+pct+'%，<b>誰動一下、結果就跑最多 → 那就是最需要管控的風險項目。</b></p>';
+  dh+='<h4 style="margin:12px 0 4px;">二、左圖：體積敏感度</h4>';
+  dh+='<table class="detail-table" style="width:auto;margin:4px 0 8px;"><thead><tr><th>顏色</th><th>代表方向</th></tr></thead><tbody>';
+  dh+='<tr><td style="color:#e74c3c;font-weight:600;">紅色條 (往左)</td><td>該參數 <b>減少</b> '+pct+'%，體積的變化量</td></tr>';
+  dh+='<tr><td style="color:#3498db;font-weight:600;">藍色條 (往右)</td><td>該參數 <b>增加</b> '+pct+'%，體積的變化量</td></tr>';
+  dh+='</tbody></table>';
+  dh+='<p><b>條越長 → 體積對這個參數越敏感</b>，代表設計容忍度低，量產公差需嚴格管控。<br>以 Gap (鰭片間距) 為例：Gap 越小 → 流阻比 AR 上升 → 需要更高的鰭片 → 體積增大 (右條)。</p>';
+  dh+='<h4 style="margin:12px 0 4px;">三、右圖：Tj_Margin 敏感度 (Fixed-Design 固定散熱器方式)</h4>';
+  dh+='<p><b>重要前提：右圖固定現有散熱器面積不變，模擬「工況偏移但散熱器不重設計」的情境。</b></p>';
+  dh+='<table class="detail-table" style="width:auto;margin:4px 0 8px;"><thead><tr><th>顏色</th><th>代表方向</th></tr></thead><tbody>';
+  dh+='<tr><td style="color:#e74c3c;font-weight:600;">紅色條 (往左)</td><td>參數變化讓 Tj_Margin <b>下降</b> (熱裕度縮水、趨向超溫)</td></tr>';
+  dh+='<tr><td style="color:#2ecc71;font-weight:600;">綠色條 (往右)</td><td>參數變化讓 Tj_Margin <b>上升</b> (更有餘裕)</td></tr>';
+  dh+='</tbody></table>';
+  dh+='<ul style="margin:4px 0 8px;padding-left:20px;">';
+  dh+='<li><b>Base 線 = 目前設計工況</b> (Tj_Margin 以此為起點向左右延伸)</li>';
+  dh+='<li>條穿越 Tj_Margin = 0 (超溫紅線) = 在該工況下散熱器不夠用，需重設計</li>';
+  dh+='<li>條越長 → 熱設計對這個參數越敏感</li></ul>';
+  dh+='<h4 style="margin:12px 0 4px;">物理意義</h4>';
+  dh+='<ul style="margin:4px 0 8px;padding-left:20px;">';
+  dh+='<li><code>T_amb ↑</code> → 基板溫度 T_hsk 整體升高 → 所有元件 Tj 同步上升 → Margin 下滑</li>';
+  dh+='<li><code>功耗 ↑</code> → T_hsk 因承受更多熱量而升高 → Tj 因 P×R 也增加 → <b>雙重衝擊</b><br>';
+  dh+='&nbsp;&nbsp;P = 元件單顆功耗 (W)、R = 接面到散熱器基板的總熱阻 (R_jc + R_int + R_TIM)、P×R = 溫差 (°C)</li>';
+  dh+='<li><code>Gap ↑</code> → h (對流+輻射係數) 改善 → T_hsk 下降 → Margin 增加 (右條)</li></ul>';
+  dh+='<h4 style="margin:12px 0 4px;">Gap 的計算方式</h4>';
+  dh+='<div style="background:#f8fafc;padding:8px 12px;border-radius:4px;font-family:monospace;font-size:0.82rem;margin:4px 0 8px;">';
+  dh+='h_conv = 6.4 × tanh(Gap / 7.0) &nbsp;&nbsp;← 自然對流飽和曲線<br>';
+  dh+='h_rad &nbsp;= 2.4 × (Gap / 10)^0.5 &nbsp;← 鰭片間輻射交換<br>';
+  dh+='T_hsk &nbsp;= T_amb + TotalPower / (h_total × Area_fixed × eff)</div>';
+  dh+='<p>Gap ↑ → h_total ↑ → T_hsk ↓ → Tj_Margin ↑</p>';
+  dh+='<h4 style="margin:12px 0 4px;">名詞對照</h4>';
+  dh+='<table class="detail-table" style="width:auto;margin:4px 0;"><thead><tr><th>符號</th><th>全名</th><th>說明</th></tr></thead><tbody>';
+  dh+='<tr><td>h_conv</td><td>自然對流換熱係數</td><td>W/m²·K，鰭片間距越大對流越強，但趨近飽和 (tanh 曲線)</td></tr>';
+  dh+='<tr><td>h_rad</td><td>輻射換熱係數</td><td>W/m²·K，間距越大鰭片互見輻射越多</td></tr>';
+  dh+='<tr><td>h_total</td><td>綜合換熱係數</td><td>h_conv + h_rad (W/m²·K)</td></tr>';
+  dh+='<tr><td>TotalPower</td><td>整機總功耗</td><td>含安全係數 Margin，= Σ(P×Qty) × Margin (W)</td></tr>';
+  dh+='<tr><td>Area_fixed</td><td>固定散熱器面積</td><td>由基準工況計算後凍結，Fixed-Design 期間不隨工況改變 (m²)</td></tr>';
+  dh+='<tr><td>eff</td><td>鰭片效率係數</td><td>壓鑄 0.90，嵌入式 0.95 (反映鰭片導熱損耗)</td></tr>';
+  dh+='</tbody></table>';
+  dh+='</div>';
+  document.getElementById('tornado-detail').innerHTML=dh;
 }
 
 // =====================================================
