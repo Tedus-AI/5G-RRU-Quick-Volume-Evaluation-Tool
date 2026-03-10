@@ -1084,16 +1084,18 @@ function loadScript(src) {
 }
 
 async function ensurePdfmake() {
-  if (typeof pdfMake !== 'undefined') return;
-  if (pdfmakeLoaded) return;
+  if (typeof pdfMake !== 'undefined' && pdfMake.createPdf) return;
+  console.log('[PDF] Loading pdfmake...');
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js');
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js');
-  pdfmakeLoaded = true;
+  if (typeof pdfMake === 'undefined') throw new Error('pdfMake failed to load');
+  console.log('[PDF] pdfmake loaded OK');
 }
 
 async function loadCJKFont() {
   if (pdfFontReady) return true;
   try {
+    console.log('[PDF] Loading CJK font...');
     // Helper: convert ArrayBuffer to base64 without stack overflow
     function arrayBufferToBase64(buffer) {
       var bytes = new Uint8Array(buffer);
@@ -1105,29 +1107,42 @@ async function loadCJKFont() {
       }
       return btoa(binary);
     }
-    const url = 'https://cdn.jsdelivr.net/fontsource/fonts/noto-sans-tc@latest/chinese-traditional-400-normal.woff';
+    // Use TTF format (pdfmake cannot parse WOFF)
+    const url = 'https://cdn.jsdelivr.net/fontsource/fonts/noto-sans-tc@latest/chinese-traditional-400-normal.ttf';
     const resp = await fetch(url);
     if (!resp.ok) throw new Error('Font fetch failed: ' + resp.status);
     const buf = await resp.arrayBuffer();
     const b64 = arrayBufferToBase64(buf);
+    console.log('[PDF] Regular font loaded, size:', buf.byteLength);
     // Also load bold
     let boldB64 = b64; // fallback
     try {
-      const boldResp = await fetch('https://cdn.jsdelivr.net/fontsource/fonts/noto-sans-tc@latest/chinese-traditional-700-normal.woff');
+      const boldResp = await fetch('https://cdn.jsdelivr.net/fontsource/fonts/noto-sans-tc@latest/chinese-traditional-700-normal.ttf');
       if (boldResp.ok) {
         const boldBuf = await boldResp.arrayBuffer();
         boldB64 = arrayBufferToBase64(boldBuf);
       }
     } catch(e) {}
+    // Register via VFS
+    pdfMake.vfs = pdfMake.vfs || {};
+    pdfMake.vfs['NotoSansTC-Regular.ttf'] = b64;
+    pdfMake.vfs['NotoSansTC-Bold.ttf'] = boldB64;
     pdfMake.fonts = {
       NotoSansTC: {
-        normal: {content: b64, encoding: 'Identity-H'},
-        bold: {content: boldB64, encoding: 'Identity-H'},
-        italics: {content: b64, encoding: 'Identity-H'},
-        bolditalics: {content: boldB64, encoding: 'Identity-H'}
+        normal: 'NotoSansTC-Regular.ttf',
+        bold: 'NotoSansTC-Bold.ttf',
+        italics: 'NotoSansTC-Regular.ttf',
+        bolditalics: 'NotoSansTC-Bold.ttf'
+      },
+      Roboto: {
+        normal: 'Roboto-Regular.ttf',
+        bold: 'Roboto-Medium.ttf',
+        italics: 'Roboto-Italic.ttf',
+        bolditalics: 'Roboto-MediumItalic.ttf'
       }
     };
     pdfFontReady = true;
+    console.log('[PDF] CJK font registered OK');
     return true;
   } catch(e) {
     console.warn('CJK font load failed, using Roboto fallback:', e);
@@ -1147,7 +1162,8 @@ async function captureChartImage(divId, w, h) {
 }
 
 async function generatePDFReport() {
-  if (!calcResults || !calcResults.rows.length) {
+  console.log('[PDF] generatePDFReport called, calcResults:', !!calcResults);
+  if (!calcResults || !calcResults.rows || !calcResults.rows.length) {
     alert('⚠️ 尚無計算結果，請先輸入元件數據！');
     return;
   }
@@ -1158,9 +1174,11 @@ async function generatePDFReport() {
   try {
     // Load pdfmake dynamically
     await ensurePdfmake();
+    console.log('[PDF] pdfMake ready:', typeof pdfMake);
     // Load CJK font
     const hasCJK = await loadCJKFont();
     const fontName = hasCJK ? 'NotoSansTC' : 'Roboto';
+    console.log('[PDF] Font:', fontName, 'hasCJK:', hasCJK);
 
     // Capture chart images in parallel
     const R = calcResults;
