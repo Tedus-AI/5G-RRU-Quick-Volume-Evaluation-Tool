@@ -922,7 +922,7 @@ function renderTab3(){
   <div class="ai-section"><h4>準備工作</h4>
   <div style="display:flex;gap:15px;margin:15px 0;flex-wrap:wrap;">
     <div style="flex:1;min-width:250px;"><h4>Step 1. 下載 3D 模擬圖</h4><div class="alert alert-info">請將滑鼠移至上方 3D 圖表的右上角，點擊相機圖示 (Download plot as a png) 下載目前的模型底圖。</div></div>
-    <div style="flex:1;min-width:250px;"><h4>Step 2. 下載 I/O 寫實參考圖</h4><div class="alert alert-info">請準備一張 5G RRU 的 I/O 介面參考圖。</div></div>
+    <div style="flex:1;min-width:250px;"><h4>Step 2. 下載 I/O 寫實參考圖</h4><div style="text-align:center;margin:10px 0;"><img src="reference_style.png" alt="RRU I/O 參考圖" style="max-width:200px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.15);cursor:pointer;" onclick="window.open('reference_style.png','_blank')"></div><div style="text-align:center;"><a href="reference_style.png" download="reference_style.png" style="display:inline-block;padding:8px 16px;background:#0984e3;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:0.9rem;">⬇️ 下載原始高解析度圖檔</a></div></div>
   </div>
   <h4>Step 3. 複製提示詞 (Prompt)</h4>
   <textarea class="prompt-box" id="ai-prompt">${prompt}</textarea>
