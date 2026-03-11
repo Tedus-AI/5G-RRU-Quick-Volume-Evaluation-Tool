@@ -841,7 +841,7 @@ function renderTab1(){
   cols.forEach(c=>{let lb=TAB2_LABELS[c]||c;let tp=TAB2_TIPS[c]||'';th+='<th title="'+tp+'">'+lb+'</th>';});
   th+='</tr></thead><tbody>';
   R.rows.forEach(r=>{th+='<tr>';cols.forEach(c=>{let v=r[c];let st='';
-    if(c==='Allowed_dT'||c==='Tj_Margin'){let ratio=mx>mn?(v-mn)/(mx-mn):0.5;let rd=Math.round(215*(1-ratio)+40),gr=Math.round(215*ratio+40);st='background:rgba('+rd+','+gr+',50,0.15);';}
+    if(c==='Allowed_dT'||c==='Tj_Margin'){let ratio=mx>mn?(v-mn)/(mx-mn):0.5;var r1,g1,b1;if(ratio<0.5){var t=ratio*2;r1=Math.round(215+(254-215)*t);g1=Math.round(48+(224-48)*t);b1=Math.round(39+(139-39)*t);}else{var t=(ratio-0.5)*2;r1=Math.round(254+(26-254)*t);g1=Math.round(224+(152-224)*t);b1=Math.round(139+(80-139)*t);}st='background:rgba('+r1+','+g1+','+b1+',0.35);font-weight:600;';}
     if(typeof v==='number')v=(c.includes('R_')&&c!=='R_jc')?v.toFixed(4):v.toFixed(1);th+='<td style="'+st+'">'+v+'</td>';});th+='</tr>';});
   th+='</tbody></table>';document.getElementById('tab1-table').innerHTML=th;
 }
@@ -922,7 +922,7 @@ function renderTab3(){
   <div class="ai-section"><h4>準備工作</h4>
   <div style="display:flex;gap:15px;margin:15px 0;flex-wrap:wrap;">
     <div style="flex:1;min-width:250px;"><h4>Step 1. 下載 3D 模擬圖</h4><div class="alert alert-info">請將滑鼠移至上方 3D 圖表的右上角，點擊相機圖示 (Download plot as a png) 下載目前的模型底圖。</div></div>
-    <div style="flex:1;min-width:250px;"><h4>Step 2. 下載 I/O 寫實參考圖</h4><div style="text-align:center;margin:10px 0;"><img src="reference_style.png" alt="RRU I/O 參考圖" style="max-width:200px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.15);cursor:pointer;" onclick="window.open('reference_style.png','_blank')"></div><div style="text-align:center;"><a href="reference_style.png" download="reference_style.png" style="display:inline-block;padding:8px 16px;background:#0984e3;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:0.9rem;">⬇️ 下載原始高解析度圖檔</a></div></div>
+    <div style="flex:1;min-width:250px;"><h4>Step 2. 下載 I/O 寫實參考圖</h4><div style="display:flex;align-items:center;gap:12px;margin:10px 0;"><img src="reference_style.png" alt="RRU I/O 參考圖" style="max-width:200px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.15);cursor:pointer;" onclick="window.open('reference_style.png','_blank')"><a href="reference_style.png" download="reference_style.png" style="display:inline-block;padding:8px 16px;background:#0984e3;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:0.9rem;white-space:nowrap;">⬇️ 下載原始高解析度圖檔</a></div></div>
   </div>
   <h4>Step 3. 複製提示詞 (Prompt)</h4>
   <textarea class="prompt-box" id="ai-prompt">${prompt}</textarea>
