@@ -6,6 +6,7 @@
 <title>📡 5G RRU 體積估算引擎 Pro</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 <style>
@@ -279,6 +280,11 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
       <button class="sub-tab-btn active" onclick="switchSubTab(0)">📡 RF Component</button>
       <button class="sub-tab-btn" onclick="switchSubTab(1)">💻 Digital Component</button>
       <button class="sub-tab-btn" onclick="switchSubTab(2)">⚡ PWR Component</button>
+      <span style="flex:1;"></span>
+      <button class="btn btn-sm" style="background:#1a7f37;color:#fff;font-size:0.78rem;padding:4px 10px;" onclick="exportCompExcel('rf')">📥 RF → Excel</button>
+      <button class="btn btn-sm" style="background:#1a7f37;color:#fff;font-size:0.78rem;padding:4px 10px;" onclick="exportCompExcel('digital')">📥 Digital → Excel</button>
+      <button class="btn btn-sm" style="background:#1a7f37;color:#fff;font-size:0.78rem;padding:4px 10px;" onclick="exportCompExcel('pwr')">📥 PWR → Excel</button>
+      <button class="btn btn-sm" style="background:#0550ae;color:#fff;font-size:0.78rem;padding:4px 10px;" onclick="exportCompExcel('all')">📥 全部 → Excel</button>
     </div>
     <div class="sub-content active" id="subtab0"></div>
     <div class="sub-content" id="subtab1"></div>
@@ -813,6 +819,30 @@ function removeComp(cat,i){components[cat].splice(i,1);recalc();}
 function copyComp(cat,i){components[cat].push({...components[cat][i]});recalc();}
 function addComp(cat){let d=cat==='rf'?RF_DEFAULT:cat==='digital'?DIG_DEFAULT:PWR_DEFAULT;components[cat].push({...d});recalc();}
 function saveCompToLib(cat,i){let row={};COLS.forEach(c=>row[c]=components[cat][i][c]);saveToLib(cat,row);}
+
+// Excel export for component tables
+function exportCompExcel(mode){
+  var wb=XLSX.utils.book_new();
+  var cats=mode==='all'?['rf','digital','pwr']:[mode];
+  var catLabels={rf:'RF Component',digital:'Digital Component',pwr:'PWR Component'};
+  var header=COLS.map(c=>COL_LABELS[c]);
+  cats.forEach(function(cat){
+    var rows=components[cat];
+    var data=[header];
+    rows.forEach(function(r){data.push(COLS.map(function(c){return r[c];}));});
+    // Add power summary row
+    var pw=rows.reduce(function(s,r){return s+r['Power(W)']*r.Qty;},0);
+    var sumRow=new Array(COLS.length).fill('');
+    sumRow[0]='合計';sumRow[2]='=SUMPRODUCT(C2:C'+(rows.length+1)+',B2:B'+(rows.length+1)+')';
+    data.push(sumRow);
+    var ws=XLSX.utils.aoa_to_sheet(data);
+    // Column widths
+    ws['!cols']=COLS.map(function(c){return{wch:c==='Component'?18:c==='Board_Type'||c==='TIM_Type'?14:12};});
+    XLSX.utils.book_append_sheet(wb,ws,catLabels[cat]);
+  });
+  var fname=mode==='all'?'Components_All.xlsx':catLabels[mode].replace(/\s/g,'_')+'.xlsx';
+  XLSX.writeFile(wb,fname);
+}
 
 // =====================================================
 // TAB 1: DETAILED ANALYSIS
