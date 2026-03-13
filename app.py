@@ -95,13 +95,27 @@ UPDATE_DATE = "2026-02-24"
 
 # === APP 設定 ===
 st.set_page_config(
-    page_title="5G RRU Thermal Engine", 
-    page_icon="📡", 
+    page_title="5G RRU Thermal Engine - 已搬遷",
+    page_icon="📡",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# ==================================================
+# === 自動轉址到 GitHub Pages 新版 ===
+NEW_URL = "https://tedus-ai.github.io/5G-RRU-Quick-Volume-Evaluation-Tool/"
+st.markdown(f"""
+<meta http-equiv="refresh" content="3;url={NEW_URL}">
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;font-family:sans-serif;">
+  <h1 style="font-size:3rem;margin-bottom:0.5rem;">📡 5G RRU 體積估算引擎</h1>
+  <h2 style="color:#e74c3c;margin-bottom:1.5rem;">本站已搬遷至新網址</h2>
+  <p style="font-size:1.2rem;color:#555;margin-bottom:2rem;">將在 <b>3 秒</b>後自動跳轉，若未自動跳轉請點擊下方連結：</p>
+  <a href="{NEW_URL}" style="display:inline-block;padding:16px 40px;background:#0984e3;color:#fff;border-radius:12px;text-decoration:none;font-size:1.3rem;font-weight:700;box-shadow:0 4px 12px rgba(9,132,227,0.3);">
+    前往新版 GitHub Pages →
+  </a>
+  <p style="margin-top:2rem;color:#888;font-size:0.9rem;">新網址：{NEW_URL}</p>
+</div>
+""", unsafe_allow_html=True)
+st.stop()
 # 0. 初始化 Session State
 # ==================================================
 
