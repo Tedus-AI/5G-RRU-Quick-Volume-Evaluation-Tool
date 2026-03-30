@@ -170,7 +170,7 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
       <h3 style="color:#27ae60;">🛠️ 主要功能一覽</h3>
       <ul style="color:#34495e;">
         <li><strong>元件熱源管理</strong>：動態新增/編輯/複製/刪除元件清單，支援 Copper Coin、Thermal Via、多種 TIM（含雙組自訂 Pad / Pad2 規格）</li>
-        <li><strong>雲端元件資料庫</strong>：整合 Firebase Firestore，RF / Digital / PWR 三類元件庫可雲端共用</li>
+        <li><strong>元件資料庫</strong>：RF / Digital / PWR 三類元件庫，支援本機 JSON 檔案儲存</li>
         <li><strong>精準熱阻計算</strong>：自動計算 Rjc + Rint + Rtim，考慮局部環溫與高度效應</li>
         <li><strong>Tj_Margin 裕度分析</strong>：全元件 Tj / Tc 裕量色階顯示，超溫自動觸發紅色警告</li>
         <li><strong>散熱器尺寸優化</strong>：根據瓶頸元件裕度與安全係數，自動推算所需鰭片高度、數量與整機體積</li>
@@ -261,16 +261,16 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
       <button onclick="saveProject()">💾 儲存專案</button>
       <input type="file" id="fileInput" accept=".json" style="display:none" onchange="handleFileLoad(event)">
       <div class="divider"></div>
-      <span id="cloudLockBtn" class="cloud-lock locked" onclick="toggleCloudLock()" title="雲端寫入保護">🔒 雲端保護：啟用</span>
+      <span id="cloudLockBtn" class="cloud-lock locked" onclick="toggleCloudLock()" title="資料庫寫入保護">🔒 資料庫保護：啟用</span>
       <input type="text" id="cloudProjectName" placeholder="專案名稱 ...">
-      <button class="cloud-btn" onclick="cloudSaveProject()">☁️ 雲端儲存</button>
-      <button class="cloud-btn" onclick="cloudLoadProject()">☁️ 雲端載入</button>
+      <button class="cloud-btn" onclick="cloudSaveProject()">💾 儲存專案</button>
+      <button class="cloud-btn" onclick="cloudLoadProject()">📂 載入專案</button>
       <div class="divider"></div>
       <button class="cloud-btn" onclick="generatePDFReport()" id="pdf-btn" style="border-color:#ff6b6b;background:rgba(255,107,107,0.15);">📄 PDF 報告</button>
     </div>
     <div class="cloud-modal-overlay" id="cloudModal">
       <div class="cloud-modal">
-        <h3>☁️ 雲端專案列表</h3>
+        <h3>📂 專案列表</h3>
         <div id="cloudList"></div>
         <button class="cloud-close" onclick="closeCloudModal()">關閉</button>
       </div>
@@ -388,17 +388,17 @@ let cloudLocked = true;
 const CLOUD_LOCK_PWD = '0420';
 function toggleCloudLock(){
   if(cloudLocked){
-    let pwd=prompt('請輸入密碼以解除雲端寫入保護：');
+    let pwd=prompt('請輸入密碼以解除資料庫寫入保護：');
     if(pwd===null)return;
     if(pwd!==CLOUD_LOCK_PWD){alert('❌ 密碼錯誤');return;}
     cloudLocked=false;
   }else{cloudLocked=true;}
   var btn=document.getElementById('cloudLockBtn');
   btn.className='cloud-lock '+(cloudLocked?'locked':'unlocked');
-  btn.innerHTML=cloudLocked?'🔒 雲端保護：啟用':'🔓 雲端保護：關閉';
+  btn.innerHTML=cloudLocked?'🔒 資料庫保護：啟用':'🔓 資料庫保護：關閉';
 }
 function checkCloudLock(action){
-  if(cloudLocked){alert('⚠️ 雲端寫入保護已啟用，無法'+action+'。\n請先點擊「🔒 雲端保護」按鈕輸入密碼解鎖。');return true;}
+  if(cloudLocked){alert('⚠️ 資料庫寫入保護已啟用，無法'+action+'。\n請先點擊「🔒 資料庫保護」按鈕輸入密碼解鎖。');return true;}
   return false;
 }
 
@@ -1132,7 +1132,7 @@ function saveProject(){readGlobals();let d={meta:{version:"v4.30 (GitHub Pages)"
 // CLOUD PROJECT SAVE / LOAD
 // =====================================================
 async function cloudSaveProject(){
-  if(checkCloudLock('雲端儲存'))return;
+  if(checkCloudLock('儲存專案'))return;
   let name=document.getElementById('cloudProjectName').value.trim();
   if(!name){alert('⚠️ 請先輸入專案名稱！');document.getElementById('cloudProjectName').focus();return;}
   if(!fbOk||!dbAdapter.isReady()){alert('⚠️ 資料庫未連線，無法儲存。');return;}
@@ -1185,8 +1185,8 @@ async function cloudLoadOne(docId){
 }
 
 async function cloudDeleteOne(docId,name){
-  if(checkCloudLock('刪除雲端專案'))return;
-  if(!confirm('確定要刪除雲端專案「'+name+'」？此操作無法復原！'))return;
+  if(checkCloudLock('刪除專案'))return;
+  if(!confirm('確定要刪除專案「'+name+'」？此操作無法復原！'))return;
   try{await dbAdapter.deleteDoc('projects', docId);alert('🗑️ 已刪除「'+name+'」');cloudLoadProject();}
   catch(e){alert('❌ 刪除失敗: '+e.message);}
 }
