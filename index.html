@@ -667,8 +667,8 @@ async function saveToLib(cat, row) {
   } else {
     compLib[colName].push(row);
   }
-  if (fbOk && db) {
-    try { await db.collection(colName).doc(docId).set(row); } catch(e) { alert('存入失敗: '+e.message); return; }
+  if (fbOk && dbAdapter.isReady()) {
+    try { await dbAdapter.setDoc(colName, docId, row); } catch(e) { alert('存入失敗: '+e.message); return; }
   }
   alert('✅ 「' + row.Component + '」已存入 ' + cat.toUpperCase() + ' 資料庫！');
   recalc();
@@ -679,9 +679,9 @@ async function deleteFromLib(cat, compName) {
   if (!confirm('確定要從 ' + cat.toUpperCase() + ' 資料庫刪除「' + compName + '」？此操作無法復原！')) return;
   let colName = cat + '_library';
   compLib[colName] = compLib[colName].filter(r => r.Component !== compName);
-  if (fbOk && db) {
+  if (fbOk && dbAdapter.isReady()) {
     let docId = compName.replace(/ /g,'_').replace(/\//g,'-').replace(/[()]/g,'');
-    try { await db.collection(colName).doc(docId).delete(); } catch(e) { console.warn(e); }
+    try { await dbAdapter.deleteDoc(colName, docId); } catch(e) { console.warn(e); }
   }
   alert('🗑️ 「' + compName + '」已從資料庫刪除！');
   recalc();
@@ -1135,60 +1135,59 @@ async function cloudSaveProject(){
   if(checkCloudLock('雲端儲存'))return;
   let name=document.getElementById('cloudProjectName').value.trim();
   if(!name){alert('⚠️ 請先輸入專案名稱！');document.getElementById('cloudProjectName').focus();return;}
-  if(!fbOk||!db){alert('⚠️ Firebase 未連線，無法使用雲端儲存。');return;}
+  if(!fbOk||!dbAdapter.isReady()){alert('⚠️ 資料庫未連線，無法儲存。');return;}
   let docId=name.replace(/ /g,'_').replace(/[^a-zA-Z0-9_\-\u4e00-\u9fff]/g,'');
   if(!docId){alert('⚠️ 專案名稱無效，請使用中英文或數字。');return;}
   // Check if exists
   try{
-    let existing=await db.collection('projects').doc(docId).get();
-    if(existing.exists&&!confirm('「'+name+'」已存在雲端，確定要覆蓋？'))return;
+    let existing=await dbAdapter.getDoc('projects', docId);
+    if(existing&&!confirm('「'+name+'」已存在，確定要覆蓋？'))return;
   }catch(e){}
   readGlobals();
   let d={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},project_name:name,global_params:{},rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
   ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density'].forEach(k=>d.global_params[k]=G[k]);
   d.global_params.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;
   try{
-    await db.collection('projects').doc(docId).set(d);
-    alert('✅ 專案「'+name+'」已儲存至雲端！');
-  }catch(e){alert('❌ 雲端儲存失敗: '+e.message);}
+    await dbAdapter.setDoc('projects', docId, d);
+    alert('✅ 專案「'+name+'」已儲存！');
+  }catch(e){alert('❌ 儲存失敗: '+e.message);}
 }
 
 async function cloudLoadProject(){
-  if(!fbOk||!db){alert('⚠️ Firebase 未連線，無法使用雲端載入。');return;}
+  if(!fbOk||!dbAdapter.isReady()){alert('⚠️ 資料庫未連線，無法載入。');return;}
   try{
-    let snap=await db.collection('projects').orderBy('meta.timestamp','desc').get();
+    let projectList=await dbAdapter.getProjectsSorted();
     let list=document.getElementById('cloudList');
-    if(snap.empty){list.innerHTML='<div class="cloud-empty">尚無雲端專案</div>';}
+    if(projectList.length===0){list.innerHTML='<div class="cloud-empty">尚無儲存專案</div>';}
     else{
       let html='<div class="cloud-list">';
-      snap.forEach(doc=>{
-        let d=doc.data();let t=d.meta&&d.meta.timestamp?new Date(d.meta.timestamp).toLocaleString('zh-TW'):'';
-        html+='<div class="cloud-item" onclick="cloudLoadOne(\''+doc.id+'\')"><div><div class="ci-name">'+
-          (d.project_name||doc.id)+'</div><div class="ci-time">'+t+'</div></div>'+
-          '<span class="ci-del" onclick="event.stopPropagation();cloudDeleteOne(\''+doc.id+'\',\''+(d.project_name||doc.id)+'\')">🗑️</span></div>';
+      projectList.forEach(item=>{
+        let t=item.meta&&item.meta.timestamp?new Date(item.meta.timestamp).toLocaleString('zh-TW'):'';
+        html+='<div class="cloud-item" onclick="cloudLoadOne(\''+item.id+'\')"><div><div class="ci-name">'+
+          (item.project_name||item.id)+'</div><div class="ci-time">'+t+'</div></div>'+
+          '<span class="ci-del" onclick="event.stopPropagation();cloudDeleteOne(\''+item.id+'\',\''+(item.project_name||item.id)+'\')">🗑️</span></div>';
       });
       html+='</div>';list.innerHTML=html;
     }
     document.getElementById('cloudModal').classList.add('active');
-  }catch(e){alert('❌ 讀取雲端專案列表失敗: '+e.message);}
+  }catch(e){alert('❌ 讀取專案列表失敗: '+e.message);}
 }
 
 async function cloudLoadOne(docId){
   try{
-    let doc=await db.collection('projects').doc(docId).get();
-    if(!doc.exists){alert('專案不存在');return;}
-    let d=doc.data();
+    let d=await dbAdapter.getDoc('projects', docId);
+    if(!d){alert('專案不存在');return;}
     if(d.global_params){for(let k in d.global_params){G[k]=d.global_params[k];let el=document.getElementById(k);if(el){el.value=d.global_params[k];}}}
     if(d.rf_data)components.rf=d.rf_data;if(d.digital_data)components.digital=d.digital_data;if(d.pwr_data)components.pwr=d.pwr_data;
     if(d.project_name)document.getElementById('cloudProjectName').value=d.project_name;
-    closeCloudModal();recalc();alert('✅ 專案「'+(d.project_name||docId)+'」已從雲端載入！');
+    closeCloudModal();recalc();alert('✅ 專案「'+(d.project_name||docId)+'」已載入！');
   }catch(e){alert('❌ 載入失敗: '+e.message);}
 }
 
 async function cloudDeleteOne(docId,name){
   if(checkCloudLock('刪除雲端專案'))return;
   if(!confirm('確定要刪除雲端專案「'+name+'」？此操作無法復原！'))return;
-  try{await db.collection('projects').doc(docId).delete();alert('🗑️ 已刪除「'+name+'」');cloudLoadProject();}
+  try{await dbAdapter.deleteDoc('projects', docId);alert('🗑️ 已刪除「'+name+'」');cloudLoadProject();}
   catch(e){alert('❌ 刪除失敗: '+e.message);}
 }
 
