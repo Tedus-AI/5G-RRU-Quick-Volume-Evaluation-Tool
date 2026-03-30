@@ -627,21 +627,32 @@ const PWR_DEFAULT = {Component:"New_PWR",Qty:1,"Power(W)":0,"Height(mm)":30,Pad_
 // FIREBASE INIT
 // =====================================================
 async function initFirebase() {
-  try {
-    firebase.initializeApp(firebaseConfig);
-    db = firebase.firestore();
-    // Load libraries
-    for (let col of ['rf_library','digital_library','pwr_library']) {
-      let snap = await db.collection(col).get();
-      compLib[col] = snap.docs.map(d => d.data());
-    }
+  // ── 原 Firebase 程式碼保留（已註解）──
+  // try {
+  //   firebase.initializeApp(firebaseConfig);
+  //   db = firebase.firestore();
+  //   for (let col of ['rf_library','digital_library','pwr_library']) {
+  //     let snap = await db.collection(col).get();
+  //     compLib[col] = snap.docs.map(d => d.data());
+  //   }
+  //   fbOk = true;
+  //   document.getElementById('fb-status').innerHTML = '<div class="firebase-status fb-ok">🟢 Firebase 連線成功</div>';
+  //   renderTab0();
+  // } catch(e) {
+  //   fbOk = false;
+  //   document.getElementById('fb-status').innerHTML = '<div class="firebase-status fb-fail">🔴 Firebase 離線 (本地模式)</div>';
+  //   console.warn('Firebase init failed:', e);
+  // }
+
+  // ── 本機資料庫初始化 ──
+  const result = await dbAdapter.init();
+  if (result.success) {
     fbOk = true;
-    document.getElementById('fb-status').innerHTML = '<div class="firebase-status fb-ok">🟢 Firebase 連線成功</div>';
-    renderTab0();
-  } catch(e) {
+    showDbBanner(`✅ 本機資料庫：${result.filename}`, 'success');
+    await loadLibraryFromLocal();
+  } else {
     fbOk = false;
-    document.getElementById('fb-status').innerHTML = '<div class="firebase-status fb-fail">🔴 Firebase 離線 (本地模式)</div>';
-    console.warn('Firebase init failed:', e);
+    showDbBanner('⚠️ 請選擇本機資料庫檔案', 'warning');
   }
 }
 
@@ -1974,18 +1985,11 @@ async function handleCreateDb() {
 }
 
 async function loadLibraryFromLocal() {
-  const cols = ['rf_library', 'digital_library', 'pwr_library'];
-  for (const col of cols) {
+  for (const col of ['rf_library', 'digital_library', 'pwr_library']) {
     const docs = await dbAdapter.getCollection(col);
-    // 原本 db.collection(col).get().then(snap => { snap.forEach(doc => { ... }) })
-    // 改成 Object.entries(docs).forEach(([docId, data]) => { ... })
-    // 請把原本 snap.forEach 裡的邏輯搬到這裡
-    Object.entries(docs).forEach(([docId, data]) => {
-      // 原本是 doc.id → 改成 docId
-      // 原本是 doc.data() → 改成 data
-      // 把原本的處理邏輯放這裡
-    });
+    compLib[col] = Object.values(docs);
   }
+  renderTab0();
 }
 </script>
 </body>
