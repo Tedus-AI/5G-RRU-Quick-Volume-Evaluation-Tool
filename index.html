@@ -141,8 +141,17 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
 #login-page .info-card ul{padding-left:20px;}
 @media(max-width:900px){body{flex-direction:column;}.sidebar{width:100%;height:auto;position:relative;}.kpi-row{flex-direction:column;}}
 </style>
+<script src="fileDb.js"></script>
+<script src="dbAdapter.js"></script>
 </head>
 <body>
+<div id="db-banner" style="display:flex;align-items:center;gap:10px;padding:6px 16px;background:#fff3cd;color:#856404;border-bottom:1px solid #ddd;font-size:13px;">
+  <span id="db-banner-icon">⚠️</span>
+  <span id="db-banner-text">請選擇本機資料庫檔案</span>
+  <button onclick="handlePickDb()" style="font-size:12px;padding:2px 10px;">切換資料庫</button>
+  <button onclick="handleCreateDb()" style="font-size:12px;padding:2px 10px;">新增資料庫</button>
+  <button onclick="dbAdapter.exportBackup()" style="font-size:12px;padding:2px 10px;">備份 JSON</button>
+</div>
 <!-- Login Page -->
 <div id="login-page">
   <div class="login-header">
@@ -1928,6 +1937,56 @@ window.addEventListener('DOMContentLoaded',function(){
   document.querySelector('.main').style.display='none';
   document.getElementById('loading').style.display='none';
 });
+</script>
+<script>
+// ── 本機資料庫 helper ──────────────────────────
+function showDbBanner(message, type) {
+  const banner = document.getElementById('db-banner');
+  const text = document.getElementById('db-banner-text');
+  const icon = document.getElementById('db-banner-icon');
+  if (type === 'success') {
+    banner.style.background = '#e6f4ea';
+    banner.style.color = '#1a6e2e';
+    icon.textContent = '✅';
+  } else {
+    banner.style.background = '#fff3cd';
+    banner.style.color = '#856404';
+    icon.textContent = '⚠️';
+  }
+  text.textContent = message;
+}
+
+async function handlePickDb() {
+  const result = await dbAdapter.pickFile();
+  if (result && result.success) {
+    fbOk = true;
+    showDbBanner(`✅ 本機資料庫：${result.filename}`, 'success');
+    await loadLibraryFromLocal();
+  }
+}
+
+async function handleCreateDb() {
+  const result = await fileDb.createFile();
+  if (result && result.success) {
+    fbOk = true;
+    showDbBanner(`✅ 本機資料庫：${result.filename}`, 'success');
+  }
+}
+
+async function loadLibraryFromLocal() {
+  const cols = ['rf_library', 'digital_library', 'pwr_library'];
+  for (const col of cols) {
+    const docs = await dbAdapter.getCollection(col);
+    // 原本 db.collection(col).get().then(snap => { snap.forEach(doc => { ... }) })
+    // 改成 Object.entries(docs).forEach(([docId, data]) => { ... })
+    // 請把原本 snap.forEach 裡的邏輯搬到這裡
+    Object.entries(docs).forEach(([docId, data]) => {
+      // 原本是 doc.id → 改成 docId
+      // 原本是 doc.data() → 改成 data
+      // 把原本的處理邏輯放這裡
+    });
+  }
+}
 </script>
 </body>
 </html>
