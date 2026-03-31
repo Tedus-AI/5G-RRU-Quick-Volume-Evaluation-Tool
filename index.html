@@ -29,7 +29,7 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
 .h-display .h-sub{font-size:0.75rem;color:#94a3b8;margin-top:4px;}
 .ar-display{background:#1a1a2e;border:1px solid #555;border-radius:8px;padding:10px;margin-top:10px;text-align:center;}
 .main{flex:1;padding:25px 30px;overflow-y:auto;}
-.header{background:linear-gradient(135deg,var(--primary),var(--primary-light));padding:20px 30px;border-radius:12px;color:#fff;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:15px;}
+.header{background:linear-gradient(135deg,var(--primary),var(--primary-light));padding:20px 30px;border-radius:12px;color:#fff;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:15px;position:relative;}
 .header h1{font-family:"Nunito",sans-serif;font-size:1.8rem;font-weight:900;}.header .subtitle{font-size:0.9rem;opacity:0.9;margin-top:5px;}
 .header .project-io{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
 .header .project-io button{padding:8px 16px;border:2px solid rgba(255,255,255,0.5);background:transparent;color:#fff;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.85rem;transition:all 0.2s;}
@@ -145,13 +145,6 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
 <script src="dbAdapter.js"></script>
 </head>
 <body>
-<div id="db-banner" style="display:flex;align-items:center;gap:10px;padding:6px 16px;background:#fff3cd;color:#856404;border-bottom:1px solid #ddd;font-size:13px;">
-  <span id="db-banner-icon">⚠️</span>
-  <span id="db-banner-text">請選擇本機資料庫檔案</span>
-  <button onclick="handlePickDb()" style="font-size:12px;padding:2px 10px;">切換資料庫</button>
-  <button onclick="handleCreateDb()" style="font-size:12px;padding:2px 10px;">新增資料庫</button>
-  <button onclick="dbAdapter.exportBackup()" style="font-size:12px;padding:2px 10px;">備份 JSON</button>
-</div>
 <!-- Login Page -->
 <div id="login-page">
   <div class="login-header">
@@ -255,6 +248,15 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
     <div>
       <h1>📡 5G RRU 體積估算引擎 <span style="font-size:0.6em;opacity:0.8;">Pro</span></h1>
       <div class="subtitle">High-Performance Thermal & Volume Estimation System | v4.30 (GitHub Pages Edition)</div>
+    </div>
+    <div style="position:absolute; top:12px; right:16px; display:flex; align-items:center; gap:8px;">
+      <span id="db-banner-text" style="font-size:12px; color:#ffffffaa;">未選擇資料庫</span>
+      <button onclick="handlePickDb()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">
+        📂 資料庫目錄
+      </button>
+      <button onclick="dbAdapter.exportBackup()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">
+        💾 備份資料庫
+      </button>
     </div>
     <div class="project-io">
       <button onclick="loadProject()">📂 載入專案</button>
@@ -1951,19 +1953,10 @@ window.addEventListener('DOMContentLoaded',function(){
 <script>
 // ── 本機資料庫 helper ──────────────────────────
 function showDbBanner(message, type) {
-  const banner = document.getElementById('db-banner');
   const text = document.getElementById('db-banner-text');
-  const icon = document.getElementById('db-banner-icon');
-  if (type === 'success') {
-    banner.style.background = '#e6f4ea';
-    banner.style.color = '#1a6e2e';
-    icon.textContent = '✅';
-  } else {
-    banner.style.background = '#fff3cd';
-    banner.style.color = '#856404';
-    icon.textContent = '⚠️';
-  }
+  if (!text) return;
   text.textContent = message;
+  text.style.color = type === 'success' ? '#90ee90' : '#ffcc00';
 }
 
 async function handlePickDb() {
