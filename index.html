@@ -259,8 +259,8 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
       </button>
     </div>
     <div class="project-io">
-      <button onclick="loadProject()">📂 載入專案</button>
-      <button onclick="saveProject()">💾 儲存專案</button>
+      <button onclick="loadProject()">📥 匯入專案</button>
+      <button onclick="saveProject()">📤 匯出專案</button>
       <input type="file" id="fileInput" accept=".json" style="display:none" onchange="handleFileLoad(event)">
       <div class="divider"></div>
       <span id="cloudLockBtn" class="cloud-lock locked" onclick="toggleCloudLock()" title="資料庫寫入保護">🔒 資料庫保護：啟用</span>
@@ -836,7 +836,7 @@ function renderCompTable(arr,containerId,defaults,category){
       if(col==='Board_Type'){lhtml+='<td><select style="min-width:110px;" onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">';BOARD_TYPES.forEach(o=>lhtml+='<option'+(row[col]===o?' selected':'')+'>'+o+'</option>');lhtml+='</select></td>';}
       else if(col==='TIM_Type'){lhtml+='<td><select style="min-width:110px;" onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">';TIM_TYPES.forEach(o=>lhtml+='<option'+(row[col]===o?' selected':'')+'>'+o+'</option>');lhtml+='</select></td>';}
       else if(col==='Component'){lhtml+='<td><input type="text" value="'+(row[col]||'')+'" onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)"></td>';}
-      else{lhtml+='<td><input type="number" value="'+(row[col]||0)+'" step="any" onchange="updateComp(\''+category+'\','+i+',\''+col+'\',parseFloat(this.value)||0)"></td>';}
+      else{let extraStyle=col==='Power(W)'?' style="width:75%;min-width:75px;"':'';lhtml+='<td><input type="number"'+extraStyle+' value="'+(row[col]||0)+'" step="any" onchange="updateComp(\''+category+'\','+i+',\''+col+'\',parseFloat(this.value)||0)"></td>';}
     });
     lhtml+='<td style="white-space:nowrap;">';
     lhtml+='<button class="btn btn-sm btn-danger" onclick="removeComp(\''+category+'\','+i+')">🗑️</button> ';
