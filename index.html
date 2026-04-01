@@ -182,6 +182,37 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
       • <strong>h_total</strong> = h_conv + h_rad<br>
       該模型已在多個專案中與 FloTHERM 結果比對，誤差通常在 <strong>±8%</strong> 以內。</p>
     </div>
+    <div class="info-card" style="background:#f3e8ff;border-left:6px solid #8b5cf6;">
+      <h3 style="color:#6d28d9;">🔍 設計規則檢查 (DRC) 總覽</h3>
+      <div style="color:#34495e;font-size:0.92rem;line-height:1.7;">
+        <p style="margin:8px 0 4px;"><strong>📏 通用規則 (Universal)</strong></p>
+        <ul style="padding-left:20px;">
+          <li>流阻比 AR ≤ 12（超過即 Choked Flow）</li>
+          <li>h_conv ≥ 4.0（Gap 過小則對流不足）</li>
+          <li>Gap ≥ 4mm（物理極限）</li>
+        </ul>
+        <p style="margin:8px 0 4px;"><strong>🔧 Embedded Fin 規則</strong></p>
+        <ul style="padding-left:20px;">
+          <li>鰭片高度 FH ≤ 100mm（製程限制）</li>
+        </ul>
+        <p style="margin:8px 0 4px;"><strong>🏭 Die-casting SSM 規則</strong></p>
+        <ul style="padding-left:20px;">
+          <li>T_tip（鰭片尖端厚度）≥ 1.0mm</li>
+          <li>拔模角 α ≥ 0.5°</li>
+          <li>T_root 根部厚度 = T_tip + 2 × FH × tan(α)</li>
+          <li>G_root 根部間隙 = Pitch − T_root > 0（根部不可重疊）</li>
+          <li>G_root ≥ G_min = max(C1, C2, C3)
+            <ul>
+              <li>C1 = max(3.0, 0.08 × FH)　模具鋼強度</li>
+              <li>C2 = 4.0mm　自然對流邊界層</li>
+              <li>C3 = 2 × T_tip　模具充填</li>
+            </ul>
+          </li>
+          <li>AR 高寬比 = FH / T_tip ≤ 45（SSM 極限），> 25 需 Cross Rib + 真空 SSM</li>
+          <li>FH ≤ 80mm（SSM 極限），> 30mm 建議配置 Cross Rib</li>
+        </ul>
+      </div>
+    </div>
     <div class="info-card" style="background:#fffacd;border-left:6px solid #f39c12;">
       <h3 style="color:#d35400;">⚠️ 使用注意事項</h3>
       <ul style="color:#34495e;">
@@ -233,9 +264,9 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
     <div class="ar-display" id="ar-display"><div style="font-size:0.78rem;color:#94a3b8;">📐 流阻比 (Aspect Ratio)</div><div id="ar-val" style="font-size:1.1rem;font-weight:700;color:#60a5fa;">--</div><div id="ar-msg" style="font-size:0.7rem;color:#888;">✅ 最佳建議：4.5 ~ 6.5</div><div id="ar-tip" style="font-size:0.65rem;color:#64748b;margin-top:4px;line-height:1.4;">最佳建議：4.5 ~ 6.5（建議值內，無風 AR 往低趨勢設計，反之亦然）</div></div>
     <div id="diecast-info" class="ar-display" style="display:none;">
       <div style="font-size:0.78rem;color:#94a3b8;">🏭 Die-casting 衍生參數</div>
-      <div id="dc-troot" style="font-size:0.85rem;color:#60a5fa;">T_root: --</div>
-      <div id="dc-groot" style="font-size:0.85rem;color:#60a5fa;">G_root: --</div>
-      <div id="dc-ar" style="font-size:0.85rem;color:#60a5fa;">AR (H/T_tip): --</div>
+      <div id="dc-troot" style="font-size:0.85rem;color:#60a5fa;">T_root 根部厚度: --</div>
+      <div id="dc-groot" style="font-size:0.85rem;color:#60a5fa;">G_root 根部間隙: --</div>
+      <div id="dc-ar" style="font-size:0.85rem;color:#60a5fa;">AR 高寬比 (H/T_tip): --</div>
     </div>
   </div>
 
@@ -260,6 +291,7 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
       <div class="subtitle">High-Performance Thermal & Volume Estimation System | v4.30 (GitHub Pages Edition)</div>
     </div>
     <div style="position:absolute; top:12px; right:16px; display:flex; align-items:center; gap:8px;">
+      <button onclick="doLogout()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">🏠 返回首頁</button>
       <span id="db-banner-text" style="font-size:12px; color:#ffffffaa;">未選擇資料庫</span>
       <button onclick="handlePickDb()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">
         📂 資料庫目錄
@@ -860,9 +892,9 @@ function updateHDisplay(){
   document.getElementById('diecast-params').style.display=isDC?'':'none';
   document.getElementById('diecast-info').style.display=(isDC&&calcResults&&calcResults.Fin_Height>0)?'':'none';
   if(isDC&&calcResults&&calcResults.Fin_Height>0){
-    document.getElementById('dc-troot').textContent='T_root: '+(calcResults.T_root||0).toFixed(2)+' mm';
-    document.getElementById('dc-groot').textContent='G_root: '+(calcResults.G_root||0).toFixed(2)+' mm';
-    document.getElementById('dc-ar').textContent='AR (H/T_tip): '+(calcResults.Fin_Height/G.Fin_t).toFixed(1);
+    document.getElementById('dc-troot').textContent='T_root 根部厚度: '+(calcResults.T_root||0).toFixed(2)+' mm';
+    document.getElementById('dc-groot').textContent='G_root 根部間隙: '+(calcResults.G_root||0).toFixed(2)+' mm';
+    document.getElementById('dc-ar').textContent='AR 高寬比 (H/T_tip): '+(calcResults.Fin_Height/G.Fin_t).toFixed(1);
   }
 }
 
@@ -1277,6 +1309,13 @@ function doLogin(){
   } else {
     document.getElementById('login-error').style.display='block';
   }
+}
+
+function doLogout(){
+  document.getElementById('login-page').style.display='flex';
+  document.getElementById('sidebar').style.display='none';
+  document.querySelector('.main').style.display='none';
+  document.getElementById('login-pw').value='';
 }
 
 // =====================================================
