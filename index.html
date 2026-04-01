@@ -206,6 +206,10 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
     <label>🔒 設計安全係數 (Margin)</label><input type="number" id="Margin" step="0.1" onchange="recalc()">
     <label>🔨 鰭片製程 (Fin Tech)</label>
     <select id="fin_tech_selector_v2" onchange="recalc()"><option value="Embedded Fin (0.95)">Embedded Fin (0.95)</option><option value="Die-casting Fin (0.90)">Die-casting Fin (0.90)</option></select>
+    <div id="diecast-params" style="display:none;">
+      <label>📐 拔模角 Draft Angle α (°)</label>
+      <input type="number" id="Draft_Angle" step="0.05" value="1.25" onchange="recalc()">
+    </div>
   </div>
 
   <div class="section-title" onclick="toggleSection(this)">2. PCB 與機構尺寸</div>
@@ -227,6 +231,12 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
     <div class="row2"><div><label>鰭片 Air Gap (mm)</label><input type="number" id="Gap" step="0.1" onchange="recalc()"></div><div><label>鰭片厚度 (mm)</label><input type="number" id="Fin_t" step="0.1" onchange="recalc()"></div></div>
     <div class="h-display" id="h-display"><div class="h-val" id="h-val">--</div><div class="h-sub" id="h-sub">h = h_conv + h_rad</div></div>
     <div class="ar-display" id="ar-display"><div style="font-size:0.78rem;color:#94a3b8;">📐 流阻比 (Aspect Ratio)</div><div id="ar-val" style="font-size:1.1rem;font-weight:700;color:#60a5fa;">--</div><div id="ar-msg" style="font-size:0.7rem;color:#888;">✅ 最佳建議：4.5 ~ 6.5</div><div id="ar-tip" style="font-size:0.65rem;color:#64748b;margin-top:4px;line-height:1.4;">最佳建議：4.5 ~ 6.5（建議值內，無風 AR 往低趨勢設計，反之亦然）</div></div>
+    <div id="diecast-info" class="ar-display" style="display:none;">
+      <div style="font-size:0.78rem;color:#94a3b8;">🏭 Die-casting 衍生參數</div>
+      <div id="dc-troot" style="font-size:0.85rem;color:#60a5fa;">T_root: --</div>
+      <div id="dc-groot" style="font-size:0.85rem;color:#60a5fa;">G_root: --</div>
+      <div id="dc-ar" style="font-size:0.85rem;color:#60a5fa;">AR (H/T_tip): --</div>
+    </div>
   </div>
 
   <div class="section-title" onclick="toggleSection(this)">3. 材料參數 (含 Via K值)</div>
@@ -719,8 +729,9 @@ function toggleSection(el){el.classList.toggle('collapsed');el.nextElementSiblin
 function toggleSAMode(){let m=document.querySelector('input[name="sa_mode"]:checked').value;document.getElementById('sa-sweep-panel').style.display=m==='sweep'?'':'none';document.getElementById('sa-tornado-panel').style.display=m==='tornado'?'':'none';}
 
 function readGlobals(){
-  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density'].forEach(id=>{let el=document.getElementById(id);if(el&&el.tagName!=='SELECT')G[id]=parseFloat(el.value)||0;});
+  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(id=>{let el=document.getElementById(id);if(el&&el.tagName!=='SELECT')G[id]=parseFloat(el.value)||0;});
   G.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;G.Slope=0.03;
+  if(!G.Draft_Angle||G.Draft_Angle<0.1)G.Draft_Angle=1.25;
 }
 
 // =====================================================
@@ -728,6 +739,27 @@ function readGlobals(){
 // =====================================================
 function calcHValue(gap){let hc=6.4*Math.tanh(gap/7.0);let rf=gap>=10?1:Math.sqrt(gap/10);let hr=2.4*rf;return{h_value:hc+hr,h_conv:hc,h_rad:hr};}
 function calcFinCount(W,gap,ft){if(gap+ft<=0)return 0;let n=Math.floor((W+gap)/(gap+ft));while(n>0&&(n*ft+(n-1)*gap)>W+0.001)n--;return Math.max(n,0);}
+
+function drcDieCasting(FH,T_tip,alpha_deg,Gap){
+  let errors=[],warnings=[];
+  if(T_tip<1.0)errors.push('⛔ Die-casting: 鰭片厚度 '+T_tip+'mm < 1.0mm SSM 最低限');
+  if(alpha_deg<0.5)errors.push('⛔ Die-casting: 拔模角 '+alpha_deg+'° < 0.5° SSM 最低限');
+  let alpha_rad=alpha_deg*Math.PI/180;
+  let T_root=T_tip+2*FH*Math.tan(alpha_rad);
+  let Pitch=Gap+T_tip;
+  let G_root=Pitch-T_root;
+  if(G_root<=0)errors.push('⛔ Die-casting: G_root='+G_root.toFixed(2)+'mm ≤ 0，鰭片根部重疊！請增大 Gap 或減小拔模角');
+  let C1=Math.max(3.0,0.08*FH),C2=4.0,C3=2.0*T_tip;
+  let G_min=Math.max(C1,C2,C3);
+  let binding=C1>=C2&&C1>=C3?'C1 模具鋼強度':(C2>=C3?'C2 自然對流邊界層':'C3 模具充填');
+  if(G_root>0&&G_root<G_min)errors.push('⛔ Die-casting: G_root='+G_root.toFixed(2)+'mm < G_min='+G_min.toFixed(1)+'mm（'+binding+'）');
+  let AR_dc=FH/T_tip;
+  if(AR_dc>45)errors.push('⛔ Die-casting: AR='+AR_dc.toFixed(1)+' > 45，超出 SSM 製程極限');
+  else if(AR_dc>25)warnings.push('⚠️ Die-casting: AR='+AR_dc.toFixed(1)+' > 25，需 Cross Rib + 真空 SSM');
+  if(FH>80)errors.push('⛔ Die-casting: 鰭片高度 '+FH.toFixed(1)+'mm > 80mm，超出 SSM 極限');
+  else if(FH>30)warnings.push('ℹ️ FH='+FH.toFixed(1)+'mm > 30mm，建議配置 Cross Rib');
+  return{errors,warnings,T_root,G_root,AR:AR_dc,G_min};
+}
 
 function calcThermalResistance(row,g){
   let bl,bw;
@@ -757,12 +789,33 @@ function computeAll(params,comps,Area_fixed_m2){
   if(valid.length){let mi=0;valid.forEach((r,i)=>{if(r.Allowed_dT<valid[mi].Allowed_dT)mi=i;});MDA=valid[mi].Allowed_dT;BN=valid[mi].Component;bti=mi;}
   let{h_value,h_conv,h_rad}=calcHValue(p.Gap);
   let LH=p.L_pcb+p.Left+p.Right,WH=p.W_pcb+p.Top+p.Btm,bam2=(LH*WH)/1e6;
-  let nf=calcFinCount(WH,p.Gap,p.Fin_t);let eff=p.fin_tech_selector_v2.includes("Embedded")?0.95:0.90;
-  let TP=TWS*p.Margin,AR=0,FH=0;
-  if(TP>0&&MDA>0){AR=1/(h_value*(MDA/TP)*eff);try{FH=((AR-bam2)*1e6)/(2*nf*LH);}catch(e){FH=0;}}
+  let isDieCasting=p.fin_tech_selector_v2.includes("Die-casting");
+  let alpha_deg=isDieCasting?(p.Draft_Angle||1.25):0;
+  let alpha_rad=alpha_deg*Math.PI/180;
+  let eff=isDieCasting?0.90:0.95;
+  let nf,TP=TWS*p.Margin,AR=0,FH=0,T_root_calc=p.Fin_t,G_root_calc=p.Gap;
+  if(!isDieCasting){
+    nf=calcFinCount(WH,p.Gap,p.Fin_t);
+    if(TP>0&&MDA>0){AR=1/(h_value*(MDA/TP)*eff);try{FH=((AR-bam2)*1e6)/(2*nf*LH);}catch(e){FH=0;}}
+  }else{
+    nf=calcFinCount(WH,p.Gap,p.Fin_t);
+    for(let iter=0;iter<5;iter++){
+      if(TP>0&&MDA>0&&nf>0){AR=1/(h_value*(MDA/TP)*eff);try{FH=((AR-bam2)*1e6)/(2*nf*LH);}catch(e){FH=0;}}
+      if(FH<=0)break;
+      T_root_calc=p.Fin_t+2*FH*Math.tan(alpha_rad);
+      let pitch=p.Gap+p.Fin_t;
+      G_root_calc=pitch-T_root_calc;
+      if(G_root_calc<=0)break;
+      let nf_new=calcFinCount(WH,G_root_calc,T_root_calc);
+      if(nf_new<=0||nf_new===nf)break;
+      nf=nf_new;
+    }
+    if(FH>0){T_root_calc=p.Fin_t+2*FH*Math.tan(alpha_rad);G_root_calc=(p.Gap+p.Fin_t)-T_root_calc;}
+  }
   let RH=p.H_shield+p.H_filter+p.t_base+FH,VL=LH*WH*RH/1e6;
   // Weight
-  let bv=LH*WH*p.t_base/1000,fv=nf*p.Fin_t*FH*LH/1000,hw=(bv+fv)*p.al_density/1000;
+  let avg_ft=isDieCasting?(p.Fin_t+T_root_calc)/2:p.Fin_t;
+  let bv=LH*WH*p.t_base/1000,fv=nf*avg_ft*FH*LH/1000,hw=(bv+fv)*p.al_density/1000;
   let sv=Math.max(LH*WH*p.H_shield/1000-p.L_pcb*p.W_pcb*p.H_shield/1000,0),sw=sv*p.al_density/1000;
   let fw=LH*WH*p.H_filter/1000*p.filter_density/1000;
   let shw=(p.L_pcb*p.W_pcb/100)*1.2*p.shielding_density/1000;
@@ -774,11 +827,18 @@ function computeAll(params,comps,Area_fixed_m2){
   let BTM=0;if(valid.length&&bti>=0){let br=rows.find(r=>r.Component===BN&&r.Total_W>0);if(br)BTM=Math.round(br.Tj_Margin*10)/10;}
   // DRC
   let drc=false,dm="",dw="";let ar=(p.Gap>0&&FH>0)?FH/p.Gap:0;
-  if(ar>12){drc=true;dm="⛔ 設計無效 (Choked Flow)：流阻比 "+ar.toFixed(1)+" > 12";}
-  else if(h_conv<4){drc=true;dm="⛔ 設計無效：h_conv="+h_conv.toFixed(2)+" < 4.0，Gap 過小";}
-  else if(p.Gap<4){drc=true;dm="⛔ 鰭片間距 "+p.Gap+"mm < 4mm 物理極限";}
-  else if(p.fin_tech_selector_v2.includes("Embedded")&&FH>100){drc=true;dm="⛔ Embedded Fin 製程限制："+FH.toFixed(1)+"mm > 100mm";}
-  return{Total_Power:TP,Min_dT_Allowed:MDA,Bottleneck_Name:BN,Area_req:AR,Fin_Height:FH,Volume_L:VL,total_weight_kg:tw,h_value,h_conv,h_rad,Bottleneck_Tj_Margin:BTM,Fin_Count:nf,rows,L_hsk:LH,W_hsk:WH,RRU_Height:RH,aspect_ratio:ar,drc_failed:drc,drc_msg:dm,drc_warn:dw,hs_weight_kg:hw,shield_weight_kg:sw,filter_weight_kg:fw,shielding_weight_kg:shw,pcb_weight_kg:pw,eff,T_hsk_base:THB};
+  if(isDieCasting&&FH>0){
+    let dcR=drcDieCasting(FH,p.Fin_t,alpha_deg,p.Gap);
+    if(dcR.errors.length>0){drc=true;dm=dcR.errors[0];}
+    if(dcR.warnings.length>0)dw=dcR.warnings.join('<br>');
+    if(!drc&&ar>12){drc=true;dm="⛔ 設計無效 (Choked Flow)：流阻比 "+ar.toFixed(1)+" > 12";}
+  }else{
+    if(ar>12){drc=true;dm="⛔ 設計無效 (Choked Flow)：流阻比 "+ar.toFixed(1)+" > 12";}
+    else if(h_conv<4){drc=true;dm="⛔ 設計無效：h_conv="+h_conv.toFixed(2)+" < 4.0，Gap 過小";}
+    else if(p.Gap<4){drc=true;dm="⛔ 鰭片間距 "+p.Gap+"mm < 4mm 物理極限";}
+    else if(p.fin_tech_selector_v2.includes("Embedded")&&FH>100){drc=true;dm="⛔ Embedded Fin 製程限制："+FH.toFixed(1)+"mm > 100mm";}
+  }
+  return{Total_Power:TP,Min_dT_Allowed:MDA,Bottleneck_Name:BN,Area_req:AR,Fin_Height:FH,Volume_L:VL,total_weight_kg:tw,h_value,h_conv,h_rad,Bottleneck_Tj_Margin:BTM,Fin_Count:nf,rows,L_hsk:LH,W_hsk:WH,RRU_Height:RH,aspect_ratio:ar,drc_failed:drc,drc_msg:dm,drc_warn:dw,hs_weight_kg:hw,shield_weight_kg:sw,filter_weight_kg:fw,shielding_weight_kg:shw,pcb_weight_kg:pw,eff,T_hsk_base:THB,T_root:T_root_calc,G_root:G_root_calc};
 }
 
 // =====================================================
@@ -796,6 +856,14 @@ function updateHDisplay(){
     else if(ar>=4.5&&ar<=6.5){arEl.style.color='#00b894';arMsg.textContent='✅ 良好 (Good)';arMsg.style.color='#00b894';}
     else{arEl.style.color='#f39c12';arMsg.textContent='⚠️ 不佳 (Poor)';arMsg.style.color='#f39c12';}
   } else {arEl.textContent='--';arMsg.textContent='等待計算...';}
+  let isDC=G.fin_tech_selector_v2.includes("Die-casting");
+  document.getElementById('diecast-params').style.display=isDC?'':'none';
+  document.getElementById('diecast-info').style.display=(isDC&&calcResults&&calcResults.Fin_Height>0)?'':'none';
+  if(isDC&&calcResults&&calcResults.Fin_Height>0){
+    document.getElementById('dc-troot').textContent='T_root: '+(calcResults.T_root||0).toFixed(2)+' mm';
+    document.getElementById('dc-groot').textContent='G_root: '+(calcResults.G_root||0).toFixed(2)+' mm';
+    document.getElementById('dc-ar').textContent='AR (H/T_tip): '+(calcResults.Fin_Height/G.Fin_t).toFixed(1);
+  }
 }
 
 // =====================================================
@@ -943,7 +1011,7 @@ function renderTab2(){
   }
   // DRC + Dims + Volume + Weight
   if(R.drc_failed){document.getElementById('tab2-drc').innerHTML='<div class="drc-error"><b>DRC FAILED</b><br>'+R.drc_msg+'</div>';document.getElementById('tab2-dims').innerHTML='';document.getElementById('tab2-volume').innerHTML='<div class="volume-box" style="background:#ffebee;border-color:#e74c3c;"><h3 style="color:#c0392b;">★ RRU 整機估算體積 (Estimated Volume)</h3><div class="vol-val" style="color:#e74c3c;">N/A</div></div>';document.getElementById('tab2-weight').innerHTML='';}
-  else{document.getElementById('tab2-drc').innerHTML='';document.getElementById('tab2-dims').innerHTML='<div class="kpi-row">'+kpiCard('建議鰭片高度',R.Fin_Height.toFixed(2)+' mm','Suggested Fin Height','#2ecc71')+kpiCard('RRU 整機尺寸 (LxWxH)',R.L_hsk.toFixed(0)+' x '+R.W_hsk.toFixed(0)+' x '+R.RRU_Height.toFixed(1),'Estimated Dimensions','#34495e')+'</div>';
+  else{document.getElementById('tab2-drc').innerHTML=R.drc_warn?'<div class="alert alert-warning" style="padding:10px;border-radius:6px;background:#fff3cd;color:#856404;border:1px solid #ffc107;margin-bottom:10px;">'+R.drc_warn+'</div>':'';document.getElementById('tab2-dims').innerHTML='<div class="kpi-row">'+kpiCard('建議鰭片高度',R.Fin_Height.toFixed(2)+' mm','Suggested Fin Height','#2ecc71')+kpiCard('RRU 整機尺寸 (LxWxH)',R.L_hsk.toFixed(0)+' x '+R.W_hsk.toFixed(0)+' x '+R.RRU_Height.toFixed(1),'Estimated Dimensions','#34495e')+'</div>';
     document.getElementById('tab2-volume').innerHTML='<div class="volume-box"><h3>★ RRU 整機估算體積 (Estimated Volume)</h3><div class="vol-val">'+R.Volume_L.toFixed(2)+' L</div></div>';
     document.getElementById('tab2-weight').innerHTML='<div class="weight-box"><h3 style="color:#2c3e50;">⚖️ 整機估算重量 (Estimated Weight)</h3><div style="font-family:Nunito,sans-serif;font-size:2.8rem;font-weight:800;color:#34495e;margin:10px 0;">'+R.total_weight_kg.toFixed(1)+' kg</div><small style="color:#7f8c8d;">Heatsink ≈ '+R.hs_weight_kg.toFixed(1)+'kg | Shield ≈ '+R.shield_weight_kg.toFixed(1)+'kg | Filter ≈ '+R.filter_weight_kg.toFixed(1)+'kg | Shielding ≈ '+R.shielding_weight_kg.toFixed(1)+'kg | PCB ≈ '+R.pcb_weight_kg.toFixed(2)+'kg</small></div>';
   }
@@ -1126,7 +1194,7 @@ function handleFileLoad(e){let f=e.target.files[0];if(!f)return;let r=new FileRe
   recalc();alert('✅ 專案載入成功！');}catch(err){alert('Error: '+err.message);}};r.readAsText(f);e.target.value='';}
 
 function saveProject(){readGlobals();let d={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},global_params:{},rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
-  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density'].forEach(k=>d.global_params[k]=G[k]);
+  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(k=>d.global_params[k]=G[k]);
   d.global_params.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;
   let b=new Blob([JSON.stringify(d,null,4)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(b);let pn=document.getElementById('cloudProjectName').value.trim()||'Project';a.download='RRU_'+pn+'_'+new Date().toISOString().slice(0,10)+'.json';a.click();}
 
@@ -1147,7 +1215,7 @@ async function cloudSaveProject(){
   }catch(e){}
   readGlobals();
   let d={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},project_name:name,global_params:{},rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
-  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density'].forEach(k=>d.global_params[k]=G[k]);
+  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(k=>d.global_params[k]=G[k]);
   d.global_params.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;
   try{
     await dbAdapter.setDoc('projects', docId, d);

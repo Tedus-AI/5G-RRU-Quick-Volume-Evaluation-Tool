@@ -33,6 +33,7 @@
         "K_Solder": 58.0,
         "t_Solder": 0.3,
         "Voiding": 0.75,
+        "Draft_Angle": 1.25,
         "fin_tech_selector_v2": "Embedded Fin (0.95)",
         "al_density": 2.7,
         "filter_density": 0.97,
