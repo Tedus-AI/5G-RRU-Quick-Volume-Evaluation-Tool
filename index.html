@@ -448,7 +448,7 @@ let db = null;
 let fbOk = false;
 let compLib = {rf_library:[], digital_library:[], pwr_library:[]};
 let cloudLocked = true;
-const CLOUD_LOCK_PWD = '0420';
+const CLOUD_LOCK_PWD = '0000';
 function _applyCloudLockUI(){
   var btn=document.getElementById('cloudLockBtn');
   if(!btn)return;
@@ -556,6 +556,16 @@ function showLockWarning(err){
   document.getElementById('lock-warning-email').textContent=err.lockedByEmail||'（未知）';
   document.getElementById('lock-warning-time').textContent=err.lockedAt||'（未知）';
   document.getElementById('lock-warning-expires').textContent=err.expiresAt||'（未知）';
+  const teamsBtn=document.getElementById('lock-warning-teams-btn');
+  if(teamsBtn && err.lockedByEmail){
+    const name=err.lockedBy||err.lockedByEmail;
+    const msg=encodeURIComponent('Hi '+name+'，我想使用 5G RRU Quick Volume Evaluation Tool 編輯資料庫，請你完成後通知我，謝謝！');
+    teamsBtn.href='https://teams.microsoft.com/l/chat/0/0?users='+encodeURIComponent(err.lockedByEmail)+'&message='+msg;
+    teamsBtn.textContent='📩 傳送 Teams 訊息給 '+name;
+    teamsBtn.style.display='';
+  }else if(teamsBtn){
+    teamsBtn.style.display='none';
+  }
   modal.style.display='flex';
 }
 
@@ -2219,6 +2229,7 @@ window.addEventListener('DOMContentLoaded',function(){
     </div>
     <p class="lock-modal-hint">請直接聯繫對方，待其完成編輯並儲存後再試。</p>
     <div class="lock-modal-actions">
+      <a id="lock-warning-teams-btn" class="lock-modal-btn lock-modal-teams-btn" href="#" target="_blank" rel="noopener">📩 傳送 Teams 訊息</a>
       <button onclick="closeLockWarning()" class="lock-modal-btn">關閉</button>
     </div>
   </div>
