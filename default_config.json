@@ -34,7 +34,7 @@
         "t_Solder": 0.3,
         "Voiding": 0.75,
         "Draft_Angle": 1.25,
-        "fin_tech_selector_v2": "Embedded Fin (0.95)",
+        "fin_tech_selector_v2": "embedded",
         "al_density": 2.7,
         "filter_density": 0.97,
         "shielding_density": 0.76,
