@@ -1102,9 +1102,10 @@ function renderCompTable(arr,containerId,defaults,category){
       else{let extraStyle=col==='Power(W)'?' style="width:75%;min-width:75px;"':'';lhtml+='<td><input type="number"'+extraStyle+' value="'+(row[col]||0)+'" step="any"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',parseFloat(this.value)||0)"></td>';}
     });
     lhtml+='<td style="white-space:nowrap;">';
-    lhtml+='<button class="btn btn-sm eye-btn'+(excl?' excluded':'')+'" onclick="toggleComp(\''+category+'\','+i+')">👁️</button> ';
-    lhtml+='<button class="btn btn-sm btn-primary" onclick="copyComp(\''+category+'\','+i+')">📋</button> ';
-    lhtml+='<button class="btn btn-sm btn-success" onclick="saveCompToLib(\''+category+'\','+i+')">💾</button>';
+    lhtml+='<button class="btn btn-sm eye-btn'+(excl?' excluded':'')+'" title="'+(excl?'顯示（納入計算）':'隱藏（排除計算）')+'" onclick="toggleComp(\''+category+'\','+i+')">👁️</button> ';
+    lhtml+='<button class="btn btn-sm btn-danger" title="刪除" onclick="removeComp(\''+category+'\','+i+')">🗑️</button> ';
+    lhtml+='<button class="btn btn-sm btn-primary" title="複製" onclick="copyComp(\''+category+'\','+i+')">📋</button> ';
+    lhtml+='<button class="btn btn-sm btn-success" title="儲存至資料庫" onclick="saveCompToLib(\''+category+'\','+i+')">💾</button>';
     lhtml+='</td></tr>';
   });
   lhtml+='</tbody></table>';
