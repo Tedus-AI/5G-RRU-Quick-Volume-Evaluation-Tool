@@ -1083,8 +1083,9 @@ function renderCompTable(arr,containerId,defaults,category){
   lhtml+='</div>';
 
   // Power summary
-  let pw=arr.reduce((s,r)=>s+r['Power(W)']*r.Qty,0);
-  lhtml+='<p style="color:#666;font-size:0.85rem;margin-bottom:8px;">📊 '+category.toUpperCase()+' 類總功耗：<b>'+pw.toFixed(1)+' W</b> | 共 <b>'+arr.length+'</b> 種元件</p>';
+  let pw=arr.reduce((s,r)=>s+(r._excluded?0:r['Power(W)']*r.Qty),0);
+  let activeCount=arr.filter(r=>!r._excluded).length;
+  lhtml+='<p style="color:#666;font-size:0.85rem;margin-bottom:8px;">📊 '+category.toUpperCase()+' 類總功耗：<b>'+pw.toFixed(1)+' W</b> | 共 <b>'+activeCount+'</b>/<b>'+arr.length+'</b> 種元件納入計算</p>';
 
   // Table
   lhtml+='<table class="comp-table"><thead><tr>';
@@ -1115,9 +1116,9 @@ function renderTab0(){
   renderCompTable(components.rf,'subtab0',RF_DEFAULT,'rf');
   renderCompTable(components.digital,'subtab1',DIG_DEFAULT,'digital');
   renderCompTable(components.pwr,'subtab2',PWR_DEFAULT,'pwr');
-  let rfP=components.rf.reduce((s,r)=>s+r['Power(W)']*r.Qty,0);
-  let digP=components.digital.reduce((s,r)=>s+r['Power(W)']*r.Qty,0);
-  let pwrP=components.pwr.reduce((s,r)=>s+r['Power(W)']*r.Qty,0);
+  let rfP=components.rf.reduce((s,r)=>s+(r._excluded?0:r['Power(W)']*r.Qty),0);
+  let digP=components.digital.reduce((s,r)=>s+(r._excluded?0:r['Power(W)']*r.Qty),0);
+  let pwrP=components.pwr.reduce((s,r)=>s+(r._excluded?0:r['Power(W)']*r.Qty),0);
   document.getElementById('power-summary').innerHTML='⚡ 整機總功耗（未含 Margin）：<b>'+( rfP+digP+pwrP).toFixed(1)+' W</b> | RF：'+rfP.toFixed(1)+'W　Digital：'+digP.toFixed(1)+'W　Power：'+pwrP.toFixed(1)+'W';
 }
 
