@@ -153,6 +153,11 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
 .lock-modal-btn:hover{background:#e8e8e8;}
 .lock-modal-teams-btn{background:#505ac9;color:#fff;border-color:#505ac9;text-decoration:none;display:inline-block;margin-right:10px;}
 .lock-modal-teams-btn:hover{background:#3f49a3;}
+tr.comp-excluded{opacity:0.4;}
+tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
+.eye-btn{position:relative;background:#f8f9fa;border:1px solid #dee2e6;color:#333;display:inline-flex;align-items:center;justify-content:center;}
+.eye-btn:hover{background:#e9ecef;}
+.eye-btn.excluded::after{content:'';position:absolute;top:10%;left:15%;width:70%;height:70%;border-top:2.5px solid #e74c3c;transform:rotate(-45deg);}
 @media(max-width:900px){body{flex-direction:column;}.sidebar{width:100%;height:auto;position:relative;}.kpi-row{flex-direction:column;}}
 </style>
 <script src="config.js"></script>
@@ -968,7 +973,7 @@ function calcThermalResistance(row,g){
 
 function computeAll(params,comps,Area_fixed_m2){
   let p={...params};let all=[];
-  ['rf','digital','pwr'].forEach(cat=>(comps[cat]||[]).forEach(c=>all.push({...c,_src:cat.toUpperCase()})));
+  ['rf','digital','pwr'].forEach(cat=>(comps[cat]||[]).forEach(c=>{if(!c._excluded)all.push({...c,_src:cat.toUpperCase()});}));
   if(!all.length)return{Total_Power:0,Min_dT_Allowed:50,Bottleneck_Name:"None",Area_req:0,Fin_Height:0,Volume_L:0,total_weight_kg:0,h_value:0,Bottleneck_Tj_Margin:0,Fin_Count:0,rows:[],drc_failed:false,drc_msg:"",L_hsk:0,W_hsk:0,RRU_Height:0,aspect_ratio:0};
   let rows=all.map(c=>{let tr=calcThermalResistance(c,p);return{...c,...tr,Allowed_dT:Math.max(tr.Allowed_dT,0)};});
   let valid=rows.filter(r=>r.Total_W>0);let TWS=valid.reduce((s,r)=>s+r.Total_W,0);
@@ -1086,15 +1091,17 @@ function renderCompTable(arr,containerId,defaults,category){
   COLS.forEach(c=>lhtml+='<th title="'+COL_TIPS[c]+'">'+COL_LABELS[c]+'</th>');
   lhtml+='<th>操作</th></tr></thead><tbody>';
   arr.forEach((row,i)=>{
-    lhtml+='<tr>';
+    let excl=row._excluded;
+    lhtml+='<tr'+(excl?' class="comp-excluded"':'')+'>';
+    let dis=excl?' disabled':'';
     COLS.forEach(col=>{
-      if(col==='Board_Type'){lhtml+='<td><select style="min-width:110px;" onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">';BOARD_TYPES.forEach(o=>lhtml+='<option'+(row[col]===o?' selected':'')+'>'+o+'</option>');lhtml+='</select></td>';}
-      else if(col==='TIM_Type'){lhtml+='<td><select style="min-width:110px;" onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">';TIM_TYPES.forEach(o=>lhtml+='<option'+(row[col]===o?' selected':'')+'>'+o+'</option>');lhtml+='</select></td>';}
-      else if(col==='Component'){lhtml+='<td><input type="text" value="'+(row[col]||'')+'" onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)"></td>';}
-      else{let extraStyle=col==='Power(W)'?' style="width:75%;min-width:75px;"':'';lhtml+='<td><input type="number"'+extraStyle+' value="'+(row[col]||0)+'" step="any" onchange="updateComp(\''+category+'\','+i+',\''+col+'\',parseFloat(this.value)||0)"></td>';}
+      if(col==='Board_Type'){lhtml+='<td><select style="min-width:110px;"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">';BOARD_TYPES.forEach(o=>lhtml+='<option'+(row[col]===o?' selected':'')+'>'+o+'</option>');lhtml+='</select></td>';}
+      else if(col==='TIM_Type'){lhtml+='<td><select style="min-width:110px;"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">';TIM_TYPES.forEach(o=>lhtml+='<option'+(row[col]===o?' selected':'')+'>'+o+'</option>');lhtml+='</select></td>';}
+      else if(col==='Component'){lhtml+='<td><input type="text" value="'+(row[col]||'')+'"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)"></td>';}
+      else{let extraStyle=col==='Power(W)'?' style="width:75%;min-width:75px;"':'';lhtml+='<td><input type="number"'+extraStyle+' value="'+(row[col]||0)+'" step="any"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',parseFloat(this.value)||0)"></td>';}
     });
     lhtml+='<td style="white-space:nowrap;">';
-    lhtml+='<button class="btn btn-sm btn-danger" onclick="removeComp(\''+category+'\','+i+')">🗑️</button> ';
+    lhtml+='<button class="btn btn-sm eye-btn'+(excl?' excluded':'')+'" onclick="toggleComp(\''+category+'\','+i+')">👁️</button> ';
     lhtml+='<button class="btn btn-sm btn-primary" onclick="copyComp(\''+category+'\','+i+')">📋</button> ';
     lhtml+='<button class="btn btn-sm btn-success" onclick="saveCompToLib(\''+category+'\','+i+')">💾</button>';
     lhtml+='</td></tr>';
@@ -1116,6 +1123,7 @@ function renderTab0(){
 
 function updateComp(cat,i,col,val){components[cat][i][col]=val;recalc();}
 function removeComp(cat,i){components[cat].splice(i,1);recalc();}
+function toggleComp(cat,i){components[cat][i]._excluded=!components[cat][i]._excluded;recalc();}
 function copyComp(cat,i){components[cat].push({...components[cat][i]});recalc();}
 function addComp(cat){let d=cat==='rf'?RF_DEFAULT:cat==='digital'?DIG_DEFAULT:PWR_DEFAULT;components[cat].push({...d});recalc();}
 function saveCompToLib(cat,i){let row={};COLS.forEach(c=>row[c]=components[cat][i][c]);saveToLib(cat,row);}
