@@ -1727,6 +1727,8 @@ async function generatePDFReport() {
     // Helper: build component table with annotations
     function compTable(arr, category) {
       if (!arr || !arr.length) return null;
+      const active = arr.filter(r => !r._excluded);
+      if (!active.length) return null;
       const headers = ['Component','Qty','Power(W)','Height(mm)','Pad_L','Pad_W','Thick(mm)','Board_Type','Limit(C)','R_jc','TIM_Type'];
       const categoryNames = {rf: 'RF 射頻板元件', digital: 'Digital 數位板元件', pwr: 'PWR 電源元件'};
       // Header row: bilingual labels
@@ -1735,17 +1737,17 @@ async function generatePDFReport() {
         fillColor:'#f1f5f9', alignment:'center'
       }));
       const body = [headerRow];
-      arr.forEach((row, ri) => {
+      active.forEach((row, ri) => {
         body.push(headers.map(h => ({
           text: String(row[h] != null ? row[h] : ''),
           fontSize:7, alignment: typeof row[h]==='number'?'center':'left',
           fillColor: ri % 2 === 1 ? '#fafbfc' : null
         })));
       });
-      const totalP = arr.reduce((s,r) => s + (r['Power(W)']||0) * (r.Qty||0), 0);
+      const totalP = active.reduce((s,r) => s + (r['Power(W)']||0) * (r.Qty||0), 0);
       return [
         {canvas: [{type:'rect', x:0, y:0, w:515, h:18, r:2, color: category==='rf'?'#dbeafe':category==='digital'?'#e0e7ff':'#fef3c7'}], margin:[0,12,0,0], absolutePosition: undefined},
-        {text: (categoryNames[category] || category.toUpperCase() + ' Components') + '  (' + arr.length + ' items, ' + totalP.toFixed(1) + ' W)', fontSize:9, bold:true, color:cDark, margin:[0,12,0,6]},
+        {text: (categoryNames[category] || category.toUpperCase() + ' Components') + '  (' + active.length + ' items, ' + totalP.toFixed(1) + ' W)', fontSize:9, bold:true, color:cDark, margin:[0,12,0,6]},
         {table: {headerRows:1, widths: Array(11).fill('auto'), body}, layout: {
           hLineWidth: function(i,node){return i===0||i===1||i===node.table.body.length?0.8:0.3;},
           vLineWidth:()=>0.3,
@@ -1907,9 +1909,9 @@ async function generatePDFReport() {
     if (pwrTable) content.push(...pwrTable);
 
     // Total summary
-    let rfP = components.rf.reduce((s,r) => s+r['Power(W)']*r.Qty, 0);
-    let digP = components.digital.reduce((s,r) => s+r['Power(W)']*r.Qty, 0);
-    let pwrP = components.pwr.reduce((s,r) => s+r['Power(W)']*r.Qty, 0);
+    let rfP = components.rf.reduce((s,r) => s+(r._excluded?0:r['Power(W)']*r.Qty), 0);
+    let digP = components.digital.reduce((s,r) => s+(r._excluded?0:r['Power(W)']*r.Qty), 0);
+    let pwrP = components.pwr.reduce((s,r) => s+(r._excluded?0:r['Power(W)']*r.Qty), 0);
     content.push({
       table:{body:[[
         {text:'Total Power (before Margin): ' + (rfP+digP+pwrP).toFixed(1) + ' W', bold:true, fontSize:8},
