@@ -382,7 +382,6 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
     <div class="scale-bar" id="tab1-scale"></div>
     <div id="tab1-col-toggle"></div>
     <div id="tab1-table"></div>
-    <div class="alert alert-info" style="margin-top:12px;">ℹ️ <b>名詞解釋 - 允許溫升 (Allowed dT)</b>：此數值代表「散熱器可用的溫升裕度」(Limit - Local Ambient - Drop)。🟩 綠色 (數值高)：散熱裕度充足。🟥 紅色 (數值低)：該元件是系統的熱瓶頸。</div>
   </div>
 
   <!-- Tab 2: 視覺化報告 -->
@@ -1165,12 +1164,16 @@ function renderTab1(){
   document.getElementById('tab1-alerts').innerHTML=html;
   // Risk Top 3
   let valid=R.rows.filter(r=>r.Total_W>0).sort((a,b)=>a.Allowed_dT-b.Allowed_dT).slice(0,3);
-  let rh='<div class="risk-row">';let emj=['🥇','🥈','🥉'];
-  valid.forEach((r,i)=>{rh+='<div class="risk-card"><div class="rank">'+emj[i]+' 風險 #'+(i+1)+' '+r.Component+'</div><div class="rval">'+r.Allowed_dT.toFixed(1)+' °C</div><div class="rdelta">Tj_Margin: '+r.Tj_Margin.toFixed(1)+'°C</div></div>';});
+  let riskLabels=['#1 最高風險','#2 次高風險','#3 第三風險'];
+  let riskBorderColors=['#c0392b','#2980b9','#e67e22'];
+  let rh='<div class="risk-row">';
+  valid.forEach((r,i)=>{rh+='<div class="risk-card" style="border-top:3px solid '+riskBorderColors[i]+';"><div class="rank" style="color:'+riskBorderColors[i]+';font-weight:700;">'+riskLabels[i]+'</div><div class="rval" style="font-size:1.1rem;">'+r.Component+'</div><div style="font-size:0.82rem;color:#555;margin-top:4px;">允許溫升: '+r.Allowed_dT.toFixed(1)+'°C</div><div class="rdelta">Tj 裕度: '+r.Tj_Margin.toFixed(1)+'°C</div></div>';});
   rh+='</div>';document.getElementById('tab1-risk').innerHTML=rh;
-  // Scale bar
-  let mn=Math.min(...R.rows.map(r=>r.Allowed_dT)),mx=Math.max(...R.rows.map(r=>r.Allowed_dT)),md=(mn+mx)/2;
-  document.getElementById('tab1-scale').innerHTML='<div style="font-weight:bold;margin-bottom:5px;color:#555;font-size:0.85rem;">允許溫升 (Allowed dT) 色階參考</div><div class="bar"></div><div class="labels"><span>'+mn.toFixed(0)+'°C (Risk)</span><span>'+md.toFixed(0)+'°C</span><span>'+mx.toFixed(0)+'°C (Safe)</span></div>';
+  document.getElementById('tab1-scale').innerHTML='';
+  // Risk highlight data
+  let riskNames=valid.map(r=>r.Component);
+  let riskBg=['#fadbd8','#d4e6f1','#fdebd0'];
+  let riskColor=['#c0392b','#2980b9','#e67e22'];
   // Column toggle
   let ctHtml='<div class="col-toggle"><div style="font-weight:600;font-size:0.85rem;color:#475569;margin-bottom:8px;">⚙️ 自訂顯示欄位</div><div class="col-checks">';
   ALL_TAB1_COLS.forEach(c=>{let lb=TAB2_LABELS[c]||c;let ck=tab1SelectedCols.includes(c)?'checked':'';ctHtml+='<label><input type="checkbox" '+ck+' onchange="toggleTab1Col(\''+c+'\',this.checked)"> '+lb+' ('+c+')</label>';});
@@ -1180,9 +1183,10 @@ function renderTab1(){
   let th='<table class="comp-table"><thead><tr>';
   cols.forEach(c=>{let lb=TAB2_LABELS[c]||c;let tp=TAB2_TIPS[c]||'';th+='<th title="'+tp+'">'+lb+'</th>';});
   th+='</tr></thead><tbody>';
-  R.rows.forEach(r=>{th+='<tr>';cols.forEach(c=>{let v=r[c];let st='';
-    if(c==='Allowed_dT'||c==='Tj_Margin'){let ratio=mx>mn?(v-mn)/(mx-mn):0.5;var r1,g1,b1;if(ratio<0.5){var t=ratio*2;r1=Math.round(215+(254-215)*t);g1=Math.round(48+(224-48)*t);b1=Math.round(39+(139-39)*t);}else{var t=(ratio-0.5)*2;r1=Math.round(254+(26-254)*t);g1=Math.round(224+(152-224)*t);b1=Math.round(139+(80-139)*t);}st='background:rgba('+r1+','+g1+','+b1+',0.35);font-weight:600;';}
-    if(typeof v==='number')v=(c.includes('R_')&&c!=='R_jc')?v.toFixed(4):v.toFixed(1);th+='<td style="'+st+'">'+v+'</td>';});th+='</tr>';});
+  R.rows.forEach((r,ri)=>{let rIdx=riskNames.indexOf(r.Component);let isRisk=rIdx>=0;let rowBg=isRisk?riskBg[rIdx]:(ri%2===1?'#fafbfc':'');th+='<tr style="'+(rowBg?'background:'+rowBg+';':'')+'">';cols.forEach(c=>{let v=r[c];let st='';
+    if(c==='Tj_Margin'&&typeof v==='number'&&v<0)st='color:#c0392b;font-weight:600;';
+    if(c==='Component'&&isRisk){let lbl='<span style="color:'+riskColor[rIdx]+';font-weight:700;">[#'+(rIdx+1)+']</span> '+v;if(typeof v==='number')v=v.toFixed(1);th+='<td style="'+st+'">'+lbl+'</td>';}
+    else{if(typeof v==='number')v=(c.includes('R_')&&c!=='R_jc')?v.toFixed(4):v.toFixed(1);th+='<td style="'+st+'">'+v+'</td>';}});th+='</tr>';});
   th+='</tbody></table>';document.getElementById('tab1-table').innerHTML=th;
 }
 
