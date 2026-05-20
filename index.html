@@ -929,7 +929,8 @@ function readGlobals(){
 // =====================================================
 // CORE CALCULATION ENGINE (exact port from Python)
 // =====================================================
-function calcHValue(gap){let hc=6.4*Math.tanh(gap/7.0);let rf=gap>=10?1:Math.sqrt(gap/10);let hr=2.4*rf;return{h_value:hc+hr,h_conv:hc,h_rad:hr};}
+function calcHValue(gap,FH_mm){const FH_REF=70.0,ALPHA_H=0.20;let FH=(FH_mm&&FH_mm>0)?FH_mm:FH_REF;let FHs=Math.max(FH,20);let hc_base=6.4*Math.tanh(gap/7.0);let fh_factor=Math.pow(FH_REF/FHs,ALPHA_H);let hc=hc_base*fh_factor;let rf=gap>=10?1:Math.sqrt(gap/10);let hr=2.4*rf;return{h_value:hc+hr,h_conv:hc,h_rad:hr};}
+function calcEtaFin(FH_mm,t_fin_mm,h_value,k_fin){if(FH_mm<=0||t_fin_mm<=0||h_value<=0||k_fin<=0)return 1.0;let t_m=t_fin_mm/1000;let Lc_m=(FH_mm+t_fin_mm/2)/1000;let m=Math.sqrt(2*h_value/(k_fin*t_m));let mLc=m*Lc_m;if(mLc<1e-6)return 1.0;return Math.tanh(mLc)/mLc;}
 function calcFinCount(W,gap,ft){if(gap+ft<=0)return 0;let n=Math.floor((W+gap)/(gap+ft));while(n>0&&(n*ft+(n-1)*gap)>W+0.001)n--;return Math.max(n,0);}
 
 function drcDieCasting(FH,T_tip,alpha_deg,Gap){
