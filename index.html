@@ -980,30 +980,48 @@ function computeAll(params,comps,Area_fixed_m2){
   let valid=rows.filter(r=>r.Total_W>0);let TWS=valid.reduce((s,r)=>s+r.Total_W,0);
   let MDA=50,BN="None",bti=-1;
   if(valid.length){let mi=0;valid.forEach((r,i)=>{if(r.Allowed_dT<valid[mi].Allowed_dT)mi=i;});MDA=valid[mi].Allowed_dT;BN=valid[mi].Component;bti=mi;}
-  let{h_value,h_conv,h_rad}=calcHValue(p.Gap);
+  let{h_value,h_conv,h_rad}=calcHValue(p.Gap,70);
   let LH=p.L_pcb+p.Left+p.Right,WH=p.W_pcb+p.Top+p.Btm,bam2=(LH*WH)/1e6;
   let isDieCasting=p.fin_tech_selector_v2.includes("Die-casting");
   let alpha_deg=isDieCasting?(p.Draft_Angle||1.25):0;
   let alpha_rad=alpha_deg*Math.PI/180;
-  let eff=isDieCasting?0.90:0.95;
-  let nf,TP=TWS*p.Margin,AR=0,FH=0,T_root_calc=p.Fin_t,G_root_calc=p.Gap;
-  if(!isDieCasting){
-    nf=calcFinCount(WH,p.Gap,p.Fin_t);
-    if(TP>0&&MDA>0){AR=1/(h_value*(MDA/TP)*eff);try{FH=((AR-bam2)*1e6)/(2*nf*LH);}catch(e){FH=0;}}
-  }else{
-    nf=calcFinCount(WH,p.Gap,p.Fin_t);
-    for(let iter=0;iter<5;iter++){
-      if(TP>0&&MDA>0&&nf>0){AR=1/(h_value*(MDA/TP)*eff);try{FH=((AR-bam2)*1e6)/(2*nf*LH);}catch(e){FH=0;}}
-      if(FH<=0)break;
-      T_root_calc=p.Fin_t+2*FH*Math.tan(alpha_rad);
-      let pitch=p.Gap+p.Fin_t;
-      G_root_calc=pitch-T_root_calc;
-      if(G_root_calc<=0)break;
-      let nf_new=calcFinCount(WH,G_root_calc,T_root_calc);
-      if(nf_new<=0||nf_new===nf)break;
-      nf=nf_new;
+  // === Phase 2: 動態 h + 動態 η_fin 迭代反推 FH ===
+  const K_FIN = isDieCasting ? 160 : 200;
+  const ETA_PROCESS = isDieCasting ? 0.99 : 1.04;
+  let nf, TP = TWS*p.Margin, AR = 0, FH = 0;
+  let T_root_calc = p.Fin_t, G_root_calc = p.Gap;
+  let eta_fin = 1.0, eff = isDieCasting ? 0.99 : 1.04;
+  nf = calcFinCount(WH, p.Gap, p.Fin_t);
+  let FH_prev = 70;
+  if (TP > 0 && MDA > 0) {
+    for (let iter = 0; iter < 15; iter++) {
+      let t_fin_for_eta = p.Fin_t;
+      if (isDieCasting) {
+        T_root_calc = p.Fin_t + 2*FH_prev*Math.tan(alpha_rad);
+        let pitch = p.Gap + p.Fin_t;
+        G_root_calc = pitch - T_root_calc;
+        if (G_root_calc > 0) {
+          let nf_new = calcFinCount(WH, G_root_calc, T_root_calc);
+          if (nf_new > 0) nf = nf_new;
+        }
+        t_fin_for_eta = (p.Fin_t + T_root_calc) / 2;
+      }
+      let hRes = calcHValue(p.Gap, FH_prev);
+      h_value = hRes.h_value; h_conv = hRes.h_conv; h_rad = hRes.h_rad;
+      eta_fin = calcEtaFin(FH_prev, t_fin_for_eta, h_value, K_FIN);
+      eff = eta_fin * ETA_PROCESS;
+      try { AR = 1 / (h_value * (MDA/TP) * eff); } catch(e) { AR = 0; }
+      let FH_new = 0;
+      try { FH_new = ((AR - bam2) * 1e6) / (2*nf*LH); } catch(e) { FH_new = 0; }
+      if (FH_new <= 0) { FH = 0; break; }
+      if (Math.abs(FH_new - FH_prev) < 0.05) { FH = FH_new; break; }
+      FH_prev = 0.5*FH_prev + 0.5*FH_new;
+      FH = FH_new;
     }
-    if(FH>0){T_root_calc=p.Fin_t+2*FH*Math.tan(alpha_rad);G_root_calc=(p.Gap+p.Fin_t)-T_root_calc;}
+  }
+  if (isDieCasting && FH > 0) {
+    T_root_calc = p.Fin_t + 2*FH*Math.tan(alpha_rad);
+    G_root_calc = (p.Gap + p.Fin_t) - T_root_calc;
   }
   let RH=p.H_shield+p.H_filter+p.t_base+FH,VL=LH*WH*RH/1e6;
   // Weight
@@ -1031,7 +1049,7 @@ function computeAll(params,comps,Area_fixed_m2){
     else if(p.Gap<4){drc=true;dm="⛔ 鰭片間距 "+p.Gap+"mm < 4mm 物理極限";}
     else if(p.fin_tech_selector_v2.includes("Embedded")&&FH>100){drc=true;dm="⛔ Embedded Fin 製程限制："+FH.toFixed(1)+"mm > 100mm";}
   }
-  return{Total_Power:TP,Min_dT_Allowed:MDA,Bottleneck_Name:BN,Area_req:AR,Fin_Height:FH,Volume_L:VL,total_weight_kg:tw,h_value,h_conv,h_rad,Bottleneck_Tj_Margin:BTM,Fin_Count:nf,rows,L_hsk:LH,W_hsk:WH,RRU_Height:RH,aspect_ratio:ar,drc_failed:drc,drc_msg:dm,drc_warn:dw,hs_weight_kg:hw,shield_weight_kg:sw,filter_weight_kg:fw,shielding_weight_kg:shw,pcb_weight_kg:pw,eff,T_hsk_base:THB,T_root:T_root_calc,G_root:G_root_calc};
+  return{Total_Power:TP,Min_dT_Allowed:MDA,Bottleneck_Name:BN,Area_req:AR,Fin_Height:FH,Volume_L:VL,total_weight_kg:tw,h_value,h_conv,h_rad,Bottleneck_Tj_Margin:BTM,Fin_Count:nf,rows,L_hsk:LH,W_hsk:WH,RRU_Height:RH,aspect_ratio:ar,drc_failed:drc,drc_msg:dm,drc_warn:dw,hs_weight_kg:hw,shield_weight_kg:sw,filter_weight_kg:fw,shielding_weight_kg:shw,pcb_weight_kg:pw,eff,eta_fin,T_hsk_base:THB,T_root:T_root_calc,G_root:G_root_calc};
 }
 
 // =====================================================
