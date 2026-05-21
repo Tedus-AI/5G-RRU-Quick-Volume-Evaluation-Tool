@@ -68,6 +68,14 @@ const fileDb = {
     await this._writeFile();
   },
 
+  async updateDoc(colName, docId, fields) {
+    this._assertReady();
+    if (!dbCache[colName]) dbCache[colName] = {};
+    const existing = dbCache[colName][docId] ?? {};
+    dbCache[colName][docId] = { ...existing, ...fields };
+    await this._writeFile();
+  },
+
   async deleteDoc(colName, docId) {
     this._assertReady();
     if (dbCache[colName]) {
