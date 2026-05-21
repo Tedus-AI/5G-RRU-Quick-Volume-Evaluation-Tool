@@ -1058,9 +1058,10 @@ function computeAll(params,comps,Area_fixed_m2){
 function recalc(){readGlobals();calcResults=computeAll(G,components,null);updateHDisplay();renderTab0();renderTab1();renderTab2();renderTab3();updateSABase();}
 
 function updateHDisplay(){
-  let{h_value,h_conv,h_rad}=calcHValue(G.Gap);let el=document.getElementById('h-val');
+  let FH_disp=(calcResults&&calcResults.Fin_Height>0)?calcResults.Fin_Height:70;let{h_value,h_conv,h_rad}=calcHValue(G.Gap,FH_disp);let el=document.getElementById('h-val');
   el.textContent='🔥 自動計算 h: '+h_value.toFixed(2);el.style.color=h_conv<4?'#ef4444':'#60a5fa';
-  document.getElementById('h-sub').textContent='h_conv: '+h_conv.toFixed(2)+' + h_rad: '+h_rad.toFixed(2);
+  let etaStr=(calcResults&&calcResults.eta_fin>0)?(' | η_fin: '+calcResults.eta_fin.toFixed(3)):'';
+  document.getElementById('h-sub').textContent='h_conv: '+h_conv.toFixed(2)+' + h_rad: '+h_rad.toFixed(2)+etaStr;
   let ar=calcResults?calcResults.aspect_ratio:0;let arEl=document.getElementById('ar-val');let arMsg=document.getElementById('ar-msg');
   if(ar>0){arEl.textContent=ar.toFixed(1);
     if(ar>12){arEl.style.color='#e74c3c';arMsg.textContent='⛔ 過高 (High)';arMsg.style.color='#e74c3c';}
@@ -1908,7 +1909,7 @@ async function generatePDFReport() {
     });
 
     // h value
-    let {h_value, h_conv, h_rad} = calcHValue(G.Gap);
+    let {h_value, h_conv, h_rad} = calcHValue(G.Gap, R.Fin_Height);
     content.push({
       table:{body:[[
         {text:[{text:'h_total\n',bold:true,fontSize:8,color:cPrimary},{text:'總表面熱傳係數',fontSize:6,color:'#94a3b8',italics:true}]},
