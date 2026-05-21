@@ -987,7 +987,7 @@ function computeAll(params,comps,Area_fixed_m2){
   let alpha_rad=alpha_deg*Math.PI/180;
   // === Phase 2: 動態 h + 動態 η_fin 迭代反推 FH ===
   const K_FIN = isDieCasting ? 160 : 200;
-  const ETA_PROCESS = isDieCasting ? 0.99 : 1.04;
+  const ETA_PROCESS = isDieCasting ? 0.99 : 1.06;
   let nf, TP = TWS*p.Margin, AR = 0, FH = 0;
   let T_root_calc = p.Fin_t, G_root_calc = p.Gap;
   let eta_fin = 1.0, eff = isDieCasting ? 0.99 : 1.04;
