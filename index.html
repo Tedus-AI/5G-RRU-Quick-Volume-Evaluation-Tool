@@ -1430,17 +1430,23 @@ async function cloudSaveProject(){
   if(!fbOk||!dbAdapter.isReady()){alert('⚠️ 資料庫未連線，無法儲存。');return;}
   let docId=name.replace(/ /g,'_').replace(/[^a-zA-Z0-9_\-\u4e00-\u9fff]/g,'');
   if(!docId){alert('⚠️ 專案名稱無效，請使用中英文或數字。');return;}
-  // Check if exists
+  // Check if exists — keep a reference so we can merge unknown fields back in
+  let existing=null;
   try{
-    let existing=await dbAdapter.getDoc('projects', docId);
+    existing=await dbAdapter.getDoc('projects', docId);
     if(existing&&!confirm('「'+name+'」已存在，確定要覆蓋？'))return;
   }catch(e){}
   readGlobals();
-  let d={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},project_name:name,global_params:{},rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
-  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(k=>d.global_params[k]=G[k]);
-  d.global_params.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;
+  // Merge global_params with existing so we don't drop keys owned by sibling tools
+  // (e.g. AI-Thermal-pad-and-stud-size-Evaluation-Tool may write keys we don't know about).
+  const mergedGlobals={...(existing&&existing.global_params?existing.global_params:{})};
+  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(k=>mergedGlobals[k]=G[k]);
+  mergedGlobals.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;
+  // Use updateDoc so fields owned by other tools (thermal_specs, hidden_components,
+  // validation_data, param_*, tcPlacement, vd_hidden_components, ...) are preserved.
+  const fields={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},project_name:name,global_params:mergedGlobals,rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
   try{
-    await dbAdapter.setDoc('projects', docId, d);
+    await dbAdapter.updateDoc('projects', docId, fields);
     alert('✅ 專案「'+name+'」已儲存！');
   }catch(e){alert('❌ 儲存失敗: '+e.message);}
 }
