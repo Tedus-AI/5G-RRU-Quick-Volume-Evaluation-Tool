@@ -196,11 +196,13 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
     </div>
     <div class="info-card" style="background:#e8f4fd;border-left:6px solid #3498db;">
       <h3 style="color:#2980b9;">🔥 綜合熱傳係數 h 的計算原理</h3>
-      <p style="color:#2c3e50;">本工具的 h 值採用<strong>半經驗模型</strong>，經多款實際 RRU 產品的 CFD 模擬結果校正而得：<br>
-      • <strong>h_conv</strong> = 6.4 × tanh(Gap / 7.0)　→ 模擬自然對流隨鰭片間距的飽和行為<br>
-      • <strong>h_rad</strong> = 2.4 × (Gap / 10)<sup>0.5</sup>　→ 考慮鰭片間輻射交換隨間距衰減<br>
-      • <strong>h_total</strong> = h_conv + h_rad<br>
-      該模型已在多個專案中與 FloTHERM 結果比對，誤差通常在 <strong>±8%</strong> 以內。</p>
+      <p style="color:#2c3e50;">本工具採用<strong>動態 h(FH) + 動態 η_fin 鰭片效率耦合</strong>物理模型，經多款 5G RRU 實機 CFD 校準：<br>
+      • <strong>h_conv</strong> = 6.4 × tanh(Gap / 7.0) × (70 / FH)<sup>0.20</sup>　→ 對流項加入鰭片高度修正（FH 越長邊界層越厚、h 越低）<br>
+      • <strong>h_rad</strong> = 2.4 × min(1, √(Gap / 10))　→ 輻射項，Gap ≥ 10mm 飽和、Gap &lt; 10mm 隨間距衰減<br>
+      • <strong>η_fin</strong> = tanh(m·Lc) / (m·Lc)，m = √(2h / (k·t))，Lc = FH + t/2　→ 鰭片溫度梯度造成的效率折扣（典型 0.85 ~ 0.95）<br>
+      • <strong>有效效率 eff</strong> = η_fin × η_process（η_process：Embedded Fin = 1.06 / Die-casting = 0.99，含底板與製程修正）<br>
+      由於 h 與 η_fin 皆隨鰭片高度 FH 變化、而 FH 又由兩者反推求得，工具採用<strong>迭代收斂演算法</strong>解出唯一自洽解。<br>
+      與舊版固定 h 模型相比，新模型能正確反映高 T_amb 高功率情境下鰭片變長後 h 的衰減與效率損失，經 CFD 比對 <strong>FH 預測誤差顯著改善</strong>。</p>
     </div>
     <div class="info-card" style="background:#f3e8ff;border-left:6px solid #8b5cf6;">
       <h3 style="color:#6d28d9;">🔍 設計規則檢查 (DRC) 總覽</h3>
