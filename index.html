@@ -977,10 +977,10 @@ function computeAll(params,comps,Area_fixed_m2){
   let p={...params};let all=[];
   ['rf','digital','pwr'].forEach(cat=>(comps[cat]||[]).forEach(c=>{if(!c._excluded)all.push({...c,_src:cat.toUpperCase()});}));
   if(!all.length)return{Total_Power:0,Min_dT_Allowed:50,Bottleneck_Name:"None",Area_req:0,Fin_Height:0,Volume_L:0,total_weight_kg:0,h_value:0,Bottleneck_Tj_Margin:0,Fin_Count:0,rows:[],drc_failed:false,drc_msg:"",L_hsk:0,W_hsk:0,RRU_Height:0,aspect_ratio:0};
-  let rows=all.map(c=>{let tr=calcThermalResistance(c,p);return{...c,...tr,Allowed_dT:Math.max(tr.Allowed_dT,0)};});
+  let rows=all.map(c=>{let tr=calcThermalResistance(c,p);return{...c,...tr};});
   let valid=rows.filter(r=>r.Total_W>0);let TWS=valid.reduce((s,r)=>s+r.Total_W,0);
   let MDA=50,BN="None",bti=-1;
-  if(valid.length){let mi=0;valid.forEach((r,i)=>{if(r.Allowed_dT<valid[mi].Allowed_dT)mi=i;});MDA=valid[mi].Allowed_dT;BN=valid[mi].Component;bti=mi;}
+  if(valid.length){let mi=0;valid.forEach((r,i)=>{if(r.Allowed_dT<valid[mi].Allowed_dT)mi=i;});MDA=Math.max(valid[mi].Allowed_dT,0);BN=valid[mi].Component;bti=mi;}
   let{h_value,h_conv,h_rad}=calcHValue(p.Gap,70);
   let LH=p.L_pcb+p.Left+p.Right,WH=p.W_pcb+p.Top+p.Btm,bam2=(LH*WH)/1e6;
   let isDieCasting=p.fin_tech_selector_v2.includes("Die-casting");
