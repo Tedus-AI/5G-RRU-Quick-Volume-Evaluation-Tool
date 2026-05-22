@@ -177,7 +177,8 @@
                 "filter_density":     { "type": "number", "description": "濾波器密度 (g/cm³)" },
                 "shielding_density":  { "type": "number", "description": "屏蔽材料密度 (g/cm³)" },
                 "pcb_surface_density":{ "type": "number", "description": "PCB 面密度 (g/cm²)" },
-                "fin_tech_selector_v2":{ "type": "string", "enum": ["CNC", "Extrusion", "Forging", "Die Casting", "Skived"], "description": "鰭片製程選擇" }
+                "fin_tech_selector_v2":{ "type": "string", "enum": ["Embedded Fin (0.95)", "Die-casting Fin (0.90)"], "description": "鰭片製程選擇 (含製程效率因子)" },
+                "Draft_Angle":        { "type": "number", "description": "Die-casting 拔模角 α (°)，僅 Die-casting Fin 時使用" }
               }
             },
             "rf_data":      { "type": "array", "items": { "$ref": "#/definitions/ComponentRecord" }, "description": "RF 元件清單" },
