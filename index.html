@@ -278,7 +278,7 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
     <label style="margin-top:12px;color:var(--primary-light);">📏 PCB 板離外殼邊距 (防水)</label>
     <div class="row2"><div><label>Top (mm)</label><input type="number" id="Top" step="1" onchange="recalc()"></div><div><label>Bottom (mm)</label><input type="number" id="Btm" step="1" onchange="recalc()"></div></div>
     <div class="row2"><div><label>Left (mm)</label><input type="number" id="Left" step="1" onchange="recalc()"></div><div><label>Right (mm)</label><input type="number" id="Right" step="1" onchange="recalc()"></div></div>
-    <label style="margin-top:12px;color:var(--primary-light);">🔶 Final PA 銅塊設定</label>
+    <label style="margin-top:12px;color:var(--primary-light);">🔶 Cu Coin 銅塊設定（套用於所有 Board_Type = Copper Coin 元件）</label>
     <div class="row2"><div><label>銅塊長 (mm)</label><input type="number" id="Coin_L_Setting" step="1" onchange="recalc()"></div><div><label>銅塊寬 (mm)</label><input type="number" id="Coin_W_Setting" step="1" onchange="recalc()"></div></div>
     <label style="margin-top:12px;color:var(--primary-light);">🌊 鰭片幾何</label>
     <div class="row2"><div><label>鰭片 Air Gap (mm)</label><input type="number" id="Gap" step="0.1" onchange="recalc()"></div><div><label>鰭片厚度 (mm)</label><input type="number" id="Fin_t" step="0.1" onchange="recalc()"></div></div>
@@ -778,7 +778,7 @@ const COL_TIPS = {
   'Pad_L':'IC E-PAD 長度或 PA 封裝底部長度或元件散熱端的長度 (mm)','Pad_W':'IC E-PAD 寬度或 PA 封裝底部寬度或元件散熱端的寬度 (mm)',
   'Thick(mm)':'熱需傳導穿過的 PCB 或銅塊厚度',
   'Board_Type':'元件導熱到 HSK 表面的方式',
-  'TIM_Type':'元件底部與散熱器之間的 TIM。Final PA 的 Solder die attach 已內建於 R_int，此欄填 Grease 即可',
+  'TIM_Type':'元件底部與散熱器之間的 TIM。Board_Type = Copper Coin 的元件其 die-attach Solder 已內建於 R_int，此欄填 Grease 或 None 即可',
   'R_jc':'結點到殼的內部熱阻 (°C/W)','Limit(C)':'元件允許最高運作溫度'
 };
 const TAB2_TIPS = {
@@ -957,7 +957,7 @@ function drcDieCasting(FH,T_tip,alpha_deg,Gap){
 
 function calcThermalResistance(row,g){
   let bl,bw;
-  if(row.Component==="Final PA"){bl=g.Coin_L_Setting;bw=g.Coin_W_Setting;}
+  if(row.Board_Type==="Copper Coin"){bl=g.Coin_L_Setting;bw=g.Coin_W_Setting;}
   else if(row['Power(W)']===0||row['Thick(mm)']===0){bl=0;bw=0;}
   else{bl=row.Pad_L+row['Thick(mm)'];bw=row.Pad_W+row['Thick(mm)'];}
   let la=g.T_amb+row['Height(mm)']*g.Slope;
@@ -965,7 +965,7 @@ function calcThermalResistance(row,g){
   let pa=(row.Pad_L*row.Pad_W)/1e6,ba=(bl*bw)/1e6;
   let ri=0;
   if(kb>0&&pa>0){let ea=ba>0?Math.sqrt(pa*ba):pa;let rv=(row['Thick(mm)']/1000)/(kb*ea);
-    if(row.Component==="Final PA")ri=rv+((g.t_Solder/1000)/(g.K_Solder*pa*g.Voiding));
+    if(row.Board_Type==="Copper Coin")ri=rv+((g.t_Solder/1000)/(g.K_Solder*pa*g.Voiding));
     else if(row.Board_Type==="Thermal Via")ri=rv/g.Via_Eff;else ri=rv;}
   let tm={Solder:{k:g.K_Solder,t:g.t_Solder},Grease:{k:g.K_Grease,t:g.t_Grease},Pad:{k:g.K_Pad,t:g.t_Pad},Pad2:{k:g.K_Pad2,t:g.t_Pad2},Putty:{k:g.K_Putty,t:g.t_Putty},None:{k:1,t:0}};
   let ti=tm[row.TIM_Type]||{k:1,t:0};let ta=ba>0?ba:pa;let rt=0;if(ta>0&&ti.t>0)rt=(ti.t/1000)/(ti.k*ta);

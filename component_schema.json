@@ -89,8 +89,8 @@
       "properties": {
         "_src":        { "type": "string",  "enum": ["RF", "DIGITAL", "PWR"], "description": "元件來源分類標記，計算時自動附加" },
         "Total_W":     { "type": "number",  "description": "總功耗 = Power(W) × Qty (W)" },
-        "R_int":       { "type": "number",  "description": "基板熱阻 (°C/W)。依 Board_Type 計算：Copper Coin = Thick/(K_copper × Area), Thermal Via = 1/(K_Via × Via_Eff × Area), None = 極大值" },
-        "R_TIM":       { "type": "number",  "description": "介面材料熱阻 (°C/W)。一般 TIM：t_TIM / (K_TIM × Area)；Solder（僅 Final PA）：t_Solder / (K_Solder × Area × Voiding)，Voiding 為有效面積率" },
+        "R_int":       { "type": "number",  "description": "基板熱阻 (°C/W)，依 Board_Type 計算（與元件名稱無關）：Copper Coin = Thick/(380 × Area_spread) + die-attach Solder t_Solder/(K_Solder × Pad_Area × Voiding)（Voiding 為錫片有效面積率）；Thermal Via = Thick/(K_Via × Area_spread × Via_Eff)；None = 0。Area_spread = √(Pad_Area × Base_Area)，Base_Area 在 Cu Coin 時 = Coin_L_Setting × Coin_W_Setting，在 Thermal Via 時 = (Pad_L+Thick) × (Pad_W+Thick)" },
+        "R_TIM":       { "type": "number",  "description": "介面材料熱阻 (°C/W)。R_TIM = t_TIM/(K_TIM × Area_eff)，Area_eff 取 Base_Area（無則 Pad_Area）。依 TIM_Type 從 lookup 取 (K, t)：Grease / Pad / Pad2 / Putty；None 或未指定 ⇒ R_TIM = 0。註：Board_Type = Copper Coin 元件的 die-attach Solder 已內建於 R_int，TIM_Type 下拉不提供 Solder" },
         "Allowed_dT":  { "type": "number",  "description": "允許溫升 = Limit - Loc_Amb - Drop (°C)。數值越小 = 越接近瓶頸" },
         "Loc_Amb":     { "type": "number",  "description": "局部環境溫度 = T_amb + Height(mm) × 0.03 (°C)" },
         "Drop":        { "type": "number",  "description": "內部溫降 = Power(W) × (R_jc + R_int + R_TIM) (°C)" },
