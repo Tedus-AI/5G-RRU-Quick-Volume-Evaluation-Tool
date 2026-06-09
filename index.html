@@ -452,7 +452,6 @@ const firebaseConfig = {
 };
 let db = null;
 let fbOk = false;
-let compLib = {rf_library:[], digital_library:[], pwr_library:[]};
 let cloudLocked = true;
 const CLOUD_LOCK_PWD = '0000';
 function _applyCloudLockUI(){
@@ -520,7 +519,7 @@ async function handleSpLogout(){
   if(!cloudLocked){cloudLocked=true;_applyCloudLockUI();}
   try{await dbAdapter.signOut();}catch(e){}
   fbOk=false;
-  compLib={rf_library:[],digital_library:[],pwr_library:[]};
+  variantsCache=null;
   renderTab0();
   _updateSpHeaderSignedOut();
 }
@@ -861,41 +860,103 @@ window.addEventListener('beforeunload', function(e){
   }
 });
 
-async function saveToLib(cat, row) {
-  if(checkCloudLock('儲存元件到資料庫'))return;
-  let colName = cat + '_library';
-  let docId = row.Component.replace(/ /g,'_').replace(/\//g,'-').replace(/[()]/g,'');
-  let existing = compLib[colName].find(r => r.Component === row.Component);
-  if (existing) {
-    if (!confirm('「' + row.Component + '」已存在資料庫，確定要覆蓋？')) return;
-    compLib[colName] = compLib[colName].map(r => r.Component===row.Component ? row : r);
-  } else {
-    compLib[colName].push(row);
+// =====================================================
+// 從資料庫快選（跨專案即時聚合 + 白名單複製）
+// -----------------------------------------------------
+// 取代舊的 *_library 快選：掃描 projects collection 的「全部專案」聚合元件
+// variant，讓快選跨專案重用任何元件。純讀取（只用 getCollection，絕不寫入任何
+// 專案或集合），所以存檔時也不再自動 upsert 到共用 *_library（避免孤兒與無聲覆寫）。
+// 去重：相同 (名稱, Power(W)) 收斂成一筆，來源專案取「最早建立者」(meta.timestamp)。
+// =====================================================
+const VARIANT_CAT = {
+  rf:      { field: 'rf_data',      default: RF_DEFAULT },
+  digital: { field: 'digital_data', default: DIG_DEFAULT },
+  pwr:     { field: 'pwr_data',     default: PWR_DEFAULT },
+};
+
+// 複製元件時要一併帶過去的「每元件欄位」白名單。
+// ⚠ 5G-RRU 專屬的每元件欄位全列入（= COLS 去掉當作 key 的 Component），避免快選掉值。
+const VARIANT_CARRY = ['Qty','Power(W)','Height(mm)','Pad_L','Pad_W','Thick(mm)','Board_Type','Limit(C)','R_jc','TIM_Type'];
+
+let variantsCache = null;     // { rf:[...], digital:[...], pwr:[...] } 或 null（未載入）
+let variantsLoading = false;
+
+function _vEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+// 純函式：用一份 projects 物件聚合出某分類的 variant 陣列
+function aggregateVariants(projects, cat){
+  const field = VARIANT_CAT[cat] && VARIANT_CAT[cat].field;
+  if(!field) return [];
+  const byKey = new Map();   // key = `${name} ${power}` → variant（保留最早建立者）
+  for(const [pid, proj] of Object.entries(projects||{})){
+    const items = Array.isArray(proj && proj[field]) ? proj[field] : [];
+    const projName = (proj && proj.project_name) || pid;
+    const ts = Date.parse((proj && proj.meta && proj.meta.timestamp) || '') || Infinity; // 無時戳 → 最晚
+    for(const comp of items){
+      const name = String((comp && comp.Component) || '').trim();
+      if(!name) continue;
+      const power = (comp && comp['Power(W)'] != null) ? comp['Power(W)'] : '';
+      const key = name + ' ' + String(power);
+      const prev = byKey.get(key);
+      if(!prev || ts < prev._ts){
+        const src = {};
+        VARIANT_CARRY.forEach(k=>{ if(comp[k]!==undefined) src[k]=comp[k]; });
+        byKey.set(key, { name, power, originProjectName: projName, originProjectId: pid, src, _ts: ts });
+      }
+    }
   }
-  if (fbOk && dbAdapter.isReady()) {
-    try { await dbAdapter.setDoc(colName, docId, row); } catch(e) { alert('存入失敗: '+e.message); return; }
-  }
-  alert('✅ 「' + row.Component + '」已存入 ' + cat.toUpperCase() + ' 資料庫！');
+  return Array.from(byKey.values()).map(({_ts,...v})=>v)
+    .sort((a,b)=>a.name.localeCompare(b.name) || (parseFloat(a.power)||0)-(parseFloat(b.power)||0));
+}
+
+// 讀一次 projects，聚合三個分類並快取
+async function loadVariantsCache(){
+  let projects;
+  try{ projects = await dbAdapter.getCollection('projects'); }
+  catch(e){ console.warn('[variants] 讀取 projects 失敗：', e); variantsCache = {rf:[],digital:[],pwr:[]}; return variantsCache; }
+  variantsCache = {
+    rf:      aggregateVariants(projects,'rf'),
+    digital: aggregateVariants(projects,'digital'),
+    pwr:     aggregateVariants(projects,'pwr'),
+  };
+  return variantsCache;
+}
+window.sgDebugVariants = async function(cat='rf'){
+  let projects; try{ projects = await dbAdapter.getCollection('projects'); }catch(e){ console.warn(e); return []; }
+  const list = aggregateVariants(projects, cat);
+  try{ console.table(list); }catch(_){ console.log(list); }
+  console.info('[variants] '+cat+'：跨全部專案聚合得 '+list.length+' 筆');
+  return list;
+};
+
+// 依分類預設建立一顆元件（可帶 overrides），供快選複製使用。
+// ⚠ 模板用 5G-RRU 的分類預設（含全部 RRU 專屬每元件欄位）。
+function makeComp(cat, overrides){
+  const d = VARIANT_CAT[cat] ? VARIANT_CAT[cat].default : {};
+  return Object.assign({}, d, overrides||{});
+}
+
+// 從快選加入一顆元件到目前工作專案，並標記為「參照」：
+// 瓦數鎖定、記錄來源專案，避免改到舊案已驗證的值。
+function addFromVariant(cat){
+  const sel = document.getElementById('lib_sel_'+cat);
+  if(!sel || sel.value==='') return;
+  const v = ((variantsCache && variantsCache[cat]) || [])[parseInt(sel.value,10)];
+  if(!v) return;
+  components[cat].push(makeComp(cat, Object.assign({ Component: v.name }, v.src || {}, {
+    _ref_origin_project: v.originProjectName,
+    _ref_origin_id: v.originProjectId,
+    _ref_locked: true,
+  })));
   recalc();
 }
 
-async function deleteFromLib(cat, compName) {
-  if(checkCloudLock('刪除資料庫元件'))return;
-  if (!confirm('確定要從 ' + cat.toUpperCase() + ' 資料庫刪除「' + compName + '」？此操作無法復原！')) return;
-  let colName = cat + '_library';
-  compLib[colName] = compLib[colName].filter(r => r.Component !== compName);
-  if (fbOk && dbAdapter.isReady()) {
-    let docId = compName.replace(/ /g,'_').replace(/\//g,'-').replace(/[()]/g,'');
-    try { await dbAdapter.deleteDoc(colName, docId); } catch(e) { console.warn(e); }
-  }
-  alert('🗑️ 「' + compName + '」已從資料庫刪除！');
+// 解除參照：解鎖瓦數使其可編輯；保留 _ref_origin_* 以「曾參照自 X」追溯。
+function detachRef(cat, idx){
+  const comp = components[cat] && components[cat][idx];
+  if(!comp) return;
+  comp._ref_locked = false;
   recalc();
-}
-
-function addFromLib(cat, compName) {
-  let colName = cat + '_library';
-  let item = compLib[colName].find(r => r.Component === compName);
-  if (item) { components[cat].push({...item}); recalc(); }
 }
 
 // =====================================================
@@ -1089,18 +1150,21 @@ function switchSubTab(i){document.querySelectorAll('.sub-tab-btn').forEach((b,j)
 // TAB 0: COMPONENT TABLES + FIREBASE LIBRARY
 // =====================================================
 function renderCompTable(arr,containerId,defaults,category){
-  let libName=category+'_library';let lib=compLib[libName]||[];
-  // Library quick-select section
+  // 📚 從資料庫快選：跨專案即時聚合（不再依賴 *_library）。
   let lhtml='<div class="lib-section">';
-  if(lib.length){
-    lhtml+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span style="font-weight:600;">📚 從 '+category.toUpperCase()+' 資料庫快選：</span>';
-    lhtml+='<select id="lib_sel_'+category+'"><option value="">（請選擇）</option>';
-    lib.forEach(item=>lhtml+='<option value="'+item.Component+'">'+item.Component+' ('+item['Power(W)']+'W)</option>');
-    lhtml+='</select>';
-    lhtml+='<button class="btn btn-sm btn-primary" onclick="let v=document.getElementById(\'lib_sel_'+category+'\').value;if(v)addFromLib(\''+category+'\',v);">➕ 新增</button>';
-    lhtml+='<button class="btn btn-sm btn-danger" onclick="let v=document.getElementById(\'lib_sel_'+category+'\').value;if(v)deleteFromLib(\''+category+'\',v);">🗑️ 刪除</button>';
+  if(variantsCache===null){
+    const msg=variantsLoading?'載入中…':'（請先連線資料庫）';
+    lhtml+='<div style="display:flex;gap:8px;align-items:center;"><span style="font-weight:600;">📚 從資料庫快選：</span><select disabled><option>'+msg+'</option></select></div>';
+  } else {
+    const vlist=(variantsCache[category]||[]);
+    const present=new Set(arr.map(r=>r.Component));
+    let vopts='';
+    vlist.forEach((v,vi)=>{ if(present.has(v.name))return; vopts+='<option value="'+vi+'">'+_vEsc(v.name)+' - '+_vEsc(String(v.power))+'W - '+_vEsc(v.originProjectName)+'</option>'; });
+    lhtml+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span style="font-weight:600;">📚 從資料庫快選：</span>';
+    lhtml+='<select id="lib_sel_'+category+'"><option value="">'+(vopts?'（請選擇：名稱・瓦數・來源專案）':'（目前無可新增的元件）')+'</option>'+vopts+'</select>';
+    lhtml+='<button class="btn btn-sm btn-primary" onclick="addFromVariant(\''+category+'\')">➕ 加入</button>';
     lhtml+='</div>';
-  } else { lhtml+='<span style="color:#888;">📚 '+category.toUpperCase()+' 資料庫目前為空，請先在下方表格建立元件後存入。</span>'; }
+  }
   lhtml+='</div>';
 
   // Power summary
@@ -1116,17 +1180,24 @@ function renderCompTable(arr,containerId,defaults,category){
     let excl=row._excluded;
     lhtml+='<tr'+(excl?' class="comp-excluded"':'')+'>';
     let dis=excl?' disabled':'';
+    let refLocked=!!row._ref_locked;
+    let refOrigin=row._ref_origin_project||'';
     COLS.forEach(col=>{
       if(col==='Board_Type'){lhtml+='<td><select style="min-width:110px;"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">';BOARD_TYPES.forEach(o=>lhtml+='<option'+(row[col]===o?' selected':'')+'>'+o+'</option>');lhtml+='</select></td>';}
       else if(col==='TIM_Type'){lhtml+='<td><select style="min-width:110px;"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">';TIM_TYPES.forEach(o=>lhtml+='<option'+(row[col]===o?' selected':'')+'>'+o+'</option>');lhtml+='</select></td>';}
-      else if(col==='Component'){lhtml+='<td><input type="text" value="'+(row[col]||'')+'"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)"></td>';}
+      else if(col==='Component'){
+        let badge=refLocked
+          ? '<div style="font-size:0.72rem;color:#b45309;margin-top:3px;">↩ 參照自 '+_vEsc(refOrigin)+' <button class="btn btn-sm" style="padding:1px 6px;font-size:0.7rem;" title="解除後可自行修改瓦數" onclick="detachRef(\''+category+'\','+i+')">🔓 解除參照</button></div>'
+          : (refOrigin?'<div style="font-size:0.72rem;color:#9ca3af;margin-top:3px;">曾參照自 '+_vEsc(refOrigin)+'</div>':'');
+        lhtml+='<td><input type="text" value="'+_vEsc(row[col]||'')+'"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">'+badge+'</td>';
+      }
+      else if(col==='Power(W)'&&refLocked){lhtml+='<td><span title="瓦數已鎖定，請先按「解除參照」" style="display:inline-block;padding:4px 8px;color:#6b7280;background:#f3f4f6;border-radius:4px;white-space:nowrap;">'+(row[col]!=null?row[col]:'')+' 🔒</span></td>';}
       else{let extraStyle=col==='Power(W)'?' style="width:75%;min-width:75px;"':'';lhtml+='<td><input type="number"'+extraStyle+' value="'+(row[col]||0)+'" step="any"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',parseFloat(this.value)||0)"></td>';}
     });
     lhtml+='<td style="white-space:nowrap;">';
     lhtml+='<button class="btn btn-sm eye-btn'+(excl?' excluded':'')+'" title="'+(excl?'顯示（納入計算）':'隱藏（排除計算）')+'" onclick="toggleComp(\''+category+'\','+i+')">👁️</button> ';
     lhtml+='<button class="btn btn-sm btn-danger" title="刪除" onclick="removeComp(\''+category+'\','+i+')">🗑️</button> ';
-    lhtml+='<button class="btn btn-sm btn-primary" title="複製" onclick="copyComp(\''+category+'\','+i+')">📋</button> ';
-    lhtml+='<button class="btn btn-sm btn-success" title="儲存至資料庫" onclick="saveCompToLib(\''+category+'\','+i+')">💾</button>';
+    lhtml+='<button class="btn btn-sm btn-primary" title="複製" onclick="copyComp(\''+category+'\','+i+')">📋</button>';
     lhtml+='</td></tr>';
   });
   lhtml+='</tbody></table>';
@@ -1135,6 +1206,11 @@ function renderCompTable(arr,containerId,defaults,category){
 }
 
 function renderTab0(){
+  // 首次/失效時載入跨專案 variant 快取，完成後重繪以填入「📚 從資料庫快選」下拉
+  if(variantsCache===null && !variantsLoading && fbOk && dbAdapter.isReady()){
+    variantsLoading=true;
+    loadVariantsCache().finally(()=>{ variantsLoading=false; renderTab0(); });
+  }
   renderCompTable(components.rf,'subtab0',RF_DEFAULT,'rf');
   renderCompTable(components.digital,'subtab1',DIG_DEFAULT,'digital');
   renderCompTable(components.pwr,'subtab2',PWR_DEFAULT,'pwr');
@@ -1149,7 +1225,6 @@ function removeComp(cat,i){components[cat].splice(i,1);recalc();}
 function toggleComp(cat,i){components[cat][i]._excluded=!components[cat][i]._excluded;recalc();}
 function copyComp(cat,i){components[cat].push({...components[cat][i]});recalc();}
 function addComp(cat){let d=cat==='rf'?RF_DEFAULT:cat==='digital'?DIG_DEFAULT:PWR_DEFAULT;components[cat].push({...d});recalc();}
-function saveCompToLib(cat,i){let row={};COLS.forEach(c=>row[c]=components[cat][i][c]);saveToLib(cat,row);}
 
 // Excel export for component tables
 function exportCompExcel(mode){
@@ -1448,6 +1523,7 @@ async function cloudSaveProject(){
   const fields={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},project_name:name,global_params:mergedGlobals,rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
   try{
     await dbAdapter.updateDoc('projects', docId, fields);
+    variantsCache=null; renderTab0();   // 專案集合改變 → 失效快選快取，下次重繪重新聚合
     alert('✅ 專案「'+name+'」已儲存！');
   }catch(e){alert('❌ 儲存失敗: '+e.message);}
 }
@@ -1486,7 +1562,7 @@ async function cloudLoadOne(docId){
 async function cloudDeleteOne(docId,name){
   if(checkCloudLock('刪除專案'))return;
   if(!confirm('確定要刪除專案「'+name+'」？此操作無法復原！'))return;
-  try{await dbAdapter.deleteDoc('projects', docId);alert('🗑️ 已刪除「'+name+'」');cloudLoadProject();}
+  try{await dbAdapter.deleteDoc('projects', docId);variantsCache=null;renderTab0();alert('🗑️ 已刪除「'+name+'」');cloudLoadProject();}
   catch(e){alert('❌ 刪除失敗: '+e.message);}
 }
 
@@ -2305,10 +2381,8 @@ async function handleCreateDb() {
 }
 
 async function loadLibraryFromLocal() {
-  for (const col of ['rf_library', 'digital_library', 'pwr_library']) {
-    const docs = await dbAdapter.getCollection(col);
-    compLib[col] = Object.values(docs);
-  }
+  // 快選改為跨專案即時聚合：DB（重新）連線時失效 variant 快取，由 renderTab0 重新載入。
+  variantsCache = null;
   renderTab0();
 }
 </script>
