@@ -234,6 +234,17 @@ const graphDb = {
     return currentLock !== null;
   },
 
+  /* 目前 dbCache 內的鎖資訊（不重新讀檔，純記憶體） */
+  getLockInfo() {
+    return dbCache.lock || null;
+  },
+
+  /* 重新讀檔以取得最新鎖狀態（供置頂佔用橫幅輪詢用） */
+  async peekLock() {
+    await this._readFile();
+    return dbCache.lock || null;
+  },
+
   /* ─── Collection/Document API (mirrors fileDb) ────────── */
   async openFile() {
     if (!msalInstance) await this.initMsal();
