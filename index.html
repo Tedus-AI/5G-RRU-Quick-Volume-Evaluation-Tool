@@ -193,6 +193,21 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
   color:#fff;background:#2e9e5b;border-radius:999px;padding:2px 8px;font-weight:700;
 }
 #version-badge.is-latest .vb-latest{display:inline-flex;}
+
+/* ── 資料庫佔用橫幅（他人正持有編輯鎖時置頂顯示）───────── */
+#lock-status-bar{
+  display:none;align-items:center;gap:10px;flex-wrap:wrap;
+  background:#fff8e1;border:1px solid #f59e0b;border-radius:10px;
+  padding:8px 16px;margin:0 0 16px 0;font-size:0.88rem;color:#78350f;
+}
+#lock-status-bar .lock-status-icon{font-size:1.1rem;}
+#lock-status-bar strong{color:#92400e;}
+#lock-status-bar .lock-status-meta{color:#a16207;font-size:0.82rem;}
+#lock-status-bar .lock-status-teams{
+  margin-left:auto;padding:4px 12px;background:#6264a7;color:#fff;
+  border-radius:6px;text-decoration:none;font-size:0.82rem;white-space:nowrap;
+}
+#lock-status-bar .lock-status-teams:hover{background:#4f5197;}
 </style>
 <script src="config.js?v=__APP_VERSION__"></script>
 <script src="fileDb.js?v=__APP_VERSION__"></script>
@@ -391,6 +406,17 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
         <button class="cloud-close" onclick="closeCloudModal()">關閉</button>
       </div>
     </div>
+  </div>
+
+  <!-- 資料庫佔用橫幅：他人持有編輯鎖時置頂顯示誰在用，無人時隱藏 -->
+  <div id="lock-status-bar">
+    <span class="lock-status-icon">🔒</span>
+    <div>
+      <strong id="lock-status-name"></strong>
+      <span class="lock-status-meta">（<span id="lock-status-email"></span>）正在編輯資料庫中</span>
+      <div class="lock-status-meta">鎖定於 <span id="lock-status-time"></span>，預計 <span id="lock-status-expires"></span> 自動解鎖</div>
+    </div>
+    <a id="lock-status-teams-btn" class="lock-status-teams" href="#" target="_blank" rel="noopener">📩 傳送 Teams 訊息</a>
   </div>
 
   <div class="tabs">
@@ -598,7 +624,7 @@ async function toggleCloudLock(){
         await dbAdapter.acquireLock();
       }catch(e){
         if(btn){btn.innerHTML=originalText;btn.style.pointerEvents='';}
-        if(e instanceof LockError){showLockWarning(e);return;}
+        if(e instanceof LockError){updateLockStatusBar();showLockWarning(e);return;}
         alert('無法取得編輯鎖定：'+(e.message||e));return;
       }
       if(btn)btn.style.pointerEvents='';
@@ -612,6 +638,7 @@ async function toggleCloudLock(){
     cloudLocked=true;
   }
   _applyCloudLockUI();
+  updateLockStatusBar();   // 取得/釋放鎖後同步置頂佔用橫幅
 }
 function checkCloudLock(action){
   if(cloudLocked){alert('⚠️ 資料庫寫入保護已啟用，無法'+action+'。\n請先點擊「🔒 資料庫保護」按鈕輸入密碼解鎖。');return true;}
@@ -627,6 +654,7 @@ async function handleSpLogin(){
       fbOk=true;
       _updateSpHeaderSignedIn();
       await loadLibraryFromLocal();
+      updateLockStatusBar();   // 登入後立即顯示「誰正在用」（若有人佔用）
     }else if(result && result.reason==='cancelled'){
       // user cancelled
     }
@@ -646,6 +674,7 @@ async function handleSpLogout(){
   variantsCache=null;
   renderTab0();
   _updateSpHeaderSignedOut();
+  updateLockStatusBar();   // 登出後隱藏佔用橫幅
 }
 
 function _updateSpHeaderSignedIn(){
@@ -702,6 +731,42 @@ function closeLockWarning(){
   const modal=document.getElementById('lock-warning-modal');
   if(modal)modal.style.display='none';
 }
+
+// 置頂佔用橫幅：他人持有編輯鎖時顯示誰在用，無人 / 是我自己 / 未登入時隱藏
+function updateLockStatusBar(){
+  const bar=document.getElementById('lock-status-bar');
+  if(!bar)return;
+  // 本機模式或尚未登入 SharePoint → 不顯示
+  if(!(dbAdapter.isSharePointMode&&dbAdapter.isSharePointMode())||!(dbAdapter.isSignedIn&&dbAdapter.isSignedIn())){
+    bar.style.display='none';return;
+  }
+  const lock=dbAdapter.getLockInfo?dbAdapter.getLockInfo():null;
+  const acct=dbAdapter.getAccountInfo?dbAdapter.getAccountInfo():null;
+  const myEmail=acct?acct.email:null;
+  const fmt=iso=>{try{return new Date(iso).toLocaleString('zh-TW',{hour12:false});}catch(e){return iso||'-';}};
+  if(lock&&lock.lockedByEmail&&new Date(lock.expiresAt)>new Date()&&lock.lockedByEmail!==myEmail){
+    document.getElementById('lock-status-name').textContent=lock.lockedBy||'-';
+    document.getElementById('lock-status-email').textContent=lock.lockedByEmail||'-';
+    document.getElementById('lock-status-time').textContent=fmt(lock.lockedAt);
+    document.getElementById('lock-status-expires').textContent=fmt(lock.expiresAt);
+    const tb=document.getElementById('lock-status-teams-btn');
+    if(tb){
+      const msg=encodeURIComponent('Hi '+(lock.lockedBy||'')+'，我想使用 5G RRU Quick Volume Evaluation Tool 編輯資料庫，請你完成後通知我，謝謝！');
+      tb.href='https://teams.microsoft.com/l/chat/0/0?users='+encodeURIComponent(lock.lockedByEmail)+'&message='+msg;
+    }
+    bar.style.display='flex';
+  }else{
+    bar.style.display='none';
+  }
+}
+
+// 每 60 秒重新讀檔輪詢鎖狀態（登入 SharePoint 時），保持置頂佔用橫幅即時
+setInterval(async ()=>{
+  if(DB_MODE==='sharepoint'&&dbAdapter.isSignedIn&&dbAdapter.isSignedIn()){
+    try{await dbAdapter.peekLock();}catch(e){return;}
+    updateLockStatusBar();
+  }
+},60000);
 
 // =====================================================
 // DEFAULT CONFIG
@@ -961,6 +1026,7 @@ async function initFirebase() {
       showDbBanner(`✅ 本機資料庫：${result.filename}`, 'success');
     }
     await loadLibraryFromLocal();
+    updateLockStatusBar();   // 啟動時若已登入且有人佔用 → 置頂顯示誰在用
   } else {
     fbOk = false;
     if (DB_MODE === 'sharepoint') {

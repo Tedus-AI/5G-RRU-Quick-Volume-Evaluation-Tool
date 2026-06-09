@@ -112,6 +112,16 @@ const dbAdapter = {
   hasLock() {
     if (DB_MODE !== 'sharepoint') return true;
     return graphDb.hasLock();
+  },
+
+  getLockInfo() {
+    if (DB_MODE !== 'sharepoint') return null;
+    return graphDb.getLockInfo();
+  },
+
+  async peekLock() {
+    if (DB_MODE !== 'sharepoint') return null;
+    return await graphDb.peekLock();
   }
 };
 
