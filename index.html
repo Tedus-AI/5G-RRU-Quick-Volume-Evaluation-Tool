@@ -159,13 +159,54 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
 .eye-btn:hover{background:#e9ecef;}
 .eye-btn.excluded::after{content:'';position:absolute;top:10%;left:15%;width:70%;height:70%;border-top:2.5px solid #e74c3c;transform:rotate(-45deg);}
 @media(max-width:900px){body{flex-direction:column;}.sidebar{width:100%;height:auto;position:relative;}.kpi-row{flex-direction:column;}}
+
+/* ── 軟體更新橫幅（刻意做得非常醒目）─────────────────────── */
+#update-banner{
+  display:none;position:fixed;top:0;left:0;right:0;z-index:100000;padding:14px 18px;color:#fff;
+  background:linear-gradient(90deg,#ff7a00,#ff2d00,#ff7a00);background-size:200% 100%;
+  border-bottom:3px solid rgba(255,255,255,.55);
+  animation:ub-slide .35s ease-out, ub-flow 3s linear infinite, ub-glow 1.4s ease-in-out infinite;
+}
+#update-banner.active{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:16px;}
+#update-banner .ub-text{font-size:1.05rem;font-weight:800;letter-spacing:.3px;display:flex;align-items:center;gap:9px;text-shadow:0 1px 2px rgba(0,0,0,.4);}
+#update-banner .ub-spin{display:inline-block;font-size:1.3rem;animation:ub-spin 2.2s linear infinite;}
+#update-banner .ub-actions{display:flex;gap:10px;}
+#update-banner button{border:none;border-radius:9px;padding:9px 20px;font-size:.92rem;font-weight:800;cursor:pointer;transition:background .15s;}
+#update-banner .ub-now{background:#fff;color:#d8340a;box-shadow:0 2px 10px rgba(0,0,0,.3);}
+#update-banner .ub-now:hover{background:#fff1e8;}
+#update-banner .ub-later{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.7);}
+#update-banner .ub-later:hover{background:rgba(255,255,255,.32);}
+@keyframes ub-slide{from{transform:translateY(-100%);}to{transform:translateY(0);}}
+@keyframes ub-flow{from{background-position:0 0;}to{background-position:200% 0;}}
+@keyframes ub-glow{0%,100%{box-shadow:0 4px 18px rgba(255,45,0,.5);}50%{box-shadow:0 6px 34px rgba(255,45,0,.95);}}
+@keyframes ub-spin{from{transform:rotate(0);}to{transform:rotate(360deg);}}
+
+/* ── 頂端版本徽章（深色標題列上）───────────────────────── */
+#version-badge{
+  display:inline-flex;align-items:center;gap:7px;font-size:.72rem;color:#eaf0ff;
+  background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.32);border-radius:999px;
+  padding:4px 11px;line-height:1.2;user-select:none;white-space:nowrap;flex-shrink:0;
+}
+#version-badge .vb-ver{font-weight:700;letter-spacing:.2px;}
+#version-badge .vb-latest{
+  display:none;align-items:center;gap:3px;white-space:nowrap;
+  color:#fff;background:#2e9e5b;border-radius:999px;padding:2px 8px;font-weight:700;
+}
+#version-badge.is-latest .vb-latest{display:inline-flex;}
 </style>
-<script src="config.js"></script>
-<script src="fileDb.js"></script>
-<script src="graphDb.js"></script>
-<script src="dbAdapter.js"></script>
+<script src="config.js?v=__APP_VERSION__"></script>
+<script src="fileDb.js?v=__APP_VERSION__"></script>
+<script src="graphDb.js?v=__APP_VERSION__"></script>
+<script src="dbAdapter.js?v=__APP_VERSION__"></script>
 </head>
 <body>
+<div id="update-banner" role="alert" aria-live="assertive">
+  <div class="ub-text"><span class="ub-spin">&#128260;</span>&#9888;&#65039; 工具已更新！請先儲存您的編輯，再點「立即更新」載入最新版本</div>
+  <div class="ub-actions">
+    <button type="button" class="ub-now">立即更新</button>
+    <button type="button" class="ub-later">稍後</button>
+  </div>
+</div>
 <!-- Login Page -->
 <div id="login-page">
   <div class="login-header">
@@ -310,7 +351,13 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
   <div class="header">
     <div>
       <h1>📡 5G RRU 體積估算引擎 <span style="font-size:0.6em;opacity:0.8;">Pro</span></h1>
-      <div class="subtitle">High-Performance Thermal & Volume Estimation System</div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div class="subtitle">High-Performance Thermal & Volume Estimation System</div>
+        <span id="version-badge" title="軟體版本">
+          <span class="vb-ver" id="vb-ver">—</span>
+          <span class="vb-latest">&#10003; 最新</span>
+        </span>
+      </div>
     </div>
     <div style="position:absolute; top:12px; right:16px; display:flex; align-items:center; gap:8px;">
       <button onclick="doLogout()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">🏠 返回首頁</button>
@@ -438,6 +485,83 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
   </div>
 </div>
 <script>
+// =====================================================
+// 軟體更新偵測
+// 版本號由 CI 於部署時把佔位符戳成實際值（時間 + 短 SHA）。
+// 本機/未經 CI 戳版本時 APP_VERSION 仍為佔位符，會自動停用偵測，避免誤判。
+// 作法：比對「載入這份 HTML 當下烙印的 APP_VERSION」與線上 version.json，
+// 不同 = 已有新部署 → 跳出醒目橫幅。行為模式參照 AI-Thermal 工具。
+// =====================================================
+window.APP_VERSION = '__APP_VERSION__';
+(function setupUpdateChecker() {
+  const BUILT = window.APP_VERSION;
+  // 注意：此佔位符刻意以字串相接寫成，避免被 CI 的 sed 替換掉而誤判
+  const PLACEHOLDER = '__APP_' + 'VERSION__';
+  const isDev = (!BUILT || BUILT === PLACEHOLDER);
+
+  // 頂端版本徽章：永遠顯示目前載入的版本號（開發版例外）
+  const badge = document.getElementById('version-badge');
+  const verEl = document.getElementById('vb-ver');
+  if (verEl) verEl.textContent = isDev ? '開發版' : ('v' + BUILT);
+
+  if (isDev) return;   // 未戳版本（本機/開發）不啟用偵測，也不打「最新」
+
+  let prompted = false;
+  let timer = null;
+  function markLatest(yes) { if (badge) badge.classList.toggle('is-latest', !!yes); }
+
+  async function fetchLiveVersion() {
+    try {
+      const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) return null;
+      const j = await r.json();
+      return (j && j.version) ? String(j.version) : null;
+    } catch (e) { return null; }   // 離線/失敗：安靜略過
+  }
+
+  async function check() {
+    if (prompted) return;
+    const live = await fetchLiveVersion();
+    if (!live) return;                                  // 抓不到：維持現狀
+    if (live === BUILT) { markLatest(true); return; }   // 已是最新 → 打勾
+    markLatest(false);
+    showUpdateBanner(live);
+  }
+
+  function showUpdateBanner(live) {
+    if (prompted) return;
+    prompted = true;
+    if (timer) { clearInterval(timer); timer = null; }
+    const bar = document.getElementById('update-banner');
+    if (!bar) return;
+    bar.classList.add('active');
+    bar.querySelector('.ub-now').onclick = () => doUpdate(live);
+    bar.querySelector('.ub-later').onclick = () => {
+      bar.classList.remove('active');
+      // 稍後再提醒：10 分鐘後重新檢查
+      setTimeout(() => { prompted = false; check(); }, 10 * 60 * 1000);
+    };
+  }
+
+  async function doUpdate(live) {
+    // 持有 SharePoint 編輯鎖 → 先釋放，避免鎖卡在舊分頁
+    try {
+      if (typeof dbAdapter !== 'undefined' && dbAdapter.isSharePointMode && dbAdapter.isSharePointMode()
+          && dbAdapter.hasLock && dbAdapter.hasLock()) {
+        await dbAdapter.releaseLock();
+      }
+    } catch (e) { /* 釋放失敗不阻擋更新 */ }
+    // 以新版本號當 cache-buster，強制向伺服器重新抓取最新 HTML（連帶抓新的 JS）
+    location.replace(location.pathname + '?v=' + encodeURIComponent(live));
+  }
+
+  setTimeout(check, 3000);                   // 啟動後稍候首檢（讓徽章盡快顯示「最新」）
+  timer = setInterval(check, 5 * 60 * 1000); // 之後每 5 分鐘
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') check();   // 切回分頁時即時檢查
+  });
+})();
+
 // =====================================================
 // FIREBASE CONFIG
 // =====================================================
