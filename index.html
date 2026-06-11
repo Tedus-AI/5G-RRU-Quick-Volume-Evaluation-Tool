@@ -1475,14 +1475,14 @@ function renderTab1(){
   if(!calcResults||!calcResults.rows.length)return;let R=calcResults;
   // Overheat alerts
   let oh=R.rows.filter(r=>r.Tj_Margin<0&&r.Total_W>0);let html='';
-  if(oh.length){html+='<div class="alert alert-danger">🔥 <b>超溫警告！以下元件已超過溫度上限：</b><br>';oh.forEach(r=>html+='<b>'+r.Component+'</b> 超溫 <b>'+Math.abs(r.Tj_Margin).toFixed(1)+'°C</b> (Tj='+r.Tj.toFixed(1)+'°C, Limit='+r['Limit(C)']+'°C)<br>');html+='</div>';}
+  if(oh.length){html+='<div class="alert alert-danger">🔥 <b>超溫警告！以下元件已超過溫度上限：</b><br>';oh.forEach(r=>html+='<b>'+_vEsc(r.Component)+'</b> 超溫 <b>'+Math.abs(r.Tj_Margin).toFixed(1)+'°C</b> (Tj='+r.Tj.toFixed(1)+'°C, Limit='+_vEsc(r['Limit(C)'])+'°C)<br>');html+='</div>';}
   document.getElementById('tab1-alerts').innerHTML=html;
   // Risk Top 3
   let valid=R.rows.filter(r=>r.Total_W>0).sort((a,b)=>a.Allowed_dT-b.Allowed_dT).slice(0,3);
   let riskLabels=['#1 最高風險','#2 次高風險','#3 第三風險'];
   let riskBorderColors=['#c0392b','#2980b9','#e67e22'];
   let rh='<div class="risk-row">';
-  valid.forEach((r,i)=>{rh+='<div class="risk-card" style="border-top:3px solid '+riskBorderColors[i]+';"><div class="rank" style="color:'+riskBorderColors[i]+';font-weight:700;">'+riskLabels[i]+'</div><div class="rval" style="font-size:1.1rem;">'+r.Component+'</div><div style="font-size:0.82rem;color:#555;margin-top:4px;">允許溫升: '+r.Allowed_dT.toFixed(1)+'°C</div><div class="rdelta">Tj 裕度: '+r.Tj_Margin.toFixed(1)+'°C</div></div>';});
+  valid.forEach((r,i)=>{rh+='<div class="risk-card" style="border-top:3px solid '+riskBorderColors[i]+';"><div class="rank" style="color:'+riskBorderColors[i]+';font-weight:700;">'+riskLabels[i]+'</div><div class="rval" style="font-size:1.1rem;">'+_vEsc(r.Component)+'</div><div style="font-size:0.82rem;color:#555;margin-top:4px;">允許溫升: '+r.Allowed_dT.toFixed(1)+'°C</div><div class="rdelta">Tj 裕度: '+r.Tj_Margin.toFixed(1)+'°C</div></div>';});
   rh+='</div>';document.getElementById('tab1-risk').innerHTML=rh;
   document.getElementById('tab1-scale').innerHTML='';
   // Risk highlight data
@@ -1500,8 +1500,8 @@ function renderTab1(){
   th+='</tr></thead><tbody>';
   R.rows.forEach((r,ri)=>{let rIdx=riskNames.indexOf(r.Component);let isRisk=rIdx>=0;let rowBg=isRisk?riskBg[rIdx]:(ri%2===1?'#fafbfc':'');th+='<tr style="'+(rowBg?'background:'+rowBg+';':'')+'">';cols.forEach(c=>{let v=r[c];let st='';
     if(c==='Tj_Margin'&&typeof v==='number'&&v<0)st='color:#c0392b;font-weight:600;';
-    if(c==='Component'&&isRisk){let lbl='<span style="color:'+riskColor[rIdx]+';font-weight:700;">[#'+(rIdx+1)+']</span> '+v;if(typeof v==='number')v=v.toFixed(1);th+='<td style="'+st+'">'+lbl+'</td>';}
-    else{if(typeof v==='number')v=(c.includes('R_')&&c!=='R_jc')?v.toFixed(4):v.toFixed(1);th+='<td style="'+st+'">'+v+'</td>';}});th+='</tr>';});
+    if(c==='Component'&&isRisk){let lbl='<span style="color:'+riskColor[rIdx]+';font-weight:700;">[#'+(rIdx+1)+']</span> '+_vEsc(v);th+='<td style="'+st+'">'+lbl+'</td>';}
+    else{if(typeof v==='number')v=(c.includes('R_')&&c!=='R_jc')?v.toFixed(4):v.toFixed(1);else v=_vEsc(v);th+='<td style="'+st+'">'+v+'</td>';}});th+='</tr>';});
   th+='</tbody></table>';document.getElementById('tab1-table').innerHTML=th;
 }
 
@@ -1513,7 +1513,7 @@ function kpiCard(t,v,d,c){return'<div class="kpi-card" style="border-left-color:
 var fullscreenBtn={name:'fullscreen',title:'全螢幕',icon:{width:24,height:24,path:'M5 5h5V3H3v7h2V5zm14 0h-5V3h7v7h-2V5zM5 19h5v2H3v-7h2v5zm14 0h-5v2h7v-7h-2v5z'},click:function(gd){if(!document.fullscreenElement){var el=gd.closest('.js-plotly-plot')||gd;var origData=JSON.parse(JSON.stringify(gd.data));var origLayout=JSON.parse(JSON.stringify(gd.layout));delete origLayout.width;delete origLayout.height;var origConfig={responsive:true,displaylogo:false,modeBarButtonsToAdd:['toggleSpikelines',fullscreenBtn],displayModeBar:true};var parent=el.parentNode;var elRect=el.getBoundingClientRect();var placeholder=document.createElement('div');placeholder.id='_fs_placeholder';placeholder.style.cssText='flex:1;min-width:'+elRect.width+'px;min-height:'+elRect.height+'px;';parent.insertBefore(placeholder,el);var wrapper=document.createElement('div');wrapper.id='_fs_wrapper';wrapper.style.cssText='background:#fff;width:100%;height:100%;';wrapper.appendChild(el);document.body.appendChild(wrapper);wrapper.requestFullscreen().then(function(){Plotly.relayout(gd,{width:window.screen.width,height:window.screen.height});});var onExit=function(){if(!document.fullscreenElement){document.removeEventListener('fullscreenchange',onExit);var ph=document.getElementById('_fs_placeholder');if(ph){ph.parentNode.insertBefore(el,ph);ph.remove();}var wr=document.getElementById('_fs_wrapper');if(wr)wr.remove();Plotly.purge(gd);Plotly.newPlot(gd,origData,origLayout,origConfig).then(function(){var flexParent=el.parentNode;if(flexParent){flexParent.querySelectorAll('.js-plotly-plot').forEach(function(sib){if(sib!==el)Plotly.Plots.resize(sib);});}});}};document.addEventListener('fullscreenchange',onExit);}else{document.exitFullscreen();}}};
 function renderTab2(){
   if(!calcResults)return;let R=calcResults;
-  document.getElementById('tab2-kpi').innerHTML=kpiCard('整機總熱耗',R.Total_Power.toFixed(2)+' W','Total Power','#e74c3c')+kpiCard('系統瓶頸元件',R.Bottleneck_Name,'Margin: '+R.Bottleneck_Tj_Margin+'°C','#f39c12')+kpiCard('所需散熱面積',R.Area_req.toFixed(3)+' m²','Required Area','#3498db')+kpiCard('預估鰭片數量',R.Fin_Count+' Pcs','Fin Count','#9b59b6');
+  document.getElementById('tab2-kpi').innerHTML=kpiCard('整機總熱耗',R.Total_Power.toFixed(2)+' W','Total Power','#e74c3c')+kpiCard('系統瓶頸元件',_vEsc(R.Bottleneck_Name),'Margin: '+R.Bottleneck_Tj_Margin+'°C','#f39c12')+kpiCard('所需散熱面積',R.Area_req.toFixed(3)+' m²','Required Area','#3498db')+kpiCard('預估鰭片數量',R.Fin_Count+' Pcs','Fin Count','#9b59b6');
   let valid=R.rows.filter(r=>r.Total_W>0);
   let pCfg={responsive:true,displaylogo:false,modeBarButtonsToAdd:['toggleSpikelines',fullscreenBtn],displayModeBar:true};
   if(valid.length){
@@ -1754,13 +1754,16 @@ async function cloudLoadProject(){
     if(projectList.length===0){list.innerHTML='<div class="cloud-empty">尚無儲存專案</div>';}
     else{
       let html='<div class="cloud-list">';
-      projectList.forEach(item=>{
+      projectList.forEach((item,idx)=>{
         let t=item.meta&&item.meta.timestamp?new Date(item.meta.timestamp).toLocaleString('zh-TW'):'';
-        html+='<div class="cloud-item" onclick="cloudLoadOne(\''+item.id+'\')"><div><div class="ci-name">'+
-          (item.project_name||item.id)+'</div><div class="ci-time">'+t+'</div></div>'+
-          '<span class="ci-del" onclick="event.stopPropagation();cloudDeleteOne(\''+item.id+'\',\''+(item.project_name||item.id)+'\')">🗑️</span></div>';
+        html+='<div class="cloud-item" data-idx="'+idx+'"><div><div class="ci-name">'+
+          _vEsc(item.project_name||item.id)+'</div><div class="ci-time">'+t+'</div></div>'+
+          '<span class="ci-del" data-idx="'+idx+'">🗑️</span></div>';
       });
       html+='</div>';list.innerHTML=html;
+      // 名稱/ID 一律不拼進 onclick 屬性（防 XSS 與引號破壞）：用 data-idx 查回 projectList 再呼叫
+      list.querySelectorAll('.cloud-item').forEach(el=>{el.addEventListener('click',()=>{let it=projectList[parseInt(el.dataset.idx,10)];if(it)cloudLoadOne(it.id);});});
+      list.querySelectorAll('.ci-del').forEach(el=>{el.addEventListener('click',ev=>{ev.stopPropagation();let it=projectList[parseInt(el.dataset.idx,10)];if(it)cloudDeleteOne(it.id,it.project_name||it.id);});});
     }
     document.getElementById('cloudModal').classList.add('active');
   }catch(e){alert('❌ 讀取專案列表失敗: '+e.message);}
