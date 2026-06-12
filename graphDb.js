@@ -20,7 +20,9 @@ let driveItemId = null;
 let _siteId = null;
 let currentLock = null;
 let dbCorrupted = false;     // 壞檔唯讀保護：JSON 解析失敗時禁止一切寫入
-let maxProjectsSeen = 0;     // 本 session 看過的 projects 筆數高水位（歸零保險絲用）
+let lastReadProjects = 0;    // 上次成功讀檔時的 projects 筆數（歸零保險絲基準）
+let sawRealData = false;     // 本 session 是否曾持有實際資料（區分「全新空庫」vs「截斷成空檔」）
+let currentEtag = null;      // 最近一次讀檔的 DriveItem eTag（樂觀並發 If-Match 基準）
 
 const graphDb = {
   /* ─── MSAL Initialization ─────────────────────────────── */
@@ -88,6 +90,9 @@ const graphDb = {
     _siteId = null;
     currentLock = null;
     dbCorrupted = false;
+    currentEtag = null;
+    lastReadProjects = 0;
+    sawRealData = false;
   },
 
   isSignedIn() {
@@ -130,19 +135,22 @@ const graphDb = {
     return resp;
   },
 
-  async _graphPut(url, body, contentType = 'application/json') {
+  async _graphPut(url, body, contentType = 'application/json', extraHeaders = {}) {
     const token = await this._getAccessToken(true);
     const resp = await fetch(url, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Content-Type': contentType
+        'Content-Type': contentType,
+        ...extraHeaders
       },
       body: body
     });
     if (!resp.ok) {
       const errText = await resp.text().catch(() => '');
-      throw new Error(`Graph API PUT failed: ${resp.status} ${resp.statusText} — ${errText}`);
+      const err = new Error(`Graph API PUT failed: ${resp.status} ${resp.statusText} — ${errText}`);
+      err.status = resp.status;   // 供 _withOptimisticWrite 偵測 412 Precondition Failed
+      throw err;
     }
     return resp;
   },
@@ -168,14 +176,32 @@ const graphDb = {
 
   async _readFile() {
     await this._resolveDriveItemId();
+    // 先取 metadata 拿 eTag 作為樂觀並發基準。content GET 會被 302 導到下載主機，
+    // 其 ETag 是儲存層的、不可用於 Graph 的 If-Match，所以要單獨取 DriveItem 的 eTag。
+    try {
+      const metaResp = await this._graphGet(
+        `https://graph.microsoft.com/v1.0/sites/${_siteId}/drive/items/${driveItemId}?$select=id,eTag,cTag`
+      );
+      const meta = await metaResp.json();
+      currentEtag = meta.eTag || meta.cTag || null;
+    } catch (e) {
+      currentEtag = null;   // 拿不到 etag → 退化為無 If-Match（不比現況差）
+    }
     const resp = await this._graphGet(
       `https://graph.microsoft.com/v1.0/sites/${_siteId}/drive/items/${driveItemId}/content`
     );
     const text = await resp.text();
     if (text.trim() === '') {
-      // 全新空檔（首次建庫）才允許 bootstrap 空骨架
-      dbCache = { rf_library: {}, digital_library: {}, pwr_library: {}, projects: {} };
-      dbCorrupted = false;
+      if (sawRealData) {
+        // 先前已持有實際資料、現在卻讀到空檔 → 視為截斷異常，保留舊快取進唯讀，
+        // 絕不可 bootstrap 空骨架後寫回（否則把整份共用 DB 抹掉）。
+        dbCorrupted = true;
+        console.error('[graphDb] 讀到空檔但先前已有資料 → 截斷疑慮，進入唯讀保護');
+      } else {
+        // 真正的全新空檔（首次建庫）→ bootstrap 空骨架
+        dbCache = { rf_library: {}, digital_library: {}, pwr_library: {}, projects: {} };
+        dbCorrupted = false;
+      }
     } else {
       let parsed = null;
       try { parsed = JSON.parse(text); } catch (e) { parsed = null; }
@@ -189,8 +215,10 @@ const graphDb = {
         console.error('[graphDb] thermal_db.json 解析失敗 → 唯讀保護模式（保留先前快取，禁止寫入）');
       }
     }
-    const n = Object.keys((dbCache && dbCache.projects) || {}).length;
-    if (n > maxProjectsSeen) maxProjectsSeen = n;
+    // 記錄這次讀到的 projects 筆數，作為「歸零保險絲」的比較基準（反映磁碟現況，
+    // 而非 session 高水位）：唯有「讀檔時有資料、寫檔時卻歸零」才視為記憶體異常丟失。
+    lastReadProjects = Object.keys((dbCache && dbCache.projects) || {}).length;
+    if (lastReadProjects > 0) sawRealData = true;
   },
 
   /* 寫入前安全檢查：壞檔唯讀 + projects 突然歸零保險絲 */
@@ -200,8 +228,10 @@ const graphDb = {
     }
     if (!allowEmptyProjects) {
       const n = Object.keys((dbCache && dbCache.projects) || {}).length;
-      if (n === 0 && maxProjectsSeen > 0) {
-        throw new Error('安全保護：projects 集合由 ' + maxProjectsSeen + ' 筆突然變成 0 筆，寫入已擋下以免抹除共用資料庫。請先至 SharePoint 檢查 thermal_db.json（可用版本歷史還原）；若確認為正常狀態，重新整理頁面即可解除。');
+      // 上次讀檔有 projects、現在卻要寫入 0 筆 → 記憶體裡的 projects 異常丟失，擋下。
+      // （磁碟本來就是空的情況 lastReadProjects===0 → 不誤擋取鎖等正常寫入。）
+      if (n === 0 && lastReadProjects > 0) {
+        throw new Error('安全保護：projects 集合由 ' + lastReadProjects + ' 筆突然變成 0 筆，寫入已擋下以免抹除共用資料庫。請先至 SharePoint 檢查 thermal_db.json（可用版本歷史還原）；若確認為正常狀態，重新整理頁面即可解除。');
       }
     }
   },
@@ -210,39 +240,75 @@ const graphDb = {
     this._assertWritable(!!(opts && opts.allowEmptyProjects));
     await this._resolveDriveItemId();
     const body = JSON.stringify(dbCache, null, 2);
-    await this._graphPut(
+    const headers = {};
+    if (currentEtag) headers['If-Match'] = currentEtag;   // 自我們上次讀檔後若有人改過 → 412
+    const resp = await this._graphPut(
       `https://graph.microsoft.com/v1.0/sites/${_siteId}/drive/items/${driveItemId}/content`,
       body,
-      'application/json'
+      'application/json',
+      headers
     );
+    // 寫入成功 → 從 PUT 回應更新 etag 供下一次 If-Match；解析失敗就保留舊 etag
+    // （下一次寫入會 412 → 自動重讀修正，安全但多一趟）。
+    try {
+      const item = await resp.json();
+      if (item && (item.eTag || item.cTag)) currentEtag = item.eTag || item.cTag;
+    } catch (e) { /* 回應無 JSON body：靠下一次 412 自癒 */ }
+    // 已成功持久化含 projects 的資料 → 標記本 session 曾有實際資料（截斷偵測用）
+    if (Object.keys((dbCache && dbCache.projects) || {}).length > 0) sawRealData = true;
+  },
+
+  _sleep(ms) { return new Promise(r => setTimeout(r, ms)); },
+
+  // 樂觀並發寫入：在「目前快取」上套用 mutateFn 後寫檔；若期間他人改過檔案（If-Match 412），
+  // 重讀最新內容＋新 etag，再於最新狀態上重跑 mutateFn 後重試。最多 4 次。
+  // mutateFn(cache) 可：(a) 直接改 cache 後 return（預設要寫）；(b) return {skipWrite:true} 不寫；
+  // (c) return {value:x} 帶回傳值；(d) throw（如 LockError）→ 立即往外丟、不重試。
+  async _withOptimisticWrite(mutateFn, opts) {
+    const MAX = 4;
+    for (let attempt = 0; ; attempt++) {
+      const decision = mutateFn(dbCache) || {};
+      if (decision.skipWrite) return decision.value;
+      try {
+        await this._writeFile(opts);
+        return decision.value;
+      } catch (e) {
+        if (e && e.status === 412 && attempt < MAX) {
+          await this._sleep(120 * (attempt + 1));
+          await this._readFile();   // 取得最新內容 + 新 etag，下一圈在最新狀態上重跑 mutateFn
+          continue;
+        }
+        throw e;
+      }
+    }
   },
 
   /* ─── Pessimistic Locking ─────────────────────────────── */
   async acquireLock() {
     if (!msalAccount) throw new Error('尚未登入 SharePoint');
 
-    await this._readFile();
+    await this._readFile();   // 取最新狀態＋etag：明顯已被鎖時可即時丟 LockError
 
-    const now = new Date();
-    const existingLock = dbCache.lock;
-
-    if (existingLock && existingLock.lockedByEmail && existingLock.lockedByEmail !== msalAccount.username) {
-      const expiresAt = new Date(existingLock.expiresAt);
-      if (expiresAt > now) {
-        throw new LockError(existingLock);
+    // 取鎖檢查與寫入透過 If-Match 構成原子 check-and-set：
+    // 若他人在我們讀檔後、寫入前搶先取鎖，PUT 會 412 → 重讀後重跑此函式，
+    // 看到對方的有效鎖即丟 LockError，不會兩人同時取得鎖（H-2）。
+    return await this._withOptimisticWrite((cache) => {
+      const now = new Date();
+      const existingLock = cache.lock;
+      if (existingLock && existingLock.lockedByEmail && existingLock.lockedByEmail !== msalAccount.username) {
+        const expiresAt = new Date(existingLock.expiresAt);
+        if (expiresAt > now) throw new LockError(existingLock);
       }
-    }
-
-    const expiresAt = new Date(now.getTime() + SHAREPOINT_CONFIG.lockTimeoutMinutes * 60 * 1000);
-    dbCache.lock = {
-      lockedBy: msalAccount.name,
-      lockedByEmail: msalAccount.username,
-      lockedAt: now.toISOString(),
-      expiresAt: expiresAt.toISOString()
-    };
-    await this._writeFile();
-    currentLock = dbCache.lock;
-    return currentLock;
+      const expiresAt = new Date(now.getTime() + SHAREPOINT_CONFIG.lockTimeoutMinutes * 60 * 1000);
+      cache.lock = {
+        lockedBy: msalAccount.name,
+        lockedByEmail: msalAccount.username,
+        lockedAt: now.toISOString(),
+        expiresAt: expiresAt.toISOString()
+      };
+      currentLock = cache.lock;
+      return { value: currentLock };
+    });
   },
 
   async releaseLock() {
@@ -251,10 +317,15 @@ const graphDb = {
       return;
     }
     try {
-      if (dbCache.lock && dbCache.lock.lockedByEmail === msalAccount.username) {
-        delete dbCache.lock;
-        await this._writeFile();
-      }
+      // 釋放前在最新狀態上判斷鎖是否仍屬於自己：若鎖已過期被他人接手，
+      // skipWrite 不動別人的鎖與資料（修 M-1：避免用過期快取整檔回寫蓋掉對方）。
+      await this._withOptimisticWrite((cache) => {
+        if (cache.lock && cache.lock.lockedByEmail === msalAccount.username) {
+          delete cache.lock;
+          return {};
+        }
+        return { skipWrite: true };
+      });
     } catch (e) {
       console.warn('[graphDb] releaseLock failed:', e);
     }
@@ -313,26 +384,33 @@ const graphDb = {
   },
 
   async setDoc(colName, docId, data) {
-    if (!dbCache[colName]) dbCache[colName] = {};
-    dbCache[colName][docId] = data;
-    await this._writeFile();
+    await this._withOptimisticWrite((cache) => {
+      if (!cache[colName]) cache[colName] = {};
+      cache[colName][docId] = data;
+    });
   },
 
   async updateDoc(colName, docId, fields) {
-    if (!dbCache[colName]) dbCache[colName] = {};
-    const existing = dbCache[colName][docId] ?? {};
-    dbCache[colName][docId] = { ...existing, ...fields };
-    await this._writeFile();
+    // 衝突時於最新 doc 上重做 shallow merge：他人對其他 doc／collection 的寫入不會被
+    // 我們的整檔 PUT 回滾（H-3）。註：同一 doc 內 global_params 巢狀欄位的競態仍屬 M-6。
+    await this._withOptimisticWrite((cache) => {
+      if (!cache[colName]) cache[colName] = {};
+      const existing = cache[colName][docId] ?? {};
+      cache[colName][docId] = { ...existing, ...fields };
+    });
   },
 
   async deleteDoc(colName, docId) {
-    if (dbCache[colName] && dbCache[colName][docId] !== undefined) {
-      delete dbCache[colName][docId];
-      // 使用者刻意刪除專案（含最後一筆）是合法操作 → 放行並同步保險絲基準
-      await this._writeFile({ allowEmptyProjects: colName === 'projects' });
-      if (colName === 'projects') {
-        maxProjectsSeen = Object.keys(dbCache.projects || {}).length;
+    // 使用者刻意刪除專案（含最後一筆）是合法操作 → 放行並同步保險絲基準
+    await this._withOptimisticWrite((cache) => {
+      if (cache[colName] && cache[colName][docId] !== undefined) {
+        delete cache[colName][docId];
+        return {};
       }
+      return { skipWrite: true };   // 已不存在（可能他人先刪了）→ 不需寫
+    }, { allowEmptyProjects: colName === 'projects' });
+    if (colName === 'projects') {
+      lastReadProjects = Object.keys(dbCache.projects || {}).length;   // 刪除後磁碟即此筆數
     }
   },
 
