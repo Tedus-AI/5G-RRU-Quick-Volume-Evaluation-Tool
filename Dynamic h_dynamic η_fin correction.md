@@ -24,12 +24,14 @@
 
 ---
 
-## 2. 鎖定的物理常數（不可改）
+## 2. 物理常數（CFD 校準；以 index.html 程式碼為準）
+
+> ⚠️ **校準歷史**：`ETA_PROCESS_EMBED` 已於 PR #56 依 CFD 由 1.04 再校準為 **1.06**。下表為現行值；若與 `index.html` 不一致，一律以程式碼為準（程式碼才是 single source of truth）。
 
 ```
 FH_REF              = 70.0   // h 校準參考點 [mm]
 ALPHA_H             = 0.20   // h 對 FH 衰減指數
-ETA_PROCESS_EMBED   = 1.04   // Embedded 製程整體校準
+ETA_PROCESS_EMBED   = 1.06   // Embedded 製程整體校準（CFD 再校準，原 1.04 → 1.06，PR #56）
 ETA_PROCESS_DC      = 0.99   // Die-casting (推算值，暫用)
 K_FIN_EMBED         = 200    // 純鋁熱導 [W/m·K]
 K_FIN_DC            = 160    // ADC12 熱導 [W/m·K]
@@ -162,10 +164,10 @@ let{h_value,h_conv,h_rad}=calcHValue(p.Gap,70);
 ```javascript
   // === Phase 2: 動態 h + 動態 η_fin 迭代反推 FH ===
   const K_FIN = isDieCasting ? 160 : 200;
-  const ETA_PROCESS = isDieCasting ? 0.99 : 1.04;
+  const ETA_PROCESS = isDieCasting ? 0.99 : 1.06;  // Embedded 1.06（CFD 再校準，PR #56）
   let nf, TP = TWS*p.Margin, AR = 0, FH = 0;
   let T_root_calc = p.Fin_t, G_root_calc = p.Gap;
-  let eta_fin = 1.0, eff = isDieCasting ? 0.99 : 1.04;
+  let eta_fin = 1.0, eff = isDieCasting ? 0.99 : 1.06;
   nf = calcFinCount(WH, p.Gap, p.Fin_t);
   let FH_prev = 70;  // 初始猜測 = FH_REF
   
@@ -419,6 +421,6 @@ FH    = (A_req - bam) × 1e6 / (2 × nf × LH)
 **校準依據**：5 個 CFD 對比 case（T_amb 45/48/50/53/55°C, TP=353.3W），詳見背景說明 1.3。
 
 **未驗證的部分**：
-- Die-casting 製程的 η_process=0.99 是從 Embedded 1.04 × (0.90/0.95) 推算，**待 die-casting 機種 CFD 數據驗證**
+- Die-casting 製程的 η_process=0.99 為推算值（原從 Embedded 1.04 × (0.90/0.95) 推得；Embedded 後續已 CFD 再校準為 1.06，DC 仍暫用 0.99），**待 die-casting 機種 CFD 數據驗證**
 - 不同 Gap（非 11.6mm）的行為未獨立驗證
 - 不同 fin thickness（非 1.2mm）的行為未獨立驗證
