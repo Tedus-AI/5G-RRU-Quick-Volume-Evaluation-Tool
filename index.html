@@ -788,11 +788,77 @@ function updateLockStatusBar(){
   }
 }
 
-// 每 60 秒重新讀檔輪詢鎖狀態（登入 SharePoint 時），保持置頂佔用橫幅即時
+// ── 編輯鎖生命週期：活動追蹤 + 自動續約 + 逾時/遺失偵測（H-4）──
+let _lastActivityTs = Date.now();
+['pointerdown','keydown'].forEach(ev=>window.addEventListener(ev,()=>{_lastActivityTs=Date.now();},{passive:true,capture:true}));
+
+// 我方是否「自認持有有效編輯鎖」
+function _iHoldLock(){
+  return !cloudLocked && dbAdapter.isSharePointMode && dbAdapter.isSharePointMode()
+      && dbAdapter.hasLock && dbAdapter.hasLock();
+}
+
+// 鎖遺失（逾時被接手 / 被清除 / 閒置釋放）→ UI 退回鎖定狀態並通知
+async function _onLockLost(msg){
+  try{ await dbAdapter.releaseLock(); }catch(e){}   // 只清本地 currentLock，鎖非自己時不會誤刪他人鎖
+  cloudLocked=true; _applyCloudLockUI(); updateLockStatusBar();
+  alert(msg);
+}
+
+// 由 60 秒輪詢呼叫：閒置自動釋放、偵測鎖被接手、接近過期則續約
+async function _maintainLock(){
+  if(!_iHoldLock()) return;
+  const TTL_MS=((window.SHAREPOINT_CONFIG&&SHAREPOINT_CONFIG.lockTimeoutMinutes)||10)*60000;
+  // (1) 閒置過久 → 主動釋放，避免鎖被無限續約佔住、別人永遠拿不到
+  if(Date.now()-_lastActivityTs > TTL_MS){
+    await _onLockLost('🔓 因閒置超過 '+Math.round(TTL_MS/60000)+' 分鐘，編輯鎖已自動釋放。需要時請重新點「資料庫保護」取得鎖。');
+    return;
+  }
+  // (2) 確認鎖仍屬於自己（peekLock 已在輪詢中更新 dbCache.lock）
+  const lk=dbAdapter.getLockInfo?dbAdapter.getLockInfo():null;
+  const acct=dbAdapter.getAccountInfo?dbAdapter.getAccountInfo():null;
+  const mine = lk && acct && lk.lockedByEmail===acct.email && new Date(lk.expiresAt)>new Date();
+  if(!mine){
+    await _onLockLost('⚠️ 你的編輯鎖已逾時並被釋放或被他人接手，已退出編輯狀態。需要時請重新取得鎖。');
+    return;
+  }
+  // (3) 剩不到半個 TTL → 續約（再次 acquireLock 會延長自己的 expiresAt；被接手時丟 LockError）
+  if(new Date(lk.expiresAt).getTime()-Date.now() < TTL_MS/2){
+    try{ await dbAdapter.acquireLock(); }
+    catch(e){
+      if(e instanceof LockError) await _onLockLost('⚠️ 編輯鎖續約失敗（已被他人接手），已退出編輯狀態。');
+      else console.warn('[lock] renew failed:',e);
+    }
+  }
+}
+
+// 寫入前驗鎖：去伺服器確認鎖仍屬於自己且未過期，否則擋下（H-4，取代純看 cloudLocked 的 checkCloudLock）
+async function _ensureLockBeforeWrite(action){
+  if(cloudLocked){
+    alert('⚠️ 資料庫寫入保護已啟用，無法'+action+'。\n請先點擊「🔒 資料庫保護」按鈕輸入密碼解鎖。');
+    return false;
+  }
+  // 本機模式無共用鎖 → 解鎖即可寫
+  if(!(dbAdapter.isSharePointMode&&dbAdapter.isSharePointMode())) return true;
+  let lk=null;
+  try{ lk=await dbAdapter.peekLock(); }
+  catch(e){ alert('⚠️ 無法確認編輯鎖狀態（網路或登入問題），'+action+'已取消，請稍後再試。'); return false; }
+  const acct=dbAdapter.getAccountInfo?dbAdapter.getAccountInfo():null;
+  const mine = lk && acct && lk.lockedByEmail===acct.email && new Date(lk.expiresAt)>new Date();
+  if(!mine){
+    await _onLockLost('⚠️ 你的編輯鎖已逾時或被他人接手，'+action+'已取消。請重新點「資料庫保護」取得鎖後再試。');
+    return false;
+  }
+  _lastActivityTs=Date.now();   // 存檔/刪除是明確活動
+  return true;
+}
+
+// 每 60 秒重新讀檔輪詢鎖狀態（登入 SharePoint 時），保持置頂佔用橫幅即時，並維護自己的鎖
 setInterval(async ()=>{
   if(DB_MODE==='sharepoint'&&dbAdapter.isSignedIn&&dbAdapter.isSignedIn()){
     try{await dbAdapter.peekLock();}catch(e){return;}
     updateLockStatusBar();
+    try{await _maintainLock();}catch(e){console.warn('[lock] maintain error:',e);}
   }
 },60000);
 
@@ -1070,11 +1136,16 @@ async function initFirebase() {
   }
 }
 
-// Warn user before leaving if they hold an editing lock
+// 持鎖時離開 → 只提醒（H-5：不在 beforeunload 釋放鎖，否則按「留下」後會變成無鎖裸寫）
 window.addEventListener('beforeunload', function(e){
   if (typeof dbAdapter !== 'undefined' && dbAdapter.isSharePointMode && dbAdapter.isSharePointMode() && dbAdapter.hasLock && dbAdapter.hasLock()) {
-    try { dbAdapter.releaseLock(); } catch(err) {}
     e.preventDefault(); e.returnValue = ''; return '';
+  }
+});
+// 頁面確實卸載了才釋放鎖（fire-and-forget；送不出去靠 TTL 兜底）。按「留下」不會觸發 pagehide → 鎖保留。
+window.addEventListener('pagehide', function(){
+  if (typeof dbAdapter !== 'undefined' && dbAdapter.isSharePointMode && dbAdapter.isSharePointMode() && dbAdapter.hasLock && dbAdapter.hasLock()) {
+    try { dbAdapter.releaseLock(); } catch(err) {}
   }
 });
 
@@ -1718,7 +1789,7 @@ function saveProject(){readGlobals();let d={meta:{version:"v4.30 (GitHub Pages)"
 // CLOUD PROJECT SAVE / LOAD
 // =====================================================
 async function cloudSaveProject(){
-  if(checkCloudLock('儲存專案'))return;
+  if(!(await _ensureLockBeforeWrite('儲存專案')))return;
   let name=document.getElementById('cloudProjectName').value.trim();
   if(!name){alert('⚠️ 請先輸入專案名稱！');document.getElementById('cloudProjectName').focus();return;}
   if(!fbOk||!dbAdapter.isReady()){alert('⚠️ 資料庫未連線，無法儲存。');return;}
@@ -1781,7 +1852,7 @@ async function cloudLoadOne(docId){
 }
 
 async function cloudDeleteOne(docId,name){
-  if(checkCloudLock('刪除專案'))return;
+  if(!(await _ensureLockBeforeWrite('刪除專案')))return;
   if(!confirm('確定要刪除專案「'+name+'」？此操作無法復原！'))return;
   try{await dbAdapter.deleteDoc('projects', docId);variantsCache=null;renderTab0();alert('🗑️ 已刪除「'+name+'」');cloudLoadProject();}
   catch(e){alert('❌ 刪除失敗: '+e.message);}
