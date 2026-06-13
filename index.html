@@ -1326,7 +1326,7 @@ function calcThermalResistance(row,g){
 function computeAll(params,comps,Area_fixed_m2){
   let p={...params};let all=[];
   ['rf','digital','pwr'].forEach(cat=>(comps[cat]||[]).forEach(c=>{if(!c._excluded)all.push({...c,_src:cat.toUpperCase()});}));
-  if(!all.length)return{Total_Power:0,Min_dT_Allowed:50,Bottleneck_Name:"None",Area_req:0,Fin_Height:0,Volume_L:0,total_weight_kg:0,h_value:0,Bottleneck_Tj_Margin:0,Fin_Count:0,rows:[],drc_failed:false,drc_msg:"",L_hsk:0,W_hsk:0,RRU_Height:0,aspect_ratio:0};
+  if(!all.length)return{Total_Power:0,Min_dT_Allowed:50,Bottleneck_Name:"None",Area_req:0,Fin_Height:0,Volume_L:0,total_weight_kg:0,h_value:0,h_conv:0,h_rad:0,Bottleneck_Tj_Margin:0,Fin_Count:0,rows:[],drc_failed:false,drc_msg:"",drc_warn:"",L_hsk:0,W_hsk:0,RRU_Height:0,aspect_ratio:0,hs_weight_kg:0,shield_weight_kg:0,filter_weight_kg:0,shielding_weight_kg:0,pcb_weight_kg:0,eff:0,eta_fin:0,T_hsk_base:0,T_root:0,G_root:0};
   let rows=all.map(c=>{let tr=calcThermalResistance(c,p);return{...c,...tr};});
   let valid=rows.filter(r=>r.Total_W>0);let TWS=valid.reduce((s,r)=>s+r.Total_W,0);
   let MDA=50,BN="None",bti=-1;
@@ -1361,10 +1361,10 @@ function computeAll(params,comps,Area_fixed_m2){
       h_value = hRes.h_value; h_conv = hRes.h_conv; h_rad = hRes.h_rad;
       eta_fin = calcEtaFin(FH_prev, t_fin_for_eta, h_value, K_FIN);
       eff = eta_fin * ETA_PROCESS;
-      try { AR = 1 / (h_value * (MDA/TP) * eff); } catch(e) { AR = 0; }
-      let FH_new = 0;
-      try { FH_new = ((AR - bam2) * 1e6) / (2*nf*LH); } catch(e) { FH_new = 0; }
-      if (FH_new <= 0) { FH = 0; break; }
+      AR = 1 / (h_value * (MDA/TP) * eff);
+      let denom = 2*nf*LH;   // nf=0（鰭片擺不下）或 LH=0 → 除以零；JS 回 Infinity 不會 throw，故須顯式守衛
+      let FH_new = denom > 0 ? ((AR - bam2) * 1e6) / denom : 0;
+      if (!isFinite(FH_new) || FH_new <= 0) { FH = 0; break; }   // 反推非有限/非正 → 無效設計，FH=0
       if (Math.abs(FH_new - FH_prev) < 0.05) { FH = FH_new; break; }
       FH_prev = 0.5*FH_prev + 0.5*FH_new;
       FH = FH_new;
