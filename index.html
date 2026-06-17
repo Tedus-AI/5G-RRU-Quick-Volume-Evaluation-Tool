@@ -373,14 +373,14 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
 
 <div class="main">
   <div class="header">
+    <span id="version-badge" title="軟體版本" style="position:absolute; top:12px; left:30px;">
+      <span class="vb-ver" id="vb-ver">—</span>
+      <span class="vb-latest">&#10003; 最新</span>
+    </span>
     <div>
       <h1>📡 5G RRU 體積估算引擎 <span style="font-size:0.6em;opacity:0.8;">Pro</span></h1>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <div class="subtitle">High-Performance Thermal & Volume Estimation System</div>
-        <span id="version-badge" title="軟體版本">
-          <span class="vb-ver" id="vb-ver">—</span>
-          <span class="vb-latest">&#10003; 最新</span>
-        </span>
       </div>
     </div>
     <div style="position:absolute; top:12px; right:16px; display:flex; align-items:center; gap:8px;">
@@ -406,13 +406,26 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
       <button class="cloud-btn" onclick="cloudSaveProject()">💾 儲存專案</button>
       <button class="cloud-btn" onclick="cloudLoadProject()">📂 載入專案</button>
       <div class="divider"></div>
-      <button class="cloud-btn" onclick="generatePDFReport()" id="pdf-btn" style="border-color:#ff6b6b;background:rgba(255,107,107,0.15);">📄 PDF 報告</button>
+      <button class="cloud-btn" onclick="cloudCopyProject()" id="copy-btn" style="border-color:#ffd166;background:rgba(255,209,102,0.18);">📋 複製專案</button>
     </div>
+    <button class="cloud-btn" onclick="generatePDFReport()" id="pdf-btn" style="position:absolute; bottom:12px; right:16px; padding:8px 16px; border:2px solid #ff6b6b; background:rgba(255,107,107,0.15); color:#fff; border-radius:8px; cursor:pointer; font-weight:600; font-size:0.85rem; transition:all 0.2s;">📄 PDF 報告</button>
     <div class="cloud-modal-overlay" id="cloudModal">
       <div class="cloud-modal">
         <h3>📂 專案列表</h3>
         <div id="cloudList"></div>
         <button class="cloud-close" onclick="closeCloudModal()">關閉</button>
+      </div>
+    </div>
+    <div class="cloud-modal-overlay" id="copyModal">
+      <div class="cloud-modal">
+        <h3>📋 複製專案</h3>
+        <p style="margin:0 0 14px;color:#475569;font-size:0.88rem;line-height:1.5;">將「目前載入的專案」內容另存為一份新專案。原專案不會被更動。</p>
+        <label style="display:block;margin-bottom:6px;color:#1e3a5f;font-weight:700;font-size:0.85rem;">新專案名稱</label>
+        <input type="text" id="copyProjectName" placeholder="輸入新專案名稱 ..." onkeydown="if(event.key==='Enter')confirmCopyProject();" style="width:100%;padding:9px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:0.95rem;box-sizing:border-box;outline:none;">
+        <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;">
+          <button class="cloud-close" onclick="closeCopyModal()">取消</button>
+          <button class="cloud-close" style="background:#2e9e5b;color:#fff;" onclick="confirmCopyProject()">確定複製</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1788,6 +1801,21 @@ function saveProject(){readGlobals();let d={meta:{version:"v4.30 (GitHub Pages)"
 // =====================================================
 // CLOUD PROJECT SAVE / LOAD
 // =====================================================
+// 專案 global_params 欄位清單（5G-RRU 擁有的 keys）。集中一處，避免儲存/複製兩處各自漂移。
+const PROJECT_GLOBAL_KEYS=['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'];
+
+// 由目前畫面狀態組出要寫入 DB 的 project fields。
+// existing：DB 既有 document（若有）→ 用來保留 sibling tool 寫入、我們不認識的 global_params keys。
+function _buildProjectFields(name, existing){
+  readGlobals();
+  // Merge global_params with existing so we don't drop keys owned by sibling tools
+  // (e.g. AI-Thermal-pad-and-stud-size-Evaluation-Tool may write keys we don't know about).
+  const mergedGlobals={...(existing&&existing.global_params?existing.global_params:{})};
+  PROJECT_GLOBAL_KEYS.forEach(k=>mergedGlobals[k]=G[k]);
+  mergedGlobals.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;
+  return {meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},project_name:name,global_params:mergedGlobals,rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
+}
+
 async function cloudSaveProject(){
   if(!(await _ensureLockBeforeWrite('儲存專案')))return;
   let name=document.getElementById('cloudProjectName').value.trim();
@@ -1801,20 +1829,52 @@ async function cloudSaveProject(){
     existing=await dbAdapter.getDoc('projects', docId);
     if(existing&&!confirm('「'+name+'」已存在，確定要覆蓋？'))return;
   }catch(e){}
-  readGlobals();
-  // Merge global_params with existing so we don't drop keys owned by sibling tools
-  // (e.g. AI-Thermal-pad-and-stud-size-Evaluation-Tool may write keys we don't know about).
-  const mergedGlobals={...(existing&&existing.global_params?existing.global_params:{})};
-  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(k=>mergedGlobals[k]=G[k]);
-  mergedGlobals.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;
   // Use updateDoc so fields owned by other tools (thermal_specs, hidden_components,
   // validation_data, param_*, tcPlacement, vd_hidden_components, ...) are preserved.
-  const fields={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},project_name:name,global_params:mergedGlobals,rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
+  const fields=_buildProjectFields(name, existing);
   try{
     await dbAdapter.updateDoc('projects', docId, fields);
     variantsCache=null; renderTab0();   // 專案集合改變 → 失效快選快取，下次重繪重新聚合
     alert('✅ 專案「'+name+'」已儲存！');
   }catch(e){alert('❌ 儲存失敗: '+e.message);}
+}
+
+// =====================================================
+// 複製專案：把「目前載入/編輯中的專案」另存為新名稱的新專案，原專案不動。
+// =====================================================
+function cloudCopyProject(){
+  if(!fbOk||!dbAdapter.isReady()){alert('⚠️ 資料庫未連線，無法複製。');return;}
+  const base=document.getElementById('cloudProjectName').value.trim();
+  const inp=document.getElementById('copyProjectName');
+  inp.value=base?base+'_copy':'';
+  document.getElementById('copyModal').classList.add('active');
+  setTimeout(()=>{inp.focus();inp.select();},50);
+}
+
+function closeCopyModal(){document.getElementById('copyModal').classList.remove('active');}
+
+async function confirmCopyProject(){
+  const name=document.getElementById('copyProjectName').value.trim();
+  if(!name){alert('⚠️ 請輸入新專案名稱！');document.getElementById('copyProjectName').focus();return;}
+  if(!fbOk||!dbAdapter.isReady()){alert('⚠️ 資料庫未連線，無法複製。');return;}
+  let docId=name.replace(/ /g,'_').replace(/[^a-zA-Z0-9_\-一-鿿]/g,'');
+  if(!docId){alert('⚠️ 專案名稱無效，請使用中英文或數字。');return;}
+  if(!(await _ensureLockBeforeWrite('複製專案')))return;
+  // 防呆：新名稱若已存在，需確認覆蓋（避免不小心蓋掉別的專案）
+  let existing=null;
+  try{
+    existing=await dbAdapter.getDoc('projects', docId);
+    if(existing&&!confirm('「'+name+'」已存在，確定要覆蓋？'))return;
+  }catch(e){}
+  // 以目前畫面狀態（即當下載入/編輯中的專案）組出 fields，寫到「新 docId」→ 原專案不受影響。
+  const fields=_buildProjectFields(name, existing);
+  try{
+    await dbAdapter.updateDoc('projects', docId, fields);
+    variantsCache=null; renderTab0();
+    document.getElementById('cloudProjectName').value=name;  // 複製後切換到新專案名
+    closeCopyModal();
+    alert('✅ 已複製為新專案「'+name+'」！');
+  }catch(e){alert('❌ 複製失敗: '+e.message);}
 }
 
 async function cloudLoadProject(){
