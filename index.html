@@ -408,7 +408,6 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
       <div class="divider"></div>
       <button class="cloud-btn" onclick="cloudCopyProject()" id="copy-btn" style="border-color:#ffd166;background:rgba(255,209,102,0.18);">📋 複製專案</button>
     </div>
-    <button class="cloud-btn" onclick="generatePDFReport()" id="pdf-btn" style="position:absolute; bottom:12px; right:16px; padding:8px 16px; border:2px solid #ff6b6b; background:rgba(255,107,107,0.15); color:#fff; border-radius:8px; cursor:pointer; font-weight:600; font-size:0.85rem; transition:all 0.2s;">📄 PDF 報告</button>
     <div class="cloud-modal-overlay" id="cloudModal">
       <div class="cloud-modal">
         <h3>📂 專案列表</h3>
@@ -456,6 +455,7 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
     <button class="tab-btn" onclick="switchTab(2)">📊 視覺化報告</button>
     <button class="tab-btn" onclick="switchTab(3)">🧊 3D 模擬視圖</button>
     <button class="tab-btn" onclick="switchTab(4)">📈 敏感度分析</button>
+    <button onclick="generatePDFReport()" id="pdf-btn" style="margin-left:auto; padding:8px 18px; border:2px solid #ff6b6b; background:rgba(255,107,107,0.12); color:#e03131; border-radius:20px; cursor:pointer; font-weight:600; font-size:0.85rem; transition:all 0.3s;">📄 PDF 報告</button>
   </div>
 
   <!-- Tab 0: 元件設定 -->
