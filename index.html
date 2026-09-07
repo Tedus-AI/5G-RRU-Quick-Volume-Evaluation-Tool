@@ -20,6 +20,11 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
 .sidebar input[type="number"],.sidebar select{width:100%;padding:6px 8px;border:1px solid #475569;border-radius:6px;background:#334155;color:#e2e8f0;font-size:0.85rem;}
 .sidebar input[type="number"]:focus,.sidebar select:focus{outline:none;border-color:var(--primary);}
 .sidebar .row2{display:flex;gap:8px;}.sidebar .row2>div{flex:1;}
+.sidebar .fin-custom-box{margin-top:8px;padding:8px 10px;border:1px dashed #475569;border-radius:8px;background:rgba(51,65,85,0.35);}
+.sidebar .fin-custom-toggle{display:flex;align-items:center;gap:7px;margin:0;font-size:0.8rem;color:#cbd5e1;cursor:pointer;user-select:none;}
+.sidebar .fin-custom-toggle input[type="checkbox"]{width:auto;margin:0;accent-color:var(--primary);cursor:pointer;}
+.sidebar .fin-custom-fields{margin-top:6px;}
+.sidebar .fin-custom-fields label{margin-top:4px;font-size:0.72rem;}
 .sidebar .section-title{color:var(--primary-light);font-size:0.9rem;font-weight:700;margin-top:18px;margin-bottom:8px;cursor:pointer;user-select:none;}
 .sidebar .section-title::before{content:"▼ ";font-size:0.7rem;}
 .sidebar .section-title.collapsed::before{content:"▶ ";}
@@ -324,6 +329,25 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
     <label>🔒 設計安全係數 (Margin)</label><input type="number" id="Margin" step="0.1" onchange="recalc()">
     <label>🔨 鰭片製程 (Fin Tech)</label>
     <select id="fin_tech_selector_v2" onchange="recalc()"><option value="Embedded Fin (0.95)">Embedded Fin (0.95)</option><option value="Die-casting Fin (0.90)">Die-casting Fin (0.90)</option></select>
+    <!-- 各製程獨立的自訂係數（η_process 有效效率係數 + K_FIN 鰭片導熱係數）。留白＝沿用製程預設值 -->
+    <div id="fin-custom-emb" class="fin-custom-box">
+      <label class="fin-custom-toggle"><input type="checkbox" id="fin_custom_emb" onchange="toggleFinCustom('emb')">🛠️ 自訂 Embedded Fin 係數</label>
+      <div id="fin-custom-emb-fields" class="fin-custom-fields" style="display:none;">
+        <div class="row2">
+          <div><label>η_process 有效效率</label><input type="number" id="fin_eta_emb" step="0.01" placeholder="預設 1.06" onchange="recalc()"></div>
+          <div><label>K_FIN 導熱 (W/mK)</label><input type="number" id="fin_kfin_emb" step="1" placeholder="預設 200" onchange="recalc()"></div>
+        </div>
+      </div>
+    </div>
+    <div id="fin-custom-dc" class="fin-custom-box" style="display:none;">
+      <label class="fin-custom-toggle"><input type="checkbox" id="fin_custom_dc" onchange="toggleFinCustom('dc')">🛠️ 自訂 Die-casting Fin 係數</label>
+      <div id="fin-custom-dc-fields" class="fin-custom-fields" style="display:none;">
+        <div class="row2">
+          <div><label>η_process 有效效率</label><input type="number" id="fin_eta_dc" step="0.01" placeholder="預設 0.99" onchange="recalc()"></div>
+          <div><label>K_FIN 導熱 (W/mK)</label><input type="number" id="fin_kfin_dc" step="1" placeholder="預設 160" onchange="recalc()"></div>
+        </div>
+      </div>
+    </div>
     <div id="diecast-params" style="display:none;">
       <label>📐 拔模角 Draft Angle α (°)</label>
       <input type="number" id="Draft_Angle" step="0.05" value="1.25" onchange="recalc()">
@@ -914,6 +938,12 @@ const DEFAULT_CONFIG = {
     "t_Solder": 0.3,
     "Voiding": 0.75,
     "fin_tech_selector_v2": "Embedded Fin (0.95)",
+    "fin_custom_emb": false,
+    "fin_eta_emb": 0,
+    "fin_kfin_emb": 0,
+    "fin_custom_dc": false,
+    "fin_eta_dc": 0,
+    "fin_kfin_dc": 0,
     "al_density": 2.7,
     "filter_density": 0.97,
     "shielding_density": 0.76,
@@ -1272,6 +1302,7 @@ function init() {
   components.digital = DEFAULT_CONFIG.digital_data.map(r=>({...r}));
   components.pwr = DEFAULT_CONFIG.pwr_data.map(r=>({...r}));
   for (let k in gp) { let el=document.getElementById(k); if(el){if(el.tagName==='SELECT')el.value=gp[k];else el.value=gp[k];} }
+  applyFinCustomUI();
   document.getElementById('loading').style.display='none';
   updateSABase();
   recalc();
@@ -1288,6 +1319,28 @@ function readGlobals(){
   ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(id=>{let el=document.getElementById(id);if(el&&el.tagName!=='SELECT')G[id]=parseFloat(el.value)||0;});
   G.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;G.Slope=0.03;
   if(!G.Draft_Angle||G.Draft_Angle<0.1)G.Draft_Angle=1.25;
+  // 各製程自訂係數（勾選狀態 + η_process + K_FIN）
+  ['emb','dc'].forEach(k=>{
+    G['fin_custom_'+k]=document.getElementById('fin_custom_'+k).checked;
+    G['fin_eta_'+k]=parseFloat(document.getElementById('fin_eta_'+k).value)||0;
+    G['fin_kfin_'+k]=parseFloat(document.getElementById('fin_kfin_'+k).value)||0;
+  });
+}
+
+// 勾選/取消「自訂係數」→ 顯示或隱藏該製程的輸入欄並重算
+function toggleFinCustom(which){
+  const on=document.getElementById('fin_custom_'+which).checked;
+  document.getElementById('fin-custom-'+which+'-fields').style.display=on?'':'none';
+  recalc();
+}
+// 依 G 內的自訂狀態還原 UI（初始化 / 載入專案後呼叫；一般載入迴圈不會處理 checkbox）
+function applyFinCustomUI(){
+  ['emb','dc'].forEach(k=>{
+    const cb=document.getElementById('fin_custom_'+k);if(cb)cb.checked=!!G['fin_custom_'+k];
+    const etaEl=document.getElementById('fin_eta_'+k);if(etaEl)etaEl.value=(G['fin_eta_'+k]>0)?G['fin_eta_'+k]:'';
+    const kEl=document.getElementById('fin_kfin_'+k);if(kEl)kEl.value=(G['fin_kfin_'+k]>0)?G['fin_kfin_'+k]:'';
+    const f=document.getElementById('fin-custom-'+k+'-fields');if(f)f.style.display=G['fin_custom_'+k]?'':'none';
+  });
 }
 
 // =====================================================
@@ -1296,6 +1349,23 @@ function readGlobals(){
 function calcHValue(gap,FH_mm){const FH_REF=70.0,ALPHA_H=0.20;let FH=(FH_mm&&FH_mm>0)?FH_mm:FH_REF;let FHs=Math.max(FH,20);let hc_base=6.4*Math.tanh(gap/7.0);let fh_factor=Math.pow(FH_REF/FHs,ALPHA_H);let hc=hc_base*fh_factor;let rf=gap>=10?1:Math.sqrt(gap/10);let hr=2.4*rf;return{h_value:hc+hr,h_conv:hc,h_rad:hr};}
 function calcEtaFin(FH_mm,t_fin_mm,h_value,k_fin){if(FH_mm<=0||t_fin_mm<=0||h_value<=0||k_fin<=0)return 1.0;let t_m=t_fin_mm/1000;let Lc_m=(FH_mm+t_fin_mm/2)/1000;let m=Math.sqrt(2*h_value/(k_fin*t_m));let mLc=m*Lc_m;if(mLc<1e-6)return 1.0;return Math.tanh(mLc)/mLc;}
 function calcFinCount(W,gap,ft){if(gap+ft<=0)return 0;let n=Math.floor((W+gap)/(gap+ft));while(n>0&&(n*ft+(n-1)*gap)>W+0.001)n--;return Math.max(n,0);}
+
+// 各鰭片製程的預設係數（η_process 有效效率、K_FIN 鰭片導熱）。
+// 使用者可在各製程底下勾選「自訂係數」覆蓋；未勾選或值無效時一律沿用預設，現有專案結果不變。
+const FIN_PROCESS_DEFAULTS={emb:{eta:1.06,kfin:200},dc:{eta:0.99,kfin:160}};
+function finEffective(p){
+  const isDC=(p.fin_tech_selector_v2||'').includes('Die-casting');
+  const key=isDC?'dc':'emb';
+  const def=FIN_PROCESS_DEFAULTS[key];
+  const on=!!p['fin_custom_'+key];
+  const eta=parseFloat(p['fin_eta_'+key]);
+  const kfin=parseFloat(p['fin_kfin_'+key]);
+  return {
+    isDC, key, custom:on,
+    eta_process:(on&&eta>0)?eta:def.eta,
+    k_fin:(on&&kfin>0)?kfin:def.kfin
+  };
+}
 
 function drcDieCasting(FH,T_tip,alpha_deg,Gap){
   let errors=[],warnings=[];
@@ -1350,11 +1420,12 @@ function computeAll(params,comps,Area_fixed_m2){
   let alpha_deg=isDieCasting?(p.Draft_Angle||1.25):0;
   let alpha_rad=alpha_deg*Math.PI/180;
   // === Phase 2: 動態 h + 動態 η_fin 迭代反推 FH ===
-  const K_FIN = isDieCasting ? 160 : 200;
-  const ETA_PROCESS = isDieCasting ? 0.99 : 1.06;
+  const finEff = finEffective(p);
+  const K_FIN = finEff.k_fin;
+  const ETA_PROCESS = finEff.eta_process;
   let nf, TP = TWS*p.Margin, AR = 0, FH = 0;
   let T_root_calc = p.Fin_t, G_root_calc = p.Gap;
-  let eta_fin = 1.0, eff = isDieCasting ? 0.99 : 1.06;
+  let eta_fin = 1.0, eff = ETA_PROCESS;
   nf = calcFinCount(WH, p.Gap, p.Fin_t);
   let FH_prev = 70;
   if (TP > 0 && MDA > 0) {
@@ -1434,6 +1505,8 @@ function updateHDisplay(){
   } else {arEl.textContent='--';arMsg.textContent='等待計算...';}
   let isDC=G.fin_tech_selector_v2.includes("Die-casting");
   document.getElementById('diecast-params').style.display=isDC?'':'none';
+  document.getElementById('fin-custom-emb').style.display=isDC?'none':'';
+  document.getElementById('fin-custom-dc').style.display=isDC?'':'none';
   document.getElementById('diecast-info').style.display=(isDC&&calcResults&&calcResults.Fin_Height>0)?'':'none';
   if(isDC&&calcResults&&calcResults.Fin_Height>0){
     document.getElementById('dc-troot').textContent='T_root 根部厚度: '+(calcResults.T_root||0).toFixed(2)+' mm';
@@ -1791,10 +1864,10 @@ function loadProject(){document.getElementById('fileInput').click();}
 function handleFileLoad(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=function(ev){try{let d=JSON.parse(ev.target.result);
   if(d.global_params){for(let k in d.global_params){G[k]=d.global_params[k];let el=document.getElementById(k);if(el){if(el.tagName==='SELECT')el.value=d.global_params[k];else el.value=d.global_params[k];}}}
   if(d.rf_data)components.rf=d.rf_data;if(d.digital_data)components.digital=d.digital_data;if(d.pwr_data)components.pwr=d.pwr_data;
-  recalc();alert('✅ 專案載入成功！');}catch(err){alert('Error: '+err.message);}};r.readAsText(f);e.target.value='';}
+  applyFinCustomUI();recalc();alert('✅ 專案載入成功！');}catch(err){alert('Error: '+err.message);}};r.readAsText(f);e.target.value='';}
 
 function saveProject(){readGlobals();let d={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},global_params:{},rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
-  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(k=>d.global_params[k]=G[k]);
+  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle','fin_custom_emb','fin_eta_emb','fin_kfin_emb','fin_custom_dc','fin_eta_dc','fin_kfin_dc'].forEach(k=>d.global_params[k]=G[k]);
   d.global_params.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;
   let b=new Blob([JSON.stringify(d,null,4)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(b);let pn=document.getElementById('cloudProjectName').value.trim()||'Project';a.download='RRU_'+pn+'_'+new Date().toISOString().slice(0,10)+'.json';a.click();}
 
@@ -1802,7 +1875,7 @@ function saveProject(){readGlobals();let d={meta:{version:"v4.30 (GitHub Pages)"
 // CLOUD PROJECT SAVE / LOAD
 // =====================================================
 // 專案 global_params 欄位清單（5G-RRU 擁有的 keys）。集中一處，避免儲存/複製兩處各自漂移。
-const PROJECT_GLOBAL_KEYS=['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'];
+const PROJECT_GLOBAL_KEYS=['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle','fin_custom_emb','fin_eta_emb','fin_kfin_emb','fin_custom_dc','fin_eta_dc','fin_kfin_dc'];
 
 // 由目前畫面狀態組出要寫入 DB 的 project fields。
 // existing：DB 既有 document（若有）→ 用來保留 sibling tool 寫入、我們不認識的 global_params keys。
@@ -1907,7 +1980,7 @@ async function cloudLoadOne(docId){
     if(d.global_params){for(let k in d.global_params){G[k]=d.global_params[k];let el=document.getElementById(k);if(el){el.value=d.global_params[k];}}}
     if(d.rf_data)components.rf=d.rf_data;if(d.digital_data)components.digital=d.digital_data;if(d.pwr_data)components.pwr=d.pwr_data;
     if(d.project_name)document.getElementById('cloudProjectName').value=d.project_name;
-    closeCloudModal();recalc();alert('✅ 專案「'+(d.project_name||docId)+'」已載入！');
+    applyFinCustomUI();closeCloudModal();recalc();alert('✅ 專案「'+(d.project_name||docId)+'」已載入！');
   }catch(e){alert('❌ 載入失敗: '+e.message);}
 }
 
@@ -2324,7 +2397,7 @@ async function generatePDFReport() {
           {table:{body:[
             paramRow('T_amb', '外部環境溫度', G.T_amb+'\u00b0C'),
             paramRow('Margin', '功耗安全係數', G.Margin+'x'),
-            paramRow('Fin Tech', '鰭片加工技術', G.fin_tech_selector_v2)
+            paramRow('Fin Tech', '鰭片加工技術', (function(){var fe=finEffective(G);return G.fin_tech_selector_v2+(fe.custom?('\n自訂 η='+fe.eta_process+', K_FIN='+fe.k_fin):'');})())
           ],widths:['55%','45%']},layout:{hLineWidth:()=>0.3,vLineWidth:()=>0,hLineColor:()=>'#f1f5f9',paddingTop:()=>2,paddingBottom:()=>2,paddingLeft:()=>4,paddingRight:()=>2},margin:[0,0,10,0]}
         ]},
         {width:'50%', stack:[
