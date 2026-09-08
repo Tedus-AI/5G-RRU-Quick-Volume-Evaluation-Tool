@@ -1468,7 +1468,9 @@ function computeAll(params,comps,Area_fixed_m2){
   let pw=(p.L_pcb*p.W_pcb/100)*p.pcb_surface_density/1000;
   let tw=hw+sw+fw+shw+pw;
   // Tc/Tj
-  let THB;if(Area_fixed_m2&&Area_fixed_m2>0)THB=p.T_amb+TP/(h_value*Area_fixed_m2*eff);else THB=p.T_amb+MDA/p.Margin;
+  // 固定散熱器模式：以「真實功耗 TWS」評估基座溫度（Margin 只用於把散熱器設計加大，不是真實工況，
+  // 用 TP=TWS*Margin 會與撐大面積時的 Margin 互相抵消，導致基準點裕度恆為 0、吃掉設計安全係數）。
+  let THB;if(Area_fixed_m2&&Area_fixed_m2>0)THB=p.T_amb+TWS/(h_value*Area_fixed_m2*eff);else THB=p.T_amb+MDA/p.Margin;
   rows.forEach(r=>{r.T_hsk_eff=THB+r['Height(mm)']*p.Slope;r.Tc=r.T_hsk_eff+r['Power(W)']*(r.R_int+r.R_TIM);r.Tj=r.Tc+r['Power(W)']*r.R_jc;let isTc=r._src==='PWR'||(r.Component||'').toLowerCase().includes('ddr');r.T_ref=isTc?r.Tc:r.Tj;r.Temp_Label=isTc?'Tc':'Tj';r.Tj_Margin=r['Limit(C)']-r.T_ref;});
   let BTM=0;if(valid.length&&bti>=0){let br=rows.find(r=>r.Component===BN&&r.Total_W>0);if(br)BTM=Math.round(br.Tj_Margin*10)/10;}
   // DRC
@@ -1765,9 +1767,12 @@ function runSweep(){
   let vn=bv*(1-mp/100),vx=bv*(1+pp/100);if(vk==='Gap')vn=Math.max(vn,0.5);if(vk==='power_scale')vn=Math.max(vn,0.1);
   let xs=[];for(let i=0;i<st;i++)xs.push(vn+(vx-vn)*i/(st-1));let ci=0;xs.forEach((x,i)=>{if(Math.abs(x-bv)<Math.abs(xs[ci]-bv))ci=i;});xs[ci]=bv;
   let br=saCalc(G,components,vk,bv,null);let ab=br.Area_req;
-  let basePower=(components.rf.reduce((s,r)=>s+r['Power(W)']*r.Qty,0)+components.digital.reduce((s,r)=>s+r['Power(W)']*r.Qty,0)+components.pwr.reduce((s,r)=>s+r['Power(W)']*r.Qty,0))*G.Margin;
-  let res=xs.map((x,i)=>{let r=saCalc(G,components,vk,x,ab);let gn=vk==='Gap'?x:G.Gap;let ar=gn>0?r.Fin_Height/gn:0;
-    return{x:Math.round(x*1e4)/1e4,Volume:Math.round(r.Volume_L*100)/100,Weight:Math.round(r.total_weight_kg*100)/100,AR:Math.round(ar*10)/10,Fin_Count:r.Fin_Count,Tj_Margin:r.Bottleneck_Tj_Margin,Fin_Height:Math.round(r.Fin_Height*10)/10};});
+  let bottleneckName=br.Bottleneck_Name;
+  // 每個工況算兩種裕度：
+  //  rD（Area=null）＝重新設計：每點重算 FH/鰭片數以滿足散熱 → 幾何(體積/重量/AR)與「重新設計裕度」
+  //  rF（Area=ab）  ＝固定散熱器：沿用基準面積 ab 評估「固定散熱器裕度」（幾何與 rD 相同，僅溫度不同）
+  let res=xs.map((x,i)=>{let rD=saCalc(G,components,vk,x,null);let rF=saCalc(G,components,vk,x,ab);let gn=vk==='Gap'?x:G.Gap;let ar=gn>0?rD.Fin_Height/gn:0;
+    return{x:Math.round(x*1e4)/1e4,Volume:Math.round(rD.Volume_L*100)/100,Weight:Math.round(rD.total_weight_kg*100)/100,AR:Math.round(ar*10)/10,Fin_Count:rD.Fin_Count,Tj_Redesign:rD.Bottleneck_Tj_Margin,Tj_Fixed:rF.Bottleneck_Tj_Margin,Fin_Height:Math.round(rD.Fin_Height*10)/10};});
 
   let ct=document.getElementById('sa-sweep-results');
   ct.innerHTML='<div style="display:flex;gap:15px;width:100%;flex-wrap:wrap;"><div id="sa-cl" style="flex:1;min-width:400px;"></div><div id="sa-cr" style="flex:1;min-width:400px;"></div></div><div id="sa-detail"></div>';
@@ -1778,14 +1783,25 @@ function runSweep(){
     {x:xv,y:res.map(r=>r.Weight),type:'bar',name:'重量 (kg)',marker:{color:'rgba(46,204,113,0.8)'},yaxis:'y2',offsetgroup:2}
   ],{barmode:'group',title:'<b>散熱器規模 — 體積 & 重量</b>',xaxis:{title:vk==='power_scale'?'功耗縮放係數 (×)':vk+' (mm)'},yaxis:{title:'體積 (L)',titlefont:{color:'#3498db'},tickfont:{color:'#3498db'}},yaxis2:{title:'重量 (kg)',titlefont:{color:'#2ecc71'},tickfont:{color:'#2ecc71'},overlaying:'y',side:'right'},legend:{orientation:'h',x:0.5,y:1.08,xanchor:'center'},shapes:[{type:'line',x0:bv,x1:bv,y0:0,y1:1,yref:'paper',line:{dash:'dash',color:'gray'},name:'Current'}],height:420,margin:{l:50,r:50,t:50,b:50},hovermode:'x unified'},{responsive:true,displaylogo:false,modeBarButtonsToAdd:[fullscreenBtn],displayModeBar:true});
   // RIGHT
-  let py,pn,pc;if(vk==='Gap'){py=res.map(r=>r.AR);pn='流阻比 (AR)';pc='#e74c3c';}else{py=res.map(r=>r.Tj_Margin);pn='Bottleneck Tj_Margin (°C)';pc='#e67e22';}
+  let py,pn,pc;if(vk==='Gap'){py=res.map(r=>r.AR);pn='流阻比 (AR)';pc='#e74c3c';}else{py=res.map(r=>r.Tj_Fixed);pn='固定散熱器 Tj_Margin (°C)';pc='#e67e22';}
   let sh2=[{type:'line',x0:bv,x1:bv,y0:0,y1:1,yref:'paper',line:{dash:'dash',color:'gray'}}];
   if(vk!=='Gap')sh2.push({type:'line',x0:xv[0],x1:xv[xv.length-1],y0:0,y1:0,line:{dash:'dot',color:'red',width:2}});
   Plotly.newPlot('sa-cr',[{x:xv,y:py,mode:'lines+markers',name:pn,line:{color:pc,width:3},marker:{size:8}}],{title:'<b>熱流/幾何性能 — '+pn+'</b>',xaxis:{title:vk==='power_scale'?'功耗縮放係數 (×)':vk+' (mm)'},yaxis:{title:pn,titlefont:{color:pc},tickfont:{color:pc}},shapes:sh2,height:420,margin:{l:50,r:50,t:50,b:50},hovermode:'x unified'},{responsive:true,displaylogo:false,modeBarButtonsToAdd:[fullscreenBtn],displayModeBar:true});
   // Detail data table
-  let dh='<div class="collapsible" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';">📋 查看詳細數據 ▼</div><div class="collapsible-body"><table class="detail-table"><thead><tr><th>'+vk+'</th><th>體積 (L)</th><th>重量 (kg)</th><th>流阻比</th><th>鰭片數</th><th>Tj_Margin (°C)</th><th>Fin 高度 (mm)</th></tr></thead><tbody>';
-  res.forEach(r=>dh+='<tr><td>'+r.x+'</td><td>'+r.Volume+'</td><td>'+r.Weight+'</td><td>'+r.AR+'</td><td>'+r.Fin_Count+'</td><td>'+r.Tj_Margin+'</td><td>'+r.Fin_Height+'</td></tr>');
-  dh+='</tbody></table></div>';document.getElementById('sa-detail').innerHTML=dh;
+  let bn=_vEsc(bottleneckName||'—');
+  let bnSub='<br><span style="font-weight:400;color:#94a3b8;font-size:0.82em;">瓶頸: '+bn+'</span>';
+  function mCell(v){var s=(typeof v==='number'&&v<0)?' style="color:#c0392b;font-weight:600;"':'';return '<td'+s+'>'+(typeof v==='number'?v.toFixed(1):v)+'</td>';}
+  let dh='<div class="collapsible" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';">📋 查看詳細數據 ▼</div><div class="collapsible-body"><table class="detail-table"><thead><tr><th>'+vk+'</th><th>體積 (L)</th><th>重量 (kg)</th><th>流阻比</th><th>鰭片數</th><th>重新設計裕度 (°C)'+bnSub+'</th><th>固定散熱器裕度 (°C)'+bnSub+'</th><th>Fin 高度 (mm)</th></tr></thead><tbody>';
+  res.forEach(r=>dh+='<tr><td>'+r.x+'</td><td>'+r.Volume+'</td><td>'+r.Weight+'</td><td>'+r.AR+'</td><td>'+r.Fin_Count+'</td>'+mCell(r.Tj_Redesign)+mCell(r.Tj_Fixed)+'<td>'+r.Fin_Height+'</td></tr>');
+  dh+='</tbody></table>';
+  dh+='<div style="margin-top:12px;padding:12px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:0.82rem;line-height:1.6;color:#475569;">'
+    +'<b style="color:#1e3a5f;">📖 兩種 Tj_Margin 名詞說明</b>'
+    +'<div style="margin-top:6px;"><b style="color:#0f766e;">重新設計裕度</b>：每個工況都<b>重新設計散熱器</b>(重算鰭片高度/數量)以滿足散熱後，瓶頸元件距溫度上限的裕度。因此它幾乎<b>不隨此變數改變</b>，數值≈設計安全係數(Margin)帶來的餘裕：Margin=1.0 → 0；Margin=1.05 → 正值。代表「若你願意為每個工況都重新開模，能達到的裕度」。</div>'
+    +'<div style="margin-top:4px;"><b style="color:#b45309;">固定散熱器裕度</b>：沿用<b>基準點設計出來的同一顆散熱器</b>，只改變此變數後、瓶頸元件的實際裕度。<b>基準點等於重新設計裕度</b>；偏離基準時上下起伏，代表「散熱器不動、只有這個參數漂移」時的熱風險，<b style="color:#c0392b;">負值 = 超溫</b>。</div>'
+    +'<div style="margin-top:4px;color:#64748b;">範例：Margin=1.05、基準 Gap='+_vEsc(String(bv))+' → 兩欄在基準點都約 +2.2°C；Gap 偏離基準時，固定散熱器裕度會下降甚至轉負，而重新設計裕度維持不變。</div>'
+    +'<div style="margin-top:4px;color:#94a3b8;font-size:0.95em;">＊瓶頸元件 = 允許溫升最小(最先超溫)的那顆；掃描非幾何變數(如功耗)時瓶頸可能換人，欄位標題顯示的是基準工況的瓶頸。</div>'
+    +'</div>';
+  dh+='</div>';document.getElementById('sa-detail').innerHTML=dh;
 }
 
 function runTornado(){
