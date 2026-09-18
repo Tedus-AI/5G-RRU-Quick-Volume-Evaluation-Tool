@@ -34,9 +34,80 @@
     }
   },
   "feedback_items":  { ... },   // AI-Thermal Tab5
+  "tim_library":     { "<id>": { model, timType, k, thickness, gapThickness, gapUnlock,
+                                 vendor, note, at, by, updatedAt, updatedBy } },
+                                // TIM 型號庫：全工具共用、不屬於任何專案。
+                                // 維護介面只在 AI-Thermal Tab2；**本工具只讀不寫**。
+  "login_history":   { "<id>": { name, email, at, tool } },  // AI-Thermal 登入稽核（本工具尚未寫入）
   "version":         <number>
 }
 ```
+
+### TIM 型號庫（`tim_library`）與 `TIM_Model`
+
+一顆 Pad 的 k 值只登錄一次，所有專案共用；放頂層 collection 是刻意的（規則 3），天然與
+`projects` 的寫入隔離。每筆的兩個厚度**不是同一件事**：
+
+| 欄位 | AI-Thermal UI 標題 | 意義 | 對應本工具 |
+|---|---|---|---|
+| `k` | k (W/m·K) | 導熱係數 | `K_Pad` / `K_Putty` / `K_Grease` |
+| `gapThickness` | 填縫厚度(mm) | **壓縮後實際填在縫隙裡**的厚度 | `t_Pad` / `t_Putty` / `t_Grease` |
+| `thickness` | 預設厚度(mm) | 材料**原始片厚**（Pad 買來 2.5mm） | 無（僅供規格書參考，計算不可用）|
+
+佐證：本工具預設 `t_Pad = 1.7` 等於 AI-Thermal Tab2 的「IC 距離 HSK = 1.7」，而不是
+「TIM 厚度 2.5」→ `calcRow` 要的就是壓縮後的縫隙厚度。**餵給 `R_TIM` 的是 `gapThickness`。**
+
+`calcThermalResistance` 取 TIM 的 k / t 一律走 `resolveTim(row, g)`（單一事實來源，計算與畫面共用）：
+
+1. `row.TIM_Model` 有值且在 `tim_library` 查得到（比對 `timType` ＋型號名，不分大小寫）
+   → 用該型號的 `k` 與 `gapThickness`；
+2. 否則沿用 `global_params` 的 `K_<Type>` / `t_<Type>`（**fallback 不可省**，否則型號庫還沒
+   建完的專案會整批算不出來）；型號查不到／型號缺 `k` 或 `gapThickness` 時也走這條，並在
+   畫面上以琥珀色標明原因；
+3. 舊類型（`Pad2` / `Solder`）→ `TIM_LEGACY_PARAM` 指到原本吃的 global key，維持既有計算值。
+
+`resolveTim` 會把來源回傳到列上（`TIM_Src` / `TIM_SrcLabel` / `TIM_SrcDetail` / `TIM_Warn`），
+元件表每列標「k=… · t=… ← 型號 X／參數控制台」，Tab1 的 `R_TIM` 標 ◆（來自型號）或 ⚠（來源有問題）。
+
+⚠ **本工具絕不寫入 `tim_library`**（維護介面只在 AI-Thermal Tab2 的「🧪 TIM 型號庫」）。
+載入時機：`loadLibraryFromLocal()`（DB 連線／取得鎖／換 DB 檔）與 `cloudLoadOne()`（載入專案）
+各 `timLibLoad(true)` 重讀一次，讀完 `recalc()`。
+
+### `Pad2` 已停用（改用「`Pad` ＋型號」）
+
+`TIM_TYPES` 只剩 `Grease / Pad / Putty / None`；不同 k 值的 Pad 用型號表達。
+
+- **讀取相容**：`TIM_Type: 'Pad2'` 的舊元件仍以該專案 `global_params` 殘留的 `K_Pad2`/`t_Pad2`
+  計算（`TIM_LEGACY_PARAM`），**不可讓它靜默變成 `R_TIM = 0`**（低估熱阻＝樂觀，比 NaN 危險）。
+  該列的下拉會臨時補回「Pad2（已停用）」選項——不靜默改掉使用者填的內容。
+- **遷移**：Tab0 會跳橫幅列出受影響元件與殘留的 k/t，選一個 Pad 型號按「套用遷移」即
+  改成 `TIM_Type:'Pad'` ＋ `TIM_Model`（只改記憶體，要按「儲存專案」才寫回 DB）。
+  型號本身要先在 AI-Thermal 的型號庫建好（本工具唯讀）。
+- `K_Pad2` / `t_Pad2` 已從參數控制台與 `PROJECT_GLOBAL_KEYS` 移除：不再由本工具寫入，
+  但既有專案裡的值因 `_buildProjectFields` 的 merge 而**保留**。換專案時
+  `clearLegacyTimGlobals()` 會清掉 `G` 裡沒有輸入框的舊參數，免得拿 A 案的殘留值算 B 案。
+
+### 每元件欄位的歸屬（同一顆元件物件由兩個工具共寫）
+
+| 欄位 | 誰有畫面可編輯 |
+|---|---|
+| `Component`、`Qty`、`Power(W)`、`Limit(C)` | 兩邊 |
+| `Height(mm)`、`Thick(mm)` | 只有 5G-RRU（AI-Thermal 一律不寫這兩個 key）|
+| `Board_Type`、`Pad_L`、`Pad_W`、`R_jc`、`TIM_Model`、`TIM_Type` | 5G-RRU 可編輯；AI-Thermal 存檔時由 Tab1/Tab2 推導後覆寫 |
+| `Type`、`Power_RT(W)`、`TV_ID_mil`、`TV_Qty`、`Temp_Sensor`、`Local_Qty`、`Remote_Qty`、`note`、`Rth`、`SpecFile` | 只有 AI-Thermal（本工具不顯示但原樣保留）|
+
+⚠ **「從資料庫快選」的 carry 白名單兩邊都必須列全上表所有欄位**（本工具的 `VARIANT_CARRY`
+／AI-Thermal 的 `SG_VARIANT_CARRY`，目前各 21 項）。漏列的 key 會被各自的分類罐頭預設值
+蓋掉，複製完再存回共用 DB 就等於把對方工具填的真實值洗成罐頭值。新增任何每元件欄位時，
+**同一個 commit 內要把它加進本工具的白名單，並在另一個 repo 同步補上**。
+物件／陣列欄位（`Rth`、`SpecFile`）carry 時必須深拷貝（`carrySrc`）。
+`SpecFile` 是檔案參照不是複本（實體檔在來源專案的 `SPEC/<專案名>/` 底下）→ 快選帶入時標
+`SpecFile._from = <來源專案名>`，AI-Thermal 才知道換檔／刪除時只能解除參照、不可刪來源檔。
+
+⚠ **空值一律「不寫 key」，不可寫 `''`**：快選是 `Object.assign({}, RF_DEFAULT, src)`，key 不
+存在會套分類預設；寫 `''` 會覆蓋預設值，而 `calcRow` 對空字串多半不噴 NaN 而是**靜默算成 0**
+（`Thick` 空 → `R_int`=0、`Pad_L/W` 空 → 面積用字串算出假值、`Limit(C)` 空 → 裕度變超大負數），
+方向是**低估熱阻＝樂觀**，比 NaN 更危險。取消 TIM 選型／換 TIM 類型時一律 `delete` key。
 
 ### 規則
 

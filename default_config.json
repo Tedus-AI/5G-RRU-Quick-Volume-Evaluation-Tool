@@ -26,8 +26,6 @@
         "t_Putty": 0.5,
         "K_Pad": 7.5,
         "t_Pad": 1.7,
-        "K_Pad2": 7.5,
-        "t_Pad2": 1.0,
         "K_Grease": 3.0,
         "t_Grease": 0.05,
         "K_Solder": 58.0,
