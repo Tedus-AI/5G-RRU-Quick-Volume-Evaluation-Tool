@@ -34,7 +34,31 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
 .h-display .h-val{font-size:1.3rem;font-weight:700;color:#60a5fa;}
 .h-display .h-sub{font-size:0.75rem;color:#94a3b8;margin-top:4px;}
 .ar-display{background:#1a1a2e;border:1px solid #555;border-radius:8px;padding:10px;margin-top:10px;text-align:center;}
-.main{flex:1;padding:25px 30px;overflow-y:auto;}
+/* 參數控制台：可拖曳調寬 + 可收合。分隔線「拖曳＝調寬、點一下＝收合／展開」，
+   收合後分隔線變成 ▶ 的展開口（收合狀態一定要留一個看得見的回去的路）。 */
+#sidebar-resizer{flex:0 0 7px;background:#1e293b;position:sticky;top:0;height:100vh;cursor:col-resize;
+  display:flex;align-items:center;justify-content:center;user-select:none;transition:background .15s;}
+#sidebar-resizer:hover,#sidebar-resizer.dragging{background:var(--primary);}
+#sidebar-resizer .grip{width:3px;height:40px;border-radius:2px;background:#475569;}
+#sidebar-resizer:hover .grip,#sidebar-resizer.dragging .grip{background:#dbeafe;}
+#sidebar-resizer .peek{display:none;font-size:0.7rem;color:#cbd5e1;}
+body.sidebar-collapsed .sidebar{display:none;}
+body.sidebar-collapsed #sidebar-resizer{flex-basis:18px;cursor:pointer;}
+body.sidebar-collapsed #sidebar-resizer .grip{display:none;}
+body.sidebar-collapsed #sidebar-resizer .peek{display:block;}
+body.sidebar-resizing{user-select:none;cursor:col-resize;}
+.sidebar h2{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.sidebar-toggle{background:transparent;border:1px solid #475569;border-radius:6px;color:#cbd5e1;
+  cursor:pointer;padding:3px 6px;line-height:0;flex:0 0 auto;}
+.sidebar-toggle:hover{background:#334155;border-color:#94a3b8;color:#fff;}
+/* 板厚：由參數控制台帶入的純參照值用白底黑字純文字（不用反灰 input）；不適用時才反灰 */
+.thick-ref{display:inline-block;padding:4px 8px;background:#fff;color:#111827;border:1px solid #e2e8f0;
+  border-radius:4px;font-size:0.82rem;cursor:help;min-width:34px;text-align:center;}
+.thick-na{display:inline-block;padding:4px 8px;color:#9ca3af;cursor:help;}
+.thick-migrate{background:#eff6ff;border:1px solid #60a5fa;border-left-width:5px;border-radius:8px;
+  padding:12px;margin-bottom:12px;color:#1e3a5f;font-size:0.85rem;line-height:1.5;}
+.thick-migrate b{color:#1d4ed8;}
+.main{flex:1;padding:25px 30px;overflow-y:auto;min-width:0;}
 .header{background:linear-gradient(135deg,var(--primary),var(--primary-light));padding:45px 30px 20px;border-radius:12px;color:#fff;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:15px;position:relative;}
 .header h1{font-family:"Nunito",sans-serif;font-size:1.8rem;font-weight:900;}.header .subtitle{font-size:0.9rem;opacity:0.9;margin-top:5px;}
 .header .project-io{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
@@ -339,7 +363,13 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
 <div id="loading" style="display:none;"><h2>📡 5G RRU 熱流引擎 Pro</h2><p>⚙️ 初始化熱流引擎中，請稍候...</p><progress></progress></div>
 
 <div class="sidebar" id="sidebar">
-  <h2>🛠️ 參數控制台</h2>
+  <h2><span>🛠️ 參數控制台</span>
+    <button class="sidebar-toggle" onclick="toggleSidebar()" title="收合參數控制台（也可以點中間的分隔線；拖曳分隔線可調寬度）">
+      <svg width="17" height="15" viewBox="0 0 18 16" fill="none" stroke="currentColor" stroke-width="1.6">
+        <rect x="1" y="1" width="16" height="14" rx="2.5"/><line x1="7" y1="1" x2="7" y2="15"/>
+      </svg>
+    </button>
+  </h2>
   <div id="fb-status"></div>
 
   <div class="section-title" onclick="toggleSection(this)">1. 環境與係數</div>
@@ -377,6 +407,7 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
   <div class="section-body">
     <label>📏 PCB 長度 L_pcb (mm)</label><input type="number" id="L_pcb" step="1" onchange="recalc()">
     <label>📏 PCB 寬度 W_pcb (mm)</label><input type="number" id="W_pcb" step="1" onchange="recalc()">
+    <label title="PCB 板厚。元件清單中「導熱方式 = Thermal Via」的元件，其板厚一律吃這一格">📏 PCB 板厚度 (mm)</label><input type="number" id="t_PCB" step="0.1" min="0" title="元件清單中所有 Thermal Via 元件的板厚都取這個值（R_int 的穿板厚度）" onchange="recalc()">
     <label>散熱器基板厚 t_base (mm)</label><input type="number" id="t_base" step="0.5" onchange="recalc()">
     <label>HSK 內腔深度 H_shield (mm)</label><input type="number" id="H_shield" step="1" onchange="recalc()">
     <label>Cavity Filter 厚度 H_filter (mm)</label><input type="number" id="H_filter" step="1" onchange="recalc()">
@@ -388,6 +419,7 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
     <div class="row2"><div><label>Left (mm)</label><input type="number" id="Left" step="1" onchange="recalc()"></div><div><label>Right (mm)</label><input type="number" id="Right" step="1" onchange="recalc()"></div></div>
     <label style="margin-top:12px;color:var(--primary-light);">🔶 Cu Coin 銅塊設定（套用於所有 Board_Type = Copper Coin 元件）</label>
     <div class="row2"><div><label>銅塊長 (mm)</label><input type="number" id="Coin_L_Setting" step="1" onchange="recalc()"></div><div><label>銅塊寬 (mm)</label><input type="number" id="Coin_W_Setting" step="1" onchange="recalc()"></div></div>
+    <div class="row2"><div><label title="元件清單中「導熱方式 = Copper Coin」的元件，其板厚一律吃這一格">銅塊厚度 (mm)</label><input type="number" id="Coin_T_Setting" step="0.1" min="0" title="所有 Copper Coin 元件的板厚都取這個值（銅塊穿板厚度）" onchange="recalc()"></div><div><label title="銅塊材質的導熱係數。純銅約 380 W/m·K；C1100/C1020 等材質可自行調整">K (銅塊) (W/m·K)</label><input type="number" id="K_Coin" step="10" min="1" title="Copper Coin 的 R_int 用它：rv = 板厚 /(K × 等效面積)。預設 380（純銅）" onchange="recalc()"></div></div>
     <label style="margin-top:12px;color:var(--primary-light);">🌊 鰭片幾何</label>
     <div class="row2"><div><label>鰭片 Air Gap (mm)</label><input type="number" id="Gap" step="0.1" onchange="recalc()"></div><div><label>鰭片厚度 (mm)</label><input type="number" id="Fin_t" step="0.1" onchange="recalc()"></div></div>
     <div class="h-display" id="h-display"><div class="h-val" id="h-val">--</div><div class="h-sub" id="h-sub">h = h_conv + h_rad</div></div>
@@ -411,6 +443,10 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
     <div class="row2"><div><label>K (錫片)</label><input type="number" id="K_Solder" step="1" onchange="recalc()"></div><div><label>t (錫片)</label><input type="number" id="t_Solder" step="0.05" onchange="recalc()"></div></div>
     <label>錫片有效面積率 (Voiding)</label><input type="number" id="Voiding" step="0.05" min="0.1" max="1" placeholder="0.5 ~ 1.0 (建議 0.75)" onchange="recalc()">
   </div>
+</div>
+
+<div id="sidebar-resizer" title="拖曳調整參數控制台寬度；點一下收合／展開" onmousedown="sidebarResizeStart(event)">
+  <div class="grip"></div><div class="peek">&#9654;</div>
 </div>
 
 <div class="main">
@@ -504,6 +540,7 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
   <div class="tab-content active" id="tab0">
     <h3>🔥 元件熱源清單設定</h3>
     <p style="color:#888;font-size:0.82rem;margin-bottom:12px;">💡 提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。</p>
+    <div id="thick-migrate-banner"></div>
     <div id="tim-migrate-banner"></div>
     <div class="sub-tabs">
       <button class="sub-tab-btn active" onclick="switchSubTab(0)">📡 RF Component</button>
@@ -932,6 +969,7 @@ const DEFAULT_CONFIG = {
     "Margin": 1.0,
     "L_pcb": 320.0,
     "W_pcb": 256.0,
+    "t_PCB": 2.0,
     "t_base": 7.0,
     "H_shield": 20.0,
     "H_filter": 42.0,
@@ -940,6 +978,8 @@ const DEFAULT_CONFIG = {
     "Left": 8.0,
     "Right": 8.0,
     "Coin_L_Setting": 55.0,
+    "Coin_T_Setting": 2.5,
+    "K_Coin": 380.0,
     "Coin_W_Setting": 35.0,
     "Gap": 11.6,
     "Fin_t": 1.2,
@@ -1474,10 +1514,104 @@ function init() {
   components.pwr = DEFAULT_CONFIG.pwr_data.map(r=>({...r}));
   for (let k in gp) { let el=document.getElementById(k); if(el){if(el.tagName==='SELECT')el.value=gp[k];else el.value=gp[k];} }
   applyFinCustomUI();
+  initSidebarLayout();
+  migrateThickGlobals(gp);
   document.getElementById('loading').style.display='none';
   updateSABase();
   recalc();
   initFirebase();
+}
+
+// =====================================================
+// 參數控制台：拖曳調寬 / 點一下收合
+// -----------------------------------------------------
+// 分隔線同時是「拖曳把手」與「收合鈕」：mousedown 之後位移超過 4px 才算拖曳，
+// 沒超過就當成點一下 → 收合／展開（收合後分隔線變成 ▶，仍是回得去的路）。
+// 寬度與收合狀態記在 localStorage：那是每個人自己的畫面偏好，讀寫一律包 try/catch，
+// 拿不到就退回預設值，不能讓瀏覽器擋 storage 就開不了畫面。
+// =====================================================
+const SIDEBAR_MIN=220, SIDEBAR_MAX=560, SIDEBAR_DEFAULT=340;
+const LS_SB_W='rru.sidebarWidth', LS_SB_C='rru.sidebarCollapsed';
+let _sbDrag=null;
+
+function _lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function _lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+
+/* 登入前/登出後要把整個應用程式外殼藏起來（側欄＋分隔線＋主區） */
+function _setShellVisible(show){
+  const v=show?'':'none';
+  const sb=document.getElementById('sidebar');if(sb)sb.style.display=v;
+  const rz=document.getElementById('sidebar-resizer');if(rz)rz.style.display=show?'flex':'none';
+  const mn=document.querySelector('.main');if(mn)mn.style.display=v;
+}
+
+function setSidebarWidth(px,persist){
+  const w=Math.max(SIDEBAR_MIN,Math.min(SIDEBAR_MAX,Math.round(px)));
+  const sb=document.getElementById('sidebar');
+  if(sb){sb.style.width=w+'px';sb.style.minWidth=w+'px';}
+  if(persist!==false)_lsSet(LS_SB_W,String(w));
+  return w;
+}
+
+/* 版面寬度變了 → Plotly 圖要重算，否則圖還停在舊寬度 */
+function resizePlots(){
+  setTimeout(function(){
+    if(typeof Plotly==='undefined'||!Plotly.Plots)return;
+    document.querySelectorAll('.js-plotly-plot').forEach(function(gd){try{Plotly.Plots.resize(gd);}catch(e){}});
+  },60);
+}
+
+function setSidebarCollapsed(on,persist){
+  document.body.classList.toggle('sidebar-collapsed',!!on);
+  const rz=document.getElementById('sidebar-resizer');
+  if(rz)rz.title=on?'展開參數控制台':'拖曳調整參數控制台寬度；點一下收合／展開';
+  const bt=document.querySelector('.sidebar-toggle');
+  if(bt)bt.title=on?'展開參數控制台':'收合參數控制台（也可以點中間的分隔線；拖曳分隔線可調寬度）';
+  if(persist!==false)_lsSet(LS_SB_C,on?'1':'0');
+  resizePlots();
+}
+
+function toggleSidebar(){ setSidebarCollapsed(!document.body.classList.contains('sidebar-collapsed')); }
+
+function sidebarResizeStart(ev){
+  if(ev.button!==0)return;
+  if(document.body.classList.contains('sidebar-collapsed')){ setSidebarCollapsed(false); return; }  // 收合時只當展開鈕
+  const sb=document.getElementById('sidebar');if(!sb)return;
+  _sbDrag={x0:ev.clientX,w0:sb.getBoundingClientRect().width,moved:false};
+  document.body.classList.add('sidebar-resizing');
+  const rz=document.getElementById('sidebar-resizer');if(rz)rz.classList.add('dragging');
+  ev.preventDefault();
+}
+
+function _sbMove(ev){
+  if(!_sbDrag)return;
+  const dx=ev.clientX-_sbDrag.x0;
+  if(!_sbDrag.moved&&Math.abs(dx)<4)return;      // 4px 以內視為「點一下」而非拖曳
+  _sbDrag.moved=true;
+  setSidebarWidth(_sbDrag.w0+dx,false);
+}
+
+function _sbUp(){
+  if(!_sbDrag)return;
+  const moved=_sbDrag.moved;_sbDrag=null;
+  document.body.classList.remove('sidebar-resizing');
+  const rz=document.getElementById('sidebar-resizer');if(rz)rz.classList.remove('dragging');
+  if(moved){
+    const sb=document.getElementById('sidebar');
+    if(sb)_lsSet(LS_SB_W,String(Math.round(sb.getBoundingClientRect().width)));
+    resizePlots();
+  }else{
+    toggleSidebar();                              // 沒拖動 → 點一下＝收合／展開
+  }
+}
+document.addEventListener('mousemove',_sbMove);
+document.addEventListener('mouseup',_sbUp);
+
+/* 還原上次的寬度與收合狀態（讀不到就用預設） */
+function initSidebarLayout(){
+  const w=parseInt(_lsGet(LS_SB_W),10);
+  setSidebarWidth(isFinite(w)&&w>0?w:SIDEBAR_DEFAULT,false);
+  setSidebarCollapsed(_lsGet(LS_SB_C)==='1',false);
 }
 
 // =====================================================
@@ -1487,7 +1621,7 @@ function toggleSection(el){el.classList.toggle('collapsed');el.nextElementSiblin
 function toggleSAMode(){let m=document.querySelector('input[name="sa_mode"]:checked').value;document.getElementById('sa-sweep-panel').style.display=m==='sweep'?'':'none';document.getElementById('sa-tornado-panel').style.display=m==='tornado'?'':'none';}
 
 function readGlobals(){
-  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(id=>{let el=document.getElementById(id);if(el&&el.tagName!=='SELECT')G[id]=parseFloat(el.value)||0;});
+  ['T_amb','Margin','L_pcb','W_pcb','t_PCB','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Coin_T_Setting','K_Coin','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(id=>{let el=document.getElementById(id);if(el&&el.tagName!=='SELECT')G[id]=parseFloat(el.value)||0;});
   G.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;G.Slope=0.03;
   if(!G.Draft_Angle||G.Draft_Angle<0.1)G.Draft_Angle=1.25;
   // 各製程自訂係數（勾選狀態 + η_process + K_FIN）
@@ -1564,11 +1698,14 @@ function calcThermalResistance(row,g){
   if(row.Board_Type==="Copper Coin"){bl=g.Coin_L_Setting;bw=g.Coin_W_Setting;}
   // IC top：熱從封裝上表面出去，沒有穿板、也就沒有基板擴散面積
   // → ba=0 使下面的 ta 退回 pa（元件上表面積）。加板厚的擴散面積會高估接觸面積＝低估 R_TIM。
-  else if(row.Board_Type==="IC top"){bl=0;bw=0;}
+  // IC top / None 都不穿板 → 沒有基板擴散面積，板厚也不參與計算（該欄在畫面上反灰）
+  else if(row.Board_Type==="IC top"||row.Board_Type==="None"){bl=0;bw=0;}
   else if(row['Power(W)']===0||row['Thick(mm)']===0){bl=0;bw=0;}
   else{bl=row.Pad_L+row['Thick(mm)'];bw=row.Pad_W+row['Thick(mm)'];}
   let la=g.T_amb+row['Height(mm)']*g.Slope;
-  let kb=0;if(row.Board_Type==="Copper Coin")kb=380;else if(row.Board_Type==="Thermal Via")kb=g.K_Via;
+  // 銅塊 K 值改由參數控制台的「K (銅塊)」提供；沒有有效值時沿用純銅 380（fallback 不可省）
+  let kCoin=parseFloat(g.K_Coin);if(!(kCoin>0))kCoin=380;
+  let kb=0;if(row.Board_Type==="Copper Coin")kb=kCoin;else if(row.Board_Type==="Thermal Via")kb=g.K_Via;
   let pa=(row.Pad_L*row.Pad_W)/1e6,ba=(bl*bw)/1e6;
   let ri=0;
   if(kb>0&&pa>0){let ea=ba>0?Math.sqrt(pa*ba):pa;let rv=(row['Thick(mm)']/1000)/(kb*ea);
@@ -1667,7 +1804,7 @@ function computeAll(params,comps,Area_fixed_m2){
 // =====================================================
 // MAIN RECALC
 // =====================================================
-function recalc(){readGlobals();calcResults=computeAll(G,components,null);updateHDisplay();renderTab0();renderTab1();renderTab2();renderTab3();updateSABase();}
+function recalc(){readGlobals();applyThickFromGlobals();calcResults=computeAll(G,components,null);updateHDisplay();renderTab0();renderTab1();renderTab2();renderTab3();updateSABase();}
 
 function updateHDisplay(){
   let FH_disp=(calcResults&&calcResults.Fin_Height>0)?calcResults.Fin_Height:70;let{h_value,h_conv,h_rad}=calcHValue(G.Gap,FH_disp);let el=document.getElementById('h-val');
@@ -1701,6 +1838,100 @@ function switchSubTab(i){document.querySelectorAll('.sub-tab-btn').forEach((b,j)
 // =====================================================
 // TAB 0: COMPONENT TABLES + FIREBASE LIBRARY
 // =====================================================
+/* ── 元件板厚（Thick(mm)）的單一事實來源：參數控制台 ─────────────
+   導熱方式決定該元件的板厚吃哪一個全域值，使用者不必逐顆填：
+     Copper Coin → 銅塊厚度 Coin_T_Setting
+     Thermal Via → PCB 板厚度 t_PCB
+     IC top / None → 不穿板 → 板厚不適用（歸 0，也不參與熱阻計算）
+   元件上仍保留 Thick(mm) 這個 key（Excel/PDF/共用 DB 都讀得到真實數字），
+   只是它由全域值推導而來，不再逐顆編輯。 */
+const THICK_SOURCE = {
+  'Copper Coin': { key:'Coin_T_Setting', label:'銅塊厚度' },
+  'Thermal Via': { key:'t_PCB',          label:'PCB 板厚度' },
+};
+function thickSourceOf(row){ return THICK_SOURCE[String((row&&row.Board_Type)||'')] || null; }
+
+/* 把全域厚度套到所有元件；回傳被改動的清單（供遷移橫幅逐顆列出，不靜默改資料） */
+function applyThickFromGlobals(){
+  const changed=[];
+  ['rf','digital','pwr'].forEach(cat=>(components[cat]||[]).forEach(c=>{
+    if(!c)return;
+    const src=thickSourceOf(c);
+    const want=src?parseFloat(G[src.key]):0;     // 不穿板 → 0
+    if(!isFinite(want))return;                   // 全域值還沒填 → 不動元件
+    const cur=parseFloat(c['Thick(mm)']);
+    if(cur===want)return;
+    changed.push({cat,name:String(c.Component||'(未命名)'),from:isFinite(cur)?cur:'(空)',to:want,bt:c.Board_Type||'(未選)'});
+    c['Thick(mm)']=want;
+  }));
+  return changed;
+}
+
+/* 舊專案沒有全域厚度 → 由元件回推：取該導熱方式底下「最常見的非零板厚」（平手取小的）。
+   全部都是 0／沒有該類元件 → 回 null，交給呼叫端決定。 */
+function inferThickGlobal(boardType){
+  const counts=new Map();
+  ['rf','digital','pwr'].forEach(cat=>(components[cat]||[]).forEach(c=>{
+    if(!c||String(c.Board_Type||'')!==boardType)return;
+    const v=parseFloat(c['Thick(mm)']);
+    if(isFinite(v)&&v>0)counts.set(v,(counts.get(v)||0)+1);
+  }));
+  let best=null,bestN=0;
+  counts.forEach((n,v)=>{ if(n>bestN||(n===bestN&&best!==null&&v<best)){best=v;bestN=n;} });
+  return best;
+}
+function countBoardType(boardType){
+  let n=0;
+  ['rf','digital','pwr'].forEach(cat=>(components[cat]||[]).forEach(c=>{ if(c&&String(c.Board_Type||'')===boardType)n++; }));
+  return n;
+}
+
+let _thickNotes=null;   // 這次載入的遷移結果（{inferred:[],changed:[]}）或 null
+
+/* 載入專案後呼叫：專案檔沒有全域厚度就回推一個，再把它統一套到元件上。
+   loadedGlobals 一定要傳「這個專案檔裡的 global_params」——不能看 G，
+   因為 G 還留著上一個專案的值（readGlobals 只從畫面欄位刷新）。 */
+function migrateThickGlobals(loadedGlobals){
+  const gp=loadedGlobals||{};
+  const notes={inferred:[],changed:[]};
+  [['Copper Coin','Coin_T_Setting','銅塊厚度'],['Thermal Via','t_PCB','PCB 板厚度']].forEach(([bt,key,label])=>{
+    const saved=parseFloat(gp[key]);
+    if(isFinite(saved)&&saved>0){ G[key]=saved; }        // 專案已有全域值 → 照用
+    else{
+      const guess=inferThickGlobal(bt);
+      G[key]=(guess==null)?0:guess;
+      const n=countBoardType(bt);
+      if(n>0)notes.inferred.push({label,bt,value:G[key],count:n,empty:(guess==null)});
+    }
+    const el=document.getElementById(key);
+    if(el)el.value=G[key];
+  });
+  notes.changed=applyThickFromGlobals();
+  _thickNotes=(notes.inferred.length||notes.changed.length)?notes:null;
+}
+
+function dismissThickNotes(){ _thickNotes=null; renderThickMigrateBanner(); }
+
+function renderThickMigrateBanner(){
+  const el=document.getElementById('thick-migrate-banner');if(!el)return;
+  if(!_thickNotes){el.innerHTML='';return;}
+  const n=_thickNotes;
+  let h='<div class="thick-migrate">⚙️ <b>板厚改為由參數控制台統一</b>（Thermal Via 吃「PCB 板厚度」、Copper Coin 吃「銅塊厚度」）。';
+  if(n.inferred.length){
+    h+='<br>本專案沒有存過這兩個值，已由元件回推：'+n.inferred.map(i=>
+      i.empty?('<b>'+_vEsc(i.label)+'</b> 找不到非零板厚（'+i.count+' 顆 '+_vEsc(i.bt)+' 元件原本都填 0）→ 先給 0，請自行填入')
+             :('<b>'+_vEsc(i.label)+' = '+i.value+' mm</b>（'+i.count+' 顆 '+_vEsc(i.bt)+' 元件中最常見的非零值）')
+    ).join('；')+'。';
+  }
+  if(n.changed.length){
+    h+='<br>以下 <b>'+n.changed.length+'</b> 顆元件的板厚因此被統一：'+
+      n.changed.map(c=>_vEsc(c.name)+' <b>'+c.from+' → '+c.to+'</b>').join('、')+'。';
+  }
+  h+='<div style="margin-top:8px;">此變更只在目前編輯中的專案（記憶體），確認沒問題請按「☁️ 儲存專案」寫回資料庫。'+
+     ' <button class="btn btn-sm" onclick="dismissThickNotes()">知道了</button></div></div>';
+  el.innerHTML=h;
+}
+
 /* ── AI-Thermal 推導欄位的來源標記 ─────────────────────────────
    同一顆元件物件由兩個工具共寫：Board_Type / Pad_L / Pad_W 由 AI-Thermal Tab2 的
    「主散熱路徑」推導，R_jc 由它 Tab1 熱阻表的 θJC 推導。這些欄位在這裡仍可編輯，
@@ -1732,6 +1963,18 @@ function derivedAttrs(row,col){
 
 function hasDerivedRow(arr){
   return (arr||[]).some(r=>['Board_Type','Pad_L','Pad_W','R_jc'].some(c=>derivedFrom(r,c)));
+}
+
+/* 板厚欄：由導熱方式決定吃哪個全域厚度。純參照值用白底黑字純文字（不用反灰 input）；
+   IC top / None 不穿板 → 板厚不適用，反灰顯示「—」。 */
+function thickCellHtml(row){
+  const src=thickSourceOf(row);
+  if(!src){
+    return '<td><span class="thick-na" title="'+_vEsc('導熱方式「'+((row&&row.Board_Type)||'未選')+'」不穿板 → 板厚不適用（值為 0，也不參與熱阻計算）')+'">—</span></td>';
+  }
+  const v=parseFloat(G[src.key]);
+  const shown=isFinite(v)?String(+v.toFixed(3)):'—';
+  return '<td><span class="thick-ref" title="'+_vEsc('由參數控制台的「'+src.label+'」帶入，所有 '+row.Board_Type+' 元件共用同一個值。要改請改參數控制台那一欄。')+'">'+_vEsc(shown)+'</span></td>';
 }
 
 /* ── 元件表的「導熱方式」欄 ─────────────────────────────────────
@@ -1890,6 +2133,7 @@ function renderCompTable(arr,containerId,defaults,category){
     let refOrigin=row._ref_origin_project||'';
     COLS.forEach(col=>{
       if(col==='Board_Type'){lhtml+=boardTypeCellHtml(row,category,i,dis);}
+      else if(col==='Thick(mm)'){lhtml+=thickCellHtml(row);}
       else if(col==='TIM_Type'){lhtml+=timCellHtml(row,category,i,dis);}
       else if(col==='Component'){
         let badge=refLocked
@@ -1917,6 +2161,7 @@ function renderTab0(){
     variantsLoading=true;
     loadVariantsCache().finally(()=>{ variantsLoading=false; renderTab0(); });
   }
+  renderThickMigrateBanner();
   renderTimMigrateBanner();
   renderCompTable(components.rf,'subtab0',RF_DEFAULT,'rf');
   renderCompTable(components.digital,'subtab1',DIG_DEFAULT,'digital');
@@ -2238,10 +2483,10 @@ function handleFileLoad(e){let f=e.target.files[0];if(!f)return;let r=new FileRe
   clearLegacyTimGlobals();
   if(d.global_params){for(let k in d.global_params){G[k]=d.global_params[k];let el=document.getElementById(k);if(el){if(el.tagName==='SELECT')el.value=d.global_params[k];else el.value=d.global_params[k];}}}
   if(d.rf_data)components.rf=d.rf_data;if(d.digital_data)components.digital=d.digital_data;if(d.pwr_data)components.pwr=d.pwr_data;
-  applyFinCustomUI();recalc();alert('✅ 專案載入成功！');}catch(err){alert('Error: '+err.message);}};r.readAsText(f);e.target.value='';}
+  applyFinCustomUI();migrateThickGlobals(d.global_params);recalc();alert('✅ 專案載入成功！');}catch(err){alert('Error: '+err.message);}};r.readAsText(f);e.target.value='';}
 
 function saveProject(){readGlobals();let d={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},global_params:{},rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
-  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle','fin_custom_emb','fin_eta_emb','fin_kfin_emb','fin_custom_dc','fin_eta_dc','fin_kfin_dc'].forEach(k=>d.global_params[k]=G[k]);
+  ['T_amb','Margin','L_pcb','W_pcb','t_PCB','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Coin_T_Setting','K_Coin','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle','fin_custom_emb','fin_eta_emb','fin_kfin_emb','fin_custom_dc','fin_eta_dc','fin_kfin_dc'].forEach(k=>d.global_params[k]=G[k]);
   d.global_params.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;
   let b=new Blob([JSON.stringify(d,null,4)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(b);let pn=document.getElementById('cloudProjectName').value.trim()||'Project';a.download='RRU_'+pn+'_'+new Date().toISOString().slice(0,10)+'.json';a.click();}
 
@@ -2249,7 +2494,7 @@ function saveProject(){readGlobals();let d={meta:{version:"v4.30 (GitHub Pages)"
 // CLOUD PROJECT SAVE / LOAD
 // =====================================================
 // 專案 global_params 欄位清單（5G-RRU 擁有的 keys）。集中一處，避免儲存/複製兩處各自漂移。
-const PROJECT_GLOBAL_KEYS=['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle','fin_custom_emb','fin_eta_emb','fin_kfin_emb','fin_custom_dc','fin_eta_dc','fin_kfin_dc'];
+const PROJECT_GLOBAL_KEYS=['T_amb','Margin','L_pcb','W_pcb','t_PCB','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Coin_T_Setting','K_Coin','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle','fin_custom_emb','fin_eta_emb','fin_kfin_emb','fin_custom_dc','fin_eta_dc','fin_kfin_dc'];
 
 // 由目前畫面狀態組出要寫入 DB 的 project fields。
 // existing：DB 既有 document（若有）→ 用來保留 sibling tool 寫入、我們不認識的 global_params keys。
@@ -2354,6 +2599,7 @@ async function cloudLoadOne(docId){
     // 專案載入時重讀型號庫：AI-Thermal 端可能剛新增/改過型號，k 與填縫厚度要吃到最新值
     try{ await timLibLoad(true); }catch(e){ console.warn('[timLib] reload failed:', e); }
     clearLegacyTimGlobals();
+    migrateThickGlobals(d.global_params);   // 板厚：專案沒存過全域值就回推並統一
     if(d.global_params){for(let k in d.global_params){G[k]=d.global_params[k];let el=document.getElementById(k);if(el){el.value=d.global_params[k];}}}
     if(d.rf_data)components.rf=d.rf_data;if(d.digital_data)components.digital=d.digital_data;if(d.pwr_data)components.pwr=d.pwr_data;
     if(d.project_name)document.getElementById('cloudProjectName').value=d.project_name;
@@ -2377,8 +2623,7 @@ function doLogin(){
   let pw=document.getElementById('login-pw').value;
   if(pw==='tedus'){
     document.getElementById('login-page').style.display='none';
-    document.getElementById('sidebar').style.display='';
-    document.querySelector('.main').style.display='';
+    _setShellVisible(true);
     document.getElementById('loading').style.display='flex';
     init();
   } else {
@@ -2392,8 +2637,7 @@ async function doLogout(){
   }
   if(!cloudLocked){cloudLocked=true;_applyCloudLockUI();}
   document.getElementById('login-page').style.display='flex';
-  document.getElementById('sidebar').style.display='none';
-  document.querySelector('.main').style.display='none';
+  _setShellVisible(false);
   document.getElementById('login-pw').value='';
 }
 
@@ -3141,8 +3385,7 @@ async function generatePDFReport() {
 // =====================================================
 window.addEventListener('DOMContentLoaded',function(){
   // Hide app until login
-  document.getElementById('sidebar').style.display='none';
-  document.querySelector('.main').style.display='none';
+  _setShellVisible(false);
   document.getElementById('loading').style.display='none';
 });
 </script>

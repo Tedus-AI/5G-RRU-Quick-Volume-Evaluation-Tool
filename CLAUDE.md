@@ -107,6 +107,46 @@
 值不在 `BOARD_TYPES` 裡時（對方工具寫進未知值），下拉會臨時補上該選項並標「（未知值）」，
 不可讓瀏覽器把它靜默顯示成清單第一項、使用者一碰就改掉資料。
 
+### `Thick(mm)`（板厚）由參數控制台統一，不再逐顆填
+
+導熱方式決定該元件的板厚吃哪一個**全域值**（`THICK_SOURCE` / `applyThickFromGlobals`，
+每次 `recalc()` 都會套用）：
+
+| `Board_Type` | 板厚來源 | 元件清單顯示 |
+|---|---|---|
+| `Copper Coin` | `Coin_T_Setting`（銅塊厚度）| 白底黑字純參照文字 |
+| `Thermal Via` | `t_PCB`（PCB 板厚度）| 白底黑字純參照文字 |
+| `IC top` / `None` | 不穿板 → 不適用，`Thick(mm)` 歸 **0** | 反灰「—」|
+
+- 元件上仍保留 `Thick(mm)` 這個 key（Excel／PDF／共用 DB 都讀得到真實數字），只是它由全域值
+  推導而來、不再是逐顆輸入的欄位。**AI-Thermal 仍然一律不寫這個 key。**
+- ⚠ `None` 現在與 `IC top` 一致：板厚不參與計算（`bl=bw=0`）。在此之前 `None` 會把 `R_TIM`
+  的接觸面積算成 `(Pad_L+Thick)×(Pad_W+Thick)`，欄位既然反灰就不能再偷偷影響數字。
+  實際資料檢查：備份裡 `None` 元件的板厚全部是 0，所以此改動對既有專案是 no-op。
+- **舊專案遷移**（`migrateThickGlobals(loadedGlobals)`）：專案的 `global_params` 沒存過
+  `t_PCB`／`Coin_T_Setting` 時，由該導熱方式底下「**最常見的非零板厚**」回推（平手取小），
+  再統一套到所有同類元件；Tab0 跳藍色橫幅寫出回推依據並**逐顆列出被改動的元件**，
+  提醒要按「儲存專案」才寫回 DB。⚠ 判斷「專案有沒有存過」一定要看傳進來的 `global_params`，
+  不能看 `G` —— `G` 還留著上一個專案的值（`readGlobals` 只從畫面欄位刷新）。
+
+### `K (銅塊)`：原本寫死的 380 已拉成參數
+
+`calcThermalResistance` 的 Copper Coin 分支原本是 `kb=380`（寫死）。現在取
+`global_params.K_Coin`，**沒有有效值時 fallback 380**（純銅）。Thermal Via 仍是
+`K_Via`（Via 等效 K，預設 30）＋ `Via_Eff`（0.9）；整份計算裡**沒有 FR4 基材 K**，
+穿板路徑就由「Via 等效 K」一個值代表。
+
+> 5G-RRU 專屬的新 global_params keys：`t_PCB`、`Coin_T_Setting`、`K_Coin`
+> （三份清單都要同步：`readGlobals` / `saveProject` / `PROJECT_GLOBAL_KEYS`）。
+
+### 參數控制台可調寬／收合
+
+`#sidebar-resizer` 同時是拖曳把手與收合鈕：`mousedown` 後位移超過 4px 才算拖曳，
+沒超過就當點一下 → 收合／展開（收合後分隔線變 ▶，這是收合狀態唯一回得去的路，不可拿掉）；
+標題列也有一顆同功能的按鈕。寬度（220–560px）與收合狀態存 localStorage，
+讀寫一律 try/catch。⚠ **寬度變動後要呼叫 `resizePlots()`**，否則 Plotly 圖停在舊寬度；
+登入前／登出後由 `_setShellVisible(false)` 把側欄、分隔線、主區一起藏起來。
+
 ### AI-Thermal 推導欄位的來源標記
 
 `Board_Type`／`Pad_L`／`Pad_W`（Tab2 主散熱路徑）與 `R_jc`（Tab1 熱阻表的 θJC）由 AI-Thermal
@@ -128,7 +168,8 @@
 | 欄位 | 誰有畫面可編輯 |
 |---|---|
 | `Component`、`Qty`、`Power(W)`、`Limit(C)` | 兩邊 |
-| `Height(mm)`、`Thick(mm)` | 只有 5G-RRU（AI-Thermal 一律不寫這兩個 key）|
+| `Height(mm)` | 只有 5G-RRU（AI-Thermal 一律不寫）|
+| `Thick(mm)` | 只有 5G-RRU，且**由參數控制台的 PCB 板厚度／銅塊厚度推導**（見下節）；AI-Thermal 一律不寫 |
 | `Board_Type`、`Pad_L`、`Pad_W`、`R_jc`、`TIM_Model`、`TIM_Type` | 5G-RRU 可編輯（標藍邊提醒會被覆寫）；AI-Thermal 存檔時由 Tab1/Tab2 推導後覆寫 |
 | `Type`、`Power_RT(W)`、`TV_ID_mil`、`TV_Qty`、`Temp_Sensor`、`Local_Qty`、`Remote_Qty`、`note`、`Rth`、`SpecFile` | 只有 AI-Thermal（本工具不顯示但原樣保留）|
 
