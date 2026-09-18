@@ -93,10 +93,29 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .kpi-card{flex:1;min-width:180px;background:#fff;border-radius:10px;padding:18px;box-shadow:var(--card-shadow);text-align:center;border-left:5px solid #ddd;}
 .kpi-card .title{color:#666;font-size:0.85rem;font-weight:500;}.kpi-card .value{font-size:1.6rem;font-weight:700;color:#333;margin:6px 0;}.kpi-card .desc{color:#999;font-size:0.75rem;}
 .comp-table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:var(--card-shadow);margin-bottom:15px;font-size:0.82rem;}
-.comp-table th{background:#f1f5f9;color:#475569;padding:10px 8px;text-align:left;font-weight:600;white-space:nowrap;cursor:help;}
-.comp-table td{padding:8px;border-top:1px solid #e2e8f0;}
-.comp-table td input,.comp-table td select{width:100%;padding:4px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:0.82rem;background:#fff;}
+.comp-table th{background:#f1f5f9;color:#475569;padding:10px 8px;text-align:center;font-weight:600;white-space:nowrap;cursor:help;}
+.comp-table td{padding:8px;border-top:1px solid #e2e8f0;text-align:center;}
+.comp-table td input,.comp-table td select{width:100%;padding:4px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:0.82rem;background:#fff;text-align:center;}
 .comp-table td input[type="number"]{width:50%;min-width:50px;}
+/* 數量／單顆功耗：欄寬收到「放得下內容」即可（width:1% 讓表格把多餘寬度讓給其他欄） */
+.comp-table th[data-col="Qty"],.comp-table td[data-col="Qty"],
+.comp-table th[data-col="Power(W)"],.comp-table td[data-col="Power(W)"]{width:1%;white-space:nowrap;}
+.comp-table td[data-col="Qty"] input[type="number"]{width:52px;min-width:0;}
+.comp-table td[data-col="Power(W)"] input[type="number"]{width:74px;min-width:0;}
+/* 收窄數量／功耗省下來的寬度給元件名稱（原本只分到 68px，名字會被截斷） */
+.comp-table th[data-col="Component"],.comp-table td[data-col="Component"]{min-width:140px;}
+/* 欄位多時表格會比容器寬：給它自己的橫向捲軸，才不會把「操作」欄切掉 */
+.comp-table-wrap{overflow-x:auto;}
+/* 新增元件列：「直接新增」與「從資料庫快選」並排在表格下方（原本快選在表格上方） */
+.add-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;padding:10px 12px;
+  background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;}
+.add-row-label{font-weight:600;color:#475569;font-size:0.85rem;}
+.add-row-or{color:#94a3b8;font-size:0.85rem;}
+.add-row-lib{font-weight:600;color:#475569;font-size:0.85rem;}
+.add-row select{padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:0.82rem;min-width:220px;background:#fff;}
+.btn-add-direct{border:2px dashed #f59e0b;background:#fff7ed;color:#c2410c;border-radius:8px;
+  padding:7px 14px;font-weight:700;font-size:0.85rem;cursor:pointer;}
+.btn-add-direct:hover{background:#ffedd5;border-color:#ea580c;}
 .comp-table td input:focus,.comp-table td select:focus{outline:none;border-color:var(--primary);}
 .comp-table tr:hover{background:#f8fafc;}
 .btn{padding:6px 14px;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.82rem;transition:all 0.2s;}
@@ -1152,13 +1171,13 @@ let components = { rf: [], digital: [], pwr: [] };
 let calcResults = null;
 
 const COLS = ['Component','Qty','Power(W)','Height(mm)','Pad_L','Pad_W','Thick(mm)','Board_Type','Limit(C)','R_jc','TIM_Type'];
-const COL_LABELS = {'Component':'元件名稱','Qty':'數量','Power(W)':'單顆功耗 (W)','Height(mm)':'高度 (mm)','Pad_L':'Pad 長 (mm)','Pad_W':'Pad 寬 (mm)','Thick(mm)':'板厚 (mm)','Board_Type':'導熱方式','Limit(C)':'限溫 (°C)','R_jc':'熱阻 Rjc','TIM_Type':'介面材料'};
+const COL_LABELS = {'Component':'元件名稱','Qty':'數量','Power(W)':'單顆功耗 (W)','Height(mm)':'元件相對高度 (mm)','Pad_L':'E-Pad 長 (mm)','Pad_W':'E-Pad 寬 (mm)','Thick(mm)':'板厚 (mm) 或銅厚','Board_Type':'導熱方式','Limit(C)':'限溫 (°C)','R_jc':'熱阻 Rjc','TIM_Type':'介面材料'};
 const COL_TIPS = {
   'Component':'元件型號或代號','Qty':'該元件的使用數量',
   'Power(W)':'單一顆元件的發熱瓦數 (TDP)',
   'Height(mm)':'元件距離 PCB 底部的垂直高度。公式：全域環溫 + (元件高度 × 0.03)',
   'Pad_L':'IC E-PAD 長度或 PA 封裝底部長度或元件散熱端的長度 (mm)','Pad_W':'IC E-PAD 寬度或 PA 封裝底部寬度或元件散熱端的寬度 (mm)',
-  'Thick(mm)':'熱需傳導穿過的 PCB 或銅塊厚度',
+  'Thick(mm)':'熱需傳導穿過的厚度。由參數控制台帶入：導熱方式 = Thermal Via 取「PCB 板厚度」、Copper Coin 取「銅塊厚度」；IC top／None 不穿板故不適用（顯示 —）',
   'Board_Type':'元件導熱到 HSK 表面的方式。Copper Coin＝銅塊穿板；Thermal Via＝導熱孔穿板；IC top＝從封裝上表面散熱（不穿板，R_int=0、接觸面積取 Pad_L×Pad_W）；None＝不計基板路徑。此欄由 AI-Thermal Tab2 的「主散熱路徑」推導',
   'TIM_Type':'元件底部與散熱器之間的 TIM。下方可再選「型號」：選了型號就改用 TIM 型號庫登錄的 k 與填縫厚度（型號庫在 AI-Thermal 工具維護），沒選型號則沿用參數控制台的 K/t。Board_Type = Copper Coin 的元件其 die-attach Solder 已內建於 R_int，此欄填 Grease 或 None 即可',
   'R_jc':'結點到殼的內部熱阻 (°C/W)','Limit(C)':'元件允許最高運作溫度'
@@ -1970,11 +1989,11 @@ function hasDerivedRow(arr){
 function thickCellHtml(row){
   const src=thickSourceOf(row);
   if(!src){
-    return '<td><span class="thick-na" title="'+_vEsc('導熱方式「'+((row&&row.Board_Type)||'未選')+'」不穿板 → 板厚不適用（值為 0，也不參與熱阻計算）')+'">—</span></td>';
+    return '<td data-col="Thick(mm)"><span class="thick-na" title="'+_vEsc('導熱方式「'+((row&&row.Board_Type)||'未選')+'」不穿板 → 板厚不適用（值為 0，也不參與熱阻計算）')+'">—</span></td>';
   }
   const v=parseFloat(G[src.key]);
   const shown=isFinite(v)?String(+v.toFixed(3)):'—';
-  return '<td><span class="thick-ref" title="'+_vEsc('由參數控制台的「'+src.label+'」帶入，所有 '+row.Board_Type+' 元件共用同一個值。要改請改參數控制台那一欄。')+'">'+_vEsc(shown)+'</span></td>';
+  return '<td data-col="Thick(mm)"><span class="thick-ref" title="'+_vEsc('由參數控制台的「'+src.label+'」帶入，所有 '+row.Board_Type+' 元件共用同一個值。要改請改參數控制台那一欄。')+'">'+_vEsc(shown)+'</span></td>';
 }
 
 /* ── 元件表的「導熱方式」欄 ─────────────────────────────────────
@@ -1989,7 +2008,7 @@ function boardTypeCellHtml(row,category,i,dis){
     const unknown=!BOARD_TYPES.includes(o);
     opts+='<option value="'+_vEsc(o)+'"'+(cur===o?' selected':'')+'>'+_vEsc(o)+(unknown?'（未知值）':'')+'</option>';
   });
-  return '<td><select style="min-width:110px;"'+derivedAttrs(row,'Board_Type')+dis+
+  return '<td data-col="Board_Type"><select style="min-width:110px;"'+derivedAttrs(row,'Board_Type')+dis+
          ' onchange="updateComp(\''+category+'\','+i+',\'Board_Type\',this.value)">'+opts+'</select></td>';
 }
 
@@ -2006,7 +2025,7 @@ function timCellHtml(row,category,i,dis){
     const legacy=!TIM_TYPES.includes(o);
     opts+='<option value="'+_vEsc(o)+'"'+(type===o?' selected':'')+'>'+_vEsc(o)+(legacy?'（已停用）':'')+'</option>';
   });
-  let h='<td class="tim-cell"><select style="min-width:110px;"'+dis+' onchange="updateComp(\''+category+'\','+i+',\'TIM_Type\',this.value)">'+opts+'</select>';
+  let h='<td class="tim-cell" data-col="TIM_Type"><select style="min-width:110px;"'+dis+' onchange="updateComp(\''+category+'\','+i+',\'TIM_Type\',this.value)">'+opts+'</select>';
   h+=timModelSelectHtml(row,category,i,dis);
   h+=timSourceNoteHtml(row);
   return h+'</td>';
@@ -2097,23 +2116,30 @@ function timMigratePad2(){
   alert('✅ 已將 '+hits.length+' 顆元件改為 Pad ＋型號「'+model+'」。\n\n請按「☁️ 儲存專案」寫回資料庫。');
 }
 
-function renderCompTable(arr,containerId,defaults,category){
-  // 📚 從資料庫快選：跨專案即時聚合（不再依賴 *_library）。
-  let lhtml='<div class="lib-section">';
+/* 新增元件列的分類名稱（按鈕上要看得出是在加哪一類元件） */
+const CAT_LABEL={rf:'RF 射頻元件',digital:'Digital 數位元件',pwr:'PWR 電源元件'};
+
+/* 表格下方的「新增元件」列：直接新增 或 從資料庫快選，兩個入口並排一行。
+   （快選原本在表格上方，離新增鈕很遠；兩者都是「加一顆元件」的入口，放一起才好找。）*/
+function addRowHtml(arr,category){
+  let h='<div class="add-row"><span class="add-row-label">新增元件：</span>';
+  h+='<button class="btn-add-direct" onclick="addComp(\''+category+'\')">➕ 直接新增 '+_vEsc(CAT_LABEL[category]||category.toUpperCase())+'</button>';
+  h+='<span class="add-row-or">或</span><span class="add-row-lib">📚 從資料庫快選：</span>';
   if(variantsCache===null){
-    const msg=variantsLoading?'載入中…':'（請先連線資料庫）';
-    lhtml+='<div style="display:flex;gap:8px;align-items:center;"><span style="font-weight:600;">📚 從資料庫快選：</span><select disabled><option>'+msg+'</option></select></div>';
-  } else {
+    h+='<select disabled><option>'+(variantsLoading?'載入中…':'（請先連線資料庫）')+'</option></select>';
+  }else{
     const vlist=(variantsCache[category]||[]);
     const present=new Set(arr.map(r=>r.Component));
     let vopts='';
     vlist.forEach((v,vi)=>{ if(present.has(v.name))return; vopts+='<option value="'+vi+'">'+_vEsc(v.name)+' - '+_vEsc(String(v.power))+'W - '+_vEsc(v.originProjectName)+'</option>'; });
-    lhtml+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span style="font-weight:600;">📚 從資料庫快選：</span>';
-    lhtml+='<select id="lib_sel_'+category+'"><option value="">'+(vopts?'（請選擇：名稱・瓦數・來源專案）':'（目前無可新增的元件）')+'</option>'+vopts+'</select>';
-    lhtml+='<button class="btn btn-sm btn-primary" onclick="addFromVariant(\''+category+'\')">➕ 加入</button>';
-    lhtml+='</div>';
+    h+='<select id="lib_sel_'+category+'"><option value="">'+(vopts?'（請選擇：名稱・瓦數・來源專案）':'（目前無可新增的元件）')+'</option>'+vopts+'</select>';
+    h+='<button class="btn btn-sm btn-primary" onclick="addFromVariant(\''+category+'\')">➕ 加入</button>';
   }
-  lhtml+='</div>';
+  return h+'</div>';
+}
+
+function renderCompTable(arr,containerId,defaults,category){
+  let lhtml='';
 
   // Power summary
   let pw=arr.reduce((s,r)=>s+(r._excluded?0:r['Power(W)']*r.Qty),0);
@@ -2122,8 +2148,8 @@ function renderCompTable(arr,containerId,defaults,category){
   if(hasDerivedRow(arr))lhtml+='<p class="derived-legend"><span class="derived-swatch"></span> 左側藍邊的欄位由 <b>AI-Thermal</b> 推導（導熱方式／Pad 尺寸來自 Tab2「主散熱路徑」，Rjc 來自熱阻表的 θJC）。在這裡改仍然算得到，但下次從 AI-Thermal 存檔時會被覆寫；滑鼠停在欄位上可看來源。</p>';
 
   // Table
-  lhtml+='<table class="comp-table"><thead><tr>';
-  COLS.forEach(c=>lhtml+='<th title="'+COL_TIPS[c]+'">'+COL_LABELS[c]+'</th>');
+  lhtml+='<div class="comp-table-wrap"><table class="comp-table"><thead><tr>';
+  COLS.forEach(c=>lhtml+='<th data-col="'+c+'" title="'+COL_TIPS[c]+'">'+COL_LABELS[c]+'</th>');
   lhtml+='<th>操作</th></tr></thead><tbody>';
   arr.forEach((row,i)=>{
     let excl=row._excluded;
@@ -2139,10 +2165,10 @@ function renderCompTable(arr,containerId,defaults,category){
         let badge=refLocked
           ? '<div style="font-size:0.72rem;color:#b45309;margin-top:3px;">↩ 參照自 '+_vEsc(refOrigin)+' <button class="btn btn-sm" style="padding:1px 6px;font-size:0.7rem;" title="解除後可自行修改瓦數" onclick="detachRef(\''+category+'\','+i+')">🔓 解除參照</button></div>'
           : (refOrigin?'<div style="font-size:0.72rem;color:#9ca3af;margin-top:3px;">曾參照自 '+_vEsc(refOrigin)+'</div>':'');
-        lhtml+='<td><input type="text" value="'+_vEsc(row[col]||'')+'"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">'+badge+'</td>';
+        lhtml+='<td data-col="Component"><input type="text" value="'+_vEsc(row[col]||'')+'"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">'+badge+'</td>';
       }
-      else if(col==='Power(W)'&&refLocked){lhtml+='<td><span title="瓦數已鎖定，請先按「解除參照」" style="display:inline-block;padding:4px 8px;color:#6b7280;background:#f3f4f6;border-radius:4px;white-space:nowrap;">'+(row[col]!=null?row[col]:'')+' 🔒</span></td>';}
-      else{let extraStyle=col==='Power(W)'?' style="width:75%;min-width:75px;"':'';lhtml+='<td><input type="number"'+extraStyle+derivedAttrs(row,col)+' value="'+(row[col]||0)+'" step="any"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',parseFloat(this.value)||0)"></td>';}
+      else if(col==='Power(W)'&&refLocked){lhtml+='<td data-col="Power(W)"><span title="瓦數已鎖定，請先按「解除參照」" style="display:inline-block;padding:4px 8px;color:#6b7280;background:#f3f4f6;border-radius:4px;white-space:nowrap;">'+(row[col]!=null?row[col]:'')+' 🔒</span></td>';}
+      else{lhtml+='<td data-col="'+col+'"><input type="number"'+derivedAttrs(row,col)+' value="'+(row[col]||0)+'" step="any"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',parseFloat(this.value)||0)"></td>';}
     });
     lhtml+='<td style="white-space:nowrap;">';
     lhtml+='<button class="btn btn-sm eye-btn'+(excl?' excluded':'')+'" title="'+(excl?'顯示（納入計算）':'隱藏（排除計算）')+'" onclick="toggleComp(\''+category+'\','+i+')">👁️</button> ';
@@ -2150,8 +2176,8 @@ function renderCompTable(arr,containerId,defaults,category){
     lhtml+='<button class="btn btn-sm btn-primary" title="複製" onclick="copyComp(\''+category+'\','+i+')">📋</button>';
     lhtml+='</td></tr>';
   });
-  lhtml+='</tbody></table>';
-  lhtml+='<button class="btn btn-success" style="margin-top:8px;" onclick="addComp(\''+category+'\')">➕ 新增元件</button>';
+  lhtml+='</tbody></table></div>';
+  lhtml+=addRowHtml(arr,category);
   document.getElementById(containerId).innerHTML=lhtml;
 }
 
