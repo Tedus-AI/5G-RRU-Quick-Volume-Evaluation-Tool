@@ -87,13 +87,49 @@
   但既有專案裡的值因 `_buildProjectFields` 的 merge 而**保留**。換專案時
   `clearLegacyTimGlobals()` 會清掉 `G` 裡沒有輸入框的舊參數，免得拿 A 案的殘留值算 B 案。
 
+### `Board_Type`（導熱方式）與 AI-Thermal 的「主散熱路徑」同一組詞彙
+
+`BOARD_TYPES = ['Thermal Via','Copper Coin','IC top','None']`，與 AI-Thermal Tab2「主散熱路徑」
+的選項同名；它存檔時把 `spec.heatDirection` 直接寫成本欄的值，並同時決定 `Pad_L`/`Pad_W`
+取 E-PAD 大小（Thermal Via）還是元件大小（Copper Coin／IC top）。
+
+| `Board_Type` | `R_int` | `R_TIM` 的接觸面積 |
+|---|---|---|
+| `Copper Coin` | 銅塊 + die-attach solder | 銅塊面積 `Coin_L×Coin_W` |
+| `Thermal Via` | 導熱孔（`K_Via`／`Via_Eff`）| `(Pad_L+Thick)×(Pad_W+Thick)` 擴散面積 |
+| `IC top` | **0**（不穿板）| **`Pad_L×Pad_W`**（元件上表面積，不加板厚）|
+| `None` | 0 | `(Pad_L+Thick)×(Pad_W+Thick)`（沿用舊行為）|
+
+⚠ `IC top` 是後來補的：在它之前 AI-Thermal 的 `IC top` 被壓成 `None`，於是熱從封裝上表面出去
+的元件也吃到「加了板厚的擴散面積」，**高估接觸面積＝低估 `R_TIM`**（樂觀）。兩邊同名之後，
+`calcThermalResistance` 對 `IC top` 令 `bl=bw=0`，`ta` 退回 `pa`。
+
+值不在 `BOARD_TYPES` 裡時（對方工具寫進未知值），下拉會臨時補上該選項並標「（未知值）」，
+不可讓瀏覽器把它靜默顯示成清單第一項、使用者一碰就改掉資料。
+
+### AI-Thermal 推導欄位的來源標記
+
+`Board_Type`／`Pad_L`／`Pad_W`（Tab2 主散熱路徑）與 `R_jc`（Tab1 熱阻表的 θJC）由 AI-Thermal
+推導。這些欄位在本工具仍可編輯，但下次從 AI-Thermal 存檔時會被覆寫 → 元件清單以
+**欄位左側藍邊＋tooltip**（`derivedAttrs`／`.derived-src`）標出來源，表格上方給一行圖例。
+判斷依據是 AI-Thermal 寫在元件物件上的內部標記，本工具**只讀不寫**：
+
+| 標記 | 意義 |
+|---|---|
+| `_bt_from = 'heatDirection'` | `Board_Type` 來自 Tab2 主散熱路徑 |
+| `_pad_from = 'epadSize' / 'heatSourceSize' / 'none'` | `Pad_L`/`Pad_W` 的來源尺寸 |
+| `_rjc_from = 'JC_bot' / 'JC_top'` | `R_jc` 取自熱阻表的哪一筆 θJC |
+
+標記是底線開頭的內部欄位，**不列入 carry 白名單**（快選複製出來的元件不帶標記，
+等 AI-Thermal 下次推導時再標）。
+
 ### 每元件欄位的歸屬（同一顆元件物件由兩個工具共寫）
 
 | 欄位 | 誰有畫面可編輯 |
 |---|---|
 | `Component`、`Qty`、`Power(W)`、`Limit(C)` | 兩邊 |
 | `Height(mm)`、`Thick(mm)` | 只有 5G-RRU（AI-Thermal 一律不寫這兩個 key）|
-| `Board_Type`、`Pad_L`、`Pad_W`、`R_jc`、`TIM_Model`、`TIM_Type` | 5G-RRU 可編輯；AI-Thermal 存檔時由 Tab1/Tab2 推導後覆寫 |
+| `Board_Type`、`Pad_L`、`Pad_W`、`R_jc`、`TIM_Model`、`TIM_Type` | 5G-RRU 可編輯（標藍邊提醒會被覆寫）；AI-Thermal 存檔時由 Tab1/Tab2 推導後覆寫 |
 | `Type`、`Power_RT(W)`、`TV_ID_mil`、`TV_Qty`、`Temp_Sensor`、`Local_Qty`、`Remote_Qty`、`note`、`Rth`、`SpecFile` | 只有 AI-Thermal（本工具不顯示但原樣保留）|
 
 ⚠ **「從資料庫快選」的 carry 白名單兩邊都必須列全上表所有欄位**（本工具的 `VARIANT_CARRY`
