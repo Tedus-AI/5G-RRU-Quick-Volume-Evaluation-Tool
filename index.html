@@ -107,6 +107,24 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 /* 欄位多時表格會比容器寬：給它自己的橫向捲軸，才不會把「操作」欄切掉 */
 .comp-table-wrap{overflow-x:auto;}
 /* 新增元件列：「直接新增」與「從資料庫快選」並排在表格下方（原本快選在表格上方） */
+/* 參數控制台的「TIM 型號庫」按鈕（取代原本 6 個 K/t 輸入欄） */
+.tim-lib-btn{width:100%;margin-top:6px;padding:11px 12px;border:none;border-radius:10px;cursor:pointer;
+  background:linear-gradient(135deg,#0ea5e9,#22d3ee);color:#07293c;font-weight:800;font-size:0.95rem;
+  box-shadow:0 4px 14px rgba(14,165,233,0.35);transition:filter .15s,box-shadow .15s;}
+.tim-lib-btn:hover{filter:brightness(1.08);box-shadow:0 6px 20px rgba(14,165,233,0.5);}
+.tim-lib-hint{margin-top:7px;font-size:0.72rem;color:#94a3b8;line-height:1.55;}
+.tim-lib-hint b{color:#cbd5e1;}
+.tim-lib-modal{width:820px;}
+.tim-lib-modal .tlv-note{margin:0 0 14px;color:#475569;font-size:0.85rem;line-height:1.6;}
+.tim-lib-modal .tlv-wrap{max-height:46vh;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;}
+.tim-lib-modal table{width:100%;border-collapse:collapse;font-size:0.82rem;}
+.tim-lib-modal th{position:sticky;top:0;background:#f1f5f9;color:#475569;padding:9px 8px;text-align:center;white-space:nowrap;}
+.tim-lib-modal td{padding:8px;border-top:1px solid #e2e8f0;text-align:center;color:#1e293b;}
+.tim-lib-modal td.tlv-model{font-weight:700;color:#0f172a;}
+.tim-lib-modal .tlv-gap{color:#0550ae;font-weight:700;}
+.tim-lib-modal .tlv-empty{padding:26px;text-align:center;color:#64748b;font-size:0.9rem;line-height:1.7;}
+.cloud-modal .cloud-close.tim-lib-go{background:#0ea5e9;color:#fff;text-decoration:none;display:inline-flex;align-items:center;}
+.cloud-modal .cloud-close.tim-lib-go:hover{background:#0284c7;}
 .add-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;padding:10px 12px;
   background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;}
 .add-row-label{font-weight:600;color:#475569;font-size:0.85rem;}
@@ -455,9 +473,8 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
   <div class="section-body">
     <div class="row2"><div><label>Via 等效 K 值</label><input type="number" id="K_Via" step="1" onchange="recalc()"></div><div><label>Via 製程係數</label><input type="number" id="Via_Eff" step="0.05" onchange="recalc()"></div></div>
     <label style="margin-top:8px;color:var(--primary-light);">🔷 熱介面材料 (TIM)</label>
-    <div class="row2"><div><label>K (Putty)</label><input type="number" id="K_Putty" step="0.1" onchange="recalc()"></div><div><label>t (Putty)</label><input type="number" id="t_Putty" step="0.1" onchange="recalc()"></div></div>
-    <div class="row2"><div><label>K (Pad)</label><input type="number" id="K_Pad" step="0.1" onchange="recalc()"></div><div><label>t (Pad)</label><input type="number" id="t_Pad" step="0.1" onchange="recalc()"></div></div>
-    <div class="row2"><div><label>K (Grease)</label><input type="number" id="K_Grease" step="0.1" onchange="recalc()"></div><div><label>t (Grease)</label><input type="number" id="t_Grease" step="0.01" onchange="recalc()"></div></div>
+    <button class="tim-lib-btn" onclick="timLibViewOpen()" title="檢視全工具共用的 TIM 型號庫（k 值與填縫厚度）。本工具唯讀，新增／修改請到 AI-Thermal">🧪 TIM 型號庫</button>
+    <div class="tim-lib-hint">每顆元件的 k 與填縫厚度由它選用的<b>型號</b>決定（型號在 <b>AI-Thermal</b> 的元件清單選）。本工具<b>只能檢視</b>，新增／修改型號請到 AI-Thermal。</div>
     <label style="margin-top:8px;color:var(--primary-light);">🔘 Solder (錫片)</label>
     <div class="row2"><div><label>K (錫片)</label><input type="number" id="K_Solder" step="1" onchange="recalc()"></div><div><label>t (錫片)</label><input type="number" id="t_Solder" step="0.05" onchange="recalc()"></div></div>
     <label>錫片有效面積率 (Voiding)</label><input type="number" id="Voiding" step="0.05" min="0.1" max="1" placeholder="0.5 ~ 1.0 (建議 0.75)" onchange="recalc()">
@@ -510,6 +527,20 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
         <h3>📂 專案列表</h3>
         <div id="cloudList"></div>
         <button class="cloud-close" onclick="closeCloudModal()">關閉</button>
+      </div>
+    </div>
+    <div class="cloud-modal-overlay" id="timLibModal" onclick="if(event.target===this)timLibViewClose()">
+      <div class="cloud-modal tim-lib-modal">
+        <h3>🧪 TIM 型號庫（唯讀）</h3>
+        <p class="tlv-note">這份型號庫<b>全工具共用、不屬於任何專案</b>，維護介面在 <b>AI-Thermal</b>。
+          本工具只讀不寫 —— 要新增或修改型號，請到 AI-Thermal 的 Tab2「🧪 TIM 型號庫」。<br>
+          算 <code>R_TIM</code> 用的是 <b>k</b> 與 <b>填縫厚度</b>（壓縮後實際填在縫隙裡的厚度）；
+          「預設厚度」是材料原始片厚，僅供規格書參考。</p>
+        <div id="timLibViewBody"></div>
+        <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;flex-wrap:wrap;">
+          <a class="cloud-close tim-lib-go" href="https://tedus-ai.github.io/AI-Thermal-pad-and-stud-size-Evaluation-Tool/" target="_blank" rel="noopener">↗ 前往 AI-Thermal 維護型號庫</a>
+          <button class="cloud-close" onclick="timLibViewClose()">關閉</button>
+        </div>
       </div>
     </div>
     <div class="cloud-modal-overlay" id="copyModal">
@@ -1259,7 +1290,49 @@ function timLibListByType(timType){
     .sort((a,b) => String(a.model||'').localeCompare(String(b.model||'')));
 }
 
-/* 參數控制台有 K_/t_ 可查的 TIM 類型（None 不需要型號也不需要參數） */
+/* ── TIM 型號庫唯讀檢視（參數控制台的按鈕） ─────────────────────
+   型號庫是全工具共用的頂層 collection，維護介面只在 AI-Thermal；本工具唯讀，
+   所以這裡只把內容列出來，並給一個前往 AI-Thermal 的連結。 */
+async function timLibViewOpen(){
+  const m=document.getElementById('timLibModal');if(m)m.classList.add('active');
+  const body=document.getElementById('timLibViewBody');
+  if(body)body.innerHTML='<div class="tlv-empty">讀取中…</div>';
+  try{ await timLibLoad(true); }catch(e){ console.warn('[timLib] 讀取失敗：',e); }
+  renderTimLibView();
+  recalc();   // 型號庫可能剛被 AI-Thermal 改過 → 讓元件的 k/t 跟著更新
+}
+
+function timLibViewClose(){
+  const m=document.getElementById('timLibModal');if(m)m.classList.remove('active');
+}
+
+function renderTimLibView(){
+  const body=document.getElementById('timLibViewBody');if(!body)return;
+  if(typeof dbAdapter==='undefined'||!dbAdapter.isReady()){
+    body.innerHTML='<div class="tlv-empty">資料庫尚未連線，讀不到型號庫。<br>'+
+      (typeof dbAdapter!=='undefined'&&dbAdapter.isSharePointMode&&dbAdapter.isSharePointMode()
+        ?'請先按右上角「🔑 登入 SharePoint」。':'請先開啟本機資料庫檔案。')+'</div>';
+    return;
+  }
+  const list=timLibListByType(null);
+  if(!list.length){
+    body.innerHTML='<div class="tlv-empty">型號庫目前是空的。<br>請到 <b>AI-Thermal</b> 的 Tab2「🧪 TIM 型號庫」新增型號（填 k 值與填縫厚度），這裡就看得到。</div>';
+    return;
+  }
+  const order={Grease:0,Pad:1,Putty:2};
+  list.sort((a,b)=>(order[a.timType]??9)-(order[b.timType]??9)||String(a.model||'').localeCompare(String(b.model||'')));
+  let h='<div class="tlv-wrap"><table><thead><tr>'+
+    '<th>型號</th><th>TIM 類型</th><th>k (W/m·K)</th><th>填縫厚度 (mm)</th><th>預設厚度 (mm)</th><th>廠商</th><th>備註</th>'+
+    '</tr></thead><tbody>';
+  list.forEach(r=>{
+    h+='<tr><td class="tlv-model">'+_vEsc(r.model||'')+'</td><td>'+_vEsc(r.timType||'')+'</td>'+
+       '<td>'+_timNum(r.k)+'</td><td class="tlv-gap">'+_timNum(r.gapThickness)+'</td>'+
+       '<td>'+_timNum(r.thickness)+'</td><td>'+_vEsc(r.vendor||'')+'</td><td>'+_vEsc(r.note||'')+'</td></tr>';
+  });
+  body.innerHTML=h+'</tbody></table></div><div style="margin-top:8px;font-size:0.78rem;color:#64748b;">共 '+list.length+' 筆型號。</div>';
+}
+
+/* 沒選型號時的 fallback：專案 global_params 裡的 K_/t_（參數控制台已不再提供編輯欄位） */
 const TIM_PARAM_TYPES = ['Grease','Pad','Putty'];
 
 /* 已停用／從未可選的舊類型 → 仍沿用它原本吃的 global_params，維持既有計算結果不變 */
@@ -1294,10 +1367,10 @@ function resolveTim(row, g){
             detail:'k=' + _timNum(k) + ' W/m·K、填縫厚度 t=' + _timNum(t) + ' mm'
                    + '（TIM 型號庫' + (rec.vendor ? '｜' + rec.vendor : '') + '）'};
         }
-        warn = '型號「' + model + '」在型號庫裡缺 k 或填縫厚度 → 暫時改用參數控制台的值';
+        warn = '型號「' + model + '」在型號庫裡缺 k 或填縫厚度 → 暫時改用專案預設值';
       }else{
-        warn = timLibLoaded ? '型號「' + model + '」已不在型號庫 → 暫時改用參數控制台的值'
-                            : '型號庫尚未載入（資料庫未連線）→ 暫時改用參數控制台的值';
+        warn = timLibLoaded ? '型號「' + model + '」已不在型號庫 → 暫時改用專案預設值'
+                            : '型號庫尚未載入（資料庫未連線）→ 暫時改用專案預設值';
       }
     }else{
       warn = '型號「' + model + '」與 TIM 類型「' + (type || '未選') + '」不相符 → 忽略型號';
@@ -1307,11 +1380,12 @@ function resolveTim(row, g){
   if(TIM_PARAM_TYPES.includes(type)){
     const k = parseFloat(g['K_' + type]), t = parseFloat(g['t_' + type]);
     if(k > 0 && t > 0){
-      return {k, t, src:'global', label:'參數控制台 K_' + type + '／t_' + type,
-        detail:'k=' + _timNum(k) + ' W/m·K、t=' + _timNum(t) + ' mm（參數控制台，非型號）', warn};
+      return {k, t, src:'global', label:'專案預設值 K_' + type + '／t_' + type,
+        detail:'k=' + _timNum(k) + ' W/m·K、t=' + _timNum(t) + ' mm（此專案 global_params 的預設值，未選型號）'+
+               '。要用真實型號的值，請到 AI-Thermal 為這顆元件選一個 TIM 型號', warn};
     }
-    return {k:1, t:0, src:'missing', label:'參數控制台缺 K_' + type + '／t_' + type,
-      detail:'R_TIM 以 0 計入', warn:'參數控制台的 K_' + type + '／t_' + type + ' 沒有有效值 → R_TIM 以 0 計入（低估熱阻）'};
+    return {k:1, t:0, src:'missing', label:'查不到 K_' + type + '／t_' + type,
+      detail:'R_TIM 以 0 計入', warn:'此專案沒有 K_' + type + '／t_' + type + ' 可用 → R_TIM 以 0 計入（低估熱阻）。請到 AI-Thermal 為這顆元件選一個 TIM 型號'};
   }
 
   const lg = TIM_LEGACY_PARAM[type];
@@ -1640,7 +1714,7 @@ function toggleSection(el){el.classList.toggle('collapsed');el.nextElementSiblin
 function toggleSAMode(){let m=document.querySelector('input[name="sa_mode"]:checked').value;document.getElementById('sa-sweep-panel').style.display=m==='sweep'?'':'none';document.getElementById('sa-tornado-panel').style.display=m==='tornado'?'':'none';}
 
 function readGlobals(){
-  ['T_amb','Margin','L_pcb','W_pcb','t_PCB','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Coin_T_Setting','K_Coin','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(id=>{let el=document.getElementById(id);if(el&&el.tagName!=='SELECT')G[id]=parseFloat(el.value)||0;});
+  ['T_amb','Margin','L_pcb','W_pcb','t_PCB','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Coin_T_Setting','K_Coin','Gap','Fin_t','K_Via','Via_Eff','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(id=>{let el=document.getElementById(id);if(el&&el.tagName!=='SELECT')G[id]=parseFloat(el.value)||0;});
   G.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;G.Slope=0.03;
   if(!G.Draft_Angle||G.Draft_Angle<0.1)G.Draft_Angle=1.25;
   // 各製程自訂係數（勾選狀態 + η_process + K_FIN）
@@ -2496,17 +2570,25 @@ function runTornado(){
 // PROJECT I/O
 // =====================================================
 function loadProject(){document.getElementById('fileInput').click();}
-/* 換專案時清掉「參數控制台已經沒有輸入框」的舊參數（目前只有 K_Pad2/t_Pad2）。
-   readGlobals 只會從畫面上的欄位刷新 G，這些 key 沒有欄位 → 不清會沿用上一個專案的殘留值，
-   拿 A 案的 K_Pad2 去算 B 案的舊 Pad2 元件。 */
-function clearLegacyTimGlobals(){
-  Object.values(TIM_LEGACY_PARAM).forEach(x=>{
-    [x.k,x.t].forEach(k=>{ if(!document.getElementById(k)) delete G[k]; });
+/* 換專案前重設「參數控制台沒有輸入欄」的全域參數（TIM 的 K_/t_、舊的 K_Pad2… 等）。
+   readGlobals 只從畫面上的欄位刷新 G，這些 key 沒有欄位 → 不重設就會沿用上一個專案的殘留值，
+   拿 A 案的 K_Pad 去算 B 案。重設之後由專案自己的 global_params 蓋回來。
+   ⚠ 有出廠預設的 key（K_Pad/t_Pad…）一律「退回預設值」而不是 delete：
+   專案若沒存過這個 key，delete 會讓 resolveTim 的 fallback 落空 → R_TIM 以 0 計入
+   （低估熱阻＝樂觀），比沿用舊值更危險。純舊參數（K_Pad2 之類，沒有出廠預設）才整個清掉。 */
+function clearGlobalsWithoutInputs(){
+  const keys=PROJECT_GLOBAL_KEYS.concat(
+    Object.values(TIM_LEGACY_PARAM).reduce((a,x)=>a.concat([x.k,x.t]),[]));
+  const def=(DEFAULT_CONFIG&&DEFAULT_CONFIG.global_params)||{};
+  keys.forEach(k=>{
+    if(document.getElementById(k))return;                  // 畫面上有欄位 → readGlobals 會刷新
+    if(Object.prototype.hasOwnProperty.call(def,k))G[k]=def[k];   // 有出廠預設 → 退回預設
+    else delete G[k];                                      // 純舊參數 → 清掉
   });
 }
 
 function handleFileLoad(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=function(ev){try{let d=JSON.parse(ev.target.result);
-  clearLegacyTimGlobals();
+  clearGlobalsWithoutInputs();
   if(d.global_params){for(let k in d.global_params){G[k]=d.global_params[k];let el=document.getElementById(k);if(el){if(el.tagName==='SELECT')el.value=d.global_params[k];else el.value=d.global_params[k];}}}
   if(d.rf_data)components.rf=d.rf_data;if(d.digital_data)components.digital=d.digital_data;if(d.pwr_data)components.pwr=d.pwr_data;
   applyFinCustomUI();migrateThickGlobals(d.global_params);recalc();alert('✅ 專案載入成功！');}catch(err){alert('Error: '+err.message);}};r.readAsText(f);e.target.value='';}
@@ -2624,11 +2706,12 @@ async function cloudLoadOne(docId){
     if(!d){alert('專案不存在');return;}
     // 專案載入時重讀型號庫：AI-Thermal 端可能剛新增/改過型號，k 與填縫厚度要吃到最新值
     try{ await timLibLoad(true); }catch(e){ console.warn('[timLib] reload failed:', e); }
-    clearLegacyTimGlobals();
-    migrateThickGlobals(d.global_params);   // 板厚：專案沒存過全域值就回推並統一
+    clearGlobalsWithoutInputs();
     if(d.global_params){for(let k in d.global_params){G[k]=d.global_params[k];let el=document.getElementById(k);if(el){el.value=d.global_params[k];}}}
     if(d.rf_data)components.rf=d.rf_data;if(d.digital_data)components.digital=d.digital_data;if(d.pwr_data)components.pwr=d.pwr_data;
     if(d.project_name)document.getElementById('cloudProjectName').value=d.project_name;
+    // ⚠ 板厚遷移一定要在「元件已換成這個專案的」之後跑：它要回推的是這個專案的板厚
+    migrateThickGlobals(d.global_params);
     applyFinCustomUI();closeCloudModal();recalc();alert('✅ 專案「'+(d.project_name||docId)+'」已載入！');
   }catch(e){alert('❌ 載入失敗: '+e.message);}
 }

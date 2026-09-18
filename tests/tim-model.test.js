@@ -245,12 +245,13 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
     // 全新專案 → 我們不主動寫這兩個 key
     const fresh = _buildProjectFields('T', null);
     G.K_Pad2 = 9; G.t_Pad2 = 9; G.K_Solder = 58;
-    clearLegacyTimGlobals();
+    clearGlobalsWithoutInputs();
     return { noInput, notInKeys,
       kept: keep.global_params.K_Pad2 === 7.5 && keep.global_params.t_Pad2 === 1.0,
       keptSibling: keep.global_params.ai_thermal_only_key === 'keep-me',
       freshHasNone: !('K_Pad2' in fresh.global_params) && !('t_Pad2' in fresh.global_params),
-      clearedLegacy: !('K_Pad2' in G) && !('t_Pad2' in G), keptSolder: G.K_Solder === 58 };
+      clearedLegacy: !('K_Pad2' in G) && !('t_Pad2' in G), keptSolder: G.K_Solder === 58,
+      timBackToDefault: G.K_Pad === 7.5 && G.t_Pad === 1.7 };
   });
   ok('參數控制台不再有 K_Pad2 / t_Pad2 欄位', d1.noInput);
   ok('PROJECT_GLOBAL_KEYS 不再含 K_Pad2 / t_Pad2', d1.notInKeys);
@@ -258,6 +259,7 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   ok('sibling tool 專屬的 global key 仍保留（shallow merge 不吃掉別人的欄位）', d1.keptSibling, d1);
   ok('新專案不寫入 K_Pad2 / t_Pad2', d1.freshHasNone, d1);
   ok('換專案時清掉沒有輸入框的舊參數，但不動 K_Solder', d1.clearedLegacy && d1.keptSolder, d1);
+  ok('換專案時 TIM 的 K_/t_ 退回出廠預設（不是被 delete 掉 → R_TIM 不會變 0）', d1.timBackToDefault, d1);
 
   ok('頁面無 JS 例外', errors.length === 0, errors.slice(0, 3));
 

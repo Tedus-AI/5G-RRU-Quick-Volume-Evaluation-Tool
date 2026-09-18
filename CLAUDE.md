@@ -67,11 +67,31 @@
 3. 舊類型（`Pad2` / `Solder`）→ `TIM_LEGACY_PARAM` 指到原本吃的 global key，維持既有計算值。
 
 `resolveTim` 會把來源回傳到列上（`TIM_Src` / `TIM_SrcLabel` / `TIM_SrcDetail` / `TIM_Warn`），
-元件表每列標「k=… · t=… ← 型號 X／參數控制台」，Tab1 的 `R_TIM` 標 ◆（來自型號）或 ⚠（來源有問題）。
+元件表每列標「k=… · t=… ← 型號 X／專案預設值」，Tab1 的 `R_TIM` 標 ◆（來自型號）或 ⚠（來源有問題）。
 
 ⚠ **本工具絕不寫入 `tim_library`**（維護介面只在 AI-Thermal Tab2 的「🧪 TIM 型號庫」）。
-載入時機：`loadLibraryFromLocal()`（DB 連線／取得鎖／換 DB 檔）與 `cloudLoadOne()`（載入專案）
-各 `timLibLoad(true)` 重讀一次，讀完 `recalc()`。
+載入時機：`loadLibraryFromLocal()`（DB 連線／取得鎖／換 DB 檔）、`cloudLoadOne()`（載入專案）
+與 `timLibViewOpen()`（按下型號庫按鈕）各 `timLibLoad(true)` 重讀一次，讀完 `recalc()`。
+
+#### 參數控制台的 TIM 區塊 ＝ 一顆唯讀的「🧪 TIM 型號庫」按鈕
+
+`K_Putty`/`t_Putty`/`K_Pad`/`t_Pad`/`K_Grease`/`t_Grease` **六個輸入欄已從參數控制台移除**，
+改成一顆按鈕開出唯讀檢視（`timLibViewOpen` → `renderTimLibView` → `#timLibModal`），列出型號／
+類型／`k`／填縫厚度／預設厚度／廠商／備註，並給一個前往 AI-Thermal 的連結。k 值屬於「材料」
+不屬於「專案」，在兩個工具各有一份可編輯的 k 會立刻對不起來 → **編輯入口只留 AI-Thermal 一個**。
+
+規則：
+
+- **視窗裡不可出現任何 input／select／新增／儲存／刪除鍵**，也不可呼叫 `setDoc`/`writeBatch`/
+  `deleteDoc`。要改型號一律指路到 AI-Thermal。
+- **六個 key 仍留在 `PROJECT_GLOBAL_KEYS`、仍由 `_buildProjectFields` 寫回 `global_params`**：
+  它們是沒選型號時的 fallback（`resolveTim` 第 2 條）。少了它們 → `R_TIM` 以 0 計入 ＝ 低估熱阻。
+- 相對地 `readGlobals` **不再**讀這六個 id（畫面上沒有欄位可讀）；值的來源是
+  `DEFAULT_CONFIG.global_params` 的出廠預設 ＋ 載入專案時的 `global_params`。
+- 換專案時 `clearGlobalsWithoutInputs()`（原 `clearLegacyTimGlobals`）處理所有「沒有輸入框」的
+  global key：**有出廠預設的退回預設值，沒有出廠預設的（`K_Pad2` 之類）才 `delete`**。
+  對這六個 key 不可以 `delete` —— 專案若沒存過該 key，fallback 會落空而靜默把 `R_TIM` 算成 0。
+- 開視窗會 `timLibLoad(true)` ＋ `recalc()`：AI-Thermal 剛改過的 k 要立刻反映到元件表。
 
 ### `Pad2` 已停用（改用「`Pad` ＋型號」）
 
@@ -85,7 +105,8 @@
   型號本身要先在 AI-Thermal 的型號庫建好（本工具唯讀）。
 - `K_Pad2` / `t_Pad2` 已從參數控制台與 `PROJECT_GLOBAL_KEYS` 移除：不再由本工具寫入，
   但既有專案裡的值因 `_buildProjectFields` 的 merge 而**保留**。換專案時
-  `clearLegacyTimGlobals()` 會清掉 `G` 裡沒有輸入框的舊參數，免得拿 A 案的殘留值算 B 案。
+  `clearGlobalsWithoutInputs()` 會清掉 `G` 裡沒有輸入框、也沒有出廠預設的舊參數，
+  免得拿 A 案的殘留值算 B 案（有出廠預設的則退回預設，見上一節）。
 
 ### `Board_Type`（導熱方式）與 AI-Thermal 的「主散熱路徑」同一組詞彙
 
