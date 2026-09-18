@@ -66,8 +66,11 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   ok('IC top 的 R_TIM 以 Pad_L×Pad_W 計算', near(b.icTop.R_TIM, b.expectIcTop, 1e-12), b);
   ok('IC top 的 R_int = 0（不穿板）', b.icTop.R_int === 0, b.icTop.R_int);
   ok('IC top 的 Base_L/Base_W = 0（無基板擴散）', b.icTop.Base_L === 0 && b.icTop.Base_W === 0, b.icTop);
-  ok('比舊的 None 更保守（面積小 → R_TIM 大）', b.icTop.R_TIM > b.asNone.R_TIM, [b.icTop.R_TIM, b.asNone.R_TIM]);
-  ok('舊的 None 行為未被改動（仍是 (Pad+Thick)² 面積）', near(b.asNone.R_TIM, b.expectNone, 1e-12), b);
+  // 「板厚連動」那次改動之後 None 也不吃板厚了（該欄在畫面上反灰＝不適用），
+  // 所以 None 與 IC top 一致：R_int=0、接觸面積 = Pad_L×Pad_W，
+  // 不再是舊的 (Pad+Thick)² 擴散面積（那會高估面積＝低估 R_TIM）。
+  ok('None 與 IC top 一致（都不吃板厚）', near(b.asNone.R_TIM, b.expectIcTop, 1e-12), b);
+  ok('None 比舊公式保守（不再用 (Pad+Thick)² 面積）', b.asNone.R_TIM > b.expectNone, [b.asNone.R_TIM, b.expectNone]);
 
   console.log('\n[C] 其他導熱方式無回歸');
   const c = await page.evaluate(() => {
