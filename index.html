@@ -11,7 +11,11 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 <script src="https://alcdn.msauth.net/browser/2.38.2/js/msal-browser.min.js"></script>
 <style>
-:root{--primary:#007CF0;--primary-light:#00DFD8;--sidebar-bg:#1e293b;--sidebar-text:#e2e8f0;--card-shadow:0 4px 6px rgba(0,0,0,0.1);--danger:#e74c3c;--warning:#f39c12;--success:#2ecc71;--info:#3498db;}
+:root{--primary:#007CF0;--primary-light:#00DFD8;--sidebar-bg:#1e293b;--sidebar-text:#e2e8f0;--card-shadow:0 4px 6px rgba(0,0,0,0.1);--danger:#e74c3c;--warning:#f39c12;--success:#2ecc71;--info:#3498db;
+  /* 表頭色票：三張表（元件清單／詳細分析／型號庫）共用一組值，改一次就全部同步 */
+  --th-bg:#1e3a5f;--th-bg2:#16304e;--th-fg:#f8fafc;--th-accent:#00DFD8;
+  /* 專案工具列：所有控制項共用的高度，換高度只要改這一個值 */
+  --io-h:36px;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f5f7fa;display:flex;min-height:100vh;}
 .sidebar{width:340px;min-width:340px;background:var(--sidebar-bg);color:var(--sidebar-text);padding:20px;overflow-y:auto;height:100vh;position:sticky;top:0;}
@@ -61,15 +65,39 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .main{flex:1;padding:25px 30px;overflow-y:auto;min-width:0;}
 .header{background:linear-gradient(135deg,var(--primary),var(--primary-light));padding:45px 30px 20px;border-radius:12px;color:#fff;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:15px;position:relative;}
 .header h1{font-family:"Nunito",sans-serif;font-size:1.8rem;font-weight:900;}.header .subtitle{font-size:0.9rem;opacity:0.9;margin-top:5px;}
-.header .project-io{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-.header .project-io button{padding:8px 16px;border:2px solid rgba(255,255,255,0.5);background:transparent;color:#fff;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.85rem;transition:all 0.2s;}
-.header .project-io button:hover{background:rgba(255,255,255,0.2);border-color:#fff;}
-.header .project-io .cloud-btn{border-color:#fff;color:#fff;background:rgba(255,255,255,0.15);}
-.header .project-io .cloud-btn:hover{background:rgba(255,255,255,0.35);}
-.header .project-io input[type="text"]{padding:7px 12px;border:2px solid rgba(255,255,255,0.5);background:rgba(255,255,255,0.15);color:#fff;border-radius:8px;font-size:0.85rem;font-weight:600;width:160px;outline:none;}
-.header .project-io input[type="text"]::placeholder{color:rgba(255,255,255,0.5);}
-.header .project-io input[type="text"]:focus{border-color:#fff;background:rgba(255,255,255,0.25);}
-.header .project-io .divider{width:1px;height:28px;background:rgba(255,255,255,0.3);margin:0 2px;}
+/* ── 專案工具列 ──────────────────────────────────────────────
+   原本是「透明底＋白框＋白字」：在青藍漸層 header 上對比不足，按鈕整個融進背景，
+   而且按鈕(8px padding)、輸入框(7px)、保護標籤(3px) 三種高度各自為政。
+   改成：半透明深色托盤把整組框起來 → 托盤上放白色實心按鈕＋深藍字（對比最高、
+   絕不會融入背景），所有控制項高度統一 var(--io-h)，用 inline-flex 垂直置中。
+   分組：檔案（匯入/匯出）｜資料庫（儲存/載入/複製）｜專案名稱＋保護狀態。 */
+.header .project-io{display:flex;gap:7px;align-items:center;flex-wrap:wrap;
+  padding:8px 9px;border-radius:14px;background:rgba(6,45,73,0.22);
+  border:1px solid rgba(255,255,255,0.35);box-shadow:inset 0 1px 0 rgba(255,255,255,0.18);}
+/* 換行時整組一起掉到下一行（窄螢幕才會換行），不要只掉半組看起來像壞掉 */
+.header .project-io .io-group{display:flex;gap:6px;align-items:center;}
+/* 分組靠留白，不用豎線：豎線在換行時會單獨留在行尾，看起來像壞掉 */
+.header .project-io .io-group+.io-group{margin-left:9px;}
+.header .project-io .io-btn{height:var(--io-h);display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  padding:0 12px;border:1px solid #cbd5e1;border-radius:9px;background:#fff;color:#123a5c;
+  font-weight:700;font-size:0.85rem;line-height:1;cursor:pointer;white-space:nowrap;
+  box-shadow:0 2px 5px rgba(2,32,54,0.25);transition:background .15s,box-shadow .15s,transform .12s;}
+.header .project-io .io-btn:hover{background:#eff6ff;box-shadow:0 4px 10px rgba(2,32,54,0.32);transform:translateY(-1px);}
+.header .project-io .io-btn:active{transform:translateY(0);box-shadow:0 1px 3px rgba(2,32,54,0.3);}
+/* 儲存＝寫回共用資料庫，是這排最主要的動作 → 深藍實心，與其他白色按鈕分出主次 */
+.header .project-io .io-btn-primary{background:#0b3c67;color:#fff;border-color:#0b3c67;}
+.header .project-io .io-btn-primary:hover{background:#12518b;}
+/* 複製專案沿用原本的琥珀色識別 */
+.header .project-io .io-btn-copy{color:#92500a;border-color:#f0b429;}
+.header .project-io .io-btn-copy:hover{background:#fff7e6;}
+.header .project-io input[type="text"]{height:var(--io-h);padding:0 12px;border:1px solid #cbd5e1;
+  background:#fff;color:#123a5c;border-radius:9px;font-size:0.85rem;font-weight:600;width:140px;outline:none;
+  box-shadow:0 2px 5px rgba(2,32,54,0.25);}
+.header .project-io input[type="text"]::placeholder{color:#94a3b8;font-weight:500;}
+.header .project-io input[type="text"]:focus{border-color:#0b3c67;box-shadow:0 0 0 3px rgba(255,255,255,0.55);}
+/* 保護狀態維持原本的紅(鎖上)/綠(解鎖)語意，只把高度與圓角對齊其他控制項 */
+.header .project-io .cloud-lock{height:var(--io-h);padding:0 10px;border-radius:9px;font-size:0.8rem;
+  box-shadow:0 2px 5px rgba(2,32,54,0.25);}
 .cloud-modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;}
 .cloud-modal-overlay.active{display:flex;}
 .cloud-modal{background:#fff;border-radius:16px;padding:30px;width:420px;max-width:90vw;max-height:70vh;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
@@ -93,7 +121,8 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .kpi-card{flex:1;min-width:180px;background:#fff;border-radius:10px;padding:18px;box-shadow:var(--card-shadow);text-align:center;border-left:5px solid #ddd;}
 .kpi-card .title{color:#666;font-size:0.85rem;font-weight:500;}.kpi-card .value{font-size:1.6rem;font-weight:700;color:#333;margin:6px 0;}.kpi-card .desc{color:#999;font-size:0.75rem;}
 .comp-table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:var(--card-shadow);margin-bottom:15px;font-size:0.82rem;}
-.comp-table th{background:#f1f5f9;color:#475569;padding:10px 8px;text-align:center;font-weight:600;white-space:nowrap;cursor:help;}
+/* 表頭要一眼看得出是表頭：深藍底＋白字＋青色底線（原本淺灰底與白色表身融在一起） */
+.comp-table th{background:linear-gradient(180deg,var(--th-bg),var(--th-bg2));color:var(--th-fg);padding:11px 8px;text-align:center;font-weight:700;white-space:nowrap;cursor:help;border-bottom:3px solid var(--th-accent);letter-spacing:0.02em;}
 .comp-table td{padding:8px;border-top:1px solid #e2e8f0;text-align:center;}
 .comp-table td input,.comp-table td select{width:100%;padding:4px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:0.82rem;background:#fff;text-align:center;}
 .comp-table td input[type="number"]{width:50%;min-width:50px;}
@@ -118,7 +147,7 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .tim-lib-modal .tlv-note{margin:0 0 14px;color:#475569;font-size:0.85rem;line-height:1.6;}
 .tim-lib-modal .tlv-wrap{max-height:46vh;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;}
 .tim-lib-modal table{width:100%;border-collapse:collapse;font-size:0.82rem;}
-.tim-lib-modal th{position:sticky;top:0;background:#f1f5f9;color:#475569;padding:9px 8px;text-align:center;white-space:nowrap;}
+.tim-lib-modal th{position:sticky;top:0;background:linear-gradient(180deg,var(--th-bg),var(--th-bg2));color:var(--th-fg);font-weight:700;padding:9px 8px;text-align:center;white-space:nowrap;}
 .tim-lib-modal td{padding:8px;border-top:1px solid #e2e8f0;text-align:center;color:#1e293b;}
 .tim-lib-modal td.tlv-model{font-weight:700;color:#0f172a;}
 .tim-lib-modal .tlv-gap{color:#0550ae;font-weight:700;}
@@ -171,7 +200,7 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .lib-section{background:#f8f9fa;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:12px;}
 .lib-section select{padding:5px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:0.82rem;min-width:200px;}
 .detail-table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:var(--card-shadow);margin-top:15px;font-size:0.8rem;}
-.detail-table th{background:#f1f5f9;padding:8px;text-align:center;font-weight:600;color:#475569;}.detail-table td{padding:6px 8px;text-align:center;border-top:1px solid #e2e8f0;}
+.detail-table th{background:linear-gradient(180deg,var(--th-bg),var(--th-bg2));padding:9px 8px;text-align:center;font-weight:700;color:var(--th-fg);border-bottom:3px solid var(--th-accent);}.detail-table td{padding:6px 8px;text-align:center;border-top:1px solid #e2e8f0;}
 .collapsible{cursor:pointer;background:#f1f5f9;padding:10px 15px;border:1px solid #e2e8f0;border-radius:8px;margin-top:15px;font-weight:600;color:#475569;}
 .collapsible:hover{background:#e2e8f0;}.collapsible-body{display:none;padding:10px 0;}
 .ai-section{background:#f8f9fa;border:1px solid #e9ecef;border-radius:10px;padding:20px;margin-top:20px;}
@@ -511,17 +540,21 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
       </button>
     </div>
     <div class="project-io">
-      <button onclick="loadProject()">📥 匯入專案</button>
-      <button onclick="saveProject()">📤 匯出專案</button>
-      <input type="file" id="fileInput" accept=".json" style="display:none" onchange="handleFileLoad(event)">
-      <div class="divider"></div>
-      <span id="cloudLockBtn" class="cloud-lock locked" onclick="toggleCloudLock()" title="資料庫寫入保護">🔒 資料庫保護：啟用</span>
-      <input type="text" id="cloudProjectName" placeholder="專案名稱 ...">
-      <button class="cloud-btn" onclick="cloudSaveProject()">💾 儲存專案</button>
-      <button class="cloud-btn" onclick="cloudLoadProject()">📂 載入專案</button>
-      <div class="divider"></div>
-      <button class="cloud-btn" onclick="cloudCopyProject()" id="copy-btn" style="border-color:#ffd166;background:rgba(255,209,102,0.18);">📋 複製專案</button>
+      <div class="io-group" role="group" aria-label="本機檔案">
+        <button class="io-btn" onclick="loadProject()" title="從本機 JSON 檔匯入專案">📥 匯入專案</button>
+        <button class="io-btn" onclick="saveProject()" title="把目前專案匯出成本機 JSON 檔">📤 匯出專案</button>
+      </div>
+      <div class="io-group" role="group" aria-label="共用資料庫">
+        <button class="io-btn io-btn-primary" onclick="cloudSaveProject()" title="把目前專案寫回共用資料庫">💾 儲存專案</button>
+        <button class="io-btn" onclick="cloudLoadProject()" title="從共用資料庫載入專案">📂 載入專案</button>
+        <button class="io-btn io-btn-copy" id="copy-btn" onclick="cloudCopyProject()" title="複製一份現有專案">📋 複製專案</button>
+      </div>
+      <div class="io-group" role="group" aria-label="專案名稱與寫入保護">
+        <input type="text" id="cloudProjectName" placeholder="專案名稱 ...">
+        <span id="cloudLockBtn" class="cloud-lock locked" onclick="toggleCloudLock()" title="資料庫寫入保護">🔒 資料庫保護：啟用</span>
+      </div>
     </div>
+    <input type="file" id="fileInput" accept=".json" style="display:none" onchange="handleFileLoad(event)">
     <div class="cloud-modal-overlay" id="cloudModal">
       <div class="cloud-modal">
         <h3>📂 專案列表</h3>

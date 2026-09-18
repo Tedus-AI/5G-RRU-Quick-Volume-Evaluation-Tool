@@ -160,6 +160,25 @@
 > 5G-RRU 專屬的新 global_params keys：`t_PCB`、`Coin_T_Setting`、`K_Coin`
 > （三份清單都要同步：`readGlobals` / `saveProject` / `PROJECT_GLOBAL_KEYS`）。
 
+### 表頭色票與專案工具列（改色／改高度前先看這裡）
+
+兩處刻意抽成 `:root` 的共用值，改一次三個地方一起動：
+
+| 變數 | 用途 |
+|---|---|
+| `--th-bg` / `--th-bg2` / `--th-fg` / `--th-accent` | 表頭深藍底＋白字＋青色底線，`.comp-table th`、`.detail-table th`、`.tim-lib-modal th` 共用 |
+| `--io-h` | 專案工具列所有控制項（按鈕／專案名稱／保護標籤）的統一高度 |
+
+- **表頭不可回到淺灰底**（原本 `#f1f5f9` ＋ `#475569` 與白色表身糊成一片）。深底白字的文字對比
+  ≥ 7、與表身對比 ≥ 4.5，這是 `tests/header-toolbar.test.js` 的契約。
+- **工具列是「半透明深色托盤 ＋ 白底深字實心按鈕」**：原本白字透明底在青藍漸層 header 上
+  對比不足、按鈕整個融進背景。⚠ 不要再把按鈕改回 `background:transparent` ＋ `color:#fff`。
+  「儲存專案」是唯一的深色實心鈕（主要動作＝寫回共用資料庫），其餘維持白底。
+- 順序固定為 **匯入／匯出 ｜ 儲存／載入／複製 ｜ 專案名稱＋資料庫保護**，三組用留白分隔
+  （不用豎線：換行時會單獨留一根在行尾）。窄螢幕靠 `flex-wrap` 整組換行，
+  所以 `專案名稱` 與 `資料庫保護` 必須待在同一個 `.io-group` 裡。
+- 隱藏的 `#fileInput` 放在 `.project-io` **外面**，不然它會卡在兩組中間破壞間距。
+
 ### 參數控制台可調寬／收合
 
 `#sidebar-resizer` 同時是拖曳把手與收合鈕：`mousedown` 後位移超過 4px 才算拖曳，
