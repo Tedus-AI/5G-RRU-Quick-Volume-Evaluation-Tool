@@ -170,6 +170,11 @@ tr.comp-excluded{opacity:0.4;}
 .tim-note-warn .tim-note-src{color:#b45309;}
 .tim-mark{font-size:0.7rem;color:#94a3b8;margin-left:3px;cursor:help;}
 .tim-mark-warn{color:#b45309;}
+/* AI-Thermal 推導欄位的來源標記：欄位左側藍邊（資訊用，非錯誤 → 不用紅色）。
+   不佔額外寬度，窄欄也不會被擠到換行。 */
+.comp-table td input.derived-src,.comp-table td select.derived-src{border-left:3px solid #0550ae;background:#f5f9ff;cursor:help;}
+.derived-legend{color:#64748b;font-size:0.76rem;margin:-4px 0 8px;line-height:1.4;}
+.derived-swatch{display:inline-block;width:10px;height:12px;border:1px solid #d1d5db;border-left:3px solid #0550ae;background:#f5f9ff;vertical-align:-2px;border-radius:2px;}
 .tim-migrate{background:#fffbeb;border:1px solid #f59e0b;border-left-width:5px;border-radius:8px;padding:12px;margin-bottom:12px;color:#7c4a03;font-size:0.85rem;}
 .tim-migrate b{color:#b45309;}
 .tim-migrate select{padding:5px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:0.82rem;min-width:220px;}
@@ -1114,7 +1119,7 @@ const COL_TIPS = {
   'Height(mm)':'元件距離 PCB 底部的垂直高度。公式：全域環溫 + (元件高度 × 0.03)',
   'Pad_L':'IC E-PAD 長度或 PA 封裝底部長度或元件散熱端的長度 (mm)','Pad_W':'IC E-PAD 寬度或 PA 封裝底部寬度或元件散熱端的寬度 (mm)',
   'Thick(mm)':'熱需傳導穿過的 PCB 或銅塊厚度',
-  'Board_Type':'元件導熱到 HSK 表面的方式',
+  'Board_Type':'元件導熱到 HSK 表面的方式。Copper Coin＝銅塊穿板；Thermal Via＝導熱孔穿板；IC top＝從封裝上表面散熱（不穿板，R_int=0、接觸面積取 Pad_L×Pad_W）；None＝不計基板路徑。此欄由 AI-Thermal Tab2 的「主散熱路徑」推導',
   'TIM_Type':'元件底部與散熱器之間的 TIM。下方可再選「型號」：選了型號就改用 TIM 型號庫登錄的 k 與填縫厚度（型號庫在 AI-Thermal 工具維護），沒選型號則沿用參數控制台的 K/t。Board_Type = Copper Coin 的元件其 die-attach Solder 已內建於 R_int，此欄填 Grease 或 None 即可',
   'R_jc':'結點到殼的內部熱阻 (°C/W)','Limit(C)':'元件允許最高運作溫度'
 };
@@ -1132,7 +1137,11 @@ const ALL_TAB1_COLS = ['Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','D
 var tab1SelectedCols = ['Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','Drop','R_jc','R_int','R_TIM','Limit(C)'];
 function toggleTab1Col(col,checked){if(checked&&!tab1SelectedCols.includes(col))tab1SelectedCols.push(col);else if(!checked)tab1SelectedCols=tab1SelectedCols.filter(c=>c!==col);renderTab1();}
 
-const BOARD_TYPES = ['Thermal Via','Copper Coin','None'];
+/* 導熱方式＝元件把熱送到 HSK 表面的路徑。與 AI-Thermal Tab2 的「主散熱路徑」同一組詞彙
+   （Copper Coin / Thermal Via / IC top / None），它存檔時直接寫成本欄的值。
+   'IC top'：熱從封裝「上表面」出去（不穿板）→ 沒有基板擴散、R_int = 0，
+   R_TIM 的接觸面積就是元件上表面積 Pad_L×Pad_W，不可再加板厚。 */
+const BOARD_TYPES = ['Thermal Via','Copper Coin','IC top','None'];
 /* 可選的 TIM 類型。已停用的舊類型（Pad2）不在此列，但既有資料仍要算得出來：
    計算走 resolveTim 的 legacy 分支，下拉只在「某一列的現值就是它」時臨時補上該選項
    （見 timCellHtml）—— 不靜默改掉使用者填的內容。清單見 TIM_LEGACY_PARAM。 */
@@ -1553,6 +1562,9 @@ function drcDieCasting(FH,T_tip,alpha_deg,Gap){
 function calcThermalResistance(row,g){
   let bl,bw;
   if(row.Board_Type==="Copper Coin"){bl=g.Coin_L_Setting;bw=g.Coin_W_Setting;}
+  // IC top：熱從封裝上表面出去，沒有穿板、也就沒有基板擴散面積
+  // → ba=0 使下面的 ta 退回 pa（元件上表面積）。加板厚的擴散面積會高估接觸面積＝低估 R_TIM。
+  else if(row.Board_Type==="IC top"){bl=0;bw=0;}
   else if(row['Power(W)']===0||row['Thick(mm)']===0){bl=0;bw=0;}
   else{bl=row.Pad_L+row['Thick(mm)'];bw=row.Pad_W+row['Thick(mm)'];}
   let la=g.T_amb+row['Height(mm)']*g.Slope;
@@ -1689,6 +1701,55 @@ function switchSubTab(i){document.querySelectorAll('.sub-tab-btn').forEach((b,j)
 // =====================================================
 // TAB 0: COMPONENT TABLES + FIREBASE LIBRARY
 // =====================================================
+/* ── AI-Thermal 推導欄位的來源標記 ─────────────────────────────
+   同一顆元件物件由兩個工具共寫：Board_Type / Pad_L / Pad_W 由 AI-Thermal Tab2 的
+   「主散熱路徑」推導，R_jc 由它 Tab1 熱阻表的 θJC 推導。這些欄位在這裡仍可編輯，
+   但下次從 AI-Thermal 存檔時會被覆寫 —— 所以要標出來（每個數字都要回答得出「哪來的」）。
+   判斷依據是 AI-Thermal 寫在元件上的內部標記，本工具只讀不寫這些標記。 */
+const PAD_FROM_LABEL = {
+  epadSize:       'Tab2 的「E-PAD 大小」（主散熱路徑 = Thermal Via）',
+  heatSourceSize: 'Tab2 的「元件大小」',
+  none:           'Tab2 的主散熱路徑 = None（Pad 歸零）',
+};
+const RJC_FROM_LABEL = { JC_bot: 'θJC,bottom（接面 → 外殼底面）', JC_top: 'θJC,top（接面 → 外殼頂面）' };
+
+function derivedFrom(row,col){
+  if(!row)return '';
+  // _bt_from 是 Board_Type 的標記；舊資料只有 _pad_from，而它只有在 Board_Type 也寫過時才會出現
+  if(col==='Board_Type')return (row._bt_from||row._pad_from)?'AI-Thermal Tab2 的「主散熱路徑」':'';
+  if(col==='Pad_L'||col==='Pad_W')return row._pad_from?('AI-Thermal '+(PAD_FROM_LABEL[row._pad_from]||'Tab2 的主散熱路徑')):'';
+  if(col==='R_jc')return row._rjc_from?('AI-Thermal 熱阻表的 '+(RJC_FROM_LABEL[row._rjc_from]||'θJC')):'';
+  return '';
+}
+
+/* 標在欄位本身（左側藍邊＋tooltip），不用行內圖示：窄欄塞不下圖示會換行、把整列撐高。
+   回傳要塞進 <input>/<select> 的屬性字串。 */
+function derivedAttrs(row,col){
+  const from=derivedFrom(row,col);
+  if(!from)return '';
+  return ' class="derived-src" title="'+_vEsc('此值由 '+from+' 推導。在這裡改仍然算得到，但下次從 AI-Thermal 存檔時會被覆寫。')+'"';
+}
+
+function hasDerivedRow(arr){
+  return (arr||[]).some(r=>['Board_Type','Pad_L','Pad_W','R_jc'].some(c=>derivedFrom(r,c)));
+}
+
+/* ── 元件表的「導熱方式」欄 ─────────────────────────────────────
+   值不在選項裡時（例如對方工具寫進未知值）臨時補上該選項，不讓瀏覽器把它
+   靜默顯示成清單第一項、一碰就改掉使用者的資料。 */
+function boardTypeCellHtml(row,category,i,dis){
+  const cur=String(row.Board_Type==null?'':row.Board_Type);
+  const list=BOARD_TYPES.slice();
+  if(cur&&!list.includes(cur))list.push(cur);
+  let opts='';
+  list.forEach(o=>{
+    const unknown=!BOARD_TYPES.includes(o);
+    opts+='<option value="'+_vEsc(o)+'"'+(cur===o?' selected':'')+'>'+_vEsc(o)+(unknown?'（未知值）':'')+'</option>';
+  });
+  return '<td><select style="min-width:110px;"'+derivedAttrs(row,'Board_Type')+dis+
+         ' onchange="updateComp(\''+category+'\','+i+',\'Board_Type\',this.value)">'+opts+'</select></td>';
+}
+
 /* ── 元件表的「介面材料」欄 ─────────────────────────────────────
    一格三層：TIM 類型 → 型號（只列該類型的型號）→ 這一列實際採用的 k/t 與其來源。
    型號庫在 AI-Thermal 維護，這裡只讀；來源標註是為了讓每個數字都回答得出「哪來的」。 */
@@ -1815,6 +1876,7 @@ function renderCompTable(arr,containerId,defaults,category){
   let pw=arr.reduce((s,r)=>s+(r._excluded?0:r['Power(W)']*r.Qty),0);
   let activeCount=arr.filter(r=>!r._excluded).length;
   lhtml+='<p style="color:#666;font-size:0.85rem;margin-bottom:8px;">📊 '+category.toUpperCase()+' 類總功耗：<b>'+pw.toFixed(1)+' W</b> | 共 <b>'+activeCount+'</b>/<b>'+arr.length+'</b> 種元件納入計算</p>';
+  if(hasDerivedRow(arr))lhtml+='<p class="derived-legend"><span class="derived-swatch"></span> 左側藍邊的欄位由 <b>AI-Thermal</b> 推導（導熱方式／Pad 尺寸來自 Tab2「主散熱路徑」，Rjc 來自熱阻表的 θJC）。在這裡改仍然算得到，但下次從 AI-Thermal 存檔時會被覆寫；滑鼠停在欄位上可看來源。</p>';
 
   // Table
   lhtml+='<table class="comp-table"><thead><tr>';
@@ -1827,7 +1889,7 @@ function renderCompTable(arr,containerId,defaults,category){
     let refLocked=!!row._ref_locked;
     let refOrigin=row._ref_origin_project||'';
     COLS.forEach(col=>{
-      if(col==='Board_Type'){lhtml+='<td><select style="min-width:110px;"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">';BOARD_TYPES.forEach(o=>lhtml+='<option'+(row[col]===o?' selected':'')+'>'+o+'</option>');lhtml+='</select></td>';}
+      if(col==='Board_Type'){lhtml+=boardTypeCellHtml(row,category,i,dis);}
       else if(col==='TIM_Type'){lhtml+=timCellHtml(row,category,i,dis);}
       else if(col==='Component'){
         let badge=refLocked
@@ -1836,7 +1898,7 @@ function renderCompTable(arr,containerId,defaults,category){
         lhtml+='<td><input type="text" value="'+_vEsc(row[col]||'')+'"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">'+badge+'</td>';
       }
       else if(col==='Power(W)'&&refLocked){lhtml+='<td><span title="瓦數已鎖定，請先按「解除參照」" style="display:inline-block;padding:4px 8px;color:#6b7280;background:#f3f4f6;border-radius:4px;white-space:nowrap;">'+(row[col]!=null?row[col]:'')+' 🔒</span></td>';}
-      else{let extraStyle=col==='Power(W)'?' style="width:75%;min-width:75px;"':'';lhtml+='<td><input type="number"'+extraStyle+' value="'+(row[col]||0)+'" step="any"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',parseFloat(this.value)||0)"></td>';}
+      else{let extraStyle=col==='Power(W)'?' style="width:75%;min-width:75px;"':'';lhtml+='<td><input type="number"'+extraStyle+derivedAttrs(row,col)+' value="'+(row[col]||0)+'" step="any"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',parseFloat(this.value)||0)"></td>';}
     });
     lhtml+='<td style="white-space:nowrap;">';
     lhtml+='<button class="btn btn-sm eye-btn'+(excl?' excluded':'')+'" title="'+(excl?'顯示（納入計算）':'隱藏（排除計算）')+'" onclick="toggleComp(\''+category+'\','+i+')">👁️</button> ';
