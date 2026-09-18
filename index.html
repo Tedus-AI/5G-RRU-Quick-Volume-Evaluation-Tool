@@ -159,6 +159,20 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
 .lock-modal-teams-btn{background:#505ac9;color:#fff;border-color:#505ac9;text-decoration:none;display:inline-block;margin-right:10px;}
 .lock-modal-teams-btn:hover{background:#3f49a3;}
 tr.comp-excluded{opacity:0.4;}
+/* TIM 型號選型 + 來源標註（UX：每個數字都要回答「哪來的」） */
+.tim-sub{margin-top:4px;}
+.comp-table td .tim-sub select{font-size:0.75rem;padding:2px 4px;}
+.tim-sub-empty{font-size:0.72rem;color:#9ca3af;cursor:help;}
+.tim-sub-gone select{border-color:#f59e0b;background:#fffbeb;}
+.tim-note{font-size:0.72rem;color:#6b7280;margin-top:3px;cursor:help;line-height:1.35;white-space:nowrap;}
+.tim-note-warn{color:#b45309;}
+.tim-note-src{color:#94a3b8;display:block;max-width:150px;overflow:hidden;text-overflow:ellipsis;}
+.tim-note-warn .tim-note-src{color:#b45309;}
+.tim-mark{font-size:0.7rem;color:#94a3b8;margin-left:3px;cursor:help;}
+.tim-mark-warn{color:#b45309;}
+.tim-migrate{background:#fffbeb;border:1px solid #f59e0b;border-left-width:5px;border-radius:8px;padding:12px;margin-bottom:12px;color:#7c4a03;font-size:0.85rem;}
+.tim-migrate b{color:#b45309;}
+.tim-migrate select{padding:5px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:0.82rem;min-width:220px;}
 tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
 .eye-btn{position:relative;background:#f8f9fa;border:1px solid #dee2e6;color:#333;display:inline-flex;align-items:center;justify-content:center;}
 .eye-btn:hover{background:#e9ecef;}
@@ -252,7 +266,7 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
     <div class="info-card" style="background:#e9f7ef;border-left:6px solid #2ecc71;">
       <h3 style="color:#27ae60;">🛠️ 主要功能一覽</h3>
       <ul style="color:#34495e;">
-        <li><strong>元件熱源管理</strong>：動態新增/編輯/複製/刪除元件清單，支援 Copper Coin、Thermal Via、多種 TIM（含雙組自訂 Pad / Pad2 規格）</li>
+        <li><strong>元件熱源管理</strong>：動態新增/編輯/複製/刪除元件清單，支援 Copper Coin、Thermal Via、多種 TIM（Grease / Pad / Putty；k 值與填縫厚度可由共用 TIM 型號庫依型號帶入）</li>
         <li><strong>元件資料庫</strong>：RF / Digital / PWR 三類元件庫，支援本機 JSON 檔案儲存</li>
         <li><strong>精準熱阻計算</strong>：自動計算 Rjc + Rint + Rtim，考慮局部環溫與高度效應</li>
         <li><strong>Tj_Margin 裕度分析</strong>：全元件 Tj / Tc 裕量色階顯示，超溫自動觸發紅色警告</li>
@@ -387,7 +401,6 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
     <label style="margin-top:8px;color:var(--primary-light);">🔷 熱介面材料 (TIM)</label>
     <div class="row2"><div><label>K (Putty)</label><input type="number" id="K_Putty" step="0.1" onchange="recalc()"></div><div><label>t (Putty)</label><input type="number" id="t_Putty" step="0.1" onchange="recalc()"></div></div>
     <div class="row2"><div><label>K (Pad)</label><input type="number" id="K_Pad" step="0.1" onchange="recalc()"></div><div><label>t (Pad)</label><input type="number" id="t_Pad" step="0.1" onchange="recalc()"></div></div>
-    <div class="row2"><div><label>K (Pad 2)</label><input type="number" id="K_Pad2" step="0.1" onchange="recalc()"></div><div><label>t (Pad 2)</label><input type="number" id="t_Pad2" step="0.1" onchange="recalc()"></div></div>
     <div class="row2"><div><label>K (Grease)</label><input type="number" id="K_Grease" step="0.1" onchange="recalc()"></div><div><label>t (Grease)</label><input type="number" id="t_Grease" step="0.01" onchange="recalc()"></div></div>
     <label style="margin-top:8px;color:var(--primary-light);">🔘 Solder (錫片)</label>
     <div class="row2"><div><label>K (錫片)</label><input type="number" id="K_Solder" step="1" onchange="recalc()"></div><div><label>t (錫片)</label><input type="number" id="t_Solder" step="0.05" onchange="recalc()"></div></div>
@@ -486,6 +499,7 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
   <div class="tab-content active" id="tab0">
     <h3>🔥 元件熱源清單設定</h3>
     <p style="color:#888;font-size:0.82rem;margin-bottom:12px;">💡 提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。</p>
+    <div id="tim-migrate-banner"></div>
     <div class="sub-tabs">
       <button class="sub-tab-btn active" onclick="switchSubTab(0)">📡 RF Component</button>
       <button class="sub-tab-btn" onclick="switchSubTab(1)">💻 Digital Component</button>
@@ -930,8 +944,6 @@ const DEFAULT_CONFIG = {
     "t_Putty": 0.5,
     "K_Pad": 7.5,
     "t_Pad": 1.7,
-    "K_Pad2": 7.5,
-    "t_Pad2": 1.0,
     "K_Grease": 3.0,
     "t_Grease": 0.05,
     "K_Solder": 58.0,
@@ -1103,7 +1115,7 @@ const COL_TIPS = {
   'Pad_L':'IC E-PAD 長度或 PA 封裝底部長度或元件散熱端的長度 (mm)','Pad_W':'IC E-PAD 寬度或 PA 封裝底部寬度或元件散熱端的寬度 (mm)',
   'Thick(mm)':'熱需傳導穿過的 PCB 或銅塊厚度',
   'Board_Type':'元件導熱到 HSK 表面的方式',
-  'TIM_Type':'元件底部與散熱器之間的 TIM。Board_Type = Copper Coin 的元件其 die-attach Solder 已內建於 R_int，此欄填 Grease 或 None 即可',
+  'TIM_Type':'元件底部與散熱器之間的 TIM。下方可再選「型號」：選了型號就改用 TIM 型號庫登錄的 k 與填縫厚度（型號庫在 AI-Thermal 工具維護），沒選型號則沿用參數控制台的 K/t。Board_Type = Copper Coin 的元件其 die-attach Solder 已內建於 R_int，此欄填 Grease 或 None 即可',
   'R_jc':'結點到殼的內部熱阻 (°C/W)','Limit(C)':'元件允許最高運作溫度'
 };
 const TAB2_TIPS = {
@@ -1113,7 +1125,7 @@ const TAB2_TIPS = {
   'Total_W':'該元件的總發熱量 (單顆功耗 × 數量)','Loc_Amb':'該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)',
   'Drop':'熱量從晶片核心傳導到散熱器表面的溫差。公式：Power × (Rjc + Rint + Rtim)',
   'R_jc':'結點到殼的內部熱阻','R_int':'元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值',
-  'R_TIM':'元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)','Limit(C)':'元件允許最高運作溫度'
+  'R_TIM':'元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)。◆ = k/t 取自 TIM 型號庫的型號；⚠ = 來源有問題（滑鼠移到數字上看說明）','Limit(C)':'元件允許最高運作溫度'
 };
 const TAB2_LABELS = {'Allowed_dT':'允許溫升','Tj_Margin':'Tj 裕度','Tj':'Tj','Tc':'Tc','Total_W':'總功耗','Loc_Amb':'局部環溫','Drop':'內部溫降','R_jc':'Rjc','R_int':'基板熱阻','R_TIM':'介面熱阻','Limit(C)':'限溫'};
 const ALL_TAB1_COLS = ['Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','Drop','R_jc','R_int','R_TIM','Limit(C)'];
@@ -1121,10 +1133,134 @@ var tab1SelectedCols = ['Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','
 function toggleTab1Col(col,checked){if(checked&&!tab1SelectedCols.includes(col))tab1SelectedCols.push(col);else if(!checked)tab1SelectedCols=tab1SelectedCols.filter(c=>c!==col);renderTab1();}
 
 const BOARD_TYPES = ['Thermal Via','Copper Coin','None'];
-const TIM_TYPES = ['Grease','Pad','Pad2','Putty','None'];
+/* 可選的 TIM 類型。已停用的舊類型（Pad2）不在此列，但既有資料仍要算得出來：
+   計算走 resolveTim 的 legacy 分支，下拉只在「某一列的現值就是它」時臨時補上該選項
+   （見 timCellHtml）—— 不靜默改掉使用者填的內容。清單見 TIM_LEGACY_PARAM。 */
+const TIM_TYPES = ['Grease','Pad','Putty','None'];
 const RF_DEFAULT = {Component:"New_RF",Qty:1,"Power(W)":0,"Height(mm)":250,Pad_L:10,Pad_W:10,"Thick(mm)":2.5,Board_Type:"Copper Coin","Limit(C)":200,R_jc:1.5,TIM_Type:"Grease"};
 const DIG_DEFAULT = {Component:"New_Digital",Qty:1,"Power(W)":0,"Height(mm)":50,Pad_L:10,Pad_W:10,"Thick(mm)":0,Board_Type:"Thermal Via","Limit(C)":100,R_jc:0.5,TIM_Type:"Putty"};
 const PWR_DEFAULT = {Component:"New_PWR",Qty:1,"Power(W)":0,"Height(mm)":30,Pad_L:20,Pad_W:20,"Thick(mm)":0,Board_Type:"None","Limit(C)":95,R_jc:0,TIM_Type:"Grease"};
+
+// =====================================================
+// TIM 型號庫（頂層 collection `tim_library`）—— 本工具「只讀不寫」
+// -----------------------------------------------------
+// 與 AI-Thermal 共用同一份 thermal_db.json。型號庫是頂層 collection、不屬於任何專案，
+// 維護介面只在 AI-Thermal Tab2 工具列的「🧪 TIM 型號庫」；本工具任何路徑都不得寫入它
+// （共用 DB 規則：不是自己的東西就不要動）。
+//
+// 每筆：{ model, timType:'Grease'|'Pad'|'Putty', k, thickness, gapThickness, gapUnlock, vendor, note, ... }
+//   k            → 導熱係數 (W/m·K)，對應參數控制台的 K_<Type>
+//   gapThickness → 壓縮後「實際填在縫隙裡」的厚度 (mm)，對應 t_<Type>，是 R_TIM 的分子
+//   thickness    → 材料原始片厚（Pad 買來 2.5mm），只供規格書參考，計算不可用
+//     佐證：本工具預設 t_Pad=1.7 等於 AI-Thermal Tab2 的「IC 距離 HSK」，不是 TIM 片厚 2.5。
+// =====================================================
+let timLibrary = {};        // { id: {...} } 讀進來的快取
+let timLibLoaded = false;   // 讀過一次才 true；false 代表「還不知道」而非「沒有型號」
+
+async function timLibLoad(force){
+  if(timLibLoaded && !force) return timLibrary;
+  if(typeof dbAdapter === 'undefined' || !dbAdapter.isReady()) return timLibrary;
+  try{
+    const col = await dbAdapter.getCollection('tim_library');
+    timLibrary = (col && typeof col === 'object') ? col : {};
+    timLibLoaded = true;
+  }catch(e){
+    // 讀失敗保留既有快取（寧可用上一次讀到的 k 值，也不要整批掉回參數控制台）
+    console.warn('[timLib] 讀取 tim_library 失敗：', e);
+  }
+  return timLibrary;
+}
+
+/* 依 (TIM 類型, 型號名) 查型號。跨工具是用「型號名字串」參照（不是內部 id），
+   大小寫與前後空白不計 —— 與 AI-Thermal 的 timLibFindByModel 同一套規則。 */
+function timLibFindByModel(timType, model){
+  if(!timType || !model) return null;
+  const want = String(model).trim().toLowerCase();
+  for(const [id, v] of Object.entries(timLibrary)){
+    if(!v || v.timType !== timType) continue;
+    if(String(v.model || '').trim().toLowerCase() === want) return Object.assign({_id:id}, v);
+  }
+  return null;
+}
+
+/* 依 TIM 類型列出型號（按型號名排序） */
+function timLibListByType(timType){
+  return Object.entries(timLibrary)
+    .filter(([,v]) => v && (!timType || v.timType === timType))
+    .map(([id,v]) => Object.assign({_id:id}, v))
+    .sort((a,b) => String(a.model||'').localeCompare(String(b.model||'')));
+}
+
+/* 參數控制台有 K_/t_ 可查的 TIM 類型（None 不需要型號也不需要參數） */
+const TIM_PARAM_TYPES = ['Grease','Pad','Putty'];
+
+/* 已停用／從未可選的舊類型 → 仍沿用它原本吃的 global_params，維持既有計算結果不變 */
+const TIM_LEGACY_PARAM = {
+  'Pad2':   { k:'K_Pad2',   t:'t_Pad2',   label:'Pad 2（已停用）', hint:'Pad 2 已停用，請改為「Pad ＋型號」' },
+  'Solder': { k:'K_Solder', t:'t_Solder', label:'Solder（非選單類型）', hint:'Solder 不是可選的 TIM 類型（舊資料），建議改為 Grease／Pad／Putty ＋型號' },
+};
+
+function _timNum(v){ const n = parseFloat(v); return isFinite(n) ? String(+n.toFixed(4)) : '-'; }
+
+/* 一列元件的 TIM k / t 到底取自哪裡 —— 單一事實來源，計算與畫面都走這支。
+   優先序：① 型號（tim_library 的 k + gapThickness）
+          ② 參數控制台 K_<Type> / t_<Type>（fallback 不可省：型號庫還沒建完的專案要照舊算得出來）
+          ③ 舊類型（Pad2／Solder）殘留的 global_params
+   回傳 { k, t, src, label, detail, warn }
+     src: 'model' 型號 | 'global' 參數控制台 | 'legacy' 舊類型 | 'none' 無 TIM | 'missing' 查不到來源
+     warn 有值 → 畫面用琥珀色提醒（紅色留給 Fail／超溫，見 UX 慣例：紅色保留給 Fail/錯誤） */
+function resolveTim(row, g){
+  const type  = String((row && row.TIM_Type)  || '').trim();
+  const model = String((row && row.TIM_Model) || '').trim();
+  g = g || {};
+  if(type === 'None') return {k:1, t:0, src:'none', label:'無 TIM', detail:'TIM_Type = None → R_TIM 不計入'};
+
+  let warn = '';
+  if(model){
+    if(TIM_PARAM_TYPES.includes(type)){
+      const rec = timLibFindByModel(type, model);
+      if(rec){
+        const k = parseFloat(rec.k), t = parseFloat(rec.gapThickness);
+        if(k > 0 && t > 0){
+          return {k, t, src:'model', model, label:'型號 ' + model,
+            detail:'k=' + _timNum(k) + ' W/m·K、填縫厚度 t=' + _timNum(t) + ' mm'
+                   + '（TIM 型號庫' + (rec.vendor ? '｜' + rec.vendor : '') + '）'};
+        }
+        warn = '型號「' + model + '」在型號庫裡缺 k 或填縫厚度 → 暫時改用參數控制台的值';
+      }else{
+        warn = timLibLoaded ? '型號「' + model + '」已不在型號庫 → 暫時改用參數控制台的值'
+                            : '型號庫尚未載入（資料庫未連線）→ 暫時改用參數控制台的值';
+      }
+    }else{
+      warn = '型號「' + model + '」與 TIM 類型「' + (type || '未選') + '」不相符 → 忽略型號';
+    }
+  }
+
+  if(TIM_PARAM_TYPES.includes(type)){
+    const k = parseFloat(g['K_' + type]), t = parseFloat(g['t_' + type]);
+    if(k > 0 && t > 0){
+      return {k, t, src:'global', label:'參數控制台 K_' + type + '／t_' + type,
+        detail:'k=' + _timNum(k) + ' W/m·K、t=' + _timNum(t) + ' mm（參數控制台，非型號）', warn};
+    }
+    return {k:1, t:0, src:'missing', label:'參數控制台缺 K_' + type + '／t_' + type,
+      detail:'R_TIM 以 0 計入', warn:'參數控制台的 K_' + type + '／t_' + type + ' 沒有有效值 → R_TIM 以 0 計入（低估熱阻）'};
+  }
+
+  const lg = TIM_LEGACY_PARAM[type];
+  if(lg){
+    const k = parseFloat(g[lg.k]), t = parseFloat(g[lg.t]);
+    if(k > 0 && t > 0){
+      return {k, t, src:'legacy', label:lg.label,
+        detail:'k=' + _timNum(k) + ' W/m·K、t=' + _timNum(t) + ' mm（此專案 global_params 的 ' + lg.k + '／' + lg.t + '）',
+        warn:lg.hint};
+    }
+    return {k:1, t:0, src:'missing', label:lg.label, detail:'R_TIM 以 0 計入',
+      warn:lg.hint + '；且此專案查不到 ' + lg.k + '／' + lg.t + ' → R_TIM 以 0 計入（低估熱阻）'};
+  }
+
+  return {k:1, t:0, src:'missing', label:'未選 TIM', detail:'R_TIM 以 0 計入',
+    warn:'未選 TIM 類型 → R_TIM 以 0 計入（低估熱阻）。確定沒有 TIM 請明確選 None'};
+}
 
 // =====================================================
 // FIREBASE INIT
@@ -1207,8 +1343,30 @@ const VARIANT_CAT = {
 };
 
 // 複製元件時要一併帶過去的「每元件欄位」白名單。
-// ⚠ 5G-RRU 專屬的每元件欄位全列入（= COLS 去掉當作 key 的 Component），避免快選掉值。
-const VARIANT_CARRY = ['Qty','Power(W)','Height(mm)','Pad_L','Pad_W','Thick(mm)','Board_Type','Limit(C)','R_jc','TIM_Type'];
+// ⚠ 同一顆元件物件由本工具與 AI-Thermal 共寫，兩邊的白名單都要列全所有欄位：
+//   漏列的 key 會被各自的分類罐頭預設值蓋掉，複製完再存回共用 DB 就等於把對方工具
+//   填的真實值洗成罐頭值。對應 AI-Thermal 的 SG_VARIANT_CARRY（21 項，須同步維護）。
+const VARIANT_CARRY = [
+  // 本工具畫得出來的欄位（= COLS 去掉當作 key 的 Component）
+  'Qty','Power(W)','Height(mm)','Pad_L','Pad_W','Thick(mm)','Board_Type','Limit(C)','R_jc','TIM_Type',
+  // AI-Thermal 推導/維護、本工具無編輯入口但存在同一顆元件物件上的欄位
+  'TIM_Model','Type','Power_RT(W)','TV_ID_mil','TV_Qty','Temp_Sensor','Local_Qty','Remote_Qty','note',
+  'Rth','SpecFile',
+];
+
+/* 依白名單抄出來源元件的欄位。物件／陣列（Rth、SpecFile）必須深拷貝，否則新元件與
+   快選快取共用同一份參照，改一邊會動到另一邊。undefined 一律跳過——空值不寫 key。 */
+function carrySrc(comp){
+  const src={};
+  if(!comp)return src;
+  VARIANT_CARRY.forEach(k=>{
+    const v=comp[k];
+    if(v===undefined)return;
+    if(v&&typeof v==='object'){ try{ src[k]=JSON.parse(JSON.stringify(v)); }catch(e){ /* 壞資料就跳過該欄 */ } }
+    else src[k]=v;
+  });
+  return src;
+}
 
 let variantsCache = null;     // { rf:[...], digital:[...], pwr:[...] } 或 null（未載入）
 let variantsLoading = false;
@@ -1231,8 +1389,7 @@ function aggregateVariants(projects, cat){
       const key = name + ' ' + String(power);
       const prev = byKey.get(key);
       if(!prev || ts < prev._ts){
-        const src = {};
-        VARIANT_CARRY.forEach(k=>{ if(comp[k]!==undefined) src[k]=comp[k]; });
+        const src = carrySrc(comp);
         byKey.set(key, { name, power, originProjectName: projName, originProjectId: pid, src, _ts: ts });
       }
     }
@@ -1275,7 +1432,12 @@ function addFromVariant(cat){
   if(!sel || sel.value==='') return;
   const v = ((variantsCache && variantsCache[cat]) || [])[parseInt(sel.value,10)];
   if(!v) return;
-  components[cat].push(makeComp(cat, Object.assign({ Component: v.name }, v.src || {}, {
+  // 再深拷貝一次：新元件不可與快選快取共用 Rth / SpecFile 的參照
+  const src = carrySrc(v.src);
+  // 規格書是「檔案參照」不是複本（實體檔在來源專案的 SPEC 資料夾底下）：標來源，
+  // AI-Thermal 之後換檔/刪除時才知道只能解除參照、不可刪來源檔。
+  if(src.SpecFile && src.SpecFile.path) src.SpecFile._from = v.originProjectName;
+  components[cat].push(makeComp(cat, Object.assign({ Component: v.name }, src, {
     _ref_origin_project: v.originProjectName,
     _ref_origin_id: v.originProjectId,
     _ref_locked: true,
@@ -1316,7 +1478,7 @@ function toggleSection(el){el.classList.toggle('collapsed');el.nextElementSiblin
 function toggleSAMode(){let m=document.querySelector('input[name="sa_mode"]:checked').value;document.getElementById('sa-sweep-panel').style.display=m==='sweep'?'':'none';document.getElementById('sa-tornado-panel').style.display=m==='tornado'?'':'none';}
 
 function readGlobals(){
-  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(id=>{let el=document.getElementById(id);if(el&&el.tagName!=='SELECT')G[id]=parseFloat(el.value)||0;});
+  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(id=>{let el=document.getElementById(id);if(el&&el.tagName!=='SELECT')G[id]=parseFloat(el.value)||0;});
   G.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;G.Slope=0.03;
   if(!G.Draft_Angle||G.Draft_Angle<0.1)G.Draft_Angle=1.25;
   // 各製程自訂係數（勾選狀態 + η_process + K_FIN）
@@ -1400,10 +1562,11 @@ function calcThermalResistance(row,g){
   if(kb>0&&pa>0){let ea=ba>0?Math.sqrt(pa*ba):pa;let rv=(row['Thick(mm)']/1000)/(kb*ea);
     if(row.Board_Type==="Copper Coin")ri=rv+((g.t_Solder/1000)/(g.K_Solder*pa*g.Voiding));
     else if(row.Board_Type==="Thermal Via")ri=rv/g.Via_Eff;else ri=rv;}
-  let tm={Solder:{k:g.K_Solder,t:g.t_Solder},Grease:{k:g.K_Grease,t:g.t_Grease},Pad:{k:g.K_Pad,t:g.t_Pad},Pad2:{k:g.K_Pad2,t:g.t_Pad2},Putty:{k:g.K_Putty,t:g.t_Putty},None:{k:1,t:0}};
-  let ti=tm[row.TIM_Type]||{k:1,t:0};let ta=ba>0?ba:pa;let rt=0;if(ta>0&&ti.t>0)rt=(ti.t/1000)/(ti.k*ta);
+  // TIM 的 k / t 一律走 resolveTim（型號優先，否則參數控制台）—— 它同時回報來源供畫面標註
+  let ti=resolveTim(row,g);let ta=ba>0?ba:pa;let rt=0;if(ta>0&&ti.t>0)rt=(ti.t/1000)/(ti.k*ta);
   let tw=row.Qty*row['Power(W)'];let dr=row['Power(W)']*(row.R_jc+ri+rt);let adt=row['Limit(C)']-dr-la;
-  return{Base_L:bl,Base_W:bw,Loc_Amb:la,R_int:ri,R_TIM:rt,Total_W:tw,Drop:dr,Allowed_dT:adt};
+  return{Base_L:bl,Base_W:bw,Loc_Amb:la,R_int:ri,R_TIM:rt,Total_W:tw,Drop:dr,Allowed_dT:adt,
+    TIM_k:ti.k,TIM_t:ti.t,TIM_Src:ti.src,TIM_SrcLabel:ti.label,TIM_SrcDetail:ti.detail||'',TIM_Warn:ti.warn||''};
 }
 
 function computeAll(params,comps,Area_fixed_m2){
@@ -1526,6 +1689,110 @@ function switchSubTab(i){document.querySelectorAll('.sub-tab-btn').forEach((b,j)
 // =====================================================
 // TAB 0: COMPONENT TABLES + FIREBASE LIBRARY
 // =====================================================
+/* ── 元件表的「介面材料」欄 ─────────────────────────────────────
+   一格三層：TIM 類型 → 型號（只列該類型的型號）→ 這一列實際採用的 k/t 與其來源。
+   型號庫在 AI-Thermal 維護，這裡只讀；來源標註是為了讓每個數字都回答得出「哪來的」。 */
+function timCellHtml(row,category,i,dis){
+  const type=String(row.TIM_Type||'');
+  const list=TIM_TYPES.slice();
+  // 舊值（如 Pad2）不在選項裡時臨時補上並標「已停用」——不靜默改掉使用者填的內容
+  if(type&&!list.includes(type))list.push(type);
+  let opts='';
+  list.forEach(o=>{
+    const legacy=!TIM_TYPES.includes(o);
+    opts+='<option value="'+_vEsc(o)+'"'+(type===o?' selected':'')+'>'+_vEsc(o)+(legacy?'（已停用）':'')+'</option>';
+  });
+  let h='<td class="tim-cell"><select style="min-width:110px;"'+dis+' onchange="updateComp(\''+category+'\','+i+',\'TIM_Type\',this.value)">'+opts+'</select>';
+  h+=timModelSelectHtml(row,category,i,dis);
+  h+=timSourceNoteHtml(row);
+  return h+'</td>';
+}
+
+/* 型號下拉：只有 Grease/Pad/Putty 有型號可選（None 與舊類型沒有）。 */
+function timModelSelectHtml(row,category,i,dis){
+  const type=String(row.TIM_Type||'');
+  if(!TIM_PARAM_TYPES.includes(type))return '';
+  const cur=String(row.TIM_Model||'').trim();
+  const list=timLibListByType(type);
+  const hint='TIM 型號庫（型號→k 值／填縫厚度）由 AI-Thermal 工具 Tab2 的「🧪 TIM 型號庫」維護，本工具只讀不寫。';
+  if(!list.length&&!cur){
+    return '<div class="tim-sub"><span class="tim-sub-empty" title="'+_vEsc(hint)+'">'+(timLibLoaded?'型號庫無 '+_vEsc(type)+' 型號':'型號庫尚未載入')+'</span></div>';
+  }
+  const gone=!!cur&&!timLibFindByModel(type,cur);
+  let opts='<option value="">— 未選型 —</option>';
+  // 型號在庫裡被刪掉（或型號庫還沒載入）時仍把舊值列出來，不讓畫面自己把選擇清掉
+  if(gone)opts+='<option value="'+_vEsc(cur)+'" selected>'+_vEsc(cur)+(timLibLoaded?'（已從型號庫移除）':'（型號庫未載入）')+'</option>';
+  list.forEach(r=>{opts+='<option value="'+_vEsc(r.model)+'"'+(!gone&&r.model===cur?' selected':'')+'>'+_vEsc(r.model)+'</option>';});
+  return '<div class="tim-sub'+(gone?' tim-sub-gone':'')+'"><select'+dis+' title="'+_vEsc(hint)+'" onchange="updateTimModel(\''+category+'\','+i+',this.value)">'+opts+'</select></div>';
+}
+
+/* 來源標註：這一列的 R_TIM 用了哪一組 k/t、從哪來。有 warn 才轉琥珀色。 */
+function timSourceNoteHtml(row){
+  const ti=resolveTim(row,G);
+  let val='',from='';
+  if(ti.src==='none'){val='無 TIM';from='R_TIM = 0';}
+  else if(ti.src==='missing'){val='來源缺失';from='R_TIM 以 0 計入';}
+  else{val='k='+_timNum(ti.k)+' · t='+_timNum(ti.t)+'mm';from='← '+ti.label;}
+  const tip=(ti.detail||'')+(ti.warn?'\n⚠ '+ti.warn:'');
+  return '<div class="tim-note'+(ti.warn?' tim-note-warn':'')+'" title="'+_vEsc(tip)+'">'+
+         (ti.warn?'⚠ ':'')+_vEsc(val)+'<br><span class="tim-note-src">'+_vEsc(from)+'</span></div>';
+}
+
+/* 選型號。空值一律「不寫 key」而不是寫 ''：共用 DB 規則——寫 '' 會覆蓋掉對方工具的預設值，
+   而 calcRow 對空字串多半不噴 NaN 而是靜默算成 0（低估熱阻＝樂觀，比 NaN 危險）。 */
+function updateTimModel(cat,i,val){
+  const c=components[cat]&&components[cat][i];if(!c)return;
+  const v=String(val||'').trim();
+  if(v)c.TIM_Model=v;else delete c.TIM_Model;
+  recalc();
+}
+
+/* ── 舊資料遷移：TIM_Type='Pad2' → 'Pad' ＋型號 ───────────────────
+   Pad 2 原本是「第二組自訂 Pad 規格」（K_Pad2/t_Pad2），已由型號庫取代：
+   不同 k 值的 Pad 用型號表達，不再靠兩個選項硬分。
+   遷移只改記憶體裡的元件，要按「☁️ 儲存專案」才寫回 DB；型號庫本身不在這裡建（唯讀）。 */
+function _timPad2Rows(){
+  const out=[];
+  ['rf','digital','pwr'].forEach(cat=>(components[cat]||[]).forEach((c,i)=>{
+    if(String(c&&c.TIM_Type||'')==='Pad2')out.push({cat,i,c});
+  }));
+  return out;
+}
+
+function renderTimMigrateBanner(){
+  const el=document.getElementById('tim-migrate-banner');if(!el)return;
+  const hits=_timPad2Rows();
+  if(!hits.length){el.innerHTML='';return;}
+  const k=parseFloat(G.K_Pad2),t=parseFloat(G.t_Pad2);
+  const cur=(k>0&&t>0)?('本專案殘留值 k='+_timNum(k)+' W/m·K、t='+_timNum(t)+' mm')
+                      :'本專案已查不到 K_Pad2／t_Pad2（這些元件的 R_TIM 目前以 0 計入，等於低估熱阻）';
+  const names=hits.map(h=>_vEsc(String(h.c.Component||'(未命名)'))).join('、');
+  const models=timLibListByType('Pad');
+  let action;
+  if(models.length){
+    action='<select id="tim-migrate-model"><option value="">（選擇要改用的 Pad 型號）</option>'+
+      models.map(m=>'<option value="'+_vEsc(m.model)+'">'+_vEsc(m.model)+'　k='+_timNum(m.k)+'、t='+_timNum(m.gapThickness)+'mm</option>').join('')+
+      '</select> <button class="btn btn-sm btn-primary" onclick="timMigratePad2()">套用遷移</button>';
+  }else{
+    action='<span style="color:#7c4a03;">型號庫裡還沒有 Pad 型號 → 請先到 <b>AI-Thermal</b> 工具 Tab2 的「🧪 TIM 型號庫」新增一筆（k 與填縫厚度照上面的殘留值填，數字才會 1:1 對得上），再回來這裡遷移。</span>';
+  }
+  el.innerHTML='<div class="tim-migrate">⚠️ <b>Pad 2 已停用</b>，請改用「Pad ＋型號」。'+
+    '受影響元件 <b>'+hits.length+'</b> 顆：'+names+'<br>'+cur+
+    '<div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'+action+'</div></div>';
+}
+
+function timMigratePad2(){
+  const sel=document.getElementById('tim-migrate-model');
+  const model=sel?String(sel.value||'').trim():'';
+  if(!model){alert('⚠️ 請先選擇要改用的 Pad 型號。');return;}
+  const hits=_timPad2Rows();
+  if(!hits.length)return;
+  if(!confirm('將 '+hits.length+' 顆元件改為「Pad ＋型號 '+model+'」？\n（此動作只改目前編輯中的專案，要按「☁️ 儲存專案」才會寫回資料庫）'))return;
+  hits.forEach(h=>{h.c.TIM_Type='Pad';h.c.TIM_Model=model;});
+  recalc();
+  alert('✅ 已將 '+hits.length+' 顆元件改為 Pad ＋型號「'+model+'」。\n\n請按「☁️ 儲存專案」寫回資料庫。');
+}
+
 function renderCompTable(arr,containerId,defaults,category){
   // 📚 從資料庫快選：跨專案即時聚合（不再依賴 *_library）。
   let lhtml='<div class="lib-section">';
@@ -1561,7 +1828,7 @@ function renderCompTable(arr,containerId,defaults,category){
     let refOrigin=row._ref_origin_project||'';
     COLS.forEach(col=>{
       if(col==='Board_Type'){lhtml+='<td><select style="min-width:110px;"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">';BOARD_TYPES.forEach(o=>lhtml+='<option'+(row[col]===o?' selected':'')+'>'+o+'</option>');lhtml+='</select></td>';}
-      else if(col==='TIM_Type'){lhtml+='<td><select style="min-width:110px;"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">';TIM_TYPES.forEach(o=>lhtml+='<option'+(row[col]===o?' selected':'')+'>'+o+'</option>');lhtml+='</select></td>';}
+      else if(col==='TIM_Type'){lhtml+=timCellHtml(row,category,i,dis);}
       else if(col==='Component'){
         let badge=refLocked
           ? '<div style="font-size:0.72rem;color:#b45309;margin-top:3px;">↩ 參照自 '+_vEsc(refOrigin)+' <button class="btn btn-sm" style="padding:1px 6px;font-size:0.7rem;" title="解除後可自行修改瓦數" onclick="detachRef(\''+category+'\','+i+')">🔓 解除參照</button></div>'
@@ -1588,6 +1855,7 @@ function renderTab0(){
     variantsLoading=true;
     loadVariantsCache().finally(()=>{ variantsLoading=false; renderTab0(); });
   }
+  renderTimMigrateBanner();
   renderCompTable(components.rf,'subtab0',RF_DEFAULT,'rf');
   renderCompTable(components.digital,'subtab1',DIG_DEFAULT,'digital');
   renderCompTable(components.pwr,'subtab2',PWR_DEFAULT,'pwr');
@@ -1597,7 +1865,14 @@ function renderTab0(){
   document.getElementById('power-summary').innerHTML='⚡ 整機總功耗（未含 Margin）：<b>'+( rfP+digP+pwrP).toFixed(1)+' W</b> | RF：'+rfP.toFixed(1)+'W　Digital：'+digP.toFixed(1)+'W　Power：'+pwrP.toFixed(1)+'W';
 }
 
-function updateComp(cat,i,col,val){components[cat][i][col]=val;recalc();}
+function updateComp(cat,i,col,val){
+  const c=components[cat]&&components[cat][i];if(!c)return;
+  c[col]=val;
+  // 型號隸屬於某一個 TIM 類型（與 AI-Thermal Tab2 同一套行為）：換類型就刪掉型號 key，
+  // 不留著讓它與新類型不相符；空值不寫 ''，直接 delete。
+  if(col==='TIM_Type'&&c.TIM_Model!==undefined)delete c.TIM_Model;
+  recalc();
+}
 function removeComp(cat,i){components[cat].splice(i,1);recalc();}
 function toggleComp(cat,i){components[cat][i]._excluded=!components[cat][i]._excluded;recalc();}
 function copyComp(cat,i){components[cat].push({...components[cat][i]});recalc();}
@@ -1608,19 +1883,22 @@ function exportCompExcel(mode){
   var wb=XLSX.utils.book_new();
   var cats=mode==='all'?['rf','digital','pwr']:[mode];
   var catLabels={rf:'RF Component',digital:'Digital Component',pwr:'PWR Component'};
-  var header=COLS.map(c=>COL_LABELS[c]);
+  // 匯出多一欄「TIM 型號」：k/t 可能取自型號庫，少了它匯出的表看不出熱阻怎麼來的
+  var xCols=COLS.concat(['TIM_Model']);
+  var xLabels=Object.assign({},COL_LABELS,{'TIM_Model':'TIM 型號'});
+  var header=xCols.map(c=>xLabels[c]);
   cats.forEach(function(cat){
     var rows=components[cat];
     var data=[header];
-    rows.forEach(function(r){data.push(COLS.map(function(c){return r[c];}));});
+    rows.forEach(function(r){data.push(xCols.map(function(c){return r[c];}));});
     // Add power summary row
     var pw=rows.reduce(function(s,r){return s+r['Power(W)']*r.Qty;},0);
-    var sumRow=new Array(COLS.length).fill('');
+    var sumRow=new Array(xCols.length).fill('');
     sumRow[0]='合計';sumRow[2]='=SUMPRODUCT(C2:C'+(rows.length+1)+',B2:B'+(rows.length+1)+')';
     data.push(sumRow);
     var ws=XLSX.utils.aoa_to_sheet(data);
     // Column widths
-    ws['!cols']=COLS.map(function(c){return{wch:c==='Component'?18:c==='Board_Type'||c==='TIM_Type'?14:12};});
+    ws['!cols']=xCols.map(function(c){return{wch:c==='Component'?18:c==='Board_Type'||c==='TIM_Type'||c==='TIM_Model'?14:12};});
     XLSX.utils.book_append_sheet(wb,ws,catLabels[cat]);
   });
   var fname=mode==='all'?'Components_All.xlsx':catLabels[mode].replace(/\s/g,'_')+'.xlsx';
@@ -1660,7 +1938,15 @@ function renderTab1(){
   R.rows.forEach((r,ri)=>{let rIdx=riskNames.indexOf(r.Component);let isRisk=rIdx>=0;let rowBg=isRisk?riskBg[rIdx]:(ri%2===1?'#fafbfc':'');th+='<tr style="'+(rowBg?'background:'+rowBg+';':'')+'">';cols.forEach(c=>{let v=r[c];let st='';
     if(c==='Tj_Margin'&&typeof v==='number'&&v<0)st='color:#c0392b;font-weight:600;';
     if(c==='Component'&&isRisk){let lbl='<span style="color:'+riskColor[rIdx]+';font-weight:700;">[#'+(rIdx+1)+']</span> '+_vEsc(v);th+='<td style="'+st+'">'+lbl+'</td>';}
-    else{if(typeof v==='number')v=(c.includes('R_')&&c!=='R_jc')?v.toFixed(4):v.toFixed(1);else v=_vEsc(v);th+='<td style="'+st+'">'+v+'</td>';}});th+='</tr>';});
+    else{if(typeof v==='number')v=(c.includes('R_')&&c!=='R_jc')?v.toFixed(4):v.toFixed(1);else v=_vEsc(v);
+      // R_TIM 要看得出 k/t 是「來自型號」還是「來自參數控制台」（每個數字都要回答得出哪來的）
+      let tip='',mark='';
+      if(c==='R_TIM'){
+        tip=(r.TIM_SrcDetail||'')+(r.TIM_Warn?'\n⚠ '+r.TIM_Warn:'');
+        if(r.TIM_Warn)mark='<span class="tim-mark tim-mark-warn" title="'+_vEsc(r.TIM_Warn)+'">⚠</span>';
+        else if(r.TIM_Src==='model')mark='<span class="tim-mark" title="'+_vEsc('k/t 來自 TIM 型號庫：'+(r.TIM_SrcLabel||''))+'">◆</span>';
+      }
+      th+='<td style="'+st+'"'+(tip?' title="'+_vEsc(tip)+'"':'')+'>'+v+mark+'</td>';}});th+='</tr>';});
   th+='</tbody></table>';document.getElementById('tab1-table').innerHTML=th;
 }
 
@@ -1877,13 +2163,23 @@ function runTornado(){
 // PROJECT I/O
 // =====================================================
 function loadProject(){document.getElementById('fileInput').click();}
+/* 換專案時清掉「參數控制台已經沒有輸入框」的舊參數（目前只有 K_Pad2/t_Pad2）。
+   readGlobals 只會從畫面上的欄位刷新 G，這些 key 沒有欄位 → 不清會沿用上一個專案的殘留值，
+   拿 A 案的 K_Pad2 去算 B 案的舊 Pad2 元件。 */
+function clearLegacyTimGlobals(){
+  Object.values(TIM_LEGACY_PARAM).forEach(x=>{
+    [x.k,x.t].forEach(k=>{ if(!document.getElementById(k)) delete G[k]; });
+  });
+}
+
 function handleFileLoad(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=function(ev){try{let d=JSON.parse(ev.target.result);
+  clearLegacyTimGlobals();
   if(d.global_params){for(let k in d.global_params){G[k]=d.global_params[k];let el=document.getElementById(k);if(el){if(el.tagName==='SELECT')el.value=d.global_params[k];else el.value=d.global_params[k];}}}
   if(d.rf_data)components.rf=d.rf_data;if(d.digital_data)components.digital=d.digital_data;if(d.pwr_data)components.pwr=d.pwr_data;
   applyFinCustomUI();recalc();alert('✅ 專案載入成功！');}catch(err){alert('Error: '+err.message);}};r.readAsText(f);e.target.value='';}
 
 function saveProject(){readGlobals();let d={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},global_params:{},rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
-  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle','fin_custom_emb','fin_eta_emb','fin_kfin_emb','fin_custom_dc','fin_eta_dc','fin_kfin_dc'].forEach(k=>d.global_params[k]=G[k]);
+  ['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle','fin_custom_emb','fin_eta_emb','fin_kfin_emb','fin_custom_dc','fin_eta_dc','fin_kfin_dc'].forEach(k=>d.global_params[k]=G[k]);
   d.global_params.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;
   let b=new Blob([JSON.stringify(d,null,4)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(b);let pn=document.getElementById('cloudProjectName').value.trim()||'Project';a.download='RRU_'+pn+'_'+new Date().toISOString().slice(0,10)+'.json';a.click();}
 
@@ -1891,7 +2187,7 @@ function saveProject(){readGlobals();let d={meta:{version:"v4.30 (GitHub Pages)"
 // CLOUD PROJECT SAVE / LOAD
 // =====================================================
 // 專案 global_params 欄位清單（5G-RRU 擁有的 keys）。集中一處，避免儲存/複製兩處各自漂移。
-const PROJECT_GLOBAL_KEYS=['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Pad2','t_Pad2','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle','fin_custom_emb','fin_eta_emb','fin_kfin_emb','fin_custom_dc','fin_eta_dc','fin_kfin_dc'];
+const PROJECT_GLOBAL_KEYS=['T_amb','Margin','L_pcb','W_pcb','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle','fin_custom_emb','fin_eta_emb','fin_kfin_emb','fin_custom_dc','fin_eta_dc','fin_kfin_dc'];
 
 // 由目前畫面狀態組出要寫入 DB 的 project fields。
 // existing：DB 既有 document（若有）→ 用來保留 sibling tool 寫入、我們不認識的 global_params keys。
@@ -1993,6 +2289,9 @@ async function cloudLoadOne(docId){
   try{
     let d=await dbAdapter.getDoc('projects', docId);
     if(!d){alert('專案不存在');return;}
+    // 專案載入時重讀型號庫：AI-Thermal 端可能剛新增/改過型號，k 與填縫厚度要吃到最新值
+    try{ await timLibLoad(true); }catch(e){ console.warn('[timLib] reload failed:', e); }
+    clearLegacyTimGlobals();
     if(d.global_params){for(let k in d.global_params){G[k]=d.global_params[k];let el=document.getElementById(k);if(el){el.value=d.global_params[k];}}}
     if(d.rf_data)components.rf=d.rf_data;if(d.digital_data)components.digital=d.digital_data;if(d.pwr_data)components.pwr=d.pwr_data;
     if(d.project_name)document.getElementById('cloudProjectName').value=d.project_name;
@@ -2229,7 +2528,7 @@ async function generatePDFReport() {
       'Board_Type': '導熱至 HSK 方式',
       'Limit(C)': '最高允許溫度',
       'R_jc': '結點到殼熱阻',
-      'TIM_Type': '界面材料類型'
+      'TIM_Type': '界面材料類型（下方為型號）'
     };
     const detailColAnnotations = {
       'Component': '元件名稱',
@@ -2287,11 +2586,20 @@ async function generatePDFReport() {
       }));
       const body = [headerRow];
       active.forEach((row, ri) => {
-        body.push(headers.map(h => ({
-          text: String(row[h] != null ? row[h] : ''),
-          fontSize:7, alignment: typeof row[h]==='number'?'center':'left',
-          fillColor: ri % 2 === 1 ? '#fafbfc' : null
-        })));
+        body.push(headers.map(h => {
+          const fill = ri % 2 === 1 ? '#fafbfc' : null;
+          // TIM 類型底下附型號：螢幕看得到型號，PDF 也要看得到（三方同步）
+          if (h === 'TIM_Type' && row.TIM_Model) {
+            return {text:[{text:String(row[h] != null ? row[h] : '') + '\n', fontSize:7},
+                          {text:String(row.TIM_Model), fontSize:5.5, color:'#64748b'}],
+                    alignment:'left', fillColor: fill};
+          }
+          return {
+            text: String(row[h] != null ? row[h] : ''),
+            fontSize:7, alignment: typeof row[h]==='number'?'center':'left',
+            fillColor: fill
+          };
+        }));
       });
       const totalP = active.reduce((s,r) => s + (r['Power(W)']||0) * (r.Qty||0), 0);
       return [
@@ -2824,7 +3132,9 @@ async function handleCreateDb() {
 async function loadLibraryFromLocal() {
   // 快選改為跨專案即時聚合：DB（重新）連線時失效 variant 快取，由 renderTab0 重新載入。
   variantsCache = null;
-  renderTab0();
+  // TIM 型號庫是頂層 collection、與專案無關，但每一列的 k/t 可能取自它 → 連線後重讀並重算。
+  try { await timLibLoad(true); } catch (e) { console.warn('[timLib] load failed:', e); }
+  recalc();
 }
 </script>
 </body>
