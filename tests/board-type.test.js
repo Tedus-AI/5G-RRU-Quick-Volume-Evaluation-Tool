@@ -108,8 +108,13 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
     recalc();
     const rows = document.querySelectorAll('#subtab0 table.comp-table tbody tr');
     const marks = rows[0].querySelectorAll('.derived-src');
+    const rjcCell = rows[0].querySelector('td[data-col="R_jc"]');
+    const rjcRef = rjcCell.querySelector('.rjc-ref');
     const titles = Array.from(marks).map(m => m.getAttribute('title'));
-    const cells = Array.from(rows[0].querySelectorAll('td')).map(td => td.querySelector('.derived-src') ? 1 : 0);
+    // Rjc 已改成鎖定的純參照值（不是 .derived-src input）→ 它的 tooltip 另外取
+    const rjcTitle = rjcRef ? (rjcRef.getAttribute('title') || '') : '';
+    const cells = Array.from(rows[0].querySelectorAll('td'))
+      .map(td => (td.querySelector('.derived-src') || td.querySelector('.rjc-ref')) ? 1 : 0);
     // 標記不可讓該列變高（窄欄換行過）：與沒有標記的列比較列高
     const h1 = rows[0].getBoundingClientRect().height, h2 = heightBefore;
     return {
@@ -118,17 +123,28 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
       cells,                                   // COLS 順序：0 Component…4 Pad_L,5 Pad_W,7 Board_Type,9 R_jc
       hasPath: titles.some(t => /主散熱路徑/.test(t)),
       hasEpad: titles.some(t => /E-PAD 大小/.test(t)),
-      hasRjc:  titles.some(t => /θJC,bottom/.test(t)),
+      hasRjc:  /θJC,bottom/.test(rjcTitle),
       overwriteWarned: titles.every(t => /會被覆寫/.test(t)),
+      // Rjc = 規格書值 → 鎖成純文字（白底黑字，不用反灰 disabled input）
+      rjcLocked: !!rjcRef && !rjcCell.querySelector('input'),
+      rjcTitle,
+      rjcBg: rjcRef ? getComputedStyle(rjcRef).backgroundColor : '',
+      rjcColor: rjcRef ? getComputedStyle(rjcRef).color : '',
+      rjcRow2Input: !!rows[1].querySelector('td[data-col="R_jc"] input'),
       legend: !!document.querySelector('#subtab0 .derived-legend'),
       sameRowHeight: Math.abs(h1 - h2) < 1.5, h1: Math.round(h1), h2: Math.round(h2),
     };
   });
-  ok('有標記的列在 4 個欄位各標一次', d.markCount === 4, d);
+  // Rjc 現在是「鎖定的純參照值」而不是可編輯欄位 → 藍邊 input 只剩 3 欄（Pad_L/Pad_W/導熱方式）
+  ok('可編輯的推導欄位標 3 次（Pad_L / Pad_W / 導熱方式）', d.markCount === 3, d);
   ok('標記落在 Pad_L / Pad_W / 導熱方式 / Rjc 這四欄',
-     d.cells.join('') === '00001101010' || (d.cells[4] && d.cells[5] && d.cells[7] && d.cells[9]), d.cells);
+     d.cells[4] && d.cells[5] && d.cells[7] && d.cells[9], d.cells);
   ok('tooltip 說得出來源（主散熱路徑 / E-PAD 大小 / θJC,bottom）', d.hasPath && d.hasEpad && d.hasRjc, d);
   ok('tooltip 提醒「會被覆寫」', d.overwriteWarned, d);
+  ok('Rjc 鎖定：沒有輸入框，是白底黑字的純參照值（不反灰）',
+     d.rjcLocked && /rgb\(255, 255, 255\)/.test(d.rjcBg) && /rgb\(17, 24, 39\)/.test(d.rjcColor), d);
+  ok('Rjc 的 tooltip 指路到 AI-Thermal 的熱阻表', /AI-Thermal/.test(d.rjcTitle) && /θJC/.test(d.rjcTitle), d.rjcTitle);
+  ok('沒有推導標記的元件 Rjc 仍可自行輸入', d.rjcRow2Input === true, d);
   ok('沒有標記的列不標', d.row2MarkCount === 0, d.row2MarkCount);
   ok('標記不佔額外寬度、不把列撐高（同一列加標記前後等高）', d.sameRowHeight, { 加標記後: d.h1, 加標記前: d.h2 });
   ok('表格上方顯示圖例', d.legend === true);
