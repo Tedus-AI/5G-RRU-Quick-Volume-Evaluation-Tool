@@ -187,6 +187,24 @@
 讀寫一律 try/catch。⚠ **寬度變動後要呼叫 `resizePlots()`**，否則 Plotly 圖停在舊寬度；
 登入前／登出後由 `_setShellVisible(false)` 把側欄、分隔線、主區一起藏起來。
 
+### `R_jc`（熱阻 Rjc）：AI-Thermal 推導過就鎖定
+
+熱阻是**規格書的值**，單一事實來源在 AI-Thermal Tab1 的熱阻表（θJC）。在本工具改它只會被
+AI-Thermal 下次存檔覆寫，還讓兩邊數字對不起來 → `rjcCellHtml` 改成：
+
+| 情況 | 畫面 |
+|---|---|
+| 有 `comp._rjc_from`（AI-Thermal 推導過）| **鎖定的純參照值**：白底黑字文字 ＋ 小 🔒，左側保留藍邊；tooltip 寫出取自哪一筆 θJC、量測條件（讀 AI-Thermal 寫的 `comp.Rth`，本工具只讀不寫），並指路回 AI-Thermal |
+| 沒有標記（本工具新增／AI-Thermal 沒推導過）| 照舊是可輸入的數字欄 |
+
+- **不可用反灰 `disabled` input**（UX 慣例 2：純參照值要白底黑字看得清楚），也**不給 ✂ 逃生口**
+  —— 這欄的逃生口是「回 AI-Thermal 改 θJC」，不是就地改。
+- `.rjc-ref` 必須 `white-space:nowrap`：數值與 🔒 換行會把整列撐高（行內圖示踩過這個坑）。
+- 鎖定只影響「能不能改」，計算照舊：`Tj = Tc + P×R_jc`。
+- 📋 複製元件會沿用標記（同一顆元件的規格書值）→ 仍鎖定；「從資料庫快選」不帶底線開頭的
+  內部標記 → 快選出來的新元件可自行輸入（`VARIANT_CARRY` 刻意不含標記）。
+- 圖例文案要跟著分開講：可編輯的推導欄位是「會被覆寫」，Rjc 是「鎖定不開放修改」。
+
 ### AI-Thermal 推導欄位的來源標記
 
 `Board_Type`／`Pad_L`／`Pad_W`（Tab2 主散熱路徑）與 `R_jc`（Tab1 熱阻表的 θJC）由 AI-Thermal
@@ -210,7 +228,8 @@
 | `Component`、`Qty`、`Power(W)`、`Limit(C)` | 兩邊 |
 | `Height(mm)` | 只有 5G-RRU（AI-Thermal 一律不寫）|
 | `Thick(mm)` | 只有 5G-RRU，且**由參數控制台的 PCB 板厚度／銅塊厚度推導**（見下節）；AI-Thermal 一律不寫 |
-| `Board_Type`、`Pad_L`、`Pad_W`、`R_jc`、`TIM_Model`、`TIM_Type` | 5G-RRU 可編輯（標藍邊提醒會被覆寫）；AI-Thermal 存檔時由 Tab1/Tab2 推導後覆寫 |
+| `Board_Type`、`Pad_L`、`Pad_W`、`TIM_Model`、`TIM_Type` | 5G-RRU 可編輯（標藍邊提醒會被覆寫）；AI-Thermal 存檔時由 Tab1/Tab2 推導後覆寫 |
+| `R_jc` | **有 `_rjc_from` 時本工具鎖定不可改**（見下節）；沒有標記才可自行輸入 |
 | `Type`、`Power_RT(W)`、`TV_ID_mil`、`TV_Qty`、`Temp_Sensor`、`Local_Qty`、`Remote_Qty`、`note`、`Rth`、`SpecFile` | 只有 AI-Thermal（本工具不顯示但原樣保留）|
 
 ⚠ **「從資料庫快選」的 carry 白名單兩邊都必須列全上表所有欄位**（本工具的 `VARIANT_CARRY`

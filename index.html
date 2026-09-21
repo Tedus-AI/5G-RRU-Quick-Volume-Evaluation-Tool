@@ -56,8 +56,13 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
   cursor:pointer;padding:3px 6px;line-height:0;flex:0 0 auto;}
 .sidebar-toggle:hover{background:#334155;border-color:#94a3b8;color:#fff;}
 /* 板厚：由參數控制台帶入的純參照值用白底黑字純文字（不用反灰 input）；不適用時才反灰 */
-.thick-ref{display:inline-block;padding:4px 8px;background:#fff;color:#111827;border:1px solid #e2e8f0;
+.thick-ref,.rjc-ref{display:inline-block;padding:4px 8px;background:#fff;color:#111827;border:1px solid #e2e8f0;
   border-radius:4px;font-size:0.82rem;cursor:help;min-width:34px;text-align:center;}
+/* Rjc 是規格書值（AI-Thermal 熱阻表的 θJC）→ 鎖定不可改。白底黑字純文字，不用反灰 disabled
+   input（UX 慣例：唯讀參照值要看得清楚）；左側藍邊沿用「AI-Thermal 推導」的識別。 */
+/* nowrap：數值與 🔒 必須留在同一行 —— 窄欄換行會把整列撐高（行內圖示踩過這個坑） */
+.rjc-ref{border-left:3px solid #0550ae;white-space:nowrap;}
+.rjc-ref .rjc-lock{font-size:0.7rem;color:#94a3b8;margin-left:3px;}
 .thick-na{display:inline-block;padding:4px 8px;color:#9ca3af;cursor:help;}
 .thick-migrate{background:#eff6ff;border:1px solid #60a5fa;border-left-width:5px;border-radius:8px;
   padding:12px;margin-bottom:12px;color:#1e3a5f;font-size:0.85rem;line-height:1.5;}
@@ -2103,6 +2108,30 @@ function thickCellHtml(row){
   return '<td data-col="Thick(mm)"><span class="thick-ref" title="'+_vEsc('由參數控制台的「'+src.label+'」帶入，所有 '+row.Board_Type+' 元件共用同一個值。要改請改參數控制台那一欄。')+'">'+_vEsc(shown)+'</span></td>';
 }
 
+/* 熱阻 Rjc 欄：由 AI-Thermal 熱阻表的 θJC 推導（comp._rjc_from 是來源標記）。
+   熱阻是規格書給的值，不該在這裡被改 → 有來源標記時鎖成純文字（白底黑字，不反灰），
+   tooltip 寫明取自哪一筆 θJC、量測條件，以及要改請回 AI-Thermal 的熱阻表。
+   沒有來源標記（AI-Thermal 沒推導過、或本工具自己新增的元件）→ 維持可輸入。 */
+function rjcCellHtml(row,category,i,dis){
+  const from=row&&row._rjc_from;
+  if(!from){
+    return '<td data-col="R_jc"><input type="number" value="'+(row['R_jc']||0)+'" step="any"'+dis+
+           ' onchange="updateComp(\''+category+'\','+i+',\'R_jc\',parseFloat(this.value)||0)"></td>';
+  }
+  const v=parseFloat(row['R_jc']);
+  const shown=isFinite(v)?String(+v.toFixed(3)):'—';
+  // Rth 是 AI-Thermal 寫的欄位（本工具只讀不寫）→ 取得起得出量測條件就一併顯示
+  let cond='';
+  if(Array.isArray(row.Rth)){
+    const hit=row.Rth.find(r=>r&&r.type===from);
+    if(hit&&hit.cond)cond='（'+hit.cond+'）';
+  }
+  const tip='Rjc = '+shown+' °C/W，取自 AI-Thermal 熱阻表的 '+(RJC_FROM_LABEL[from]||'θJC')+cond+
+            '。\n熱阻是規格書的值 → 這裡鎖定不開放修改；要改請到 AI-Thermal 的「熱阻（θ）」填 θJC 並標「主要」。';
+  return '<td data-col="R_jc"><span class="rjc-ref" title="'+_vEsc(tip)+'">'+_vEsc(shown)+
+         '<span class="rjc-lock">🔒</span></span></td>';
+}
+
 /* ── 元件表的「導熱方式」欄 ─────────────────────────────────────
    值不在選項裡時（例如對方工具寫進未知值）臨時補上該選項，不讓瀏覽器把它
    靜默顯示成清單第一項、一碰就改掉使用者的資料。 */
@@ -2252,7 +2281,7 @@ function renderCompTable(arr,containerId,defaults,category){
   let pw=arr.reduce((s,r)=>s+(r._excluded?0:r['Power(W)']*r.Qty),0);
   let activeCount=arr.filter(r=>!r._excluded).length;
   lhtml+='<p style="color:#666;font-size:0.85rem;margin-bottom:8px;">📊 '+category.toUpperCase()+' 類總功耗：<b>'+pw.toFixed(1)+' W</b> | 共 <b>'+activeCount+'</b>/<b>'+arr.length+'</b> 種元件納入計算</p>';
-  if(hasDerivedRow(arr))lhtml+='<p class="derived-legend"><span class="derived-swatch"></span> 左側藍邊的欄位由 <b>AI-Thermal</b> 推導（導熱方式／Pad 尺寸來自 Tab2「主散熱路徑」，Rjc 來自熱阻表的 θJC）。在這裡改仍然算得到，但下次從 AI-Thermal 存檔時會被覆寫；滑鼠停在欄位上可看來源。</p>';
+  if(hasDerivedRow(arr))lhtml+='<p class="derived-legend"><span class="derived-swatch"></span> 左側藍邊的欄位由 <b>AI-Thermal</b> 推導：<b>導熱方式／E-Pad 尺寸</b>（Tab2「主散熱路徑」）在這裡改仍算得到，但下次從 AI-Thermal 存檔時會被覆寫；<b>Rjc</b> 是規格書值（熱阻表的 θJC）<b>直接鎖定 🔒 不開放修改</b>，要改請到 AI-Thermal 的熱阻（θ）填 θJC。滑鼠停在欄位上可看來源。</p>';
 
   // Table
   lhtml+='<div class="comp-table-wrap"><table class="comp-table"><thead><tr>';
@@ -2267,6 +2296,7 @@ function renderCompTable(arr,containerId,defaults,category){
     COLS.forEach(col=>{
       if(col==='Board_Type'){lhtml+=boardTypeCellHtml(row,category,i,dis);}
       else if(col==='Thick(mm)'){lhtml+=thickCellHtml(row);}
+      else if(col==='R_jc'){lhtml+=rjcCellHtml(row,category,i,dis);}
       else if(col==='TIM_Type'){lhtml+=timCellHtml(row,category,i,dis);}
       else if(col==='Component'){
         let badge=refLocked
