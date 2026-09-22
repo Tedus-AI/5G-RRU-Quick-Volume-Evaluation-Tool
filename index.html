@@ -268,6 +268,11 @@ tr.comp-excluded{opacity:0.4;}
 /* AI-Thermal 推導欄位的來源標記：欄位左側藍邊（資訊用，非錯誤 → 不用紅色）。
    不佔額外寬度，窄欄也不會被擠到換行。 */
 .comp-table td input.derived-src,.comp-table td select.derived-src{border-left:3px solid #0550ae;background:#f5f9ff;cursor:help;}
+/* 自動補值（原本缺這個欄位，多半是 AI-Thermal 建的元件）→ 琥珀色提醒去確認，
+   與藍色的「AI-Thermal 推導值」區隔；紅色保留給 Fail。 */
+.comp-table td input.cell-filled,.comp-table td select.cell-filled{border-left:3px solid #d97706;background:#fffbeb;cursor:help;}
+.comp-fill-note{background:#fffbeb;border:1px solid #fcd34d;border-left:4px solid #d97706;color:#78350f;
+  border-radius:8px;padding:10px 14px;margin:10px 0;font-size:0.86rem;line-height:1.7;}
 .derived-legend{color:#64748b;font-size:0.76rem;margin:-4px 0 8px;line-height:1.4;}
 .derived-swatch{display:inline-block;width:10px;height:12px;border:1px solid #d1d5db;border-left:3px solid #0550ae;background:#f5f9ff;vertical-align:-2px;border-radius:2px;}
 .tim-migrate{background:#fffbeb;border:1px solid #f59e0b;border-left-width:5px;border-radius:8px;padding:12px;margin-bottom:12px;color:#7c4a03;font-size:0.85rem;}
@@ -629,6 +634,7 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
     <h3>🔥 元件熱源清單設定</h3>
     <p style="color:#888;font-size:0.82rem;margin-bottom:12px;">💡 提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。</p>
     <div id="thick-migrate-banner"></div>
+    <div id="comp-fill-banner"></div>
     <div id="tim-migrate-banner"></div>
     <div class="sub-tabs">
       <button class="sub-tab-btn active" onclick="switchSubTab(0)">📡 RF Component</button>
@@ -1090,9 +1096,9 @@ const DEFAULT_CONFIG = {
     "fin_eta_dc": 0,
     "fin_kfin_dc": 0,
     "al_density": 2.7,
-    "filter_density": 0.97,
-    "shielding_density": 0.76,
-    "pcb_surface_density": 0.95
+    "filter_density": 1,
+    "shielding_density": 1.5,
+    "pcb_surface_density": 1.2
   },
   "rf_data": [
     {
@@ -1655,6 +1661,7 @@ function init() {
   components.digital = DEFAULT_CONFIG.digital_data.map(r=>({...r}));
   components.pwr = DEFAULT_CONFIG.pwr_data.map(r=>({...r}));
   for (let k in gp) { let el=document.getElementById(k); if(el){if(el.tagName==='SELECT')el.value=gp[k];else el.value=gp[k];} }
+  normalizeComps();
   applyFinCustomUI();
   initSidebarLayout();
   migrateThickGlobals(gp);
@@ -1835,7 +1842,15 @@ function drcDieCasting(FH,T_tip,alpha_deg,Gap){
   return{errors,warnings,T_root,G_root,AR:AR_dc,G_min};
 }
 
-function calcThermalResistance(row,g){
+/* 欄位轉成數字。⚠ 不可用 `+` 直接吃原始值：Pad_L 與 Thick(mm) 若是字串，
+   `row.Pad_L+row['Thick(mm)']` 會變成字串相接（"7"+"2"="72" → 擴散面積算成 72×72mm，
+   熱阻被低估近 8 倍且不會噴 NaN，是「靜默樂觀」，比 NaN 更危險）。
+   真的沒有值時回 NaN —— 讓它在畫面上現形，不要偷偷當 0（R_jc/Height 當 0 都是低估溫度）。 */
+function _num(v){ return (typeof v==='number')?v:parseFloat(v); }
+
+function calcThermalResistance(row0,g){
+  const row={...row0};
+  ['Qty','Power(W)','Height(mm)','Pad_L','Pad_W','Thick(mm)','Limit(C)','R_jc'].forEach(k=>{ row[k]=_num(row[k]); });
   let bl,bw;
   if(row.Board_Type==="Copper Coin"){bl=g.Coin_L_Setting;bw=g.Coin_W_Setting;}
   // IC top：熱從封裝上表面出去，沒有穿板、也就沒有基板擴散面積
@@ -2033,6 +2048,74 @@ let _thickNotes=null;   // 這次載入的遷移結果（{inferred:[],changed:[]
 /* 載入專案後呼叫：專案檔沒有全域厚度就回推一個，再把它統一套到元件上。
    loadedGlobals 一定要傳「這個專案檔裡的 global_params」——不能看 G，
    因為 G 還留著上一個專案的值（readGlobals 只從畫面欄位刷新）。 */
+/* ── 元件欄位正規化（載入專案／匯入檔案後一定要跑）────────────────────────
+   AI-Thermal 建立的元件**刻意不寫**本工具專屬欄位（Height(mm)／R_jc…）——
+   它不知道這些值，寫了就分不出「工程師填的」還是「工具塞的」。但那些元件載進來時
+   `row['Height(mm)']` 是 undefined，而元件表是 `value="'+(row[col]||0)+'"` → 畫面顯示 0，
+   看起來跟正常元件一模一樣，calcThermalResistance 卻拿 undefined 做算術 →
+   Tj／Tj 裕度／允許溫升／局部環溫整列 NaN（使用者回報的「明明建法一樣卻跑出 NaN」）。
+
+   規則：能轉成數字的就轉成數字（同時解掉字串相加的坑）；真的沒有值才套**該分類的預設值**，
+   並記在 `row._filled` → 元件表把那一格標成琥珀色、Tab0 跳橫幅逐顆列出來讓人確認後再存。
+   ⚠ 不可反過來「一律填 0」：R_jc=0、Height=0 都是低估溫度的方向。
+   ⚠ `Thick(mm)` 不在這裡補：它每次 recalc 都由 applyThickFromGlobals 依導熱方式統一帶入。 */
+const FILL_NUM_COLS=['Qty','Power(W)','Height(mm)','Pad_L','Pad_W','Limit(C)','R_jc'];
+const FILL_STR_COLS=['Board_Type','TIM_Type'];
+let _fillNotes=null;
+
+function normalizeComps(){
+  const filled=[];
+  ['rf','digital','pwr'].forEach(cat=>{
+    const def=(VARIANT_CAT[cat]&&VARIANT_CAT[cat].default)||{};
+    (components[cat]||[]).forEach(c=>{
+      if(!c)return;
+      if(c._filled)delete c._filled;                       // 每次載入重新判定
+      const mark=(k,v)=>{ (c._filled||(c._filled={}))[k]=true;
+        filled.push({cat,name:String(c.Component||'(未命名)'),col:k,label:COL_LABELS[k]||k,value:v}); };
+      FILL_NUM_COLS.forEach(k=>{
+        const v=c[k];
+        if(typeof v==='number'&&isFinite(v))return;         // 已經是數字
+        const n=(v===''||v==null)?NaN:parseFloat(v);
+        if(isFinite(n)){c[k]=n;return;}                     // 字串數字 → 轉成數字（不算補值）
+        c[k]=def[k];mark(k,def[k]);
+      });
+      FILL_STR_COLS.forEach(k=>{
+        if(typeof c[k]==='string'&&c[k].trim()!=='')return;
+        c[k]=def[k];mark(k,def[k]);
+      });
+    });
+  });
+  _fillNotes=filled.length?filled:null;
+  return filled;
+}
+
+function dismissFillNotes(){ _fillNotes=null; renderFillBanner(); }
+
+function renderFillBanner(){
+  const el=document.getElementById('comp-fill-banner');if(!el)return;
+  if(!_fillNotes){el.innerHTML='';return;}
+  const byComp=new Map();
+  _fillNotes.forEach(n=>{ const k=n.cat+'|'+n.name; if(!byComp.has(k))byComp.set(k,{name:n.name,cat:n.cat,items:[]}); byComp.get(k).items.push(n); });
+  let h='<div class="comp-fill-note">🧩 <b>有元件缺少本工具的欄位，已自動套用該分類的預設值</b>'+
+        '（多半是在 AI-Thermal 建立的元件：那邊沒有這些欄位，也不會替你猜值）。'+
+        '<br>沒補的話這些欄位是「空的」，畫面上會顯示 0 但計算會變成 <b>NaN</b>（Tj／裕度／允許溫升整列算不出來）。';
+  h+='<ul style="margin:6px 0 0 18px;padding:0;">';
+  [...byComp.values()].forEach(g=>{
+    h+='<li><b>'+_vEsc(g.name)+'</b>（'+g.cat.toUpperCase()+'）：'+
+       g.items.map(i=>_vEsc(i.label)+' = <b>'+_vEsc(String(i.value))+'</b>').join('、')+'</li>';
+  });
+  h+='</ul><div style="margin-top:8px;">這些是<b>預設值不是實際值</b>，元件表裡已標成琥珀色，請逐一確認後按「☁️ 儲存專案」寫回資料庫。'+
+     ' <button class="btn btn-sm" onclick="dismissFillNotes()">知道了</button></div></div>';
+  el.innerHTML=h;
+}
+
+/* 自動補值的欄位標記（琥珀色＋說明）。使用者自己改過就不再標（updateComp 會清掉）。 */
+function filledAttrs(row,col){
+  if(!row||!row._filled||!row._filled[col])return '';
+  return ' class="cell-filled" title="'+_vEsc('這一格原本沒有值（多半是在 AI-Thermal 建立的元件），'+
+         '已自動套用分類預設值讓計算跑得動。請確認後改成實際值，並按「☁️ 儲存專案」寫回。')+'"';
+}
+
 function migrateThickGlobals(loadedGlobals){
   const gp=loadedGlobals||{};
   const notes={inferred:[],changed:[]};
@@ -2126,7 +2209,7 @@ function thickCellHtml(row){
 function rjcCellHtml(row,category,i,dis){
   const from=row&&row._rjc_from;
   if(!from){
-    return '<td data-col="R_jc"><input type="number" value="'+(row['R_jc']||0)+'" step="any"'+dis+
+    return '<td data-col="R_jc"><input type="number"'+filledAttrs(row,'R_jc')+' value="'+(row['R_jc']||0)+'" step="any"'+dis+
            ' onchange="updateComp(\''+category+'\','+i+',\'R_jc\',parseFloat(this.value)||0)"></td>';
   }
   const v=parseFloat(row['R_jc']);
@@ -2155,7 +2238,7 @@ function boardTypeCellHtml(row,category,i,dis){
     const unknown=!BOARD_TYPES.includes(o);
     opts+='<option value="'+_vEsc(o)+'"'+(cur===o?' selected':'')+'>'+_vEsc(o)+(unknown?'（未知值）':'')+'</option>';
   });
-  return '<td data-col="Board_Type"><select style="min-width:110px;"'+derivedAttrs(row,'Board_Type')+dis+
+  return '<td data-col="Board_Type"><select style="min-width:110px;"'+(derivedAttrs(row,'Board_Type')||filledAttrs(row,'Board_Type'))+dis+
          ' onchange="updateComp(\''+category+'\','+i+',\'Board_Type\',this.value)">'+opts+'</select></td>';
 }
 
@@ -2316,7 +2399,11 @@ function renderCompTable(arr,containerId,defaults,category){
         lhtml+='<td data-col="Component"><input type="text" value="'+_vEsc(row[col]||'')+'"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">'+badge+'</td>';
       }
       else if(col==='Power(W)'&&refLocked){lhtml+='<td data-col="Power(W)"><span title="瓦數已鎖定，請先按「解除參照」" style="display:inline-block;padding:4px 8px;color:#6b7280;background:#f3f4f6;border-radius:4px;white-space:nowrap;">'+(row[col]!=null?row[col]:'')+' 🔒</span></td>';}
-      else{lhtml+='<td data-col="'+col+'"><input type="number"'+derivedAttrs(row,col)+' value="'+(row[col]||0)+'" step="any"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',parseFloat(this.value)||0)"></td>';}
+      else{
+        // ⚠ value 用 (row[col]||0) 會把「沒有值」顯示成 0（看起來正常、算起來 NaN）→
+        //    載入時已由 normalizeComps() 補成分類預設值並標記，這裡把標記畫出來。
+        const attrs=derivedAttrs(row,col)||filledAttrs(row,col);
+        lhtml+='<td data-col="'+col+'"><input type="number"'+attrs+' value="'+(row[col]||0)+'" step="any"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',parseFloat(this.value)||0)"></td>';}
     });
     lhtml+='<td style="white-space:nowrap;">';
     lhtml+='<button class="btn btn-sm eye-btn'+(excl?' excluded':'')+'" title="'+(excl?'顯示（納入計算）':'隱藏（排除計算）')+'" onclick="toggleComp(\''+category+'\','+i+')">👁️</button> ';
@@ -2336,6 +2423,7 @@ function renderTab0(){
     loadVariantsCache().finally(()=>{ variantsLoading=false; renderTab0(); });
   }
   renderThickMigrateBanner();
+  renderFillBanner();
   renderTimMigrateBanner();
   renderCompTable(components.rf,'subtab0',RF_DEFAULT,'rf');
   renderCompTable(components.digital,'subtab1',DIG_DEFAULT,'digital');
@@ -2349,6 +2437,8 @@ function renderTab0(){
 function updateComp(cat,i,col,val){
   const c=components[cat]&&components[cat][i];if(!c)return;
   c[col]=val;
+  // 使用者自己確認過這一格 → 拿掉「自動補值」標記（不要一直標琥珀色）
+  if(c._filled&&c._filled[col]){delete c._filled[col];if(!Object.keys(c._filled).length)delete c._filled;}
   // 型號隸屬於某一個 TIM 類型（與 AI-Thermal Tab2 同一套行為）：換類型就刪掉型號 key，
   // 不留著讓它與新類型不相符；空值不寫 ''，直接 delete。
   if(col==='TIM_Type'&&c.TIM_Model!==undefined)delete c.TIM_Model;
@@ -2665,6 +2755,7 @@ function handleFileLoad(e){let f=e.target.files[0];if(!f)return;let r=new FileRe
   clearGlobalsWithoutInputs();
   if(d.global_params){for(let k in d.global_params){G[k]=d.global_params[k];let el=document.getElementById(k);if(el){if(el.tagName==='SELECT')el.value=d.global_params[k];else el.value=d.global_params[k];}}}
   if(d.rf_data)components.rf=d.rf_data;if(d.digital_data)components.digital=d.digital_data;if(d.pwr_data)components.pwr=d.pwr_data;
+  normalizeComps();
   applyFinCustomUI();migrateThickGlobals(d.global_params);recalc();alert('✅ 專案載入成功！');}catch(err){alert('Error: '+err.message);}};r.readAsText(f);e.target.value='';}
 
 function saveProject(){readGlobals();let d={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},global_params:{},rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
@@ -2687,7 +2778,10 @@ function _buildProjectFields(name, existing){
   const mergedGlobals={...(existing&&existing.global_params?existing.global_params:{})};
   PROJECT_GLOBAL_KEYS.forEach(k=>mergedGlobals[k]=G[k]);
   mergedGlobals.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;
-  return {meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},project_name:name,global_params:mergedGlobals,rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
+  // `_filled` 只是「這格是自動補的」UI 提醒，不是資料 → 不寫回共用 DB
+  const strip=arr=>(arr||[]).map(c=>{const{_filled,...rest}=c||{};return rest;});
+  return {meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},project_name:name,global_params:mergedGlobals,
+          rf_data:strip(components.rf),digital_data:strip(components.digital),pwr_data:strip(components.pwr)};
 }
 
 async function cloudSaveProject(){
@@ -2784,6 +2878,8 @@ async function cloudLoadOne(docId){
     if(d.global_params){for(let k in d.global_params){G[k]=d.global_params[k];let el=document.getElementById(k);if(el){el.value=d.global_params[k];}}}
     if(d.rf_data)components.rf=d.rf_data;if(d.digital_data)components.digital=d.digital_data;if(d.pwr_data)components.pwr=d.pwr_data;
     if(d.project_name)document.getElementById('cloudProjectName').value=d.project_name;
+    // 缺欄位的元件（多半是 AI-Thermal 建的）先補成分類預設值，否則整列算出 NaN
+    normalizeComps();
     // ⚠ 板厚遷移一定要在「元件已換成這個專案的」之後跑：它要回推的是這個專案的板厚
     migrateThickGlobals(d.global_params);
     applyFinCustomUI();closeCloudModal();recalc();alert('✅ 專案「'+(d.project_name||docId)+'」已載入！');
