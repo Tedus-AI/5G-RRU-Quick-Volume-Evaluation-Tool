@@ -1605,6 +1605,15 @@ function makeComp(cat, overrides){
   return Object.assign({}, d, overrides||{});
 }
 
+/* 把（可能有多份的）規格書逐份標上來源專案。
+   AI-Thermal 的 comp.SpecFile：1 份是單一物件、≥2 份是陣列（本工具只原樣保留、不顯示，
+   但快選複製時一定要把每一份都標成「參照」）。 */
+function specMarkFrom(holder, projName){
+  if(!holder || !holder.SpecFile || !projName) return;
+  const arr = Array.isArray(holder.SpecFile) ? holder.SpecFile : [holder.SpecFile];
+  arr.forEach(s => { if(s && s.path) s._from = projName; });
+}
+
 // 從快選加入一顆元件到目前工作專案，並標記為「參照」：
 // 瓦數鎖定、記錄來源專案，避免改到舊案已驗證的值。
 function addFromVariant(cat){
@@ -1616,7 +1625,9 @@ function addFromVariant(cat){
   const src = carrySrc(v.src);
   // 規格書是「檔案參照」不是複本（實體檔在來源專案的 SPEC 資料夾底下）：標來源，
   // AI-Thermal 之後換檔/刪除時才知道只能解除參照、不可刪來源檔。
-  if(src.SpecFile && src.SpecFile.path) src.SpecFile._from = v.originProjectName;
+  // ⚠ 一顆元件可以有多份規格書：AI-Thermal 的 SpecFile「1 份＝物件、≥2 份＝陣列」，
+  // 這裡兩種形狀都要逐份標 _from，否則多份的那些會被當成本專案自己的檔案而遭刪除。
+  specMarkFrom(src, v.originProjectName);
   components[cat].push(makeComp(cat, Object.assign({ Component: v.name }, src, {
     _ref_origin_project: v.originProjectName,
     _ref_origin_id: v.originProjectId,

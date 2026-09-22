@@ -240,6 +240,24 @@ AI-Thermal 下次存檔覆寫，還讓兩邊數字對不起來 → `rjcCellHtml`
 `SpecFile` 是檔案參照不是複本（實體檔在來源專案的 `SPEC/<專案名>/` 底下）→ 快選帶入時標
 `SpecFile._from = <來源專案名>`，AI-Thermal 才知道換檔／刪除時只能解除參照、不可刪來源檔。
 
+#### ⚠ `SpecFile` 可能是陣列（一顆元件多份規格書）
+
+AI-Thermal 已支援「一顆元件多份規格書」（datasheet／application note／errata）。
+欄位仍叫 `SpecFile`，但**形狀隨份數變**：
+
+| 份數 | `comp.SpecFile` |
+|---|---|
+| 0 | key 不存在 |
+| 1 | `{ path, name, at, by, _from? }` ← 與舊格式相同 |
+| ≥2 | `[{ … }, { … }, …]` |
+
+本工具**不顯示規格書、只原樣保留**，但快選複製元件時一定要把**每一份**都標上來源：
+`addFromVariant` 走 `specMarkFrom(src, v.originProjectName)`（單一物件與陣列都逐份標）。
+⚠ 原本寫成 `if(src.SpecFile && src.SpecFile.path) src.SpecFile._from = …` —— 那隻認單一物件，
+遇到陣列會整批漏標，AI-Thermal 之後會把那些檔案當成本專案自己的而**刪掉來源專案的原始檔**。
+新增任何會碰 `SpecFile` 的程式碼時，兩種形狀都要處理（AI-Thermal 端對應 `sgSpecList()` /
+`sgSpecStore()` / `sgSpecMarkFrom()`）。
+
 ⚠ **空值一律「不寫 key」，不可寫 `''`**：快選是 `Object.assign({}, RF_DEFAULT, src)`，key 不
 存在會套分類預設；寫 `''` 會覆蓋預設值，而 `calcRow` 對空字串多半不噴 NaN 而是**靜默算成 0**
 （`Thick` 空 → `R_int`=0、`Pad_L/W` 空 → 面積用字串算出假值、`Limit(C)` 空 → 裕度變超大負數），
