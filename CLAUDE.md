@@ -258,6 +258,36 @@ AI-Thermal 已支援「一顆元件多份規格書」（datasheet／application 
 新增任何會碰 `SpecFile` 的程式碼時，兩種形狀都要處理（AI-Thermal 端對應 `sgSpecList()` /
 `sgSpecStore()` / `sgSpecMarkFrom()`）。
 
+#### ⚠ 載入的元件一定要過 `normalizeComps()`（缺欄位 → 整列 NaN 的根因）
+
+AI-Thermal 建立的元件**刻意不寫**本工具專屬欄位（`Height(mm)`／`R_jc`／`Thick(mm)`…）——
+它不知道這些值，寫了就分不出「工程師填的」還是「工具塞的」（見上一節）。但那些元件載進來時：
+
+- 元件表是 `value="'+(row[col]||0)+'"` → 畫面**顯示 0**，看起來跟正常元件一模一樣；
+- `calcThermalResistance` 直接拿 `undefined` 做算術 → `Loc_Amb`／`Drop`／`Allowed_dT`／`Tj`
+  **整列 NaN**（使用者實際踩到：同一顆料的 `-B8` 版是從快選進來的（`Object.assign({},DEFAULT,src)`
+  會補齊）所以正常，`-B20B28` 版沒走快選就整列 NaN）。
+
+→ `cloudLoadOne` / `handleFileLoad` / `init` 指派完 `components.*` 後**一定要呼叫 `normalizeComps()`**：
+
+1. 能轉成數字的就轉成數字（見下一條）；
+2. 真的沒有值才套**該分類的預設值**（`RF_DEFAULT`/`DIG_DEFAULT`/`PWR_DEFAULT`，與快選同一套），
+   並標在 `row._filled[欄位]`；
+3. Tab0 跳琥珀色橫幅逐顆列出補了哪些欄位、元件表把那一格標琥珀色（`filledAttrs`），
+   提醒「這是預設值不是實際值」，使用者改過（`updateComp`）就取消標記。
+4. `_filled` 是 UI 提醒不是資料 → `_buildProjectFields` 寫回 DB 前 **strip 掉**。
+
+⚠ 不可反過來「一律填 0 了事」：`R_jc=0`、`Height(mm)=0` 都是**低估溫度**的方向。
+⚠ `Thick(mm)` 不在補值清單裡 —— 它每次 `recalc()` 都由 `applyThickFromGlobals()` 依導熱方式統一帶入。
+
+#### ⚠ 數字欄位一律先轉成 Number（`Pad_L + Thick(mm)` 是加法）
+
+`calcThermalResistance` 開頭用 `_num()` 把 `Qty`/`Power(W)`/`Height(mm)`/`Pad_L`/`Pad_W`/
+`Thick(mm)`/`Limit(C)`/`R_jc` 全部轉成數字。少了這一步，值若是字串就會**字串相接**：
+`"7" + "2" = "72"` → 擴散面積算成 72×72mm（正解 9×9），熱阻被低估近 8 倍，
+而且**不噴 NaN**、圖表照樣畫得出來 —— 靜默樂觀，比 NaN 更危險。
+`_num()` 對真的沒有值回 `NaN`（讓它在畫面上現形），不偷偷當 0。
+
 ⚠ **空值一律「不寫 key」，不可寫 `''`**：快選是 `Object.assign({}, RF_DEFAULT, src)`，key 不
 存在會套分類預設；寫 `''` 會覆蓋預設值，而 `calcRow` 對空字串多半不噴 NaN 而是**靜默算成 0**
 （`Thick` 空 → `R_int`=0、`Pad_L/W` 空 → 面積用字串算出假值、`Limit(C)` 空 → 裕度變超大負數），
