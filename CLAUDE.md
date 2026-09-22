@@ -167,17 +167,50 @@
 | 變數 | 用途 |
 |---|---|
 | `--th-bg` / `--th-bg2` / `--th-fg` / `--th-accent` | 表頭深藍底＋白字＋青色底線，`.comp-table th`、`.detail-table th`、`.tim-lib-modal th` 共用 |
-| `--io-h` | 專案工具列所有控制項（按鈕／專案名稱／保護標籤）的統一高度 |
+| `--io-h` | 專案工具列所有控制項（按鈕／保護標籤）的統一高度 |
 
 - **表頭不可回到淺灰底**（原本 `#f1f5f9` ＋ `#475569` 與白色表身糊成一片）。深底白字的文字對比
   ≥ 7、與表身對比 ≥ 4.5，這是 `tests/header-toolbar.test.js` 的契約。
 - **工具列是「半透明深色托盤 ＋ 白底深字實心按鈕」**：原本白字透明底在青藍漸層 header 上
   對比不足、按鈕整個融進背景。⚠ 不要再把按鈕改回 `background:transparent` ＋ `color:#fff`。
   「儲存專案」是唯一的深色實心鈕（主要動作＝寫回共用資料庫），其餘維持白底。
-- 順序固定為 **匯入／匯出 ｜ 儲存／載入／複製 ｜ 專案名稱＋資料庫保護**，三組用留白分隔
-  （不用豎線：換行時會單獨留一根在行尾）。窄螢幕靠 `flex-wrap` 整組換行，
-  所以 `專案名稱` 與 `資料庫保護` 必須待在同一個 `.io-group` 裡。
+- 順序固定為 **匯入／匯出 ｜ 儲存／載入／複製 ｜ 資料庫保護**，三組用留白分隔
+  （不用豎線：換行時會單獨留一根在行尾）。窄螢幕靠 `flex-wrap` 整組換行。
+- **工具列靠右**（`.project-io{margin-left:auto}`）：`.header` 是 `space-between`，同一行時
+  本來就靠右，但換行後整組會掉到「自己那一行的最左邊」。專案名稱欄位移除後要讓按鈕
+  往右補上空出來的位置，兩種情況都要靠右才一致（`tests/header-toolbar.test.js` 的契約：
+  右緣貼齊 header 內距、左邊必須空出位置）。
 - 隱藏的 `#fileInput` 放在 `.project-io` **外面**，不然它會卡在兩組中間破壞間距。
+
+### header 頂排：版本徽章 ─ 專案名稱 ─ 右側按鈕
+
+原本三塊各自 `position:absolute`（徽章 `left:30px`、右側按鈕群 `right:16px`），中間那段沒人管。
+現在包成一條 flex `.hdr-topbar`（`left:30px; right:16px; top:12px`）：
+
+| 區塊 | flex 行為 |
+|---|---|
+| `#version-badge` | `flex-shrink:0`（CI 戳完版本後約 230px 寬，本機只有 60px —— 量位置時要自己塞長字串）|
+| `.hdr-name-slot` | `flex:1 1 auto; min-width:0` → 吃掉中間剩餘空間並置中；**只有它會縮** |
+| `.hdr-right` | `flex-shrink:0` |
+
+⚠ **不可加 `flex-wrap:wrap`**：flex 是「先分行、後壓縮」，加了會變成名稱還沒縮、右側按鈕
+就先掉到第二行蓋到標題。目前的設計是空間不夠時名稱縮到 ellipsis，兩端永遠不重疊。
+
+### 專案名稱：狀態不是欄位（`#cloudProjectName` 已移除）
+
+工具列上的專案名稱輸入框已拿掉，改成頂排的**純文字顯示**（`#projNameBox` / `#projNameText`）：
+
+- **單一事實來源是 `currentProjectName`**，讀寫一律走 `projectNameGet()` / `projectNameSet()`
+  （`projectNameSet` 同時更新畫面與 tooltip）。不要再從 DOM 讀專案名稱。
+- 會動到它的地方：`cloudLoadOne`（`d.project_name || docId` —— 常駐顯示，**不可留上一個專案的
+  殘值**）、`confirmCopyProject`、`cloudDeleteOne`（刪到目前這個就清空）、`cloudSaveProject`、
+  `saveProject`（匯出檔名）、PDF 報告標題。
+- **沒命名時按「💾 儲存專案」會當場 `promptProjectName()` 問一次**，取消就靜靜退出（不寫入、
+  不噴警告）。欄位拿掉後 `promptProjectName()` 是唯一的手動輸入口 → ✏️ 必須常駐可見
+  （不可只在 hover 才出現），點文字即可改名。
+- **文字不可有外框／底色**（使用者明確要求），顏色必須是**深色**：header 是青藍漸層，
+  名稱所在位置實測背景為 `rgb(0,161,231)`，白字只有 **2.90:1**，深藍 `#062a46` 有 **5.08:1**。
+  測試是截 1×1 的圖讀真實像素再算對比（拿漸層端點算會失真：兩端分別是 3.4:1 與 9.3:1）。
 
 ### 參數控制台可調寬／收合
 

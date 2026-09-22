@@ -189,7 +189,6 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   console.log('\n[G] `_filled` 不可寫回共用 DB');
   const g = await page.evaluate(() => {
     components.rf[0]._filled = { R_jc: true };
-    document.getElementById('cloudProjectName').value = 'T';
     const fields = _buildProjectFields('T', {});
     return { hasFilled: fields.rf_data.some(c => c._filled !== undefined),
              keeps: fields.rf_data[0].Component === 'Circulators-B8' && fields.rf_data[0].R_jc === 0,

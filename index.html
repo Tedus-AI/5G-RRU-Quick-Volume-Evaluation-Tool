@@ -75,8 +75,12 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
    而且按鈕(8px padding)、輸入框(7px)、保護標籤(3px) 三種高度各自為政。
    改成：半透明深色托盤把整組框起來 → 托盤上放白色實心按鈕＋深藍字（對比最高、
    絕不會融入背景），所有控制項高度統一 var(--io-h)，用 inline-flex 垂直置中。
-   分組：檔案（匯入/匯出）｜資料庫（儲存/載入/複製）｜專案名稱＋保護狀態。 */
-.header .project-io{display:flex;gap:7px;align-items:center;flex-wrap:wrap;
+   分組：檔案（匯入/匯出）｜資料庫（儲存/載入/複製）｜寫入保護。
+   （專案名稱原本也在這裡，已改成 header 頂排的純文字顯示，見下方 .proj-name） */
+/* margin-left:auto：工具列永遠靠右。header 是 space-between，同一行時本來就靠右，
+   但窄螢幕換行後整組會掉到「自己那一行的最左邊」；拿掉專案名稱欄位後要讓按鈕往右
+   補上空出來的位置，兩種情況都要靠右才一致。 */
+.header .project-io{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-left:auto;
   padding:8px 9px;border-radius:14px;background:rgba(6,45,73,0.22);
   border:1px solid rgba(255,255,255,0.35);box-shadow:inset 0 1px 0 rgba(255,255,255,0.18);}
 /* 換行時整組一起掉到下一行（窄螢幕才會換行），不要只掉半組看起來像壞掉 */
@@ -95,14 +99,33 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 /* 複製專案沿用原本的琥珀色識別 */
 .header .project-io .io-btn-copy{color:#92500a;border-color:#f0b429;}
 .header .project-io .io-btn-copy:hover{background:#fff7e6;}
-.header .project-io input[type="text"]{height:var(--io-h);padding:0 12px;border:1px solid #cbd5e1;
-  background:#fff;color:#123a5c;border-radius:9px;font-size:0.85rem;font-weight:600;width:140px;outline:none;
-  box-shadow:0 2px 5px rgba(2,32,54,0.25);}
-.header .project-io input[type="text"]::placeholder{color:#94a3b8;font-weight:500;}
-.header .project-io input[type="text"]:focus{border-color:#0b3c67;box-shadow:0 0 0 3px rgba(255,255,255,0.55);}
 /* 保護狀態維持原本的紅(鎖上)/綠(解鎖)語意，只把高度與圓角對齊其他控制項 */
 .header .project-io .cloud-lock{height:var(--io-h);padding:0 10px;border-radius:9px;font-size:0.8rem;
   box-shadow:0 2px 5px rgba(2,32,54,0.25);}
+/* ── header 頂排：版本徽章 ─ 專案名稱 ─ 右側按鈕 ──────────────
+   原本三塊各自 position:absolute（徽章 left:30px、按鈕 right:16px），中間那段
+   沒有人管；專案名稱要放在那裡就得跟兩邊搶位置。改成一條 flex：兩端維持原本的
+   左右位置且不縮（flex-shrink:0），中間的名稱吃掉剩餘空間並置中，空間不夠時
+   **只有名稱會縮**（ellipsis），所以徽章與右側按鈕永遠不會疊在一起。
+   ⚠ 不可加 flex-wrap:wrap —— flex 是先分行再壓縮，加了會變成「名稱還沒縮，
+   右側按鈕就先掉到第二行」，反而蓋到標題。 */
+.header .hdr-topbar{position:absolute;top:12px;left:30px;right:16px;
+  display:flex;align-items:center;gap:12px;}
+.header .hdr-topbar .hdr-name-slot{flex:1 1 auto;min-width:0;display:flex;justify-content:center;}
+.header .hdr-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+/* 專案名稱：純文字、**不加外框/底色**（使用者指定）。
+   ⚠ 顏色必須是「深色」：header 是青藍漸層，中段約 rgb(0,169,229)（相對亮度 0.34），
+   白字只有 2.7:1、比旁邊的白底按鈕還糊；深藍 #062a46 有 5.1:1（≥AA）。
+   點一下可改名（欄位拿掉後這是唯一的輸入口）→ ✏️ 常駐顯示，不能只在 hover 才出現。 */
+.header .proj-name{display:inline-flex;align-items:center;gap:5px;max-width:100%;
+  line-height:1.2;cursor:pointer;user-select:none;}
+.header .proj-name .pn-label{font-size:0.82rem;font-weight:700;color:#062a46;flex-shrink:0;}
+.header .proj-name .pn-value{font-size:1.04rem;font-weight:900;color:#062a46;letter-spacing:.3px;
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.header .proj-name.is-empty .pn-value{font-weight:700;opacity:.62;}
+.header .proj-name .pn-edit{font-size:0.78rem;opacity:.55;flex-shrink:0;transition:opacity .15s;}
+.header .proj-name:hover .pn-edit{opacity:1;}
+.header .proj-name:hover .pn-value{text-decoration:underline;text-underline-offset:3px;}
 .cloud-modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;}
 .cloud-modal-overlay.active{display:flex;}
 .cloud-modal{background:#fff;border-radius:16px;padding:30px;width:420px;max-width:90vw;max-height:70vh;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
@@ -526,28 +549,35 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
 
 <div class="main">
   <div class="header">
-    <span id="version-badge" title="軟體版本" style="position:absolute; top:12px; left:30px;">
-      <span class="vb-ver" id="vb-ver">—</span>
-      <span class="vb-latest">&#10003; 最新</span>
-    </span>
+    <div class="hdr-topbar">
+      <span id="version-badge" title="軟體版本">
+        <span class="vb-ver" id="vb-ver">—</span>
+        <span class="vb-latest">&#10003; 最新</span>
+      </span>
+      <div class="hdr-name-slot">
+        <span class="proj-name is-empty" id="projNameBox" onclick="promptProjectName()">
+          <span class="pn-label">專案名稱：</span><span class="pn-value" id="projNameText">（未命名）</span><span class="pn-edit">✏️</span>
+        </span>
+      </div>
+      <div class="hdr-right">
+        <button onclick="doLogout()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">🏠 返回首頁</button>
+        <span id="db-banner-text" style="font-size:12px; color:#ffffffaa;">未選擇資料庫</span>
+        <button id="btn-pick-db" onclick="handlePickDb()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">
+          📂 資料庫目錄
+        </button>
+        <button id="btn-sp-login" onclick="handleSpLogin()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer; display:none;">🔐 登入 SharePoint</button>
+        <button id="btn-sp-logout" onclick="handleSpLogout()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer; display:none;">🚪 登出</button>
+        <span id="sp-user-info" style="font-size:11px; color:#ffffffaa; display:none;"></span>
+        <button onclick="dbAdapter.exportBackup()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">
+          💾 備份資料庫
+        </button>
+      </div>
+    </div>
     <div>
       <h1>📡 5G RRU 體積估算引擎 <span style="font-size:0.6em;opacity:0.8;">Pro</span></h1>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <div class="subtitle">High-Performance Thermal & Volume Estimation System</div>
       </div>
-    </div>
-    <div style="position:absolute; top:12px; right:16px; display:flex; align-items:center; gap:8px;">
-      <button onclick="doLogout()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">🏠 返回首頁</button>
-      <span id="db-banner-text" style="font-size:12px; color:#ffffffaa;">未選擇資料庫</span>
-      <button id="btn-pick-db" onclick="handlePickDb()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">
-        📂 資料庫目錄
-      </button>
-      <button id="btn-sp-login" onclick="handleSpLogin()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer; display:none;">🔐 登入 SharePoint</button>
-      <button id="btn-sp-logout" onclick="handleSpLogout()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer; display:none;">🚪 登出</button>
-      <span id="sp-user-info" style="font-size:11px; color:#ffffffaa; display:none;"></span>
-      <button onclick="dbAdapter.exportBackup()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">
-        💾 備份資料庫
-      </button>
     </div>
     <div class="project-io">
       <div class="io-group" role="group" aria-label="本機檔案">
@@ -559,8 +589,7 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
         <button class="io-btn" onclick="cloudLoadProject()" title="從共用資料庫載入專案">📂 載入專案</button>
         <button class="io-btn io-btn-copy" id="copy-btn" onclick="cloudCopyProject()" title="複製一份現有專案">📋 複製專案</button>
       </div>
-      <div class="io-group" role="group" aria-label="專案名稱與寫入保護">
-        <input type="text" id="cloudProjectName" placeholder="專案名稱 ...">
+      <div class="io-group" role="group" aria-label="寫入保護">
         <span id="cloudLockBtn" class="cloud-lock locked" onclick="toggleCloudLock()" title="資料庫寫入保護">🔒 資料庫保護：啟用</span>
       </div>
     </div>
@@ -1663,6 +1692,7 @@ function init() {
   for (let k in gp) { let el=document.getElementById(k); if(el){if(el.tagName==='SELECT')el.value=gp[k];else el.value=gp[k];} }
   normalizeComps();
   applyFinCustomUI();
+  projectNameSet('');
   initSidebarLayout();
   migrateThickGlobals(gp);
   document.getElementById('loading').style.display='none';
@@ -2758,10 +2788,41 @@ function handleFileLoad(e){let f=e.target.files[0];if(!f)return;let r=new FileRe
   normalizeComps();
   applyFinCustomUI();migrateThickGlobals(d.global_params);recalc();alert('✅ 專案載入成功！');}catch(err){alert('Error: '+err.message);}};r.readAsText(f);e.target.value='';}
 
+// =====================================================
+// 專案名稱：單一事實來源
+// -----------------------------------------------------
+// 原本是工具列上的輸入框（id 為 cloudProjectName），已移除：欄位佔掉整排按鈕的位置，
+// 而且「目前是哪個專案」屬於狀態、不該長得像可以隨手改的欄位。
+// 現在值只存在 currentProjectName，畫面是 header 頂排的純文字；讀寫一律走
+// projectNameGet() / projectNameSet()，不要再有第二份副本。
+// =====================================================
+let currentProjectName='';
+function projectNameGet(){return (currentProjectName||'').trim();}
+function projectNameSet(name){
+  currentProjectName=(name||'').trim();
+  const box=document.getElementById('projNameBox'),txt=document.getElementById('projNameText');
+  if(txt)txt.textContent=currentProjectName||'（未命名）';
+  if(box){
+    box.classList.toggle('is-empty',!currentProjectName);
+    box.title=(currentProjectName?'目前專案：'+currentProjectName:'尚未命名（按「💾 儲存專案」時會問你）')+
+      '\n點一下可修改名稱；改成新名稱後按「💾 儲存專案」會存成另一個專案（原專案保留）。';
+  }
+}
+// 改名／命名：欄位拿掉後這是唯一的手動輸入口（載入／複製專案會自動帶入）。
+// 回傳最後的名稱，取消時維持原值（不清空、不噴警告）。
+function promptProjectName(){
+  const v=window.prompt('專案名稱：',projectNameGet());
+  if(v===null)return projectNameGet();
+  const name=v.trim();
+  if(!name){alert('⚠️ 專案名稱不可空白。');return projectNameGet();}
+  projectNameSet(name);
+  return name;
+}
+
 function saveProject(){readGlobals();let d={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},global_params:{},rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
   ['T_amb','Margin','L_pcb','W_pcb','t_PCB','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Coin_T_Setting','K_Coin','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle','fin_custom_emb','fin_eta_emb','fin_kfin_emb','fin_custom_dc','fin_eta_dc','fin_kfin_dc'].forEach(k=>d.global_params[k]=G[k]);
   d.global_params.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;
-  let b=new Blob([JSON.stringify(d,null,4)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(b);let pn=document.getElementById('cloudProjectName').value.trim()||'Project';a.download='RRU_'+pn+'_'+new Date().toISOString().slice(0,10)+'.json';a.click();}
+  let b=new Blob([JSON.stringify(d,null,4)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(b);let pn=projectNameGet()||'Project';a.download='RRU_'+pn+'_'+new Date().toISOString().slice(0,10)+'.json';a.click();}
 
 // =====================================================
 // CLOUD PROJECT SAVE / LOAD
@@ -2786,8 +2847,9 @@ function _buildProjectFields(name, existing){
 
 async function cloudSaveProject(){
   if(!(await _ensureLockBeforeWrite('儲存專案')))return;
-  let name=document.getElementById('cloudProjectName').value.trim();
-  if(!name){alert('⚠️ 請先輸入專案名稱！');document.getElementById('cloudProjectName').focus();return;}
+  let name=projectNameGet();
+  if(!name)name=promptProjectName();   // 沒命名就當場問一次；取消就靜靜退出
+  if(!name)return;
   if(!fbOk||!dbAdapter.isReady()){alert('⚠️ 資料庫未連線，無法儲存。');return;}
   let docId=name.replace(/ /g,'_').replace(/[^a-zA-Z0-9_\-\u4e00-\u9fff]/g,'');
   if(!docId){alert('⚠️ 專案名稱無效，請使用中英文或數字。');return;}
@@ -2812,7 +2874,7 @@ async function cloudSaveProject(){
 // =====================================================
 function cloudCopyProject(){
   if(!fbOk||!dbAdapter.isReady()){alert('⚠️ 資料庫未連線，無法複製。');return;}
-  const base=document.getElementById('cloudProjectName').value.trim();
+  const base=projectNameGet();
   const inp=document.getElementById('copyProjectName');
   inp.value=base?base+'_copy':'';
   document.getElementById('copyModal').classList.add('active');
@@ -2839,7 +2901,7 @@ async function confirmCopyProject(){
   try{
     await dbAdapter.updateDoc('projects', docId, fields);
     variantsCache=null; renderTab0();
-    document.getElementById('cloudProjectName').value=name;  // 複製後切換到新專案名
+    projectNameSet(name);  // 複製後切換到新專案名
     closeCopyModal();
     alert('✅ 已複製為新專案「'+name+'」！');
   }catch(e){alert('❌ 複製失敗: '+e.message);}
@@ -2877,7 +2939,7 @@ async function cloudLoadOne(docId){
     clearGlobalsWithoutInputs();
     if(d.global_params){for(let k in d.global_params){G[k]=d.global_params[k];let el=document.getElementById(k);if(el){el.value=d.global_params[k];}}}
     if(d.rf_data)components.rf=d.rf_data;if(d.digital_data)components.digital=d.digital_data;if(d.pwr_data)components.pwr=d.pwr_data;
-    if(d.project_name)document.getElementById('cloudProjectName').value=d.project_name;
+    projectNameSet(d.project_name||docId);
     // 缺欄位的元件（多半是 AI-Thermal 建的）先補成分類預設值，否則整列算出 NaN
     normalizeComps();
     // ⚠ 板厚遷移一定要在「元件已換成這個專案的」之後跑：它要回推的是這個專案的板厚
@@ -2889,7 +2951,9 @@ async function cloudLoadOne(docId){
 async function cloudDeleteOne(docId,name){
   if(!(await _ensureLockBeforeWrite('刪除專案')))return;
   if(!confirm('確定要刪除專案「'+name+'」？此操作無法復原！'))return;
-  try{await dbAdapter.deleteDoc('projects', docId);variantsCache=null;renderTab0();alert('🗑️ 已刪除「'+name+'」');cloudLoadProject();}
+  try{await dbAdapter.deleteDoc('projects', docId);variantsCache=null;renderTab0();
+    if(projectNameGet()===name)projectNameSet('');   // 刪掉的正好是目前這個 → 頂排不可留殘值
+    alert('🗑️ 已刪除「'+name+'」');cloudLoadProject();}
   catch(e){alert('❌ 刪除失敗: '+e.message);}
 }
 
@@ -3090,7 +3154,7 @@ async function generatePDFReport() {
     const now = new Date();
     const dateStr = now.toLocaleDateString('zh-TW', {year:'numeric',month:'2-digit',day:'2-digit'});
     const timeStr = now.toLocaleTimeString('zh-TW', {hour:'2-digit',minute:'2-digit'});
-    const projectName = document.getElementById('cloudProjectName').value.trim() || '5G RRU Project';
+    const projectName = projectNameGet() || '5G RRU Project';
 
     // Color palette
     const cPrimary = '#007CF0';

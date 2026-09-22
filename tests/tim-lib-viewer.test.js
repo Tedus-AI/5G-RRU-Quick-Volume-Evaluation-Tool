@@ -209,7 +209,6 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   ok('專案自己的 global_params 蓋得上去', d1.applied.K_Pad === 3.3 && d1.applied.t_Pad === 2.0, d1);
 
   const d2 = await page.evaluate(() => {
-    document.getElementById('cloudProjectName').value = 'T';
     G.K_Pad = 3.3; G.t_Pad = 2.0;
     const f = _buildProjectFields('T', { global_params: { ai_only: 'keep', K_Pad: 1.1 } });
     return { k: f.global_params.K_Pad, t: f.global_params.t_Pad, sib: f.global_params.ai_only,

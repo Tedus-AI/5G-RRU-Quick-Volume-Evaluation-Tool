@@ -239,7 +239,6 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   const d1 = await page.evaluate(() => {
     const noInput = !document.getElementById('K_Pad2') && !document.getElementById('t_Pad2');
     const notInKeys = !PROJECT_GLOBAL_KEYS.includes('K_Pad2') && !PROJECT_GLOBAL_KEYS.includes('t_Pad2');
-    document.getElementById('cloudProjectName').value = 'T';
     // 既有專案有 K_Pad2 → 合併時必須保留（不是被我們刪掉）
     const keep = _buildProjectFields('T', { global_params: { K_Pad2: 7.5, t_Pad2: 1.0, ai_thermal_only_key: 'keep-me' } });
     // 全新專案 → 我們不主動寫這兩個 key
