@@ -247,9 +247,10 @@ docId → id≠名稱的專案每存一次就多一份分身、原專案永遠�
 - **名稱不可與其他專案重複**（`projectNameTakenBy`，不分大小寫；與 AI-Thermal 改名規則同一條：
   規格書路徑 `SPEC/<專案名>/`，同名會共用資料夾）。只在「新專案」或「改了名」時檢查，
   既有的重名資料不會因此存不了檔。
-- `cloudLoadOne` 對 `getDoc` 的結果**深拷貝**（`getDoc` 回傳 DB 快取的活參照；直接編輯的話，
+- `cloudLoadOne` 對 `getDoc` 的結果**深拷貝**（原本 `getDoc` 回傳 DB 快取的活參照；直接編輯的話，
   載入時的轉型與畫面上的試改會在釋放編輯鎖——整份快取寫回——時被寫進共用 DB）。
-  `_buildProjectFields` 寫出去的元件也深拷貝（反方向同理）。
+  `_buildProjectFields` 寫出去的元件也深拷貝（反方向同理）。現在兩個後端的 `getDoc` 本身就回複本、
+  寫入也存複本（見下方「存檔三方合併」），這兩處深拷貝保留當作第二道保險。
 - 載入時**缺哪一類元件就是空陣列**，不可沿用上一個專案的元件。
 - 規格書是「檔案參照」：**複製專案**與 **📋 複製元件**都用 `specMarkFromIfUnset` 逐份標 `_from`
   （單一物件與陣列兩種形狀都要；已經有 `_from` 的保留原本的來源），AI-Thermal 刪除或取代複本的規格書
@@ -270,6 +271,51 @@ docId → id≠名稱的專案每存一次就多一份分身、原專案永遠�
   直接寫「參數控制台全部是出廠預設值」。
 - `migrateThickGlobals` 從元件推不出板厚時改用**出廠預設**（`t_PCB` 2.0／`Coin_T_Setting` 2.5），
   不再給 0（0 會讓所有 Via／Coin 元件 `R_int = 0`，偏樂觀）。
+
+### 存檔三方合併（`compMerge.js`）⚠️ 兩個 repo 共用同一份
+
+兩個工具存檔時都會把整份元件清單（`rf_data`／`digital_data`／`pwr_data`）用自己畫面上的副本寫回。
+直接寫回 → 對方在我們**載入之後**存的修改被整批蓋掉。標準流程就會踩到：5G-RRU 開著專案 →
+到 AI-Thermal 補 θJC 存檔 → 回 5G-RRU 補高度再存 → θJC、導熱方式、E-Pad、規格書全被蓋回舊值。
+
+- **`compMerge.js`（＋`tests/comp-merge.unit.test.js`）在兩個 repo 內容逐字相同**，改一邊就同步另一邊。
+- 三方比對：`projBase`（載入時的快照）／畫面（我的）／寫入當下資料庫的最新內容（對方的）。
+  逐顆元件、逐欄：我沒改 → 用資料庫的；只有我改 → 用我的；兩邊改得一樣 → 照用；
+  **兩邊改得不一樣 → 存檔前跳衝突視窗**（`CompMerge.showConflictDialog`，列出元件、欄位、兩邊的值與
+  載入時的值，每一列選「用我的／用資料庫的」，全部選完才能存；取消 → 不寫入、畫面不動）。
+- 相依欄位整組比對（`GROUPS`）：E-Pad 長／寬／`_pad_from`、`R_jc`／`_rjc_from`、`Board_Type`／`_bt_from`、
+  `TIM_Type`／`TIM_Model` —— 不會拼出兩邊都沒有過的組合（例：我的長＋對方的寬）。
+- **推導欄位不比對**（`MERGE_DERIVED = ['Thick(mm)']`，`derivedKeys`）：板厚每次 recalc 都由參數控制台帶入，
+  若列入比對，載入時自動帶入的板厚會被當成「我改過這顆」→ 對方刪掉那顆元件時變成假衝突。
+  合併後由 `thickApplyToFields` 重新帶入。
+- 型別差異不算修改（`normalizeComp`：`"5.2"` 與 `5.2` 相同、`''` 等於沒有 key）。
+- 專案名稱也三方比對（`MERGE_SCALARS = ['project_name']`）：AI-Thermal 改了名、本工具沒改 → 保留新名稱。
+- 元件配對用 **`_cid`（元件 id）**：載入時 `CompMerge.ensureProjectCids` 補發（快照與畫面同一份 id）、
+  `addComp`／快選／📋 複製都給**新的** id、存檔一律寫出；舊資料沒有 id 時退回用名稱配對，
+  資料庫已有的 id 優先沿用。`_cid` 是底線開頭的內部欄位，**不列入 carry 白名單**。
+- 寫入時機：`dbAdapter.updateDoc('projects', id, (cur) => fields)` —— **fields 可以是函式**，後端在
+  「寫入當下的最新內容」上呼叫（412 重讀後會重算）；函式裡有未決定的衝突就丟 `CompMerge.MergePending`，
+  `CompMerge.saveWithMerge` 接到後開視窗、帶著選擇重試。後端規則：**先算完才動快取**（算的途中丟例外 →
+  快取不變、不寫入）。本機檔模式沒有 If-Match → 存檔前先 `dbAdapter.refresh()`（`fileDb.refresh`）。
+- 不合併的情況：新專案、覆蓋別的專案、原專案已被刪除要重建 → 以畫面為準（沒有「載入時」可以比）。
+- 存檔成功 → `adoptWrittenProject`：畫面換成實際寫入的內容（含併入的對方修改）、當作新快照；
+  alert 附一行「已合併：併入資料庫最新的 N 項修改…」（`CompMerge.summaryText`）。
+- **切回分頁自動檢查**（`visibilitychange`／`focus` → `checkProjectFreshness`，15 秒節流、存檔中或衝突視窗
+  開著時不做）：資料庫裡這個專案（元件清單＋名稱＋`global_params`）跟快照不同時 ——
+  畫面沒有未存修改（`projectIsDirty`，比 `markProjectClean` 當時的畫面指紋）→ 靜默重新載入並跳一行提示；
+  有未存修改 → 不動畫面，Tab0 跳**琥珀色**提示（`#stale-banner`，提醒不是錯誤）與「放棄我的修改，重新載入」鈕。
+- **兩個後端的 `getDoc` 回複本、`setDoc`／`updateDoc` 存複本**：不可再讓畫面持有 DB 快取的活參照。
+  （`getCollection` 仍回快取本身，呼叫端只能讀。）
+- 契約測試：`tests/merge-save.test.js`（整合）、`tests/comp-merge.unit.test.js`（純邏輯）。
+
+### SharePoint 讀寫防護（`graphDb.js`）
+
+- `_graphGet`：`cache:'no-store'`＋`Cache-Control: no-cache`（不可讀到瀏覽器快取的舊檔）；逾時 30 秒；
+  逾時／斷線／429／5xx 自動重試 2 次，其他 4xx 直接丟出。`_graphPut` 逾時 90 秒。
+- `_withOptimisticWrite`：除了 412，逾時／斷線／429／5xx 也重讀後重試（帶 If-Match，若其實已寫成功會
+  得到 412 再重讀，不會蓋掉任何人的寫入）。
+- `_readFile`：metadata 多取 `size`。**本 session 第一次讀檔就讀到空內容、但檔案大小不是 0（或拿不到大小）→
+  唯讀保護**，不可 bootstrap 空骨架（否則下一次寫入就把整份共用 DB 抹掉）；真的是 0 bytes 才建立空骨架。
 
 ### 參數控制台可調寬／收合
 
@@ -297,6 +343,9 @@ AI-Thermal 下次存檔覆寫，還讓兩邊數字對不起來 → `rjcCellHtml`
 - 📋 複製元件會沿用標記（同一顆元件的規格書值）→ 仍鎖定；「從資料庫快選」不帶底線開頭的
   內部標記 → 快選出來的新元件可自行輸入（`VARIANT_CARRY` 刻意不含標記）。
 - 圖例文案要跟著分開講：可編輯的推導欄位是「會被覆寫」，Rjc 是「鎖定不開放修改」。
+- AI-Thermal 依**主散熱路徑**取 θJC（`IC top` → θJC,top；`Copper Coin`／`Thermal Via` → θJC,bottom），
+  熱阻表沒有對應的那一筆才暫用另一筆。本工具看 `Board_Type` 與 `_rjc_from` 對不上時，在鎖定值旁標琥珀色 ⚠
+  （tooltip 說明「應該用哪一筆、Tj 可能被低估，請到 AI-Thermal 補上」）。只讀現有欄位，不新增 key。
 
 ### AI-Thermal 推導欄位的來源標記
 
@@ -324,6 +373,10 @@ AI-Thermal 下次存檔覆寫，還讓兩邊數字對不起來 → `rjcCellHtml`
 | `Board_Type`、`Pad_L`、`Pad_W`、`TIM_Model`、`TIM_Type` | 5G-RRU 可編輯（標藍邊提醒會被覆寫）；AI-Thermal 存檔時由 Tab1/Tab2 推導後覆寫 |
 | `R_jc` | **有 `_rjc_from` 且有值時本工具鎖定不可改**（見下節）；沒有標記（或值是空的）才可自行輸入 |
 | `Type`、`Power_RT(W)`、`TV_ID_mil`、`TV_Qty`、`Temp_Sensor`、`Local_Qty`、`Remote_Qty`、`note`、`Rth`、`SpecFile` | 只有 AI-Thermal（本工具不顯示但原樣保留）|
+
+> 內部欄位（底線開頭，兩個工具都原樣保留、不列入 carry 白名單）：`_cid`（元件 id，存檔三方合併配對用，
+> 兩邊都會補發）、`_defaults_ok`（本工具寫：確認過不是舊預設值）、`_rjc_from`／`_bt_from`／`_pad_from`
+> （AI-Thermal 寫：推導來源）、`_excluded`、`_ref_*`（本工具的快選參照）。
 
 ⚠ **「從資料庫快選」的 carry 白名單兩邊都必須列全上表所有欄位**（本工具的 `VARIANT_CARRY`
 ／AI-Thermal 的 `SG_VARIANT_CARRY`，目前各 21 項）。漏列的 key 快選時就不會被帶過來（本工具已不套分類預設 → 變成缺值被必填檢查擋下；
@@ -385,6 +438,24 @@ AI-Thermal 已支援「一顆元件多份規格書」（datasheet／application 
   但**只做型別整理**：字串數字轉 number、`''`／`null`／非數字 → 刪 key、清掉舊版 `_filled`。**不補任何值。**
 - 舊版的 `_filled`／琥珀色「自動補值」機制已整個拿掉；`_buildProjectFields` 仍會剝掉殘留的 `_filled`。
 - 契約測試：`tests/comp-normalize.test.js`。
+
+#### ⚠ 疑似舊版罐頭預設值：一樣擋計算（`compStamped`／`_defaults_ok`）
+
+2026-09-18 以前，AI-Thermal 建立元件時會自動塞一組分類預設值（它的 `SG_DEFAULTS`，已移除）。那些元件
+「有值」，上面的必填檢查擋不下來，但值幾乎可以確定不是實際值 —— 正是使用者擔心的「填了預設值但是錯的」。
+備份實測：Cygnus-V2-62.5dB 的 40 顆元件全中（39 顆 Digital＋1 顆 PWR），其他 7 個專案最多只有 4 欄碰巧相同。
+
+- 判斷：**7 個欄位全部**等於該分類的舊預設（`STAMPED_FIELDS`／`STAMPED_DEFAULTS`：
+  RF 250／10×10／Copper Coin／200／1.5／Grease、Digital 50／10×10／Thermal Via／100／0.5／Putty、
+  PWR 30／20×20／None／95／0／Grease）。**這組是歷史值，刻意寫死**，不可改成引用 `RF_DEFAULT` 之類的常數。
+- 不列入：0 瓦／0 顆、按 👁 排除、`_defaults_ok === true`、只有部分欄位相同、缺必填欄位的（先歸「必填」那段）。
+- 處理（使用者選的方案 A）：**視同未填、一樣擋計算**。`listMissing` 回 `kind:'stamped'`；告警分兩段
+  （「必填欄位還沒填」／「疑似舊版自動帶入的預設值」），後者每顆有「✓ 確認是實際值」鈕；元件表 7 格
+  **虛線紅框**（值照常顯示，與「沒填」的實線紅框區隔）、名稱下方也有確認鈕；PDF 拒絕產生時列出。
+- 解除：改掉任一格（組合不再相同）→ 自動解除；或按確認（先 `confirm` 列出 7 個值）→ 寫
+  **`_defaults_ok: true`**（跟著元件存進共用 DB，AI-Thermal 原樣保留）。`_defaults_ok` 是底線開頭的內部欄位，
+  **不列入 carry 白名單**（快選出來的新元件要重新確認）；📋 複製同一顆元件會沿用（同樣的值）。
+- 契約測試：`tests/stamped-defaults.test.js`（含備份真實資料的判斷結果）。
 
 #### ⚠ 數字欄位一律先轉成 Number（`Pad_L + Thick(mm)` 是加法）
 
@@ -455,7 +526,7 @@ await dbAdapter.updateDoc('projects', docId, {
 ### 運作方式
 
 - 原始碼裡只放佔位符 `__APP_VERSION__`（出現在 `index.html` 的 `window.APP_VERSION`、
-  4 支本地 JS（`config.js` / `fileDb.js` / `graphDb.js` / `dbAdapter.js`）的
+  5 支本地 JS（`config.js` / `fileDb.js` / `graphDb.js` / `dbAdapter.js` / `compMerge.js`）的
   `?v=__APP_VERSION__` 快取戳記、以及 `version.json`）。
 - `.github/workflows/deploy-pages.yml` 在每次 push 到 `main` 時，用
   `TZ='Asia/Taipei' date +%Y.%m.%d.%H%M`＋短 SHA 算出版本號，`sed` 戳進上述佔位符，

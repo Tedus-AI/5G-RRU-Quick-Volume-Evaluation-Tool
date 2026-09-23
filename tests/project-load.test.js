@@ -69,11 +69,15 @@ const FULL = (name, extra) => Object.assign({ Component: name, Qty: 1, 'Power(W)
     dbAdapter.isReady = () => true;
     dbAdapter.getDoc = async (c, id) => (window.__db[c] || {})[id] || null;
     dbAdapter.getCollection = async (c) => window.__db[c] || {};
+    // fields 可以是函式：跟真的後端一樣，在「目前資料庫內容」的複本上算出要寫的欄位（三方合併）
     dbAdapter.updateDoc = async (c, id, f) => {
-      window.__writes.push({ c, id, f: JSON.parse(JSON.stringify(f)) });
       window.__db[c] = window.__db[c] || {};
-      window.__db[c][id] = Object.assign({}, window.__db[c][id] || {}, f);
+      const cur = window.__db[c][id];
+      const ff = typeof f === 'function' ? f(cur ? JSON.parse(JSON.stringify(cur)) : null) : f;
+      window.__writes.push({ c, id, f: JSON.parse(JSON.stringify(ff)) });
+      window.__db[c][id] = Object.assign({}, cur || {}, JSON.parse(JSON.stringify(ff)));
     };
+    dbAdapter.refresh = async () => {};
     dbAdapter.deleteDoc = async (c, id) => { delete (window.__db[c] || {})[id]; };
     dbAdapter.getProjectsSorted = async () => Object.entries(window.__db.projects).map(([id, d]) => Object.assign({ id }, d));
     _ensureLockBeforeWrite = async () => true;

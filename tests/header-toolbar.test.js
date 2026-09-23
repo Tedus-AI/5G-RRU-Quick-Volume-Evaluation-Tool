@@ -352,7 +352,8 @@ const COLOR_UTILS = () => {
           realList = dbAdapter.getProjectsSorted, realReady = dbAdapter.isReady;
     dbAdapter.isReady = () => true; fbOk = true;
     dbAdapter.getDoc = async (c, id) => (c === 'projects' ? { project_name: '雲端載入的專案', global_params: {}, rf_data: [] } : null);
-    dbAdapter.updateDoc = async (c, id, f) => { writes.push([id, f.project_name]); };
+    // fields 可以是函式（存檔時在資料庫最新內容上計算，見 compMerge.js）→ 跟真的後端一樣先算出來
+    dbAdapter.updateDoc = async (c, id, f) => { const ff = typeof f === 'function' ? f(null) : f; writes.push([id, ff.project_name]); };
     dbAdapter.deleteDoc = async () => {};
     dbAdapter.getProjectsSorted = async () => [];
     _ensureLockBeforeWrite = async () => true;

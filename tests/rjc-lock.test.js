@@ -92,7 +92,7 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   ok('滑鼠指標是 help（看得出可看說明）', a.cursor === 'help', a.cursor);
   ok('tooltip 寫出來源 θ 型別', /θJC,bottom/.test(a.title), a.title);
   ok('tooltip 帶出量測條件（讀 AI-Thermal 寫的 Rth）', /@85°C 冷板/.test(a.title), a.title);
-  ok('tooltip 指路到 AI-Thermal 的熱阻表', /AI-Thermal/.test(a.title) && /主要/.test(a.title), a.title);
+  ok('tooltip 指路到 AI-Thermal 的熱阻表，並寫明依主散熱路徑取用哪一筆', /AI-Thermal/.test(a.title) && /依主散熱路徑取用/.test(a.title), a.title);
 
   // 窄欄換行會把整列撐高（行內圖示踩過這個坑）→ 同一列鎖定前後必須等高
   const aH = await page.evaluate(() => {
