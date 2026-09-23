@@ -1,28 +1,25 @@
 /*
- * 元件缺欄位 → 整列 NaN 的修正 —— headless 驗證
+ * 元件必填欄位：不補預設值，缺值告警並擋下計算 —— headless 驗證
  * ---------------------------------------------------------------------------
- * 使用者回報：Circulators-B20B28 / Cavity Filter-B20B28 與對應的 -B8 版本「建法一樣、
- * 只有瓦數不同」，但詳細分析的 Tj／Tj 裕度／允許溫升／局部環溫全是 NaN。
- *
- * 根因（兩個，第二個更危險）：
- *  (1) 缺 key：AI-Thermal 建立的元件刻意不寫本工具專屬欄位（Height(mm)／R_jc…），
- *      而元件表是 `value="'+(row[col]||0)+'"` → 畫面顯示 0，看起來跟正常元件一模一樣；
- *      calcThermalResistance 卻直接拿 undefined 做算術 → 整列 NaN。
- *      （-B8 那幾顆是「從資料庫快選」進來的，快選走 Object.assign({},DEFAULT,src) 會補齊，
- *        所以同樣的建法只有沒走快選的那幾顆爆 NaN。）
- *  (2) 數字存成字串：`Pad_L + Thick(mm)` 是加法 → "7"+"2"="72"，擴散面積變成 72×72mm，
- *      熱阻被低估近 8 倍且**不會噴 NaN**（靜默樂觀，比 NaN 更危險）。
+ * 標準流程：AI-Thermal 先建資料 → 5G-RRU 讀同一個專案算體積。AI-Thermal 刻意不寫本工具
+ * 專屬欄位（Height(mm)／R_jc…），專案也可能還沒維護完整。原本載入時會補上分類預設值
+ * （Height 250、Rjc 1.5、限溫 200…）讓計算跑得動，但預設值若是錯的，算出來的體積就是錯的，
+ * 而且不容易被發現。使用者要求：
+ *   「參數控制台可以填預設值，元件設定不要；沒填就是使用者必須注意到，否則不能計算。」
  *
  * 驗證情境：
- *   [A] 計算端：字串欄位不再相接成 "72"，算出與數字版完全相同的結果。
- *   [B] 計算端：真的缺值時仍回 NaN（不偷偷當 0 —— R_jc=0／Height=0 都是低估溫度的方向）。
- *   [C] normalizeComps：缺 key → 補分類預設值並標記；字串數字 → 轉成 number 但不標記；
- *       已有的值一律不動。
- *   [D] 走完整載入路徑（cloudLoadOne）後，使用者那個情境不再出現 NaN。
- *   [E] 元件表把補過的那一格標成琥珀色並給說明；使用者改過就不再標。
- *   [F] Tab0 橫幅逐顆列出補了哪些欄位，可關閉。
- *   [G] `_filled` 是 UI 提醒不是資料 → 不寫回共用 DB。
- *   [H] 重量估算預設值＝鋁 2.7／Filter 1／Shielding 1.5／PCB 1.2。
+ *   [A] 數字存成字串也要算對（"7"+"2" 不可相接成 "72"）。
+ *   [B] calcThermalResistance 對真的缺值維持 NaN（不偷偷當 0）。
+ *   [C] normalizeComps 只轉型、空值刪 key，**不補任何值**；舊版 _filled 標記清掉。
+ *   [D] compMissing 的必填規則（數量／瓦數必填；有熱才要其餘 7 欄；0 算有填；排除的不算）。
+ *   [E] 走完整載入路徑（cloudLoadOne）：不補預設、擋下計算、各頁都顯示同一份擋下原因。
+ *   [F] 元件表：缺值格空白（不顯示 0）＋紅框「必填」；下拉顯示「請選擇」而不是第一個選項。
+ *   [G] 點擋下原因裡的欄位名稱 → 跳到那一格並聚焦。
+ *   [H] 補齊後才計算、不再有 NaN；清空數字欄 → 刪 key（不是寫 0）→ 再次擋下。
+ *   [I] 按 👁 排除缺值的元件 → 不再擋。
+ *   [J] 新增元件／從資料庫快選：不帶分類預設值；來源瓦數是 '' → 不帶、不鎖瓦數。
+ *   [K] 寫回 DB 的元件是深拷貝，並去掉舊版 _filled。
+ *   [L] 重量估算出廠預設值（參數控制台）＝鋁 2.7／Filter 1／Shielding 1.5／PCB 1.2。
  *
  * 執行：
  *   npx http-server . -p 8123 -c-1 &      # 於 repo 根目錄
@@ -41,13 +38,28 @@ function ok(name, cond, extra) {
 }
 const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
 
+// AI-Thermal 建的專案：元件缺本工具專屬欄位，瓦數還可能是 ''
+const AIT_PROJECT = {
+  project_name: 'FDD B8B20B28 4T4R 560W',
+  rf_data: [
+    { Component:'Circulators-B8', Qty:4, 'Power(W)':3.81, 'Height(mm)':450, Pad_L:7, Pad_W:7,
+      'Thick(mm)':2, Board_Type:'Thermal Via', 'Limit(C)':125, R_jc:0, TIM_Type:'None' },   // 完整
+    { Component:'Circulators-B20B28', Qty:4, 'Power(W)':4.09, Type:'CR' },                 // 只有數量瓦數
+    { Component:'Cavity Filter-B8', Qty:4, 'Power(W)':19.1, 'Height(mm)':300, Pad_L:0, Pad_W:0,
+      Board_Type:'None', 'Limit(C)':125, R_jc:0.2, TIM_Type:'None' },                      // Pad 0×0＝有填
+  ],
+  digital_data: [ { Component:'L1452-TMPA1004S', Qty:1, 'Power(W)':'' } ],                 // 瓦數 ''
+  pwr_data: [ { Component:'Spare', Qty:1, 'Power(W)':0 } ],                                // 明確 0 瓦
+};
+
 (async () => {
   const browser = await chromium.launch(EXEC ? { executablePath: EXEC } : {});
   const page = await browser.newPage();
   await page.setViewportSize({ width: 1600, height: 950 });
   await page.route('**', r => r.request().url().startsWith(BASE.replace(/index\.html$/, '')) ? r.continue() : r.abort());
   await page.addInitScript(() => {
-    window.Plotly = { newPlot(){}, Plots:{resize(){}}, relayout(){}, purge(){}, toImage: async()=>'' };
+    window.__plots = {};
+    window.Plotly = { newPlot(id, t){ window.__plots[id] = t; }, Plots:{resize(){}}, relayout(){}, purge(){}, toImage: async()=>'' };
     window.XLSX = { utils:{book_new:()=>({}),aoa_to_sheet:()=>({}),book_append_sheet(){}}, writeFile(){} };
     window.msal = { PublicClientApplication: class {
       async initialize(){} async handleRedirectPromise(){return null} getAllAccounts(){return []} } };
@@ -68,146 +80,239 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
     const str = { Component:'X', Qty:'4', 'Power(W)':'3.81', 'Height(mm)':'450', Pad_L:'7', Pad_W:'7', 'Thick(mm)':'2',
                   Board_Type:'Thermal Via', 'Limit(C)':'125', R_jc:'0', TIM_Type:'None' };
     const n = calcThermalResistance(num, G), s = calcThermalResistance(str, G);
-    return { nBase:[n.Base_L,n.Base_W], sBase:[s.Base_L,s.Base_W],
-             nRint:n.R_int, sRint:s.R_int, nAdt:n.Allowed_dT, sAdt:s.Allowed_dT, nLoc:n.Loc_Amb, sLoc:s.Loc_Amb };
+    return { sBase:[s.Base_L,s.Base_W], nRint:n.R_int, sRint:s.R_int, nAdt:n.Allowed_dT, sAdt:s.Allowed_dT };
   });
   ok('字串版的擴散面積是 7+2=9（不是 "72"）', a.sBase[0] === 9 && a.sBase[1] === 9, a.sBase);
-  ok('字串版與數字版的 R_int 完全相同', near(a.nRint, a.sRint), [a.nRint, a.sRint]);
-  ok('字串版與數字版的局部環溫／允許溫升完全相同',
-     near(a.nLoc, a.sLoc) && near(a.nAdt, a.sAdt), a);
+  ok('字串版與數字版算出完全相同的 R_int／允許溫升', near(a.nRint, a.sRint) && near(a.nAdt, a.sAdt), a);
 
-  console.log('\n[B] 真的缺值 → 維持 NaN（不可偷偷當 0）');
+  console.log('\n[B] calcThermalResistance 對真的缺值維持 NaN');
   const b = await page.evaluate(() => {
     const noRjc = { Component:'Y', Qty:4, 'Power(W)':4.09, 'Height(mm)':450, Pad_L:7, Pad_W:7, 'Thick(mm)':2,
-                    Board_Type:'Thermal Via', 'Limit(C)':125, TIM_Type:'None' };              // 缺 R_jc
-    const noH = Object.assign({}, noRjc, { R_jc:0 }); delete noH['Height(mm)'];               // 缺 Height
-    const r1 = calcThermalResistance(noRjc, G), r2 = calcThermalResistance(noH, G);
-    return { dropNaN: isNaN(r1.Drop), adtNaN: isNaN(r1.Allowed_dT), locOK: r1.Loc_Amb === 58.5,
-             locNaN: isNaN(r2.Loc_Amb), rintOK: Math.abs(r1.R_int - 1.1758) < 1e-3 };
+                    Board_Type:'Thermal Via', 'Limit(C)':125, TIM_Type:'None' };
+    const r = calcThermalResistance(noRjc, G);
+    return { dropNaN: isNaN(r.Drop), adtNaN: isNaN(r.Allowed_dT) };
   });
-  ok('缺 R_jc → 內部溫降／允許溫升 NaN、局部環溫仍正常（與使用者畫面一致）',
-     b.dropNaN && b.adtNaN && b.locOK && b.rintOK, b);
-  ok('缺 Height(mm) → 局部環溫 NaN（Cavity Filter 那一列的症狀）', b.locNaN, b);
+  ok('缺 R_jc → 內部溫降／允許溫升 NaN（不偷偷當 0）', b.dropNaN && b.adtNaN, b);
 
-  console.log('\n[C] normalizeComps：補值／轉型／不亂動');
+  console.log('\n[C] normalizeComps：只轉型、空值刪 key，不補任何值');
   const c = await page.evaluate(() => {
     components.rf = [
-      { Component:'Circulators-B8', Qty:4, 'Power(W)':3.81, 'Height(mm)':450, Pad_L:7, Pad_W:7,
-        'Thick(mm)':2, Board_Type:'Thermal Via', 'Limit(C)':125, R_jc:0, TIM_Type:'None' },
-      { Component:'Circulators-B20B28', Qty:4, 'Power(W)':4.09, 'Height(mm)':450, Pad_L:7, Pad_W:7,
-        Board_Type:'Thermal Via', 'Limit(C)':125, TIM_Type:'None' },                       // 缺 R_jc
+      { Component:'完整', Qty:4, 'Power(W)':3.81, 'Height(mm)':450, Pad_L:7, Pad_W:7,
+        Board_Type:'Thermal Via', 'Limit(C)':125, R_jc:0, TIM_Type:'None' },
+      { Component:'缺欄位', Qty:4, 'Power(W)':4.09 },
       { Component:'字串', Qty:'4', 'Power(W)':'4.09', 'Height(mm)':'450', Pad_L:'7', Pad_W:'7',
-        Board_Type:'Thermal Via', 'Limit(C)':'125', R_jc:'0.5', TIM_Type:'None' },          // 全是字串
+        Board_Type:'Thermal Via', 'Limit(C)':'125', R_jc:'0.5', TIM_Type:'None' },
+      { Component:'空值', Qty:'', 'Power(W)':null, 'Height(mm)':'abc', Board_Type:'', TIM_Type:'  ',
+        _filled:{ R_jc:true } },
     ];
     components.digital = []; components.pwr = [];
-    const notes = normalizeComps();
-    const [b8, b20, st] = components.rf;
+    normalizeComps();
+    const [full, miss, str, empty] = components.rf;
     return {
-      notes: notes.map(n => n.name + '/' + n.col + '=' + n.value),
-      b8Untouched: b8.R_jc === 0 && b8['Height(mm)'] === 450 && !b8._filled,
-      b20Rjc: b20.R_jc, b20Filled: b20._filled && Object.keys(b20._filled),
-      strTypes: [typeof st.Qty, typeof st['Power(W)'], typeof st.Pad_L, typeof st['Limit(C)'], typeof st.R_jc],
-      strValues: [st.Qty, st['Power(W)'], st.Pad_L, st['Limit(C)'], st.R_jc],
-      strNotFilled: !st._filled,
-      rfDefaultRjc: RF_DEFAULT.R_jc,
+      fullSame: full.R_jc === 0 && full['Height(mm)'] === 450 && Object.keys(full).length === 10,
+      missKeys: Object.keys(miss).sort().join(','),
+      strTypes: [str.Qty, str['Power(W)'], str.Pad_L, str['Limit(C)'], str.R_jc].map(v => typeof v).join(','),
+      strVals: [str.Qty, str['Power(W)'], str.Pad_L, str['Limit(C)'], str.R_jc].join(','),
+      emptyKeys: Object.keys(empty).sort().join(','),
     };
   });
-  ok('缺 R_jc → 補成 RF 分類預設值並標記', c.b20Rjc === c.rfDefaultRjc
-     && String(c.b20Filled) === 'R_jc', c);
-  ok('已經有值的元件一個欄位都不動、也不標記', c.b8Untouched, c);
-  ok('字串數字一律轉成 number（擋掉字串相加）',
-     c.strTypes.every(t => t === 'number') && c.strValues.join(',') === '4,4.09,7,125,0.5', c);
-  ok('轉型不算「補值」，不標記琥珀色', c.strNotFilled, c);
-  ok('補值清單逐顆逐欄位列出', c.notes.join('|') === 'Circulators-B20B28/R_jc=' + c.rfDefaultRjc, c.notes);
+  ok('缺的欄位維持沒有 key（不補分類預設值）', c.missKeys === 'Component,Power(W),Qty', c.missKeys);
+  ok('已經有值的元件一個欄位都不動', c.fullSame, c);
+  ok('字串數字轉成 number', c.strTypes === 'number,number,number,number,number' && c.strVals === '4,4.09,7,125,0.5', c);
+  ok("空字串／null／非數字／空白字串一律刪 key；舊版 _filled 清掉", c.emptyKeys === 'Component', c.emptyKeys);
 
-  console.log('\n[D] 走完整載入路徑後，使用者的情境不再 NaN');
-  const d = await page.evaluate(async () => {
-    dbAdapter.getDoc = async () => ({
-      project_name: '使用者情境', global_params: {},
-      rf_data: [
-        { Component:'Circulators-B8', Qty:4, 'Power(W)':3.81, 'Height(mm)':450, Pad_L:7, Pad_W:7,
-          'Thick(mm)':2, Board_Type:'Thermal Via', 'Limit(C)':125, R_jc:0, TIM_Type:'None' },
-        { Component:'Circulators-B20B28', Qty:4, 'Power(W)':4.09, 'Height(mm)':450, Pad_L:7, Pad_W:7,
-          Board_Type:'Thermal Via', 'Limit(C)':125, TIM_Type:'None' },                       // AI-Thermal 建的
-        { Component:'Cavity Filter-B20B28', Qty:4, 'Power(W)':25.5, Pad_L:0, Pad_W:0,
-          Board_Type:'None', 'Limit(C)':125, TIM_Type:'None' },                              // 連 Height 都沒有
-      ],
-      digital_data: [], pwr_data: [],
-    });
-    await cloudLoadOne('X');
-    const pick = n => calcResults.rows.find(r => r.Component === n);
-    const bad = calcResults.rows.filter(r => ['Allowed_dT','Tj','Tj_Margin','Loc_Amb','Drop']
-      .some(k => typeof r[k] === 'number' && isNaN(r[k])));
-    const b20 = pick('Circulators-B20B28'), cav = pick('Cavity Filter-B20B28');
-    return { nanRows: bad.map(r => r.Component),
-             b20: { adt: +b20.Allowed_dT.toFixed(1), loc: b20.Loc_Amb, tj: +b20.Tj.toFixed(1), rjc: b20.R_jc },
-             cav: { loc: cav.Loc_Amb, adt: +cav.Allowed_dT.toFixed(1) },
-             filled: calcResults.rows.filter(r => r._filled).map(r => r.Component + ':' + Object.keys(r._filled).join('+')) };
-  });
-  ok('詳細分析不再有任何 NaN', d.nanRows.length === 0, d.nanRows);
-  ok('Circulators-B20B28 算得出 Tj／允許溫升', isFinite(d.b20.adt) && isFinite(d.b20.tj), d.b20);
-  ok('Cavity Filter-B20B28 的局部環溫也算得出來', isFinite(d.cav.loc) && isFinite(d.cav.adt), d.cav);
-  ok('被補值的元件有記錄下來（供畫面提醒）',
-     d.filled.some(x => /Circulators-B20B28/.test(x)) && d.filled.some(x => /Cavity Filter-B20B28/.test(x)), d.filled);
+  console.log('\n[D] 必填規則（compMissing）');
+  const d = await page.evaluate(() => ({
+    onlyName: compMissing({ Component:'A' }),
+    powered: compMissing({ Component:'B', Qty:2, 'Power(W)':5 }),
+    zeroPower: compMissing({ Component:'C', Qty:2, 'Power(W)':0 }),
+    zeroQty: compMissing({ Component:'C2', Qty:0, 'Power(W)':7 }),
+    zeroPad: compMissing({ Component:'D', Qty:1, 'Power(W)':10, 'Height(mm)':0, Pad_L:0, Pad_W:0,
+                           Board_Type:'None', 'Limit(C)':125, R_jc:0, TIM_Type:'None' }),
+    excluded: compMissing({ Component:'E', _excluded:true }),
+    nanPower: compMissing({ Component:'F', Qty:1, 'Power(W)':NaN }),
+  }));
+  ok('只有名稱 → 9 個欄位全列', d.onlyName.length === 9 && d.onlyName[0] === 'Qty' && d.onlyName[1] === 'Power(W)', d.onlyName);
+  ok('有數量有瓦數 → 列出其餘 7 欄（高度、限溫、Rjc、導熱方式、介面材料、E-Pad 長寬）',
+     JSON.stringify(d.powered) === JSON.stringify(['Height(mm)','Limit(C)','R_jc','Board_Type','TIM_Type','Pad_L','Pad_W']), d.powered);
+  ok('明確填 0 瓦或 0 顆 → 不產生熱，其餘免填', d.zeroPower.length === 0 && d.zeroQty.length === 0, d);
+  ok('0 是「有填」（Cavity Filter 的 E-Pad 0×0、Rjc 0 都算有填）', d.zeroPad.length === 0, d.zeroPad);
+  ok('按 👁 排除的元件不列', d.excluded.length === 0, d.excluded);
+  ok('NaN 瓦數算沒填', d.nanPower.includes('Power(W)'), d.nanPower);
 
-  console.log('\n[E] 元件表把補過的那一格標出來');
+  console.log('\n[E] 走完整載入路徑：不補預設、擋下計算');
+  await page.evaluate(async (proj) => {
+    window.__alerts = [];
+    dbAdapter.isReady = () => true; fbOk = true;
+    dbAdapter.getDoc = async () => JSON.parse(JSON.stringify(proj));
+    dbAdapter.getCollection = async () => ({});
+    await cloudLoadOne('RRU_5G');
+  }, AIT_PROJECT);
   const e = await page.evaluate(() => {
-    const rows = [...document.querySelectorAll('#subtab0 table.comp-table tbody tr')];
-    const row = rows.find(r => (r.querySelector('input[type="text"]') || {}).value === 'Circulators-B20B28');
-    const cell = row.querySelector('td[data-col="R_jc"] input');
-    const okRow = rows.find(r => (r.querySelector('input[type="text"]') || {}).value === 'Circulators-B8');
-    const okCell = okRow.querySelector('td[data-col="R_jc"] input');
-    const cs = getComputedStyle(cell);
-    return { marked: cell.classList.contains('cell-filled'), tip: cell.title,
-             border: cs.borderLeftColor, bg: cs.backgroundColor,
-             normalNotMarked: !okCell.classList.contains('cell-filled') };
+    const cir = components.rf.find(x => x.Component === 'Circulators-B20B28');
+    const L = calcResults.missing || [];
+    const txt = id => (document.getElementById(id) || {}).textContent || '';
+    return {
+      noDefaults: !('Height(mm)' in cir) && !('R_jc' in cir) && !('Limit(C)' in cir) && !('Board_Type' in cir),
+      digPowerKey: 'Power(W)' in components.digital[0],
+      blocked: !!calcResults.blocked, rows: calcResults.rows.length, vol: calcResults.Volume_L,
+      missing: L.map(m => m.cat + ':' + m.name + ':' + m.fields.length),
+      alert: window.__alerts.join('\n'),
+      banner: txt('comp-missing-banner'),
+      t1: txt('tab1-alerts'), t1table: document.getElementById('tab1-table').innerHTML,
+      t2: txt('tab2-kpi'), t2vol: txt('tab2-volume'), t3: txt('tab3-3d'),
+    };
   });
-  ok('補值的格子有 cell-filled、琥珀色左邊框與說明',
-     e.marked && /預設值/.test(e.tip) && /rgb\(217, 119, 6\)/.test(e.border), e);
-  ok('本來就有值的格子不標記', e.normalNotMarked, e);
-  const e2 = await page.evaluate(() => {
-    updateComp('rf', 1, 'R_jc', 0.8);
-    const rows = [...document.querySelectorAll('#subtab0 table.comp-table tbody tr')];
-    const row = rows.find(r => (r.querySelector('input[type="text"]') || {}).value === 'Circulators-B20B28');
-    return { marked: row.querySelector('td[data-col="R_jc"] input').classList.contains('cell-filled'),
-             val: components.rf[1].R_jc, still: !!components.rf[1]._filled };
-  });
-  ok('使用者改過之後就不再標記', e2.marked === false && e2.val === 0.8 && e2.still === false, e2);
+  ok('缺的欄位沒有被補上分類預設值', e.noDefaults, e);
+  ok("瓦數 '' 在載入時刪 key（空值不寫 key）", e.digPowerKey === false, e);
+  ok('計算被擋下（不產生任何計算列、體積為 0）', e.blocked && e.rows === 0 && e.vol === 0, e);
+  ok('缺值清單正確：Circulators-B20B28 缺 7 欄、L1452 缺瓦數＋7 欄；完整的／0 瓦的不列',
+     JSON.stringify(e.missing) === JSON.stringify(['rf:Circulators-B20B28:7', 'digital:L1452-TMPA1004S:8']), e.missing);
+  ok('載入時的提示就告知有幾顆缺值、無法計算', /2 顆元件的必填欄位還沒填/.test(e.alert) && /無法計算體積/.test(e.alert), e.alert);
+  ok('元件設定的紅色橫幅列出元件與欄位', /無法計算體積/.test(e.banner) && /Circulators-B20B28/.test(e.banner) && /L1452-TMPA1004S/.test(e.banner), e.banner.slice(0, 120));
+  ok('詳細分析頁：顯示擋下原因、不顯示計算表', /無法計算體積/.test(e.t1) && e.t1table === '', e.t1.slice(0, 60));
+  ok('視覺化報告頁：擋下原因＋體積顯示「無法計算」', /無法計算體積/.test(e.t2) && /無法計算：必填欄位未填/.test(e.t2vol), [e.t2.slice(0, 40), e.t2vol]);
+  ok('3D 頁顯示擋下原因', /無法計算體積/.test(e.t3), e.t3.slice(0, 40));
 
-  console.log('\n[F] Tab0 橫幅');
+  const e2 = await page.evaluate(async () => {
+    runSweep(); runTornado();
+    window.__alerts = [];
+    await generatePDFReport();
+    return { sweep: document.getElementById('sa-sweep-results').textContent,
+             tornado: document.getElementById('sa-tornado-results').textContent,
+             pdf: window.__alerts.join('\n') };
+  });
+  ok('敏感度分析（掃描／Tornado）都顯示擋下原因', /無法計算體積/.test(e2.sweep) && /無法計算體積/.test(e2.tornado), e2);
+  ok('PDF 報告拒絕產生並列出缺什麼', /無法產生報告/.test(e2.pdf) && /Circulators-B20B28/.test(e2.pdf), e2.pdf.slice(0, 80));
+
+  console.log('\n[F] 元件表：缺值格不顯示 0、紅框「必填」、下拉顯示「請選擇」');
   const f = await page.evaluate(() => {
-    const el = document.getElementById('comp-fill-banner');
-    const txt = el.textContent || '';
-    return { has: /自動套用/.test(txt), listsComp: /Cavity Filter-B20B28/.test(txt),
-             listsField: /熱阻 Rjc|元件相對高度/.test(txt), warnsNaN: /NaN/.test(txt) };
+    const rows = [...document.querySelectorAll('#subtab0 table.comp-table tbody tr')];
+    const row = rows.find(r => (r.querySelector('td[data-col="Component"] input') || {}).value === 'Circulators-B20B28');
+    const full = rows.find(r => (r.querySelector('td[data-col="Component"] input') || {}).value === 'Circulators-B8');
+    const h = row.querySelector('td[data-col="Height(mm)"] input');
+    const bt = row.querySelector('td[data-col="Board_Type"] select');
+    const tim = row.querySelector('td[data-col="TIM_Type"] select');
+    const rj = row.querySelector('td[data-col="R_jc"] input');
+    const cs = getComputedStyle(h);
+    return {
+      hVal: h.value, hMissing: h.classList.contains('cell-missing'), hPh: h.placeholder, border: cs.borderTopColor,
+      btText: bt.options[bt.selectedIndex].textContent, btVal: bt.value, btMissing: bt.classList.contains('cell-missing'),
+      timText: tim.options[tim.selectedIndex].textContent, timMissing: tim.classList.contains('cell-missing'),
+      rjVal: rj.value, rjMissing: rj.classList.contains('cell-missing'),
+      fullMarked: !!full.querySelector('.cell-missing'),
+    };
   });
-  ok('橫幅說明原因、列出元件與欄位、點出 NaN 的後果',
-     f.has && f.listsComp && f.listsField && f.warnsNaN, f);
-  const f2 = await page.evaluate(() => { dismissFillNotes(); return document.getElementById('comp-fill-banner').innerHTML; });
-  ok('「知道了」可以關掉橫幅', f2 === '', f2);
+  ok('缺值的數字格是空白（不是 0）、紅框、placeholder「必填」',
+     f.hVal === '' && f.hMissing && f.hPh === '必填' && f.border === 'rgb(220, 38, 38)', f);
+  ok('導熱方式下拉顯示「— 請選擇 —」而不是清單第一項', /請選擇/.test(f.btText) && f.btVal === '' && f.btMissing, f);
+  ok('介面材料下拉同樣顯示「— 請選擇 —」並標紅', /請選擇/.test(f.timText) && f.timMissing, f);
+  ok('Rjc 缺值 → 可輸入的空白欄位並標紅', f.rjVal === '' && f.rjMissing, f);
+  ok('完整的元件沒有任何紅框', !f.fullMarked, f);
 
-  console.log('\n[G] `_filled` 不可寫回共用 DB');
+  console.log('\n[G] 點欄位名稱 → 跳到那一格');
+  // 使用者多半是在「視覺化報告」頁看到擋下原因 → 從那裡點欄位名稱
+  await page.evaluate(() => { switchTab(2); });
+  await page.click('#tab2-kpi a:has-text("限溫")');
+  await page.waitForTimeout(250);
   const g = await page.evaluate(() => {
-    components.rf[0]._filled = { R_jc: true };
-    const fields = _buildProjectFields('T', {});
-    return { hasFilled: fields.rf_data.some(c => c._filled !== undefined),
-             keeps: fields.rf_data[0].Component === 'Circulators-B8' && fields.rf_data[0].R_jc === 0,
-             memoryStillMarked: !!components.rf[0]._filled };
+    const a = document.activeElement;
+    const td = a && a.closest('td');
+    const tr = a && a.closest('tr');
+    return { tab0: document.querySelectorAll('.tab-content')[0].classList.contains('active'),
+             col: td && td.dataset.col,
+             comp: tr && (tr.querySelector('td[data-col="Component"] input') || {}).value,
+             flashed: !!(td && td.classList.contains('cell-flash')) };
   });
-  ok('寫回 DB 的資料不含 _filled，其餘欄位照舊', g.hasFilled === false && g.keeps, g);
-  ok('記憶體裡的標記保留（畫面還要提醒）', g.memoryStillMarked, g);
+  ok('切回元件設定、聚焦在 Circulators-B20B28 的「限溫」並閃一下',
+     g.tab0 && g.col === 'Limit(C)' && g.comp === 'Circulators-B20B28' && g.flashed, g);
 
-  console.log('\n[H] 重量估算預設值');
+  console.log('\n[H] 補齊後才計算；清空欄位 → 刪 key 再次擋下');
   const h = await page.evaluate(() => {
+    const i = components.rf.findIndex(x => x.Component === 'Circulators-B20B28');
+    [['Height(mm)','450'],['Limit(C)','125'],['R_jc','0.3'],['Pad_L','7'],['Pad_W','7']].forEach(([k,v]) => updateCompNum('rf', i, k, v));
+    updateComp('rf', i, 'Board_Type', 'Thermal Via'); updateComp('rf', i, 'TIM_Type', 'None');
+    const afterRf = (calcResults.missing || []).map(m => m.name);
+    updateCompNum('digital', 0, 'Power(W)', '0');            // 這顆確定是 0 瓦 → 其餘免填
+    const r = calcResults;
+    // 有熱的元件不可有 NaN；0 瓦元件其餘欄位免填，算不出的值在畫面上要顯示「—」而不是 NaN
+    const nan = r.rows.filter(x => x.Total_W > 0 && ['Allowed_dT','Tj','Tj_Margin','Loc_Amb','Drop'].some(k => typeof x[k] === 'number' && isNaN(x[k])));
+    const res = { afterRf, blocked: !!r.blocked, vol: r.Volume_L, nan: nan.map(x => x.Component),
+                  tab1NaN: /NaN/.test(document.getElementById('tab1-table').textContent),
+                  tab1Rows: document.querySelectorAll('#tab1-table tbody tr').length,
+                  banner: document.getElementById('comp-missing-banner').innerHTML };
+    updateCompNum('rf', i, 'Height(mm)', '');                // 清空 → 刪 key（不是 0）
+    res.cleared = !('Height(mm)' in components.rf[i]);
+    res.reblocked = !!calcResults.blocked && calcResults.missing.map(m => m.name + ':' + m.fields.join('+')).join('|');
+    updateCompNum('rf', i, 'Height(mm)', '450');
+    return res;
+  });
+  ok('只剩 L1452 沒補時仍然擋著', JSON.stringify(h.afterRf) === JSON.stringify(['L1452-TMPA1004S']), h.afterRf);
+  ok('全部補齊 → 開始計算、體積 > 0、有熱的元件沒有 NaN、紅色橫幅消失',
+     h.blocked === false && h.vol > 0 && h.nan.length === 0 && h.banner === '', h);
+  ok('詳細分析表列出全部元件、0 瓦元件算不出的值顯示「—」而不是 NaN', h.tab1Rows === 5 && h.tab1NaN === false, h);
+  ok('清空數字欄 → 刪 key（不是寫 0）並再次擋下', h.cleared && h.reblocked === 'Circulators-B20B28:Height(mm)', h);
+
+  console.log('\n[I] 👁 排除缺值的元件 → 不再擋');
+  const i2 = await page.evaluate(() => {
+    components.rf.push({ Component:'待確認', Qty:1, 'Power(W)':5 }); recalc();
+    const before = !!calcResults.blocked;
+    toggleComp('rf', components.rf.length - 1);
+    const after = !!calcResults.blocked, vol = calcResults.Volume_L;
+    components.rf.pop(); recalc();
+    return { before, after, vol };
+  });
+  ok('排除前擋下、排除後正常計算', i2.before === true && i2.after === false && i2.vol > 0, i2);
+
+  console.log('\n[J] 新增元件／從資料庫快選不帶分類預設值');
+  const j = await page.evaluate(() => {
+    const n0 = components.digital.length;
+    addComp('digital');
+    const added = components.digital[n0];
+    const addedMiss = compMissing(added);
+    components.digital.pop();
+    variantsCache = { rf: [], pwr: [], digital: [
+      { name:'快選元件', power:'', originProjectName:'StarKcore-12L', originProjectId:'StarKcore-12L',
+        src: { Qty:1, 'Power(W)':'', 'Limit(C)':105, Type:'DC-DC' } } ] };
+    renderTab0();
+    const sel = document.getElementById('lib_sel_digital'); sel.value = '0';
+    addFromVariant('digital');
+    const q = components.digital[components.digital.length - 1];
+    // Thick(mm) 每次 recalc 都由參數控制台依導熱方式帶入（推導值，不是元件預設值）→ 不列入比對
+    const own = o => Object.keys(o).filter(k => !k.startsWith('_') && k !== 'Thick(mm)');
+    const res = { addedKeys: own(added).join(','), addedMiss: addedMiss.length,
+                  qKeys: own(q).sort().join(','),
+                  qLocked: q._ref_locked, qMiss: compMissing(q) };
+    components.digital.pop(); recalc();
+    return res;
+  });
+  ok('直接新增 → 只有名稱，9 個必填全部標出', j.addedKeys === 'Component' && j.addedMiss === 9, j);
+  ok("快選：來源瓦數 '' 不帶過來、其他欄位不補預設（只有來源真的有的）",
+     j.qKeys === 'Component,Limit(C),Qty,Type', j);
+  ok('快選：來源沒有瓦數 → 不鎖瓦數（要讓使用者能填），並列為缺值',
+     j.qLocked === false && j.qMiss.includes('Power(W)'), j);
+
+  console.log('\n[K] 寫回 DB 的元件是深拷貝、去掉舊版 _filled');
+  const k = await page.evaluate(() => {
+    components.rf[0]._filled = { R_jc: true };
+    components.rf[0].Rth = [{ type:'JC_bot', value:0.4 }];
+    const fields = _buildProjectFields('T', {});
+    components.rf[0].Rth[0].value = 9.9; components.rf[0]['Height(mm)'] = 111;
+    const w = fields.rf_data[0];
+    const res = { noFilled: w._filled === undefined, rthIsolated: w.Rth[0].value === 0.4, hIsolated: w['Height(mm)'] !== 111 };
+    delete components.rf[0]._filled; delete components.rf[0].Rth; components.rf[0]['Height(mm)'] = 450;
+    return res;
+  });
+  ok('寫回 DB 的資料不含 _filled', k.noFilled, k);
+  ok('寫出去之後再改畫面上的元件，不會改到要寫進 DB 的那份（深拷貝）', k.rthIsolated && k.hIsolated, k);
+
+  console.log('\n[L] 重量估算出廠預設值（參數控制台）');
+  const l = await page.evaluate(() => {
     const gp = DEFAULT_CONFIG.global_params;
-    return { al: gp.al_density, filter: gp.filter_density, shield: gp.shielding_density, pcb: gp.pcb_surface_density,
-             uiAl: document.getElementById('al_density').value, uiFilter: document.getElementById('filter_density').value,
-             uiShield: document.getElementById('shielding_density').value, uiPcb: document.getElementById('pcb_surface_density').value };
+    return { al: gp.al_density, filter: gp.filter_density, shield: gp.shielding_density, pcb: gp.pcb_surface_density };
   });
   ok('出廠預設＝鋁 2.7／Filter 1／Shielding 1.5／PCB 1.2',
-     h.al === 2.7 && h.filter === 1 && h.shield === 1.5 && h.pcb === 1.2, h);
-  ok('參數控制台欄位顯示同一組值',
-     h.uiAl === '2.7' && h.uiFilter === '1' && h.uiShield === '1.5' && h.uiPcb === '1.2', h);
+     l.al === 2.7 && l.filter === 1 && l.shield === 1.5 && l.pcb === 1.2, l);
 
   ok('頁面無 JS 例外', errors.length === 0, errors.slice(0, 3));
 

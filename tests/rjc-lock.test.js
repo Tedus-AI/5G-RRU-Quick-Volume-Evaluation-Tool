@@ -116,6 +116,20 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   });
   ok('可輸入且改得動（2.4 寫進元件）', b.hasInput && b.stored === 2.4 && !b.locked, b);
 
+  // 標記還在、值卻不見了（例：被清掉）→ 不可把一個空值鎖起來讓人改不了（Rjc 是必填）
+  const b2 = await page.evaluate(() => {
+    const c = components.rf[1];
+    c._rjc_from = 'JC_bot'; delete c.R_jc; recalc();
+    const td = document.querySelectorAll('#subtab0 table.comp-table tbody tr')[1].querySelector('td[data-col="R_jc"]');
+    const inp = td.querySelector('input');
+    const r = { locked: !!td.querySelector('.rjc-ref'), hasInput: !!inp,
+                missing: !!(inp && inp.classList.contains('cell-missing')), blocked: !!calcResults.blocked };
+    delete c._rjc_from; c.R_jc = 2.4; recalc();     // 還原給後面的情境用
+    return r;
+  });
+  ok('有標記但值是空的 → 可輸入＋紅框必填、計算被擋（不鎖成空值）',
+     !b2.locked && b2.hasInput && b2.missing && b2.blocked, b2);
+
   console.log('\n[C] 鎖定不影響計算');
   const c = await page.evaluate(() => {
     const row = calcResults.rows.find(r => r.Component === components.rf[0].Component);

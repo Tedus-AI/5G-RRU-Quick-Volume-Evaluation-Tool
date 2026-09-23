@@ -374,7 +374,8 @@ const COLOR_UTILS = () => {
     projectNameSet('來源專案'); document.getElementById('copyProjectName').value = '複製出來的';
     await confirmCopyProject();                      out.copied = [txt(), projectNameGet()];
     // 刪掉的正好是目前這個 → 頂排不可留殘值
-    await cloudDeleteOne('x', '複製出來的');           out.afterDelete = txt();
+    // 以 id 判斷是不是目前這個專案（名稱可能重複或改過）→ 傳複本真正的 id
+    await cloudDeleteOne(currentProjectId, '複製出來的');  out.afterDelete = txt();
     dbAdapter.getDoc = realGet; dbAdapter.updateDoc = realUpd; dbAdapter.deleteDoc = realDel;
     dbAdapter.getProjectsSorted = realList; dbAdapter.isReady = realReady;
     return out;
