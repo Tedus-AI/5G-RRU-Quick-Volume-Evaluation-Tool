@@ -146,7 +146,7 @@
   實際資料檢查：備份裡 `None` 元件的板厚全部是 0，所以此改動對既有專案是 no-op。
 - **舊專案遷移**（`migrateThickGlobals(loadedGlobals)`）：專案的 `global_params` 沒存過
   `t_PCB`／`Coin_T_Setting` 時，由該導熱方式底下「**最常見的非零板厚**」回推（平手取小），
-  再統一套到所有同類元件；Tab0 跳藍色橫幅寫出回推依據並**逐顆列出被改動的元件**，
+  再統一套到所有同類元件（推不出來 → 出廠預設，不是 0）；Tab0 跳藍色橫幅寫出回推依據並**逐顆列出被改動的元件**，
   提醒要按「儲存專案」才寫回 DB。⚠ 判斷「專案有沒有存過」一定要看傳進來的 `global_params`，
   不能看 `G` —— `G` 還留著上一個專案的值（`readGlobals` 只從畫面欄位刷新）。
 
@@ -223,13 +223,53 @@
   （`projectNameSet` 同時更新畫面與 tooltip）。不要再從 DOM 讀專案名稱。
 - 會動到它的地方：`cloudLoadOne`（`d.project_name || docId` —— 常駐顯示，**不可留上一個專案的
   殘值**）、`confirmCopyProject`、`cloudDeleteOne`（刪到目前這個就清空）、`cloudSaveProject`、
-  `saveProject`（匯出檔名）、PDF 報告標題。
+  `saveProject`（匯出檔名，JSON 也帶 `project_name`）、`handleFileLoad`、PDF 報告標題。
 - **沒命名時按「💾 儲存專案」會當場 `promptProjectName()` 問一次**，取消就靜靜退出（不寫入、
   不噴警告）。欄位拿掉後 `promptProjectName()` 是唯一的手動輸入口 → ✏️ 必須常駐可見
   （不可只在 hover 才出現），點文字即可改名。
 - **文字不可有外框／底色**（使用者明確要求），顏色必須是**深色**：header 是青藍漸層，
   名稱所在位置實測背景為 `rgb(0,161,231)`，白字只有 **2.90:1**，深藍 `#062a46` 有 **5.08:1**。
   測試是截 1×1 的圖讀真實像素再算對比（拿漸層端點算會失真：兩端分別是 3.4:1 與 9.3:1）。
+
+### 專案身分：存檔寫回「載入時的 id」（`currentProjectId`）
+
+⚠ **不可再由名稱推 docId 來存檔**。AI-Thermal 建專案時 id 與名稱分開輸入，改名也刻意只改
+`project_name`、不動 id（id 是規格書／標註圖／三個頁籤選單的錨點）。原本本工具每次存檔都由名稱推
+docId → id≠名稱的專案每存一次就多一份分身、原專案永遠收不到修改（備份裡 8 個專案有 3 個是這樣：
+`CB-GN-HB-2X2M-2B`、`tedus`、`RRU_5G`）。
+
+- 身分一律走 `projectIdentitySet(id, name)`：`cloudLoadOne` → 載入的 id；`cloudSaveProject` 成功 →
+  寫入的 id；`confirmCopyProject` → 複本的 id；`handleFileLoad`（匯入本機檔）→ **`null`**
+  （未儲存的新專案，存檔才不會蓋掉前一個開著的雲端專案）；`cloudDeleteOne` 刪到目前的 → `null`。
+- `cloudSaveProject`：有 id → 寫回同一個 id（**不再跳「已存在，確定要覆蓋？」**，那是同一個專案）；
+  沒有 id（新專案）→ 才 `projectDocIdFromName(name)`，撞到既有專案時確認訊息寫出**對方的名稱**。
+- **改名＝只改 `project_name`**（✏️ 改名後存檔，id 不變）；要另存一份用「📋 複製專案」。
+- **名稱不可與其他專案重複**（`projectNameTakenBy`，不分大小寫；與 AI-Thermal 改名規則同一條：
+  規格書路徑 `SPEC/<專案名>/`，同名會共用資料夾）。只在「新專案」或「改了名」時檢查，
+  既有的重名資料不會因此存不了檔。
+- `cloudLoadOne` 對 `getDoc` 的結果**深拷貝**（`getDoc` 回傳 DB 快取的活參照；直接編輯的話，
+  載入時的轉型與畫面上的試改會在釋放編輯鎖——整份快取寫回——時被寫進共用 DB）。
+  `_buildProjectFields` 寫出去的元件也深拷貝（反方向同理）。
+- 載入時**缺哪一類元件就是空陣列**，不可沿用上一個專案的元件。
+- 規格書是「檔案參照」：**複製專案**與 **📋 複製元件**都用 `specMarkFromIfUnset` 逐份標 `_from`
+  （單一物件與陣列兩種形狀都要；已經有 `_from` 的保留原本的來源），AI-Thermal 刪除或取代複本的規格書
+  時才不會把來源的實體檔一起刪掉。複製專案成功後畫面上的元件也要標（它們從此代表複本）。
+- 契約測試：`tests/project-load.test.js`。
+
+### 參數控制台：換專案先退回出廠預設（`loadGlobalsForProject`）
+
+⚠ 原本只覆寫「專案有存的 key」，有輸入框的參數會沿用上一個專案留在畫面上的值、存檔時還寫進本專案
+（AI-Thermal 建的專案沒有 `global_params` → 34 個參數全部沿用前一個看過的專案；其餘專案都沒存過
+`K_Coin`，也一樣沿用）。
+
+- 載入／匯入：`clearGlobalsWithoutInputs()` → **所有 `PROJECT_GLOBAL_KEYS`＋`fin_tech_selector_v2`
+  先退回 `DEFAULT_CONFIG.global_params`** → 再套專案存過的值 → `syncGlobalsToInputs` 同步所有輸入框
+  （勾選框用 `checked`、自訂鰭片係數走 `applyFinCustomUI`）。
+- 參數控制台**允許**出廠預設（這是使用者同意的地方），但要看得出哪些是預設：Tab0 藍色橫幅
+  （`#globals-default-banner`）列出「專案沒存過、採用出廠預設」的參數；完全沒有 `global_params` 時
+  直接寫「參數控制台全部是出廠預設值」。
+- `migrateThickGlobals` 從元件推不出板厚時改用**出廠預設**（`t_PCB` 2.0／`Coin_T_Setting` 2.5），
+  不再給 0（0 會讓所有 Via／Coin 元件 `R_int = 0`，偏樂觀）。
 
 ### 參數控制台可調寬／收合
 
@@ -248,6 +288,7 @@ AI-Thermal 下次存檔覆寫，還讓兩邊數字對不起來 → `rjcCellHtml`
 |---|---|
 | 有 `comp._rjc_from`（AI-Thermal 推導過）| **鎖定的純參照值**：白底黑字文字 ＋ 小 🔒，左側保留藍邊；tooltip 寫出取自哪一筆 θJC、量測條件（讀 AI-Thermal 寫的 `comp.Rth`，本工具只讀不寫），並指路回 AI-Thermal |
 | 沒有標記（本工具新增／AI-Thermal 沒推導過）| 照舊是可輸入的數字欄 |
+| 有標記但**值是空的**（標記殘留、值被清掉）| 可輸入 ＋ 紅框「必填」——不可把一個空值鎖起來讓人改不了（Rjc 是必填欄位）|
 
 - **不可用反灰 `disabled` input**（UX 慣例 2：純參照值要白底黑字看得清楚），也**不給 ✂ 逃生口**
   —— 這欄的逃生口是「回 AI-Thermal 改 θJC」，不是就地改。
@@ -281,12 +322,12 @@ AI-Thermal 下次存檔覆寫，還讓兩邊數字對不起來 → `rjcCellHtml`
 | `Height(mm)` | 只有 5G-RRU（AI-Thermal 一律不寫）|
 | `Thick(mm)` | 只有 5G-RRU，且**由參數控制台的 PCB 板厚度／銅塊厚度推導**（見下節）；AI-Thermal 一律不寫 |
 | `Board_Type`、`Pad_L`、`Pad_W`、`TIM_Model`、`TIM_Type` | 5G-RRU 可編輯（標藍邊提醒會被覆寫）；AI-Thermal 存檔時由 Tab1/Tab2 推導後覆寫 |
-| `R_jc` | **有 `_rjc_from` 時本工具鎖定不可改**（見下節）；沒有標記才可自行輸入 |
+| `R_jc` | **有 `_rjc_from` 且有值時本工具鎖定不可改**（見下節）；沒有標記（或值是空的）才可自行輸入 |
 | `Type`、`Power_RT(W)`、`TV_ID_mil`、`TV_Qty`、`Temp_Sensor`、`Local_Qty`、`Remote_Qty`、`note`、`Rth`、`SpecFile` | 只有 AI-Thermal（本工具不顯示但原樣保留）|
 
 ⚠ **「從資料庫快選」的 carry 白名單兩邊都必須列全上表所有欄位**（本工具的 `VARIANT_CARRY`
-／AI-Thermal 的 `SG_VARIANT_CARRY`，目前各 21 項）。漏列的 key 會被各自的分類罐頭預設值
-蓋掉，複製完再存回共用 DB 就等於把對方工具填的真實值洗成罐頭值。新增任何每元件欄位時，
+／AI-Thermal 的 `SG_VARIANT_CARRY`，目前各 21 項）。漏列的 key 快選時就不會被帶過來（本工具已不套分類預設 → 變成缺值被必填檢查擋下；
+AI-Thermal 專屬欄位則是整個掉失），複製完再存回共用 DB 就等於把對方工具填的真實值丟掉。新增任何每元件欄位時，
 **同一個 commit 內要把它加進本工具的白名單，並在另一個 repo 同步補上**。
 物件／陣列欄位（`Rth`、`SpecFile`）carry 時必須深拷貝（`carrySrc`）。
 `SpecFile` 是檔案參照不是複本（實體檔在來源專案的 `SPEC/<專案名>/` 底下）→ 快選帶入時標
@@ -310,27 +351,40 @@ AI-Thermal 已支援「一顆元件多份規格書」（datasheet／application 
 新增任何會碰 `SpecFile` 的程式碼時，兩種形狀都要處理（AI-Thermal 端對應 `sgSpecList()` /
 `sgSpecStore()` / `sgSpecMarkFrom()`）。
 
-#### ⚠ 載入的元件一定要過 `normalizeComps()`（缺欄位 → 整列 NaN 的根因）
+#### ⚠ 元件欄位**不補預設值**：缺必填 → 告警並擋下計算（`compMissing`／`listMissing`）
 
-AI-Thermal 建立的元件**刻意不寫**本工具專屬欄位（`Height(mm)`／`R_jc`／`Thick(mm)`…）——
-它不知道這些值，寫了就分不出「工程師填的」還是「工具塞的」（見上一節）。但那些元件載進來時：
+標準流程是 **AI-Thermal 先建資料 → 本工具讀同一個專案算體積**。AI-Thermal 刻意不寫本工具專屬欄位
+（`Height(mm)`／`R_jc`…），專案也可能還沒維護完整。原本載入時會補分類預設值（Height 250、Rjc 1.5、
+限溫 200…）讓計算跑得動 —— 使用者明確要求拿掉：**預設值若是錯的，算出來的體積就是錯的，還不容易被發現。**
 
-- 元件表是 `value="'+(row[col]||0)+'"` → 畫面**顯示 0**，看起來跟正常元件一模一樣；
-- `calcThermalResistance` 直接拿 `undefined` 做算術 → `Loc_Amb`／`Drop`／`Allowed_dT`／`Tj`
-  **整列 NaN**（使用者實際踩到：同一顆料的 `-B8` 版是從快選進來的（`Object.assign({},DEFAULT,src)`
-  會補齊）所以正常，`-B20B28` 版沒走快選就整列 NaN）。
+> 使用者原話：「參數控制台填預設值可以，元件設定那邊不需要；沒填就是使用者必須要注意到，否則不能計算。」
 
-→ `cloudLoadOne` / `handleFileLoad` / `init` 指派完 `components.*` 後**一定要呼叫 `normalizeComps()`**：
+**必填規則**（`REQ_ALWAYS`／`REQ_IF_POWERED`）：
 
-1. 能轉成數字的就轉成數字（見下一條）；
-2. 真的沒有值才套**該分類的預設值**（`RF_DEFAULT`/`DIG_DEFAULT`/`PWR_DEFAULT`，與快選同一套），
-   並標在 `row._filled[欄位]`；
-3. Tab0 跳琥珀色橫幅逐顆列出補了哪些欄位、元件表把那一格標琥珀色（`filledAttrs`），
-   提醒「這是預設值不是實際值」，使用者改過（`updateComp`）就取消標記。
-4. `_filled` 是 UI 提醒不是資料 → `_buildProjectFields` 寫回 DB 前 **strip 掉**。
+| 條件 | 必填欄位 |
+|---|---|
+| 一律 | `Qty`、`Power(W)`（沒有就不知道熱負載）|
+| `Qty × Power ≠ 0`（或還不知道）| 另加 `Height(mm)`、`Limit(C)`、`R_jc`、`Board_Type`、`TIM_Type`、`Pad_L`、`Pad_W` |
+| 明確填 0 瓦／0 顆 | 不產生熱 → 其餘免填（Tab1／PDF 表格裡算不出的值顯示「—」，不印 NaN）|
+| 按 👁 排除（`_excluded`）| 不檢查 |
 
-⚠ 不可反過來「一律填 0 了事」：`R_jc=0`、`Height(mm)=0` 都是**低估溫度**的方向。
-⚠ `Thick(mm)` 不在補值清單裡 —— 它每次 `recalc()` 都由 `applyThickFromGlobals()` 依導熱方式統一帶入。
+- **0 是「有填」**（例：Cavity Filter 的 E-Pad 0×0、Rjc 0 是既有建模慣例）；只有「沒有 key／空字串／非數字」算沒填。
+- `TIM_Model` 不必填（沒選型號就用參數控制台的 `K_<Type>`／`t_<Type>`，那是允許預設值的地方）；
+  `Thick(mm)` 也不在清單裡（每次 `recalc()` 由 `applyThickFromGlobals()` 從參數控制台帶入）。
+- **擋下計算**：`computeAll` 開頭 `listMissing(comps)` 有東西就回 `{…emptyCalcResult(), blocked:true, missing}`，
+  不產生任何計算列。Tab1／Tab2（體積框顯示「無法計算：必填欄位未填」）／Tab3／敏感度掃描與 Tornado
+  一律顯示同一份 `calcGateHtml(missing)`；PDF 報告拒絕產生並列出缺什麼；載入／匯入時的 alert 也附上缺值摘要。
+- **畫面**：元件設定頂部紅色橫幅（`#comp-missing-banner`）逐顆列出元件與欄位，**點欄位名稱 →
+  `jumpToMissing` 切到該分類、捲到該列、聚焦那一格並閃一下**。缺值格：數字欄**空白**（不可再顯示 0，
+  看起來像有填）＋紅框＋placeholder「必填」；下拉放「— 請選擇 —」佔位（不讓瀏覽器顯示成清單第一項）。
+  紅色 = 擋下計算的錯誤狀態（紅色保留給錯誤）。
+- **清空數字欄＝刪 key**（`updateCompNum`），不可寫 0：0 是一個值，缺值會被當成有填而靜默算下去。
+- **新增元件只給名稱**（`addComp`）；**從資料庫快選**不再套分類預設（`makeComp` 已移除），
+  來源沒填的欄位就讓它空著；來源瓦數是 `''` 不帶、也不鎖瓦數（`_ref_locked` 只在有值時成立）。
+- `normalizeComps()` 仍要在 `cloudLoadOne`／`handleFileLoad`／`init` 指派完 `components.*` 後呼叫，
+  但**只做型別整理**：字串數字轉 number、`''`／`null`／非數字 → 刪 key、清掉舊版 `_filled`。**不補任何值。**
+- 舊版的 `_filled`／琥珀色「自動補值」機制已整個拿掉；`_buildProjectFields` 仍會剝掉殘留的 `_filled`。
+- 契約測試：`tests/comp-normalize.test.js`。
 
 #### ⚠ 數字欄位一律先轉成 Number（`Pad_L + Thick(mm)` 是加法）
 
@@ -340,10 +394,10 @@ AI-Thermal 建立的元件**刻意不寫**本工具專屬欄位（`Height(mm)`�
 而且**不噴 NaN**、圖表照樣畫得出來 —— 靜默樂觀，比 NaN 更危險。
 `_num()` 對真的沒有值回 `NaN`（讓它在畫面上現形），不偷偷當 0。
 
-⚠ **空值一律「不寫 key」，不可寫 `''`**：快選是 `Object.assign({}, RF_DEFAULT, src)`，key 不
-存在會套分類預設；寫 `''` 會覆蓋預設值，而 `calcRow` 對空字串多半不噴 NaN 而是**靜默算成 0**
+⚠ **空值一律「不寫 key」，不可寫 `''`**：`calcRow` 對空字串多半不噴 NaN 而是**靜默算成 0**
 （`Thick` 空 → `R_int`=0、`Pad_L/W` 空 → 面積用字串算出假值、`Limit(C)` 空 → 裕度變超大負數），
-方向是**低估熱阻＝樂觀**，比 NaN 更危險。取消 TIM 選型／換 TIM 類型時一律 `delete` key。
+方向是**低估熱阻＝樂觀**，比 NaN 更危險。取消 TIM 選型／換 TIM 類型、清空數字欄時一律 `delete` key；
+載入時 `normalizeComps` 也會把別的工具寫進來的 `''` 刪掉，交給必填檢查擋下。
 
 ### 規則
 
