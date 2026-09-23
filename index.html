@@ -169,6 +169,12 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
   background:linear-gradient(135deg,#0ea5e9,#22d3ee);color:#07293c;font-weight:800;font-size:0.95rem;
   box-shadow:0 4px 14px rgba(14,165,233,0.35);transition:filter .15s,box-shadow .15s;}
 .tim-lib-btn:hover{filter:brightness(1.08);box-shadow:0 6px 20px rgba(14,165,233,0.5);}
+/* 整機長寬即時算式（參數控制台「PCB 板離外殼邊距」底下）：邊距加到哪個方向容易搞混 → 直接攤開算式 */
+.sidebar .dim-derive{margin-top:8px;padding:8px 10px;border:1px solid #334155;border-radius:8px;background:rgba(15,23,42,0.35);}
+.sidebar .dim-derive .dd-rule{font-size:0.7rem;color:#94a3b8;line-height:1.5;margin-bottom:6px;}
+.sidebar .dim-derive .dd-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:0.78rem;color:#cbd5e1;}
+.sidebar .dim-derive .dd-row b{color:#f1f5f9;font-size:0.86rem;white-space:nowrap;}
+.sidebar .dim-derive .dd-sum{font-size:0.68rem;color:#94a3b8;text-align:right;margin:1px 0 5px;}
 .tim-lib-hint{margin-top:7px;font-size:0.72rem;color:#94a3b8;line-height:1.55;}
 .tim-lib-hint b{color:#cbd5e1;}
 .tim-lib-modal{width:820px;}
@@ -516,6 +522,11 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
     <label style="margin-top:12px;color:var(--primary-light);">📏 PCB 板離外殼邊距 (防水)</label>
     <div class="row2"><div><label>Top (mm)</label><input type="number" id="Top" step="1" onchange="recalc()"></div><div><label>Bottom (mm)</label><input type="number" id="Btm" step="1" onchange="recalc()"></div></div>
     <div class="row2"><div><label>Left (mm)</label><input type="number" id="Left" step="1" onchange="recalc()"></div><div><label>Right (mm)</label><input type="number" id="Right" step="1" onchange="recalc()"></div></div>
+    <div class="dim-derive" id="dim-derive" title="鰭片沿長度方向延伸（每片鰭片長＝整機長 L，片數由整機寬 W 決定）；自然對流時鰭片是垂直的，所以 L 就是吊掛後的上下方向。">
+      <div class="dd-rule">Top／Bottom＝長度方向兩端（吊掛時的上下）<br>Left／Right＝寬度方向兩側</div>
+      <div class="dd-row"><span>整機長 L</span><b id="dd-L">—</b></div><div class="dd-sum" id="dd-L-sum"></div>
+      <div class="dd-row"><span>整機寬 W</span><b id="dd-W">—</b></div><div class="dd-sum" id="dd-W-sum"></div>
+    </div>
     <label style="margin-top:12px;color:var(--primary-light);">🔶 Cu Coin 銅塊設定（套用於所有 Board_Type = Copper Coin 元件）</label>
     <div class="row2"><div><label>銅塊長 (mm)</label><input type="number" id="Coin_L_Setting" step="1" onchange="recalc()"></div><div><label>銅塊寬 (mm)</label><input type="number" id="Coin_W_Setting" step="1" onchange="recalc()"></div></div>
     <div class="row2"><div><label title="元件清單中「導熱方式 = Copper Coin」的元件，其板厚一律吃這一格">銅塊厚度 (mm)</label><input type="number" id="Coin_T_Setting" step="0.1" min="0" title="所有 Copper Coin 元件的板厚都取這個值（銅塊穿板厚度）" onchange="recalc()"></div><div><label title="銅塊材質的導熱係數。純銅約 380 W/m·K；C1100/C1020 等材質可自行調整">K (銅塊) (W/m·K)</label><input type="number" id="K_Coin" step="10" min="1" title="Copper Coin 的 R_int 用它：rv = 板厚 /(K × 等效面積)。預設 380（純銅）" onchange="recalc()"></div></div>
@@ -1832,6 +1843,26 @@ function applyFinCustomUI(){
 // =====================================================
 function calcHValue(gap,FH_mm){const FH_REF=70.0,ALPHA_H=0.20;let FH=(FH_mm&&FH_mm>0)?FH_mm:FH_REF;let FHs=Math.max(FH,20);let hc_base=6.4*Math.tanh(gap/7.0);let fh_factor=Math.pow(FH_REF/FHs,ALPHA_H);let hc=hc_base*fh_factor;let rf=gap>=10?1:Math.sqrt(gap/10);let hr=2.4*rf;return{h_value:hc+hr,h_conv:hc,h_rad:hr};}
 function calcEtaFin(FH_mm,t_fin_mm,h_value,k_fin){if(FH_mm<=0||t_fin_mm<=0||h_value<=0||k_fin<=0)return 1.0;let t_m=t_fin_mm/1000;let Lc_m=(FH_mm+t_fin_mm/2)/1000;let m=Math.sqrt(2*h_value/(k_fin*t_m));let mLc=m*Lc_m;if(mLc<1e-6)return 1.0;return Math.tanh(mLc)/mLc;}
+/* 整機長寬（底面積）＝ PCB ＋ 防水邊距。單一事實來源：computeAll 與參數控制台的即時算式都走這裡。
+   ⚠ 邊距方向：鰭片沿「長」延伸（每片鰭片長＝L，片數由 W 決定：calcFinCount(WH,…)），
+   自然對流時鰭片必須垂直 → L 是吊掛後的上下方向 → Top/Bottom 是長度方向兩端，Left/Right 是寬度方向兩側。
+   原本寫成 L+Left+Right、W+Top+Bottom（平面圖「圖面上下」的習慣），與鰭片方向對不起來：
+   Bottom 比其他邊大（底部留接頭／防水）時，那幾 mm 被加到寬度 → 可能多排一片鰭片 → 鰭片高與體積偏樂觀。 */
+function rruFootprint(p){
+  // 一律轉型：值若是字串，"500"+"8" 會變成字串相接；真的沒有值就回 NaN 讓它現形，不偷偷當 0
+  const n=v=>parseFloat(v);
+  return{L:n(p.L_pcb)+n(p.Top)+n(p.Btm),W:n(p.W_pcb)+n(p.Left)+n(p.Right)};
+}
+/* 參數控制台：把長寬算式直接攤開（邊距方向容易搞混，數字要答得出「哪來的」） */
+function renderDimDerive(){
+  const el=document.getElementById('dim-derive');if(!el)return;
+  const f=rruFootprint(G);
+  const n=v=>{const x=parseFloat(v);return isFinite(x)?String(+x.toFixed(2)):'—';};
+  document.getElementById('dd-L').textContent=n(f.L)+' mm';
+  document.getElementById('dd-L-sum').textContent='PCB '+n(G.L_pcb)+' ＋ Top '+n(G.Top)+' ＋ Bottom '+n(G.Btm);
+  document.getElementById('dd-W').textContent=n(f.W)+' mm';
+  document.getElementById('dd-W-sum').textContent='PCB '+n(G.W_pcb)+' ＋ Left '+n(G.Left)+' ＋ Right '+n(G.Right);
+}
 function calcFinCount(W,gap,ft){if(gap+ft<=0)return 0;let n=Math.floor((W+gap)/(gap+ft));while(n>0&&(n*ft+(n-1)*gap)>W+0.001)n--;return Math.max(n,0);}
 
 // 各鰭片製程的預設係數（η_process 有效效率、K_FIN 鰭片導熱）。
@@ -1914,7 +1945,8 @@ function computeAll(params,comps,Area_fixed_m2){
   let MDA=50,BN="None",bti=-1;
   if(valid.length){let mi=0;valid.forEach((r,i)=>{if(r.Allowed_dT<valid[mi].Allowed_dT)mi=i;});MDA=Math.max(valid[mi].Allowed_dT,0);BN=valid[mi].Component;bti=mi;}
   let{h_value,h_conv,h_rad}=calcHValue(p.Gap,70);
-  let LH=p.L_pcb+p.Left+p.Right,WH=p.W_pcb+p.Top+p.Btm,bam2=(LH*WH)/1e6;
+  const fp=rruFootprint(p);
+  let LH=fp.L,WH=fp.W,bam2=(LH*WH)/1e6;
   let isDieCasting=p.fin_tech_selector_v2.includes("Die-casting");
   let alpha_deg=isDieCasting?(p.Draft_Angle||1.25):0;
   let alpha_rad=alpha_deg*Math.PI/180;
@@ -1991,7 +2023,7 @@ function computeAll(params,comps,Area_fixed_m2){
 // =====================================================
 // MAIN RECALC
 // =====================================================
-function recalc(){readGlobals();applyThickFromGlobals();calcResults=computeAll(G,components,null);updateHDisplay();renderTab0();renderTab1();renderTab2();renderTab3();updateSABase();}
+function recalc(){readGlobals();applyThickFromGlobals();calcResults=computeAll(G,components,null);updateHDisplay();renderDimDerive();renderTab0();renderTab1();renderTab2();renderTab3();updateSABase();}
 
 function updateHDisplay(){
   let FH_disp=(calcResults&&calcResults.Fin_Height>0)?calcResults.Fin_Height:70;let{h_value,h_conv,h_rad}=calcHValue(G.Gap,FH_disp);let el=document.getElementById('h-val');
@@ -3377,6 +3409,7 @@ async function generatePDFReport() {
           {text: 'Geometry / 幾何尺寸', fontSize:8.5, bold:true, color:cPrimary, margin:[0,0,0,4]},
           {table:{body:[
             paramRow('PCB (LxW)', 'PCB 板長 x 寬', G.L_pcb+'x'+G.W_pcb+' mm'),
+            paramRow('Margin T/B · L/R', '防水邊距（T/B 加在長、L/R 加在寬）', G.Top+'/'+G.Btm+' · '+G.Left+'/'+G.Right+' mm'),
             paramRow('Base Thick', '散熱器基板厚度', G.t_base+' mm'),
             paramRow('H_shield', '屏蔽罩高度', G.H_shield+' mm'),
             paramRow('H_filter', '腔體濾波器高度', G.H_filter+' mm'),
