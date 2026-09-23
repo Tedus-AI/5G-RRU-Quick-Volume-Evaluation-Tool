@@ -313,6 +313,16 @@ tr.comp-excluded{opacity:0.4;}
 .calc-gate .cg-cat{display:inline-block;margin-left:6px;padding:0 6px;border-radius:4px;background:#fee2e2;color:#991b1b;font-size:0.7rem;font-weight:700;vertical-align:1px;}
 .calc-gate a{color:#b91c1c;text-decoration:underline;cursor:pointer;}
 .pw-unknown{color:#b91c1c;margin-left:4px;}
+/* 疑似舊版罐頭預設值（7 欄全等於 AI-Thermal 舊版 SG_DEFAULTS）→ 一樣擋計算；虛線紅框與「沒填」的實線紅框區隔 */
+.comp-table td input.cell-stamped,.comp-table td select.cell-stamped{border:2px dashed #dc2626;background:#fff5f5;}
+.comp-table td input.cell-stamped{padding-left:3px;padding-right:2px;}   /* 框線加粗後窄欄（限溫、Rjc）要縮內距，數字才不會被裁掉 */
+.stamped-note{margin-top:3px;font-size:0.72rem;color:#b91c1c;line-height:1.35;}
+.stamped-note .btn{padding:1px 6px;font-size:0.7rem;}
+.calc-gate .cg-h{margin:8px 0 2px;font-weight:700;color:#991b1b;font-size:0.86rem;}
+.calc-gate .cg-ok{margin-left:6px;padding:1px 8px;font-size:0.74rem;border:1px solid #b91c1c;background:#fff;color:#b91c1c;border-radius:4px;cursor:pointer;}
+/* 資料庫在載入之後被更新、畫面上又有還沒存的修改 → 琥珀色提示（提醒，不是錯誤） */
+.stale-note{background:#fffbeb;border:1px solid #fcd34d;border-left:5px solid #d97706;color:#78350f;border-radius:8px;padding:10px 14px;margin:0 0 12px;font-size:0.86rem;line-height:1.6;}
+.rjc-warn{color:#b45309;margin-left:3px;}
 .derived-legend{color:#64748b;font-size:0.76rem;margin:-4px 0 8px;line-height:1.4;}
 .derived-swatch{display:inline-block;width:10px;height:12px;border:1px solid #d1d5db;border-left:3px solid #0550ae;background:#f5f9ff;vertical-align:-2px;border-radius:2px;}
 .tim-migrate{background:#fffbeb;border:1px solid #f59e0b;border-left-width:5px;border-radius:8px;padding:12px;margin-bottom:12px;color:#7c4a03;font-size:0.85rem;}
@@ -386,6 +396,7 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
 <script src="fileDb.js?v=__APP_VERSION__"></script>
 <script src="graphDb.js?v=__APP_VERSION__"></script>
 <script src="dbAdapter.js?v=__APP_VERSION__"></script>
+<script src="compMerge.js?v=__APP_VERSION__"></script>
 </head>
 <body>
 <div id="update-banner" role="alert" aria-live="assertive">
@@ -684,6 +695,7 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
   <div class="tab-content active" id="tab0">
     <h3>🔥 元件熱源清單設定</h3>
     <p style="color:#888;font-size:0.82rem;margin-bottom:12px;">💡 提示：將滑鼠游標停留在表格的「欄位標題」上，即可查看詳細的名詞解釋與定義。</p>
+    <div id="stale-banner"></div>
     <div id="globals-default-banner"></div>
     <div id="thick-migrate-banner"></div>
     <div id="comp-missing-banner"></div>
@@ -1686,6 +1698,7 @@ function addFromVariant(cat){
     _ref_origin_project: v.originProjectName,
     _ref_origin_id: v.originProjectId,
     _ref_locked: _hasVal(src['Power(W)'],true),   // 來源有瓦數才鎖；沒有的話要讓使用者能填
+    _cid: CompMerge.newCid(),                      // 新的一顆（跨專案複製，不沿用來源的元件 id）
   }));
   recalc();
 }
@@ -1708,6 +1721,7 @@ function init() {
   components.rf = DEFAULT_CONFIG.rf_data.map(r=>({...r}));
   components.digital = DEFAULT_CONFIG.digital_data.map(r=>({...r}));
   components.pwr = DEFAULT_CONFIG.pwr_data.map(r=>({...r}));
+  ['rf','digital','pwr'].forEach(cat=>CompMerge.ensureCids(components[cat]));
   for (let k in gp) { let el=document.getElementById(k); if(el){if(el.tagName==='SELECT')el.value=gp[k];else el.value=gp[k];} }
   normalizeComps();
   applyFinCustomUI();
@@ -1717,6 +1731,7 @@ function init() {
   document.getElementById('loading').style.display='none';
   updateSABase();
   recalc();
+  projBase=null;markProjectClean();
   initFirebase();
 }
 
@@ -2148,30 +2163,85 @@ function compMissing(c){
   if(!noHeat)REQ_IF_POWERED.forEach(k=>{if(!_hasVal(c[k],REQ_NUM.includes(k)))miss.push(k);});
   return miss;
 }
+/* ── 疑似舊版罐頭預設值 ──────────────────────────────────────────────
+   2026-09-18 以前，AI-Thermal 建立元件時會自動塞一組分類預設值（它的 SG_DEFAULTS，已移除）。
+   那些元件「有值」，上面的必填檢查擋不下來，但值幾乎可以確定不是實際值 → 使用者擔心的正是
+   「填了預設值但是錯的」。判斷：7 個欄位**全部**等於該分類的舊預設（備份實測：Cygnus 40 顆全中，
+   其他 7 個專案最多只有 4 欄碰巧相同）。視同未填、一樣擋計算；解除方式：改成實際值（組合就不再
+   相同），或按「確認是實際值」（寫 `_defaults_ok: true`，跟著元件存進共用 DB）。
+   ⚠ 這組是「歷史值」，刻意寫死、不引用 RF_DEFAULT 之類的常數：那些以後改了也不能影響判斷。 */
+const STAMPED_FIELDS=['Height(mm)','Pad_L','Pad_W','Board_Type','Limit(C)','R_jc','TIM_Type'];
+const STAMPED_DEFAULTS={
+  rf:     {'Height(mm)':250,Pad_L:10,Pad_W:10,Board_Type:'Copper Coin','Limit(C)':200,R_jc:1.5,TIM_Type:'Grease'},
+  digital:{'Height(mm)':50, Pad_L:10,Pad_W:10,Board_Type:'Thermal Via','Limit(C)':100,R_jc:0.5,TIM_Type:'Putty'},
+  pwr:    {'Height(mm)':30, Pad_L:20,Pad_W:20,Board_Type:'None',       'Limit(C)':95, R_jc:0,  TIM_Type:'Grease'},
+};
+function compStamped(c,cat){
+  if(!c||c._excluded||c._defaults_ok===true)return false;
+  const d=STAMPED_DEFAULTS[cat];if(!d)return false;
+  const q=parseFloat(c.Qty),p=parseFloat(c['Power(W)']);
+  if(isFinite(q)&&isFinite(p)&&q*p===0)return false;        // 不發熱 → 這些欄位不影響計算
+  return STAMPED_FIELDS.every(k=>{
+    const v=c[k],dv=d[k];
+    return typeof dv==='number'?(_hasVal(v,true)&&parseFloat(v)===dv):(v===dv);
+  });
+}
 function listMissing(comps){
   const out=[];
   ['rf','digital','pwr'].forEach(cat=>((comps&&comps[cat])||[]).forEach((c,idx)=>{
     const f=compMissing(c);
-    if(f.length)out.push({cat,idx,name:String((c&&c.Component)||'(未命名)'),fields:f});
+    const name=String((c&&c.Component)||'(未命名)');
+    if(f.length)out.push({cat,idx,name,fields:f,kind:'missing'});
+    else if(compStamped(c,cat))out.push({cat,idx,name,fields:STAMPED_FIELDS.slice(),kind:'stamped'});
   }));
   return out;
+}
+/* 按「確認是實際值」：標 _defaults_ok（要按「儲存專案」才寫回 DB）。改成別的值則不需要確認。 */
+function confirmStampedDefaults(cat,idx){
+  const c=components[cat]&&components[cat][idx];if(!c)return;
+  const lines=STAMPED_FIELDS.map(k=>'・'+(COL_LABELS[k]||k)+' = '+c[k]).join('\n');
+  if(!confirm('確認「'+(c.Component||'(未命名)')+'」的這 7 個欄位都是實際值（不是舊版自動帶入的預設值）？\n\n'+lines+
+              '\n\n確認後這顆元件就會納入計算（記得按「💾 儲存專案」寫回資料庫）。\n要改成別的值，直接修改該欄即可。'))return;
+  c._defaults_ok=true;
+  recalc();
 }
 /* 載入／匯入後 alert 的附註（有缺值才加） */
 function missingSummaryText(){
   const m=listMissing(components);
   if(!m.length)return '';
-  return '\n\n⚠️ 有 '+m.length+' 顆元件的必填欄位還沒填，補齊前無法計算體積。\n請到「元件設定」看紅色提示（點欄位名稱可以直接跳過去填）。';
+  const nMiss=m.filter(x=>x.kind!=='stamped').length,nSt=m.length-nMiss;
+  return '\n\n⚠️ 無法計算體積：'+
+    (nMiss?'有 '+nMiss+' 顆元件的必填欄位還沒填':'')+(nMiss&&nSt?'；':'')+
+    (nSt?'有 '+nSt+' 顆元件的值疑似舊版自動帶入的預設值（需要確認）':'')+
+    '。\n請到「元件設定」看紅色提示（點欄位名稱可以直接跳過去）。';
 }
 /* 擋下計算的提示：元件設定的橫幅與各結果頁共用同一份內容。點欄位名稱 → 跳到那一格。 */
 function calcGateHtml(missing){
-  let h='<div class="calc-gate"><div class="cg-title">⛔ 無法計算體積：'+missing.length+' 顆元件的必填欄位還沒填</div>'+
-        '<div class="cg-sub">元件欄位不會自動套用預設值（預設值若是錯的，算出來的體積也是錯的）。請補齊下列欄位；'+
-        '暫時不想納入計算的元件，可以在元件設定按 👁 排除。</div><ul class="cg-list">';
-  missing.forEach(m=>{
-    h+='<li><b>'+_vEsc(m.name)+'</b><span class="cg-cat">'+m.cat.toUpperCase()+'</span>：'+
-       m.fields.map(f=>'<a href="javascript:void(0)" onclick="jumpToMissing(\''+m.cat+'\','+m.idx+',\''+f+'\')">'+_vEsc(COL_LABELS[f]||f)+'</a>').join('、')+'</li>';
-  });
-  return h+'</ul></div>';
+  const miss=missing.filter(m=>m.kind!=='stamped'),st=missing.filter(m=>m.kind==='stamped');
+  const link=m=>m.fields.map(f=>'<a href="javascript:void(0)" onclick="jumpToMissing(\''+m.cat+'\','+m.idx+',\''+f+'\')">'+_vEsc(COL_LABELS[f]||f)+'</a>').join('、');
+  const title=!st.length?(miss.length+' 顆元件的必填欄位還沒填')
+             :!miss.length?(st.length+' 顆元件的值疑似舊版自動帶入的預設值')
+             :(missing.length+' 顆元件需要處理');
+  let h='<div class="calc-gate"><div class="cg-title">⛔ 無法計算體積：'+title+'</div>'+
+        '<div class="cg-sub">元件欄位不會自動套用預設值（預設值若是錯的，算出來的體積也是錯的）。'+
+        '暫時不想納入計算的元件，可以在元件設定按 👁 排除。</div>';
+  if(miss.length){
+    if(st.length)h+='<div class="cg-h">必填欄位還沒填（'+miss.length+' 顆）</div>';
+    h+='<ul class="cg-list">';
+    miss.forEach(m=>{ h+='<li><b>'+_vEsc(m.name)+'</b><span class="cg-cat">'+m.cat.toUpperCase()+'</span>：'+link(m)+'</li>'; });
+    h+='</ul>';
+  }
+  if(st.length){
+    h+='<div class="cg-h">疑似舊版自動帶入的預設值（'+st.length+' 顆）</div>'+
+       '<div class="cg-sub">這些元件的 7 個欄位（元件高度、E-Pad 長寬、導熱方式、限溫、Rjc、介面材料）<b>全部等於</b>舊版 AI-Thermal '+
+       '建立元件時自動填入的預設值，很可能不是實際值。請改成實際值；若確實就是這些值，按「確認是實際值」。</div><ul class="cg-list">';
+    st.forEach(m=>{
+      h+='<li><b>'+_vEsc(m.name)+'</b><span class="cg-cat">'+m.cat.toUpperCase()+'</span>：'+link(m)+
+         '<button type="button" class="cg-ok" onclick="confirmStampedDefaults(\''+m.cat+'\','+m.idx+')">✓ 確認是實際值</button></li>';
+    });
+    h+='</ul>';
+  }
+  return h+'</div>';
 }
 function renderMissingBanner(){
   const el=document.getElementById('comp-missing-banner');if(!el)return;
@@ -2195,6 +2265,12 @@ function jumpToMissing(cat,idx,field){
 function missingAttrs(row,col){
   if(!compMissing(row).includes(col))return '';
   return ' class="cell-missing" placeholder="必填" title="'+_vEsc('必填：算體積需要這一格。元件欄位不會自動套用預設值，請填入實際值（不想納入計算可按 👁 排除這顆元件）。')+'"';
+}
+/* 疑似舊預設值的 7 格：虛線紅框（值照常顯示，只是要確認） */
+function stampedAttrs(row,col,cat){
+  if(!STAMPED_FIELDS.includes(col)||!compStamped(row,cat))return '';
+  return ' class="cell-stamped" title="'+_vEsc('疑似舊版自動帶入的預設值：這顆元件的 7 個欄位全部等於舊版 AI-Thermal 建立元件時自動填入的值，很可能不是實際值。'+
+         '請改成實際值；若確實就是這些值，按元件名稱下方的「確認是實際值」。確認前無法計算體積。')+'"';
 }
 /* 功耗小計：數量或瓦數沒填的元件不算進去，另外回報有幾顆 */
 function compWatts(arr){
@@ -2332,7 +2408,7 @@ function rjcCellHtml(row,category,i,dis){
   const v=parseFloat(row&&row['R_jc']);
   // 沒有來源標記、或標記還在但值不見了（不能把一個空值鎖起來讓人改不了）→ 可輸入
   if(!from||!isFinite(v)){
-    return '<td data-col="R_jc"><input type="number"'+missingAttrs(row,'R_jc')+' value="'+(isFinite(v)?v:'')+'" step="any"'+dis+
+    return '<td data-col="R_jc"><input type="number"'+(missingAttrs(row,'R_jc')||stampedAttrs(row,'R_jc',category))+' value="'+(isFinite(v)?v:'')+'" step="any"'+dis+
            ' onchange="updateCompNum(\''+category+'\','+i+',\'R_jc\',this.value)"></td>';
   }
   const shown=String(+v.toFixed(3));
@@ -2342,10 +2418,20 @@ function rjcCellHtml(row,category,i,dis){
     const hit=row.Rth.find(r=>r&&r.type===from);
     if(hit&&hit.cond)cond='（'+hit.cond+'）';
   }
-  const tip='Rjc = '+shown+' °C/W，取自 AI-Thermal 熱阻表的 '+(RJC_FROM_LABEL[from]||'θJC')+cond+
-            '。\n熱阻是規格書的值 → 這裡鎖定不開放修改；要改請到 AI-Thermal 的「熱阻（θ）」填 θJC 並標「主要」。';
+  // 熱從哪一面出去，就要用那一面的 θJC：IC top → θJC,top；穿板（Copper Coin／Thermal Via）→ θJC,bottom。
+  // AI-Thermal 依主散熱路徑挑；沒有對應的那一筆時才暫用另一筆 → 這裡標 ⚠ 提醒（Tj 可能失真）。
+  const bt=String(row.Board_Type||'');
+  const want=bt==='IC top'?'JC_top':((bt==='Copper Coin'||bt==='Thermal Via')?'JC_bot':null);
+  const mism=!!(want&&from!==want);
+  const wl=RJC_FROM_LABEL[want]||want,fl=RJC_FROM_LABEL[from]||from;
+  const warn=mism?('\n⚠ 導熱方式是「'+bt+'」，應該用 '+wl+'；AI-Thermal 沒有這顆的這一筆，暫用 '+fl+'。'+
+                   (want==='JC_top'?'露銅焊墊封裝的 θJC,bottom 通常小很多 → Tj 可能被低估。':'')+
+                   '請到 AI-Thermal 的「熱阻（θ）」補上。'):'';
+  const tip='Rjc = '+shown+' °C/W，取自 AI-Thermal 熱阻表的 '+(fl||'θJC')+cond+
+            '。\n熱阻是規格書的值 → 這裡鎖定不開放修改；要改請到 AI-Thermal 的「熱阻（θ）」修改'+
+            '（依主散熱路徑取用：IC top 取 θJC,top，Copper Coin／Thermal Via 取 θJC,bottom）。'+warn;
   return '<td data-col="R_jc"><span class="rjc-ref" title="'+_vEsc(tip)+'">'+_vEsc(shown)+
-         '<span class="rjc-lock">🔒</span></span></td>';
+         '<span class="rjc-lock">🔒</span>'+(mism?'<span class="rjc-warn">⚠</span>':'')+'</span></td>';
 }
 
 /* ── 元件表的「導熱方式」欄 ─────────────────────────────────────
@@ -2361,7 +2447,7 @@ function boardTypeCellHtml(row,category,i,dis){
     const unknown=!BOARD_TYPES.includes(o);
     opts+='<option value="'+_vEsc(o)+'"'+(cur===o?' selected':'')+'>'+_vEsc(o)+(unknown?'（未知值）':'')+'</option>';
   });
-  return '<td data-col="Board_Type"><select style="min-width:110px;"'+(missingAttrs(row,'Board_Type')||derivedAttrs(row,'Board_Type'))+dis+
+  return '<td data-col="Board_Type"><select style="min-width:110px;"'+(missingAttrs(row,'Board_Type')||stampedAttrs(row,'Board_Type',category)||derivedAttrs(row,'Board_Type'))+dis+
          ' onchange="updateComp(\''+category+'\','+i+',\'Board_Type\',this.value)">'+opts+'</select></td>';
 }
 
@@ -2378,7 +2464,7 @@ function timCellHtml(row,category,i,dis){
     const legacy=!TIM_TYPES.includes(o);
     opts+='<option value="'+_vEsc(o)+'"'+(type===o?' selected':'')+'>'+_vEsc(o)+(legacy?'（已停用）':'')+'</option>';
   });
-  let h='<td class="tim-cell" data-col="TIM_Type"><select style="min-width:110px;"'+missingAttrs(row,'TIM_Type')+dis+' onchange="updateComp(\''+category+'\','+i+',\'TIM_Type\',this.value)">'+opts+'</select>';
+  let h='<td class="tim-cell" data-col="TIM_Type"><select style="min-width:110px;"'+(missingAttrs(row,'TIM_Type')||stampedAttrs(row,'TIM_Type',category))+dis+' onchange="updateComp(\''+category+'\','+i+',\'TIM_Type\',this.value)">'+opts+'</select>';
   if(!type)return h+'</td>';   // 還沒選類型 → 沒有型號與 k/t 可顯示
   h+=timModelSelectHtml(row,category,i,dis);
   h+=timSourceNoteHtml(row);
@@ -2520,6 +2606,7 @@ function renderCompTable(arr,containerId,defaults,category){
         let badge=refLocked
           ? '<div style="font-size:0.72rem;color:#b45309;margin-top:3px;">↩ 參照自 '+_vEsc(refOrigin)+' <button class="btn btn-sm" style="padding:1px 6px;font-size:0.7rem;" title="解除後可自行修改瓦數" onclick="detachRef(\''+category+'\','+i+')">🔓 解除參照</button></div>'
           : (refOrigin?'<div style="font-size:0.72rem;color:#9ca3af;margin-top:3px;">曾參照自 '+_vEsc(refOrigin)+'</div>':'');
+        if(compStamped(row,category))badge+='<div class="stamped-note">⚠ 疑似舊預設值 <button class="btn btn-sm" title="這顆元件的 7 個欄位全部等於舊版自動帶入的預設值；確認都是實際值才會納入計算" onclick="confirmStampedDefaults(\''+category+'\','+i+')">✓ 確認是實際值</button></div>';
         lhtml+='<td data-col="Component"><input type="text" value="'+_vEsc(row[col]||'')+'"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">'+badge+'</td>';
       }
       else if(col==='Power(W)'&&refLocked&&_hasVal(row[col],true)){lhtml+='<td data-col="Power(W)"><span title="瓦數已鎖定，請先按「解除參照」" style="display:inline-block;padding:4px 8px;color:#6b7280;background:#f3f4f6;border-radius:4px;white-space:nowrap;">'+(row[col]!=null?row[col]:'')+' 🔒</span></td>';}
@@ -2527,7 +2614,7 @@ function renderCompTable(arr,containerId,defaults,category){
         // 沒填就顯示空白＋紅框「必填」（不可顯示成 0：看起來像有填，其實是空的）；
         // 清空欄位 → 刪 key（updateCompNum），不寫 0。
         const has=_hasVal(row[col],true);
-        const attrs=missingAttrs(row,col)||derivedAttrs(row,col);
+        const attrs=missingAttrs(row,col)||stampedAttrs(row,col,category)||derivedAttrs(row,col);
         lhtml+='<td data-col="'+col+'"><input type="number"'+attrs+' value="'+(has?row[col]:'')+'" step="any"'+dis+' onchange="updateCompNum(\''+category+'\','+i+',\''+col+'\',this.value)"></td>';}
     });
     lhtml+='<td style="white-space:nowrap;">';
@@ -2547,6 +2634,7 @@ function renderTab0(){
     variantsLoading=true;
     loadVariantsCache().finally(()=>{ variantsLoading=false; renderTab0(); });
   }
+  renderStaleBanner();
   renderGlobalsBanner();
   renderThickMigrateBanner();
   renderMissingBanner();
@@ -2571,7 +2659,7 @@ function removeComp(cat,i){components[cat].splice(i,1);recalc();}
 function toggleComp(cat,i){components[cat][i]._excluded=!components[cat][i]._excluded;recalc();}
 // 📋 複製元件：深拷貝（不與原元件共用 Rth／SpecFile 參照）。規格書仍指向原元件上傳的那份檔案
 // → 複本標 _from，AI-Thermal 刪掉或取代複本的規格書時才不會把原元件的檔案一起刪掉。
-function copyComp(cat,i){const cp=JSON.parse(JSON.stringify(components[cat][i]));specMarkFromIfUnset(cp,currentProjectLoadedName||projectNameGet()||'本專案');components[cat].push(cp);recalc();}
+function copyComp(cat,i){const cp=JSON.parse(JSON.stringify(components[cat][i]));cp._cid=CompMerge.newCid();specMarkFromIfUnset(cp,currentProjectLoadedName||projectNameGet()||'本專案');components[cat].push(cp);recalc();}
 // 數字欄位：清空＝「沒填」→ 刪 key。不可寫 0：0 是一個值，缺值會被當成有填而靜默算下去。
 function updateCompNum(cat,i,col,raw){
   const c=components[cat]&&components[cat][i];if(!c)return;
@@ -2581,7 +2669,7 @@ function updateCompNum(cat,i,col,raw){
 }
 // 新增元件只給名稱：算體積要用的欄位一律留空，不套分類預設值 —— 沒填會標紅並擋下計算，
 // 使用者一定會去填實際值；預設值若是錯的反而不會被發現。
-function addComp(cat){const nm={rf:'New_RF',digital:'New_Digital',pwr:'New_PWR'}[cat]||'New';components[cat].push({Component:nm});recalc();}
+function addComp(cat){const nm={rf:'New_RF',digital:'New_Digital',pwr:'New_PWR'}[cat]||'New';components[cat].push({Component:nm,_cid:CompMerge.newCid()});recalc();}
 
 // Excel export for component tables
 function exportCompExcel(mode){
@@ -2958,6 +3046,7 @@ function renderGlobalsBanner(){
 }
 
 function handleFileLoad(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=function(ev){try{let d=JSON.parse(ev.target.result);
+  CompMerge.ensureProjectCids(d);
   setGlobalsNotes(loadGlobalsForProject(d.global_params),d.global_params);
   // 缺哪一類就是空的，不可沿用上一個專案的元件
   components.rf=Array.isArray(d.rf_data)?d.rf_data:[];components.digital=Array.isArray(d.digital_data)?d.digital_data:[];components.pwr=Array.isArray(d.pwr_data)?d.pwr_data:[];
@@ -2967,6 +3056,7 @@ function handleFileLoad(e){let f=e.target.files[0];if(!f)return;let r=new FileRe
   projectIdentitySet(null,nm);
   normalizeComps();
   migrateThickGlobals(d.global_params);recalc();
+  projBase=null;markProjectClean();_staleNotice=null;renderStaleBanner();   // 新專案：沒有「載入時」可以合併
   alert('✅ 已匯入為「未儲存的新專案」'+(nm?'「'+nm+'」':'')+'。\n按「💾 儲存專案」會建立新專案，不會覆蓋資料庫裡現有的專案。'+missingSummaryText());}catch(err){alert('Error: '+err.message);}};r.readAsText(f);e.target.value='';}
 
 // =====================================================
@@ -3018,6 +3108,99 @@ async function projectNameTakenBy(name,exceptId){
   const hit=(list||[]).find(p=>p.id!==exceptId&&String(p.project_name||p.id).trim().toLowerCase()===want);
   return hit?hit.id:null;
 }
+// =====================================================
+// 存檔合併（compMerge.js）：載入時快照＋未存修改＋切回分頁自動重載
+// -----------------------------------------------------
+// 兩個工具存檔時都會把整份元件清單寫回共用 DB。直接寫回 → 對方在我們載入之後存的修改被整批蓋掉
+// （標準流程就會踩到：5G-RRU 開著專案 → 到 AI-Thermal 補 θJC 存檔 → 回來補高度再存 → θJC 被蓋回舊值）。
+// projBase：載入（或存檔成功）當下資料庫裡這個專案的樣子 → 存檔時與「畫面」「資料庫最新」做三方比對，
+//           只寫入我改過的欄位；兩邊改到同一格 → 存檔前列出來讓使用者選（CompMerge.showConflictDialog）。
+// projClean：同一時間點的畫面指紋 → 判斷有沒有還沒存的修改（切回分頁時要不要自動重載）。
+// =====================================================
+let projBase=null,projClean=null,_saveBusy=false,_staleNotice=null,_freshAt=0,_freshBusy=false;
+const MERGE_SCALARS=['project_name'];
+// 本工具每次 recalc 都會重新推導的欄位：合併時不比對（見 compMerge.js 的 derivedKeys），合併後由 thickApplyToFields 重新帶入
+const MERGE_DERIVED=['Thick(mm)'];
+function projBaseFrom(doc){
+  if(!doc)return null;
+  const o={project_name:doc.project_name,global_params:doc.global_params};
+  CompMerge.CATS.forEach(f=>{o[f]=Array.isArray(doc[f])?doc[f]:[];});
+  return CompMerge.clone(o);
+}
+function projScreenDigest(){
+  readGlobals();
+  const g={};PROJECT_GLOBAL_KEYS.forEach(k=>g[k]=G[k]);
+  const fs=document.getElementById('fin_tech_selector_v2');g.fin_tech_selector_v2=fs?fs.value:undefined;
+  const norm=arr=>(arr||[]).map(CompMerge.normalizeComp);
+  return CompMerge.canon({name:projectNameGet(),g,rf:norm(components.rf),digital:norm(components.digital),pwr:norm(components.pwr)});
+}
+function markProjectClean(){projClean=projScreenDigest();}
+function projectIsDirty(){return projClean!==null&&projScreenDigest()!==projClean;}
+// 合併進來的元件（對方可能改了導熱方式）→ 板厚依參數控制台重新帶入，寫進 DB 的數字才一致
+function thickApplyToFields(fields){
+  CompMerge.CATS.forEach(f=>(fields[f]||[]).forEach(c=>{
+    if(!c)return;
+    const src=thickSourceOf(c);
+    const want=src?parseFloat(G[src.key]):0;
+    if(isFinite(want))c['Thick(mm)']=want;
+  }));
+}
+// 存檔成功：畫面換成實際寫入的內容（含併入的對方修改），並以它當作新的快照
+function adoptWrittenProject(docId,fields){
+  const c=CompMerge.clone(fields);
+  components.rf=c.rf_data||[];components.digital=c.digital_data||[];components.pwr=c.pwr_data||[];
+  normalizeComps();
+  projectIdentitySet(docId,c.project_name||projectNameGet());
+  projBase=projBaseFrom(fields);
+  recalc();
+  markProjectClean();
+  _staleNotice=null;renderStaleBanner();
+}
+/* 切回本分頁時檢查：資料庫裡的這個專案在載入之後有沒有被更新（例如剛在 AI-Thermal 存檔）。
+   - 沒變 → 什麼都不做；
+   - 變了、畫面也沒有未存修改 → 直接重新載入（提示一行），補完的欄位紅框就會自己消失；
+   - 變了、但畫面有未存修改 → 不動畫面，Tab0 跳琥珀色提示：存檔時會自動合併，兩邊改到同一格會先問。 */
+async function checkProjectFreshness(force){
+  if(!currentProjectId||!projBase||_saveBusy||_freshBusy)return;
+  if(!dbAdapter.isReady||!dbAdapter.isReady())return;
+  if(document.querySelector('.cm-mask'))return;                 // 衝突視窗開著 → 不打擾
+  const now=Date.now();
+  if(!force&&now-_freshAt<15000)return;                         // 節流：快速切換分頁不重複讀檔
+  _freshAt=now;_freshBusy=true;
+  try{
+    try{await dbAdapter.refresh();}catch(e){console.warn('[fresh] refresh failed:',e);return;}
+    const latest=await dbAdapter.getDoc('projects',currentProjectId);
+    if(!latest)return;                                          // 被刪掉了：存檔時會問要不要重建
+    if(CompMerge.sameDoc(projBase,latest,MERGE_SCALARS.concat(['global_params']))){
+      if(_staleNotice){_staleNotice=null;renderStaleBanner();}
+      return;
+    }
+    if(!projectIsDirty()){
+      const ok=await cloudLoadOne(currentProjectId,{silent:true});
+      if(ok)CompMerge.toast('🔄 已載入最新資料：這個專案剛在其他地方（例如 AI-Thermal）更新過。');
+    }else{
+      _staleNotice={at:new Date()};
+      renderStaleBanner();
+      CompMerge.toast('⚠ 這個專案剛在其他地方更新過；你還沒存的修改都還在，存檔時會自動合併。',5000);
+    }
+  }finally{_freshBusy=false;}
+}
+function renderStaleBanner(){
+  const el=document.getElementById('stale-banner');if(!el)return;
+  if(!_staleNotice||!currentProjectId){el.innerHTML='';return;}
+  el.innerHTML='<div class="stale-note">🔄 <b>這個專案在你載入後，已在資料庫被更新</b>（可能是 AI-Thermal 或其他人剛存檔）。'+
+    '你還沒存的修改都還在；按「💾 儲存專案」時會<b>自動合併</b>：你改的欄位用你的，其他欄位用資料庫最新的；'+
+    '兩邊改到同一格會先列出來讓你選。 <button class="btn btn-sm" onclick="reloadCurrentProject()">放棄我的修改，重新載入</button></div>';
+}
+async function reloadCurrentProject(){
+  if(!currentProjectId)return;
+  if(projectIsDirty()&&!confirm('重新載入會放棄你還沒存的修改，確定嗎？'))return;
+  try{await dbAdapter.refresh();}catch(e){}
+  await cloudLoadOne(currentProjectId);
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkProjectFreshness();});
+window.addEventListener('focus',()=>checkProjectFreshness());
+
 // 規格書是「檔案參照」：實體檔在原專案／原元件上傳的位置。複製出來的那份要標 _from，
 // AI-Thermal 刪除或取代時才知道只能解除參照、不可刪檔（已有 _from 的保留原本的來源）。
 function specMarkFromIfUnset(holder,projName){
@@ -3069,6 +3252,9 @@ async function cloudSaveProject(){
   if(!name)name=promptProjectName();   // 沒命名就當場問一次；取消就靜靜退出
   if(!name)return;
   if(!fbOk||!dbAdapter.isReady()){alert('⚠️ 資料庫未連線，無法儲存。');return;}
+  // 本機檔模式沒有 If-Match 版本檢查 → 先重讀磁碟，合併才看得到另一個工具剛寫進同一個檔的內容
+  // （SharePoint 模式在 _ensureLockBeforeWrite 驗鎖時已重讀，寫入時還有 If-Match 把關）
+  if(!(dbAdapter.isSharePointMode&&dbAdapter.isSharePointMode())){try{await dbAdapter.refresh();}catch(e){console.warn('[save] refresh failed:',e);}}
   let docId=currentProjectId,existing=null;
   if(docId){
     // 已載入的專案 → 寫回同一個 id（改名只改 project_name，不另建文件）
@@ -3086,15 +3272,38 @@ async function cloudSaveProject(){
     const dup=await projectNameTakenBy(name,docId);
     if(dup){alert('⚠️ 已有另一個專案叫「'+name+'」（ID：'+dup+'）。\n專案名稱不可重複：規格書資料夾以專案名稱命名，同名會共用同一個資料夾。請改名後再存。');return;}
   }
-  // Use updateDoc so fields owned by other tools (thermal_specs, hidden_components,
-  // validation_data, param_*, tcPlacement, vd_hidden_components, ...) are preserved.
-  const fields=_buildProjectFields(name,existing);
+  // 畫面上每顆元件都要有 id（三方合併靠它配對；舊資料在這裡補發）
+  ['rf','digital','pwr'].forEach(cat=>CompMerge.ensureCids(components[cat]));
+  // 合併的前提：畫面上的是「從資料庫載入的這個專案」（有載入時快照），而且資料庫裡還有它。
+  // 新專案、覆蓋別的專案、或原專案已被刪除要重建 → 以畫面為準（沒有「載入時」可以比）。
+  const base=(currentProjectId&&docId===currentProjectId&&existing)?projBase:null;
+  let written=null,merged=null;
+  _saveBusy=true;
   try{
-    await dbAdapter.updateDoc('projects',docId,fields);
-    projectIdentitySet(docId,name);
-    variantsCache=null; renderTab0();   // 專案集合改變 → 失效快選快取，下次重繪重新聚合
-    alert('✅ 專案「'+name+'」已儲存！');
-  }catch(e){alert('❌ 儲存失敗: '+e.message);}
+    // updateDoc 傳函式：寫入時在「資料庫最新內容」上計算要寫的欄位（遇到 412 重讀後會重算），
+    // 保留其他工具寫的欄位（thermal_specs、validation_data、param_*…）與我們不認識的 global_params。
+    const res=await CompMerge.saveWithMerge(async(resolutions)=>{
+      await dbAdapter.updateDoc('projects',docId,(cur)=>{
+        const fields=_buildProjectFields(name,cur);
+        merged=null;
+        if(base&&cur){
+          const m=CompMerge.mergeProject(base,fields,cur,{resolutions,scalars:MERGE_SCALARS,derivedKeys:MERGE_DERIVED});
+          if(m.unresolved.length)throw CompMerge.MergePending(m.unresolved);
+          Object.assign(fields,m.fields);
+          thickApplyToFields(fields);   // 對方可能改了導熱方式 → 板厚依參數控制台重新帶入
+          merged=m;
+        }
+        written=fields;
+        return fields;
+      });
+    },{dialog:{title:'⚠ 這個專案在你載入後，已在資料庫被更新（可能是 AI-Thermal 或其他人剛存檔）'}});
+    if(!res.ok)return;   // 衝突視窗按「取消」→ 不存檔，畫面維持原狀
+  }catch(e){alert('❌ 儲存失敗: '+e.message);return;}
+  finally{_saveBusy=false;}
+  adoptWrittenProject(docId,written);
+  variantsCache=null; renderTab0();   // 專案集合改變 → 失效快選快取，下次重繪重新聚合
+  const note=merged?CompMerge.summaryText(merged):'';
+  alert('✅ 專案「'+written.project_name+'」已儲存！'+(note?'\n'+note:''));
 }
 
 // =====================================================
@@ -3127,6 +3336,7 @@ async function confirmCopyProject(){
   const dup=await projectNameTakenBy(name,docId);
   if(dup){alert('⚠️ 已有另一個專案叫「'+name+'」（ID：'+dup+'）。\n專案名稱不可重複：規格書資料夾以專案名稱命名，同名會共用同一個資料夾。');return;}
   const srcName=currentProjectLoadedName||projectNameGet()||'來源專案';   // 資料庫裡的名稱（頂排可能改了還沒存）
+  ['rf','digital','pwr'].forEach(cat=>CompMerge.ensureCids(components[cat]));
   // 以目前畫面狀態（即當下載入/編輯中的專案）組出 fields，寫到「新 docId」→ 原專案不受影響。
   const fields=_buildProjectFields(name,existing);
   // 規格書只複製「參照」：實體檔仍在來源專案的 SPEC 資料夾 → 逐份標 _from
@@ -3137,6 +3347,7 @@ async function confirmCopyProject(){
     ['rf','digital','pwr'].forEach(cat=>(components[cat]||[]).forEach(c=>specMarkFromIfUnset(c,srcName)));
     variantsCache=null; renderTab0();
     projectIdentitySet(docId,name);   // 複製後切換到新專案（之後存檔寫到新 id）
+    projBase=projBaseFrom(fields);markProjectClean();_staleNotice=null;renderStaleBanner();
     closeCopyModal();
     alert('✅ 已複製為新專案「'+name+'」！');
   }catch(e){alert('❌ 複製失敗: '+e.message);}
@@ -3165,13 +3376,18 @@ async function cloudLoadProject(){
   }catch(e){alert('❌ 讀取專案列表失敗: '+e.message);}
 }
 
-async function cloudLoadOne(docId){
+async function cloudLoadOne(docId,opts){
+  opts=opts||{};
   try{
     const src=await dbAdapter.getDoc('projects', docId);
-    if(!src){alert('專案不存在');return;}
+    if(!src){if(!opts.silent)alert('專案不存在');return false;}
     // ⚠ 深拷貝：getDoc 回傳的是 DB 快取的活參照。直接拿來編輯的話，載入時的轉型與畫面上的
     //   試改都會改到快取，釋放編輯鎖（整份快取寫回）時就算沒按「儲存」也會被寫進共用 DB。
     const d=JSON.parse(JSON.stringify(src));
+    // 元件 id（三方合併靠它配對）：舊資料沒有 → 這裡補發，快照與畫面用同一份 id
+    CompMerge.ensureProjectCids(d);
+    // 載入時快照：一定要在下面的轉型／板厚遷移「之前」取（那些是本工具這次的修改，存檔時要算我的）
+    const base=projBaseFrom(d);
     // 專案載入時重讀型號庫：AI-Thermal 端可能剛新增/改過型號，k 與填縫厚度要吃到最新值
     try{ await timLibLoad(true); }catch(e){ console.warn('[timLib] reload failed:', e); }
     setGlobalsNotes(loadGlobalsForProject(d.global_params),d.global_params);
@@ -3182,15 +3398,18 @@ async function cloudLoadOne(docId){
     normalizeComps();
     // ⚠ 板厚遷移一定要在「元件已換成這個專案的」之後跑：它要回推的是這個專案的板厚
     migrateThickGlobals(d.global_params);
-    closeCloudModal();recalc();alert('✅ 專案「'+(d.project_name||docId)+'」已載入！'+missingSummaryText());
-  }catch(e){alert('❌ 載入失敗: '+e.message);}
+    closeCloudModal();recalc();
+    projBase=base;markProjectClean();_staleNotice=null;renderStaleBanner();
+    if(!opts.silent)alert('✅ 專案「'+(d.project_name||docId)+'」已載入！'+missingSummaryText());
+    return true;
+  }catch(e){if(!opts.silent)alert('❌ 載入失敗: '+e.message);else console.warn('[load] silent reload failed:',e);return false;}
 }
 
 async function cloudDeleteOne(docId,name){
   if(!(await _ensureLockBeforeWrite('刪除專案')))return;
   if(!confirm('確定要刪除專案「'+name+'」？此操作無法復原！'))return;
   try{await dbAdapter.deleteDoc('projects', docId);variantsCache=null;renderTab0();
-    if(docId===currentProjectId)projectIdentitySet(null,'');   // 刪掉的正好是目前這個 → 身分與頂排都不可留殘值
+    if(docId===currentProjectId){projectIdentitySet(null,'');projBase=null;_staleNotice=null;renderStaleBanner();}   // 刪掉的正好是目前這個 → 身分、快照與頂排都不可留殘值
     alert('🗑️ 已刪除「'+name+'」');cloudLoadProject();}
   catch(e){alert('❌ 刪除失敗: '+e.message);}
 }
@@ -3320,9 +3539,10 @@ async function generatePDFReport() {
   console.log('[PDF] generatePDFReport called, calcResults:', !!calcResults);
   if (calcResults && calcResults.blocked) {
     const m = calcResults.missing;
-    alert('⛔ 無法產生報告：' + m.length + ' 顆元件的必填欄位還沒填，補齊前無法計算體積。\n\n' +
-      m.slice(0, 12).map(x => '・' + x.name + '（' + x.cat.toUpperCase() + '）：' + x.fields.map(f => COL_LABELS[f] || f).join('、')).join('\n') +
-      (m.length > 12 ? '\n…還有 ' + (m.length - 12) + ' 顆' : '') + '\n\n請到「元件設定」補齊紅框欄位。');
+    alert('⛔ 無法產生報告：' + m.length + ' 顆元件需要處理（必填欄位還沒填，或值疑似舊版自動帶入的預設值），處理完才能計算體積。\n\n' +
+      m.slice(0, 12).map(x => '・' + x.name + '（' + x.cat.toUpperCase() + '）：' +
+        (x.kind === 'stamped' ? '疑似舊預設值（7 個欄位全等於舊版自動帶入的值，請確認）' : x.fields.map(f => COL_LABELS[f] || f).join('、'))).join('\n') +
+      (m.length > 12 ? '\n…還有 ' + (m.length - 12) + ' 顆' : '') + '\n\n請到「元件設定」處理紅框欄位。');
     return;
   }
   if (!calcResults || !calcResults.rows || !calcResults.rows.length) {

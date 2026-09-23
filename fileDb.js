@@ -3,6 +3,7 @@ let dbCache = {};
 let dbCorrupted = false;     // 壞檔唯讀保護：JSON 解析失敗時禁止一切寫入
 let lastReadProjects = 0;    // 上次成功讀檔時的 projects 筆數（歸零保險絲基準）
 let sawRealData = false;     // 本 session 是否曾持有實際資料（區分「全新空庫」vs「截斷成空檔」）
+function _fdbClone(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }   // 讀寫用複本
 
 const fileDb = {
   async openFile() {
@@ -65,23 +66,32 @@ const fileDb = {
     return dbCache[colName] ?? {};
   },
 
+  /** 重新讀磁碟上的檔案（另一個工具可能剛寫過同一個檔） */
+  async refresh() {
+    this._assertReady();
+    await this._readFile();
+  },
+
+  // 讀寫一律用複本（與 graphDb 同一套理由：活參照會讓畫面上的試改直接改到快取）
   async getDoc(colName, docId) {
     this._assertReady();
-    return dbCache[colName]?.[docId] ?? null;
+    return _fdbClone(dbCache[colName]?.[docId] ?? null);
   },
 
   async setDoc(colName, docId, data) {
     this._assertReady();
     if (!dbCache[colName]) dbCache[colName] = {};
-    dbCache[colName][docId] = data;
+    dbCache[colName][docId] = _fdbClone(data);
     await this._writeFile();
   },
 
+  // fields 可以是函式：在目前（最新）的 doc 上計算要寫的欄位（三方合併用，見 compMerge.js）
   async updateDoc(colName, docId, fields) {
     this._assertReady();
+    const existing = (dbCache[colName] || {})[docId];
+    const f = _fdbClone(typeof fields === 'function' ? fields(existing ? _fdbClone(existing) : null) : fields);
     if (!dbCache[colName]) dbCache[colName] = {};
-    const existing = dbCache[colName][docId] ?? {};
-    dbCache[colName][docId] = { ...existing, ...fields };
+    dbCache[colName][docId] = { ...(existing ?? {}), ...f };
     await this._writeFile();
   },
 

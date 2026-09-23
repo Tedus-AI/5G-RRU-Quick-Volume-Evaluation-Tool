@@ -24,6 +24,34 @@ let lastReadProjects = 0;    // 上次成功讀檔時的 projects 筆數（歸�
 let sawRealData = false;     // 本 session 是否曾持有實際資料（區分「全新空庫」vs「截斷成空檔」）
 let currentEtag = null;      // 最近一次讀檔的 DriveItem eTag（樂觀並發 If-Match 基準）
 
+/* 讀寫一律用複本：getDoc 若回傳快取的活參照，呼叫端在畫面上的試改會直接改到快取，之後任何一次
+   整檔寫入（例如釋放編輯鎖）就會把沒按儲存的內容寫進共用 DB；寫入時把呼叫端的物件放進快取也同理。 */
+function _clone(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
+/* updateDoc 的 fields 可以是函式：在「寫入當下的最新內容」上計算要寫的欄位（412 重讀後會重算一次），
+   給需要三方合併的呼叫端用（compMerge.js）。函式拿到的是複本；丟例外 → 不寫入、原樣往外丟。 */
+function _resolveFields(fields, existing) {
+  return typeof fields === 'function' ? fields(existing ? _clone(existing) : null) : fields;
+}
+
+/* 外部請求一律有逾時（網路卡住時不讓畫面一直轉圈）；讀取另外自動重試（UX 慣例 11） */
+const GET_TIMEOUT_MS = 30000;
+const PUT_TIMEOUT_MS = 90000;
+async function _fetchT(url, init, ms) {
+  const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), ms) : null;
+  try {
+    return await fetch(url, ctl ? Object.assign({}, init, { signal: ctl.signal }) : init);
+  } catch (e) {
+    const err = new Error((e && e.name === 'AbortError')
+      ? ('連線逾時：SharePoint ' + Math.round(ms / 1000) + ' 秒沒有回應')
+      : ('網路連線失敗：' + ((e && e.message) || e)));
+    err.network = true;                 // 供重試判斷（逾時／斷線）
+    throw err;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 const graphDb = {
   /* ─── MSAL Initialization ─────────────────────────────── */
   async initMsal() {
@@ -125,19 +153,30 @@ const graphDb = {
   /* ─── Graph API Helpers ───────────────────────────────── */
   async _graphGet(url, allowInteractive = true) {
     const token = await this._getAccessToken(allowInteractive);
-    const resp = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!resp.ok) {
+    // cache:'no-store' ＋ no-cache：不可讓瀏覽器／代理回快取的舊檔（會把別人剛存的內容當成沒改過）。
+    // 逾時、斷線、429／5xx 自動重試 2 次；其他 4xx（權限、找不到檔）直接丟出。
+    let lastErr = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt) await this._sleep(600 * attempt);
+      let resp;
+      try {
+        resp = await _fetchT(url, {
+          cache: 'no-store',
+          headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+        }, GET_TIMEOUT_MS);
+      } catch (e) { lastErr = e; continue; }
+      if (resp.ok) return resp;
       const errText = await resp.text().catch(() => '');
-      throw new Error(`Graph API GET failed: ${resp.status} ${resp.statusText} — ${errText}`);
+      lastErr = new Error(`Graph API GET failed: ${resp.status} ${resp.statusText} — ${errText}`);
+      lastErr.status = resp.status;
+      if (!(resp.status === 429 || resp.status >= 500)) break;
     }
-    return resp;
+    throw lastErr;
   },
 
   async _graphPut(url, body, contentType = 'application/json', extraHeaders = {}) {
     const token = await this._getAccessToken(true);
-    const resp = await fetch(url, {
+    const resp = await _fetchT(url, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -145,7 +184,7 @@ const graphDb = {
         ...extraHeaders
       },
       body: body
-    });
+    }, PUT_TIMEOUT_MS);
     if (!resp.ok) {
       const errText = await resp.text().catch(() => '');
       const err = new Error(`Graph API PUT failed: ${resp.status} ${resp.statusText} — ${errText}`);
@@ -178,12 +217,14 @@ const graphDb = {
     await this._resolveDriveItemId();
     // 先取 metadata 拿 eTag 作為樂觀並發基準。content GET 會被 302 導到下載主機，
     // 其 ETag 是儲存層的、不可用於 Graph 的 If-Match，所以要單獨取 DriveItem 的 eTag。
+    let metaSize = null;   // 檔案實際大小（bytes）：判斷「讀到空內容」是全新空檔還是讀取異常
     try {
       const metaResp = await this._graphGet(
-        `https://graph.microsoft.com/v1.0/sites/${_siteId}/drive/items/${driveItemId}?$select=id,eTag,cTag`
+        `https://graph.microsoft.com/v1.0/sites/${_siteId}/drive/items/${driveItemId}?$select=id,eTag,cTag,size`
       );
       const meta = await metaResp.json();
       currentEtag = meta.eTag || meta.cTag || null;
+      if (typeof meta.size === 'number') metaSize = meta.size;
     } catch (e) {
       currentEtag = null;   // 拿不到 etag → 退化為無 If-Match（不比現況差）
     }
@@ -197,6 +238,11 @@ const graphDb = {
         // 絕不可 bootstrap 空骨架後寫回（否則把整份共用 DB 抹掉）。
         dbCorrupted = true;
         console.error('[graphDb] 讀到空檔但先前已有資料 → 截斷疑慮，進入唯讀保護');
+      } else if (metaSize !== 0) {
+        // 本 session 第一次讀檔就讀到空內容，但檔案大小不是 0（或拿不到大小）→ 是讀取異常，不是全新空檔。
+        // 若照舊 bootstrap 空骨架，下一次寫入就會把整份共用 DB 抹掉 → 進唯讀，請使用者重新整理。
+        dbCorrupted = true;
+        console.error('[graphDb] 讀到空內容但檔案大小為 ' + metaSize + ' bytes → 讀取異常，進入唯讀保護');
       } else {
         // 真正的全新空檔（首次建庫）→ bootstrap 空骨架
         dbCache = { rf_library: {}, digital_library: {}, pwr_library: {}, projects: {} };
@@ -273,7 +319,10 @@ const graphDb = {
         await this._writeFile(opts);
         return decision.value;
       } catch (e) {
-        if (e && e.status === 412 && attempt < MAX) {
+        // 412：別人改過 → 重讀後在最新狀態上重算；逾時／斷線／429／5xx：不確定有沒有寫成功 →
+        // 一樣重讀再試（帶 If-Match：若其實已寫成功會得到 412 再重讀，不會蓋掉任何人的寫入）
+        const retryable = e && (e.status === 412 || e.network || e.status === 429 || e.status >= 500);
+        if (retryable && attempt < MAX) {
           await this._sleep(120 * (attempt + 1));
           await this._readFile();   // 取得最新內容 + 新 etag，下一圈在最新狀態上重跑 mutateFn
           continue;
@@ -380,23 +429,25 @@ const graphDb = {
   },
 
   async getDoc(colName, docId) {
-    return dbCache[colName]?.[docId] ?? null;
+    return _clone(dbCache[colName]?.[docId] ?? null);
   },
 
   async setDoc(colName, docId, data) {
+    const copy = _clone(data);
     await this._withOptimisticWrite((cache) => {
       if (!cache[colName]) cache[colName] = {};
-      cache[colName][docId] = data;
+      cache[colName][docId] = copy;
     });
   },
 
   async updateDoc(colName, docId, fields) {
     // 衝突時於最新 doc 上重做 shallow merge：他人對其他 doc／collection 的寫入不會被
-    // 我們的整檔 PUT 回滾（H-3）。註：同一 doc 內 global_params 巢狀欄位的競態仍屬 M-6。
+    // 我們的整檔 PUT 回滾（H-3）。fields 是函式時，每次都在最新 doc 上重算（三方合併）。
     await this._withOptimisticWrite((cache) => {
+      const existing = (cache[colName] || {})[docId];
+      const f = _clone(_resolveFields(fields, existing));   // 先算完再動快取：算的途中丟例外 → 快取不變
       if (!cache[colName]) cache[colName] = {};
-      const existing = cache[colName][docId] ?? {};
-      cache[colName][docId] = { ...existing, ...fields };
+      cache[colName][docId] = { ...(existing ?? {}), ...f };
     });
   },
 
