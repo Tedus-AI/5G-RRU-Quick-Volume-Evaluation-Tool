@@ -160,6 +160,25 @@
 > 5G-RRU 專屬的新 global_params keys：`t_PCB`、`Coin_T_Setting`、`K_Coin`
 > （三份清單都要同步：`readGlobals` / `saveProject` / `PROJECT_GLOBAL_KEYS`）。
 
+### 整機長寬：防水邊距的方向（`rruFootprint`）
+
+```
+長 L = L_pcb + Top  + Bottom
+寬 W = W_pcb + Left + Right
+```
+
+- **單一事實來源是 `rruFootprint(p)`**：`computeAll` 與參數控制台「PCB 板離外殼邊距」底下的即時算式
+  （`renderDimDerive`，每次 `recalc()` 更新）都走它，不要在別處再寫一次加法。
+- 方向依據：鰭片沿「長」延伸（每片鰭片長＝L，片數由 W 決定：`calcFinCount(WH,…)`，3D 視圖也是
+  鰭片沿 x＝Length），自然對流時鰭片必須垂直 → **L 是吊掛後的上下方向** → Top/Bottom 是長度方向兩端，
+  Left/Right 是寬度方向兩側。Bottom 通常較大（底部留接頭／防水）。
+- ⚠ 原本寫成 `L+Left+Right`、`W+Top+Bottom`（平面圖「圖面上下」的習慣），與鰭片方向對不起來：
+  使用者 PCB 500×385、邊距 8/11/8/8 算出 516×404（應為 519×401）。配反時 Bottom 多出來的 mm 被加到寬度
+  → 可能多排一片鰭片 → 鰭片高與體積**偏樂觀**。修正後備份裡 5 個專案：長 +3、寬 −3；
+  少一片鰭片的 3 個專案體積 +1.5～1.7%，鰭片數不變的 2 個 −0.7～−0.8%。
+- PDF「Geometry」表列出邊距（T/B 加在長、L/R 加在寬），報告上的 L/W 才對得回來源。
+- 契約測試：`tests/dimensions.test.js`（四個邊距都不同的值才分辨得出配對）。
+
 ### 表頭色票與專案工具列（改色／改高度前先看這裡）
 
 兩處刻意抽成 `:root` 的共用值，改一次三個地方一起動：
