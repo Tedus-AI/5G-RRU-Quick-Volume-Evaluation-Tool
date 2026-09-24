@@ -16,6 +16,10 @@
  *   [G] 元件 id：載入補發、存檔寫出、📋 複製給新 id、新增元件有 id。
  *   [H] 真的後端（graphDb／fileDb）：getDoc 回複本、updateDoc 接受函式且先算完才動快取、
  *       讀取禁用快取＋5xx 重試、第一次讀到空內容但檔案不是 0 bytes → 唯讀保護。
+ *   [I] 元件改名 → 標 `_renamed_from`（AI-Thermal 以名稱當 key 的資料還掛在哪個名稱底下）：
+ *       改名存檔標舊名稱；再改一次仍指向最早的名稱；改回原名不標；AI-Thermal 已經搬過（清掉標記）後
+ *       再改名，標的是搬過去的那個名稱（不是載入時的舊標記）；資料庫舊資料沒有元件 id 時用載入時的名稱對；
+ *       新專案／複製專案／📋 複製元件不帶標記；沒改名的元件不標。
  *
  * 執行：
  *   npx http-server . -p 8123 -c-1 &      # 於 repo 根目錄
@@ -248,6 +252,60 @@ const PROJ = {
   });
   ok('載入時補發 id，每顆都有且不重複', g.allHave && g.unique, g);
   ok('📋 複製出來的元件給新 id、新增的元件也有 id', g.copyNew && g.addHas, g);
+
+  console.log('\n[I] 元件改名 → 標 _renamed_from 給 AI-Thermal 搬資料');
+  const rename = (from, to) => page.evaluate(([from, to]) => {
+    const i = components.rf.findIndex(c => c.Component === from); updateComp('rf', i, 'Component', to); }, [from, to]);
+  const save = () => page.evaluate(async () => { await cloudSaveProject(); });
+  await seed(PROJ); await load();
+  await rename('Driver', 'Driver_v2'); await save();
+  let idb = await db();
+  ok('改名存檔 → 標上資料庫裡原本的名稱', by(idb.rf_data, 'Driver_v2') && by(idb.rf_data, 'Driver_v2')._renamed_from === 'Driver', idb.rf_data.map(c => [c.Component, c._renamed_from]));
+  ok('沒改名的元件不標', !('_renamed_from' in by(idb.rf_data, 'PA')) && idb.digital_data.every(c => !('_renamed_from' in c)));
+  await rename('Driver_v2', 'Driver_v3'); await save();
+  idb = await db();
+  ok('AI-Thermal 還沒搬之前再改一次 → 仍指向最早的名稱（資料還掛在那裡）', by(idb.rf_data, 'Driver_v3')._renamed_from === 'Driver', by(idb.rf_data, 'Driver_v3'));
+  await rename('Driver_v3', 'Driver'); await save();
+  idb = await db();
+  ok('改回原名 → 不標（不用搬）', by(idb.rf_data, 'Driver') && !('_renamed_from' in by(idb.rf_data, 'Driver')), by(idb.rf_data, 'Driver'));
+
+  // AI-Thermal 在我們載入之後已經搬過一次、清掉了標記 → 我們手上還是舊標記，再改名時要以資料庫為準
+  await seed(PROJ); await load();
+  await rename('Driver', 'Driver_v2'); await save();
+  await other(() => { const d = window.__db.projects.X.rf_data.find(c => c.Component === 'Driver_v2'); delete d._renamed_from; });
+  ok('（前提）畫面上還留著舊標記', await page.evaluate(() => components.rf.find(c => c.Component === 'Driver_v2')._renamed_from === 'Driver'));
+  await rename('Driver_v2', 'Driver_v3'); await save();
+  idb = await db();
+  ok('AI-Thermal 搬過之後再改名 → 標的是搬過去的名稱 Driver_v2，不是載入時的舊標記', by(idb.rf_data, 'Driver_v3')._renamed_from === 'Driver_v2', by(idb.rf_data, 'Driver_v3'));
+
+  // 資料庫的舊資料還沒有元件 id（兩個工具都還沒存過）→ 用載入時的名稱對到資料庫那一顆
+  await seed(PROJ); await load();
+  await rename('Driver', 'Driver_new'); await save();
+  idb = await db();
+  ok('舊資料沒有元件 id：一樣標得出原本的名稱', by(idb.rf_data, 'Driver_new') && by(idb.rf_data, 'Driver_new')._renamed_from === 'Driver', idb.rf_data.map(c => [c.Component, c._renamed_from, !!c._cid]));
+
+  const i2 = await page.evaluate(async () => {
+    const i = components.rf.findIndex(c => c.Component === 'Driver_new');
+    copyComp('rf', i);
+    const cp = components.rf[components.rf.length - 1];
+    return { copyMark: '_renamed_from' in cp, srcMark: components.rf[i]._renamed_from };
+  });
+  ok('📋 複製元件：複本是新的一顆，不帶改名標記（原本那顆保留）', !i2.copyMark && i2.srcMark === 'Driver', i2);
+  await page.evaluate(async () => { document.getElementById('copyProjectName').value = 'X 案 複本'; await confirmCopyProject(); });
+  const cpy = await page.evaluate(() => { const id = Object.keys(window.__db.projects).find(k => window.__db.projects[k].project_name === 'X 案 複本');
+    return id ? JSON.parse(JSON.stringify(window.__db.projects[id])) : null; });
+  ok('複製專案：新專案沒有 AI-Thermal 的資料 → 不帶改名標記（畫面上也清掉）',
+     !!cpy && cpy.rf_data.every(c => !('_renamed_from' in c)) && await page.evaluate(() => components.rf.every(c => !('_renamed_from' in c))),
+     cpy && cpy.rf_data.map(c => [c.Component, c._renamed_from]));
+
+  // 新專案（匯入本機檔後存成新的）→ 沒有可以對照的資料庫內容，不標
+  await seed(PROJ); await load();
+  await page.evaluate(async () => {
+    components.rf.find(c => c.Component === 'Driver')._renamed_from = 'Something';   // 例：匯入的檔案帶著舊標記
+    projectIdentitySet(null, 'Y 案'); await cloudSaveProject(); });
+  const ydb = await page.evaluate(() => { const id = Object.keys(window.__db.projects).find(k => window.__db.projects[k].project_name === 'Y 案');
+    return id ? JSON.parse(JSON.stringify(window.__db.projects[id])) : null; });
+  ok('新專案：不帶改名標記', !!ydb && ydb.rf_data.every(c => !('_renamed_from' in c)), ydb && ydb.rf_data.map(c => [c.Component, c._renamed_from]));
 
   console.log('\n[H] 真的後端：graphDb／fileDb');
   const h = await page.evaluate(async () => {
