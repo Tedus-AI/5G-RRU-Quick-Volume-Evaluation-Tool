@@ -351,7 +351,7 @@ AI-Thermal 有好幾份資料用「元件名稱」當 key：TH/ME 頁的 `therma
 ### 詳細分析頁（`renderTab1`）：前三名卡片＋分析表（改前先看這裡）
 
 **裕度分級是單一事實來源 `MARGIN_LEVELS`**（`marginLevel(m)`）：`<0` 超溫 ✖、`0–10` 偏緊 ▲、`10–20` 留意 ●、
-`≥20` 充裕 ✓（°C，比 `Tj_Margin`）。卡片底色、表格裕度格、PDF 卡片／表格、視覺化報告「溫度裕度總覽」圖的門檻
+`≥20` 充裕 ✓（°C，比 `Tj_Margin`）。卡片底色、表格裕度格、PDF 卡片／表格、視覺化報告「溫度 vs 限溫」的門檻
 全部讀它 —— 不要在別處再寫一次 `<10`、`<20`。每級帶 `fg/bg/bd/mk` 四個色值（文字／底色／框線／記號，
 fg 對 bg ≥ 5.9:1），畫面用 `marginVars(lv)` 塞進 CSS 變數 `--st-*`，PDF 直接讀同一組 hex。
 **紅色只給超溫**；顏色一律搭配圖示＋文字（使用者要求卡片不要白底 → 改成依分級上色，不是依名次上色）。
@@ -386,6 +386,41 @@ fg 對 bg ≥ 5.9:1），畫面用 `marginVars(lv)` 塞進 CSS 變數 `--st-*`�
   `budgetCanvasPdf` 畫的溫升條＋判定溫度／限溫／裕度＋各段數字）。卡片與一覽共用 `budgetCanvasPdf`／`segLegendPdf`。
 - 瓶頸成本（改善哪一顆散熱器才會縮小、換算成體積）**使用者說不做**，不要自行加回。
 - 契約測試：`tests/tab2-analysis.test.js`（含 PDF docDefinition 攔截比對）、`tests/limit-ref.test.js` [G]／[H]。
+
+### 視覺化報告頁（`renderTab2`）：答案在上 → 體積推導 → 一張溫度圖（改前先看這裡）
+
+使用者回報「溫度裕度的圖有點重複」：原本「溫度裕度總覽」與「各元件溫度裕度」兩張 Plotly 圖畫的是同一組裕度
+（後者用紅→綠漸層，0–10 °C 就畫成紅色），詳細分析頁也已經有卡片、分析表與溫升組成。改版後這頁只放詳細分析沒有的東西：
+
+| 區塊 | 內容 |
+|---|---|
+| `#tab2-result` 設計結果 | 體積（主數字）／外觀尺寸 L × W × H／整機重量；右上 DRC 狀態；下方「體積怎麼決定的」5 步 |
+| `#tab2-charts` | **一張**「溫度 vs 限溫」＋「熱源分佈」（容器寬 ≥ 1060px 並排，否則上下）|
+| `#tab2-comp` 整機組成 | 高度組成（決定體積）與重量組成；深色＝隨散熱設計變動（鰭片／散熱器），淺色＝參數控制台固定 |
+
+- **不要再加第二張裕度圖**（使用者明確說重複）。溫度圖的顏色＝`MARGIN_LEVELS` 的 `mk`，紅色只給超溫。
+- **熱負載一律寫實際值**（發熱元件 Σ `Total_W`）。⚠ `computeAll` 回傳的 `Total_Power` 是 **× 安全係數** 後的設計負載
+  （`TP = TWS × Margin`），原本 KPI「整機總熱耗」與功耗圖的 Total 都直接寫它：8T8R-40W（係數 1.1）顯示 807.05 W，
+  功耗圖的條加起來卻是 733.7 W。現在設計值另寫「散熱器依 ×1.1 ＝ … W 設計」。
+- **5 步推導與 `computeAll` 同一組公式**（`vrSteps`）：① 熱負載 → ② 散熱器允許溫升＝最小的 `Allowed_dT`（瓶頸，
+  寫出「限溫 − 局部環溫 − 內部溫降」）→ ③ 所需散熱面積＝熱負載 × 安全係數 ÷ (h × η × 允許溫升) → ④ 鰭片高＝
+  (面積 − 底面 L×W) ÷ (2 × 片數 × L) → ⑤ 整機高＝屏蔽罩＋濾波器＋基板＋鰭片。**改 `computeAll` 的面積／高度算法就要一起改這裡**
+  （`tests/visual-report.test.js` [B] 會抓）。顯示的 h 用 `calcHValue(Gap, Fin_Height)`，與參數控制台、PDF 同一個值。
+- 畫面與 PDF 共用資料函式（單一事實來源）：`vrState`／`vrStateNote`／`vrSteps`／`vrTempItems`／`vrTempAxis`／
+  `vrPowerData`／`vrCompData`。分類色 `VR_CATS`（RF 藍／Digital 紫／PWR 粉）用 `validate_palette --pairs all` 驗過，
+  粉紅對白底 < 3:1 → 名稱旁一律寫出分類文字；刻意避開狀態色的色相（橘／黃／綠已被裕度分級用掉）。
+- **狀態**（`vrState`）：`blocked`（缺必填）只顯示 `calcGateHtml`；`nohot`（沒有發熱元件）不列體積；
+  `nosol`（瓶頸的允許溫升 ≤ 0，散熱器壓到環溫也不夠）→「無法設計」並寫出算式，**不再顯示一個沒有鰭片的體積**
+  （原本 `MDA = 0` 時鰭片高 0、體積照樣算出來）；`drc`（DRC 不通過）→ 體積「—」但推導照列（看得出哪一步出問題）；
+  `ok` 有 `drc_warn` 時加琥珀色提醒。
+- **版面是 HTML 不是 Plotly**：`#tab2{container-type:inline-size}` 用 `@container` 切欄。每張清單的 4 欄寬度
+  用變數固定（`--vr-name`／`--vr-c3`／`--vr-c4`），**不可改回 `auto`**：各列的條寬會不同，共用溫度軸就對不齊。
+  原本的 Plotly 並排圖是 `flex:1` 沒有 `min-width:0`，在 1366／1600 寬時右邊那張被裁掉一大半。
+- **PDF**：第 1 節＝設計結果＋5 步（取代原本「整機總熱耗（含係數）／瓶頸 Margin 0 °C／散熱面積／鰭片數」4 格 KPI）；
+  第 4 節＝溫度 vs 限溫＋熱源分佈，**用 canvas 直接畫**（`vrTempPdf`／`vrPowerPdf`；原本截 900px 的 Plotly 圖縮到
+  245pt，字小到看不清）；第 5 節＝整機組成（`vrCompPdf`，接在第 4 節後面不另起一頁、`unbreakable`）。
+  PDF 不再截視覺化報告的圖，只截 3D 與敏感度分析。
+- 契約測試：`tests/visual-report.test.js`。
 
 ### 限溫對象（`Limit_Ref`：Tj／Tc）與允許溫升基準 ⚠️ 兩個工具共用
 

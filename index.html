@@ -145,9 +145,6 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .tab-btn{padding:8px 18px;border:none;border-radius:20px;background:#e2e8f0;color:#475569;font-weight:600;font-size:0.85rem;cursor:pointer;transition:all 0.3s;}
 .tab-btn.active{background:var(--primary);color:#fff;box-shadow:0 4px 6px rgba(0,124,240,0.3);}
 .tab-content{display:none;}.tab-content.active{display:block;}
-.kpi-row{display:flex;gap:15px;margin-bottom:20px;flex-wrap:wrap;}
-.kpi-card{flex:1;min-width:180px;background:#fff;border-radius:10px;padding:18px;box-shadow:var(--card-shadow);text-align:center;border-left:5px solid #ddd;}
-.kpi-card .title{color:#666;font-size:0.85rem;font-weight:500;}.kpi-card .value{font-size:1.6rem;font-weight:700;color:#333;margin:6px 0;}.kpi-card .desc{color:#999;font-size:0.75rem;}
 .comp-table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:var(--card-shadow);margin-bottom:15px;font-size:0.82rem;}
 /* 表頭要一眼看得出是表頭：深藍底＋白字＋青色底線（原本淺灰底與白色表身融在一起） */
 .comp-table th{background:linear-gradient(180deg,var(--th-bg),var(--th-bg2));color:var(--th-fg);padding:11px 8px;text-align:center;font-weight:700;white-space:nowrap;cursor:help;border-bottom:3px solid var(--th-accent);letter-spacing:0.02em;}
@@ -209,9 +206,6 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .sub-tab-btn{padding:6px 14px;border:1px solid #d1d5db;border-radius:8px;background:#fff;color:#475569;font-size:0.82rem;cursor:pointer;font-weight:600;}
 .sub-tab-btn.active{background:var(--primary);color:#fff;border-color:var(--primary);}
 .sub-content{display:none;}.sub-content.active{display:block;}
-.volume-box{background:#e6fffa;padding:30px;margin-top:20px;border-radius:15px;border-left:10px solid var(--success);box-shadow:0 4px 15px rgba(0,0,0,0.1);text-align:center;}
-.volume-box h3{color:#006266;font-size:1.3rem;letter-spacing:1px;}.volume-box .vol-val{font-family:"Nunito",sans-serif;color:var(--success);font-size:3.5rem;font-weight:800;margin:15px 0 0;}
-.weight-box{background:#ecf0f1;padding:25px;margin-top:15px;border-radius:15px;border-left:10px solid #34495e;text-align:center;}
 .alert{padding:12px 16px;border-radius:8px;margin-bottom:12px;font-size:0.88rem;}
 .alert-danger{background:#fdeded;border-left:4px solid var(--danger);color:#c0392b;}
 .alert-warning{background:#fff8e1;border-left:4px solid var(--warning);color:#e67e22;}
@@ -314,6 +308,87 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 @media (prefers-reduced-motion:reduce){.an-exp svg,.an-all-ico svg{transition:none;}}
 .an-excluded{margin:0 0 12px;padding:8px 12px;border:1px dashed #cbd5e1;border-radius:8px;background:#f8fafc;font-size:0.8rem;color:#475569;}
 .an-excluded .an-cat{margin-left:4px;font-size:0.66rem;font-weight:800;color:#64748b;}
+/* ── 視覺化報告（renderTab2）：設計結果（答案在上）→ 體積怎麼決定的 → 溫度 vs 限溫＋熱源分佈 → 整機組成。
+   版面依 #tab2 的寬度切換（@container）：側欄收合／展開、17 吋筆電都不會把圖擠出畫面。 */
+#tab2{container-type:inline-size;}
+.vr-panel{background:#fff;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:16px;overflow:hidden;min-width:0;}
+.vr-head{display:flex;align-items:baseline;gap:4px 10px;flex-wrap:wrap;padding:8px 14px;background:linear-gradient(180deg,var(--th-bg),var(--th-bg2));color:var(--th-fg);border-bottom:3px solid var(--th-accent);}
+.vr-head.lite{background:#f8fafc;color:#0f172a;border-bottom:1px solid #e2e8f0;}
+.vr-title{font-size:0.92rem;font-weight:800;letter-spacing:0.03em;}
+.vr-hsub{font-size:0.76rem;opacity:0.86;font-variant-numeric:tabular-nums;}
+.vr-head.lite .vr-hsub{color:#475569;opacity:1;}
+.vr-state{margin-left:auto;align-self:center;display:inline-flex;align-items:center;gap:5px;padding:1px 10px;border-radius:999px;font-size:0.74rem;font-weight:800;background:#fff;color:#1d6b24;border:1.5px solid #0ca30c;}
+.vr-state.warn{color:#7a5200;border-color:#fab219;}
+.vr-state.fail{color:#a61b1b;border-color:#d03b3b;}
+.vr-res{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1.3fr) minmax(0,0.9fr);}
+.vr-cell{padding:12px 18px 13px;border-right:1px solid #e2e8f0;min-width:0;}
+.vr-cell:last-child{border-right:0;}
+.vr-lbl{font-size:0.78rem;font-weight:700;color:#475569;}
+.vr-num{font-family:"Nunito",sans-serif;font-weight:900;font-size:1.75rem;line-height:1.15;color:#0f172a;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.vr-num small{font-size:0.85rem;font-weight:800;margin-left:4px;color:#334155;}
+.vr-cell.main .vr-num{font-size:2.5rem;color:var(--th-bg);}
+.vr-cell.na .vr-num{font-size:1.2rem;color:#64748b;}
+.vr-note{margin-top:2px;font-size:0.76rem;color:#475569;font-variant-numeric:tabular-nums;}
+.vr-alert{padding:9px 14px;font-size:0.8rem;line-height:1.6;border-top:1px solid;}
+.vr-alert.warn{background:#fffbeb;border-color:#f3d88f;color:#78350f;}
+.vr-alert.fail{background:#fdecec;border-color:#f3c1c1;color:#a61b1b;}
+.vr-alert.info{background:#f1f5f9;border-color:#e2e8f0;color:#334155;}
+.vr-chain{padding:10px 14px 14px;background:#f6f8fb;border-top:1px solid #e2e8f0;}
+.vr-chain-t{font-size:0.8rem;font-weight:800;color:var(--th-bg);margin-bottom:8px;}
+.vr-chain-t span{font-weight:400;color:#64748b;margin-left:8px;}
+.vr-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;}
+.vr-step{position:relative;background:#fff;border:1px solid #dbe3ee;border-radius:8px;padding:8px 11px 9px;min-width:0;}
+.vr-step .no{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-right:6px;border-radius:50%;background:var(--th-bg);color:var(--th-fg);font-size:0.68rem;font-weight:800;vertical-align:1px;}
+.vr-step .sl{font-size:0.78rem;font-weight:700;color:#334155;}
+.vr-step .sv{font-family:"Nunito",sans-serif;font-size:1.3rem;font-weight:900;color:#0f172a;margin:3px 0 2px;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.vr-step .sv small{font-size:0.78rem;font-weight:800;margin-left:3px;color:#334155;}
+.vr-step .sn{font-size:0.74rem;color:#334155;line-height:1.45;overflow-wrap:anywhere;}
+.vr-step .sf{margin-top:4px;padding-top:4px;border-top:1px dashed #dbe3ee;font-size:0.7rem;color:#64748b;line-height:1.45;font-variant-numeric:tabular-nums;}
+.vr-step+.vr-step::before{content:'';position:absolute;left:-12px;top:50%;width:7px;height:7px;border-top:2px solid #94a3b8;border-right:2px solid #94a3b8;transform:translateY(-50%) rotate(45deg);}
+.vr-grid2{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;margin-bottom:16px;}
+.vr-grid2 .vr-panel{margin-bottom:0;}
+.vr-list{padding:8px 14px 10px;}
+.vr-row{display:grid;grid-template-columns:minmax(80px,min(var(--vr-name,27%),230px)) minmax(0,1fr) var(--vr-c3,auto) var(--vr-c4,auto);align-items:center;gap:0 10px;min-height:27px;}
+.vr-row+.vr-row{border-top:1px solid #f1f5f9;}
+.vr-row.total{border-top:1.5px solid #cbd5e1;font-weight:800;}
+.vr-name{display:flex;align-items:baseline;min-width:0;font-size:0.8rem;font-weight:700;color:#1e293b;}
+.vr-nm{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.vr-name .vr-src{flex-shrink:0;margin-left:5px;font-size:0.64rem;font-weight:800;color:#64748b;}
+.vr-sus{margin-left:3px;color:#b45309;font-weight:800;cursor:help;}
+.vr-bar{position:relative;height:12px;min-width:40px;}
+.vr-val{font-size:0.78rem;color:#0f172a;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:72px;}
+.vr-val .vr-lbl2{margin-right:4px;font-size:0.66rem;font-weight:800;color:#475569;}
+.vr-val .vr-dim{color:#64748b;}
+.vr-pct{font-size:0.74rem;color:#475569;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:46px;}
+.vr-row .an-mg{min-width:62px;font-size:0.76rem;}
+.vr-trk{position:absolute;top:0;bottom:0;left:0;background:#e9eef5;border-radius:3px;}
+.vr-used{position:absolute;top:0;bottom:0;left:0;border-radius:3px 0 0 3px;}
+.vr-over{position:absolute;top:0;bottom:0;border-radius:0 3px 3px 0;background:repeating-linear-gradient(135deg,rgba(208,59,59,0.92) 0 3px,rgba(255,255,255,0.55) 3px 6px);}
+.vr-lim{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;background:#0f172a;border-radius:1px;}
+.vr-gl{position:absolute;top:-7px;bottom:-7px;width:1px;background:#eef2f7;}
+.vr-fill{position:absolute;top:0;bottom:0;left:0;border-radius:0 3px 3px 0;}
+.vr-axis{position:relative;height:16px;font-size:0.68rem;color:#64748b;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.vr-axis span{position:absolute;top:1px;transform:translateX(-50%);}
+.vr-axis span.first{transform:none;}
+.vr-legend{display:flex;flex-wrap:wrap;gap:4px 14px;padding:8px 14px 0;font-size:0.76rem;color:#334155;font-variant-numeric:tabular-nums;}
+.vr-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;}
+.vr-legend .an-mg{min-width:0;padding:0 7px;font-size:0.72rem;}
+.vr-legend .an-mg i{float:none;display:inline;width:auto;height:auto;margin-right:4px;border-radius:0;}
+.vr-split{display:flex;gap:2px;height:12px;margin:8px 14px 0;}
+.vr-split span{display:block;min-width:2px;}
+.vr-split span:first-child{border-radius:3px 0 0 3px;}
+.vr-split span:last-child{border-radius:0 3px 3px 0;}
+.vr-foot{padding:0 14px 10px;font-size:0.72rem;color:#64748b;line-height:1.5;}
+.vr-comp{display:grid;grid-template-columns:minmax(0,1fr);}
+.vr-comp>div+div{border-top:1px solid #e2e8f0;}
+.vr-sub-t{padding:9px 14px 0;font-size:0.8rem;font-weight:800;color:#1e293b;}
+.vr-sub-t span{font-weight:400;color:#64748b;margin-left:6px;}
+@container (min-width:1060px){.vr-grid2{grid-template-columns:minmax(0,1fr) minmax(0,1fr);}}
+@container (min-width:820px){.vr-comp{grid-template-columns:minmax(0,1fr) minmax(0,1fr);}.vr-comp>div+div{border-top:0;border-left:1px solid #e2e8f0;}}
+@container (max-width:820px){.vr-steps{grid-template-columns:repeat(3,minmax(0,1fr));}.vr-step+.vr-step::before{display:none;}}
+@container (max-width:760px){.vr-res{grid-template-columns:minmax(0,1fr) minmax(0,1fr);}.vr-cell:nth-child(2){grid-column:1/-1;order:3;border-right:0;border-top:1px solid #e2e8f0;}}
+@container (max-width:480px){.vr-res{grid-template-columns:minmax(0,1fr);}.vr-cell{border-right:0;border-bottom:1px solid #e2e8f0;}.vr-cell:nth-child(2){border-top:0;}}
+@container (max-width:560px){.vr-steps{grid-template-columns:minmax(0,1fr);}}
 .sa-controls{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:18px;margin-bottom:20px;display:flex;gap:15px;align-items:flex-end;flex-wrap:wrap;}
 .sa-controls>div{display:flex;flex-direction:column;}.sa-controls label{font-size:0.78rem;color:#666;margin-bottom:4px;}
 .sa-controls input,.sa-controls select{padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:0.85rem;}
@@ -339,7 +414,6 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .fb-ok{background:#e8f5e9;color:#2e7d32;}.fb-fail{background:#ffebee;color:#c0392b;}
 #loading{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#1e293b,#0f172a);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;color:#e2e8f0;}
 #loading h2{font-size:1.8rem;margin-bottom:15px;}#loading p{color:#94a3b8;margin-bottom:20px;}#loading progress{width:300px;height:6px;}
-.kpi-card .value{font-family:"Nunito","Segoe UI","Roboto","Helvetica Neue",Arial,sans-serif;font-size:1.8rem;font-weight:800;color:#333;margin:6px 0;}
 /* Login Page */
 #login-page{position:fixed;top:0;left:0;width:100%;height:100%;background:#f5f7fa;z-index:10000;overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:30px 30px;}
 #login-page .login-header{background:linear-gradient(135deg,#007CF0,#00DFD8);padding:30px;border-radius:15px;color:#fff;text-align:center;margin-bottom:30px;box-shadow:0 6px 12px rgba(0,0,0,0.2);width:100%;}
@@ -432,7 +506,7 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
 .eye-btn{position:relative;background:#f8f9fa;border:1px solid #dee2e6;color:#333;display:inline-flex;align-items:center;justify-content:center;}
 .eye-btn:hover{background:#e9ecef;}
 .eye-btn.excluded::after{content:'';position:absolute;top:10%;left:15%;width:70%;height:70%;border-top:2.5px solid #e74c3c;transform:rotate(-45deg);}
-@media(max-width:900px){body{flex-direction:column;}.sidebar{width:100%;height:auto;position:relative;}.kpi-row{flex-direction:column;}}
+@media(max-width:900px){body{flex-direction:column;}.sidebar{width:100%;height:auto;position:relative;}}
 
 /* ── 軟體更新橫幅（刻意做得非常醒目）─────────────────────── */
 #update-banner{
@@ -832,14 +906,9 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
   <!-- Tab 2: 視覺化報告 -->
   <div class="tab-content" id="tab2">
     <h3>📊 VISUAL REPORT (視覺化報告)</h3>
-    <div class="kpi-row" id="tab2-kpi"></div>
-    <div id="tab2-charts"></div>
-    <hr style="margin:20px 0;">
-    <h3>📏 尺寸、體積、重量估算</h3>
-    <div id="tab2-drc"></div>
-    <div id="tab2-dims"></div>
-    <div id="tab2-volume"></div>
-    <div id="tab2-weight"></div>
+    <div id="tab2-result"></div>
+    <div class="vr-grid2" id="tab2-charts"></div>
+    <div id="tab2-comp"></div>
   </div>
 
   <!-- Tab 3: 3D 模擬視圖 -->
@@ -1443,7 +1512,7 @@ const ALL_TAB1_COLS = ['Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','D
 var tab1SelectedCols = ['Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','Drop','R_jc','R_int','R_TIM','Limit(C)'];
 function toggleTab1Col(col,checked){if(checked&&!tab1SelectedCols.includes(col))tab1SelectedCols.push(col);else if(!checked)tab1SelectedCols=tab1SelectedCols.filter(c=>c!==col);renderTab1();}
 
-/* 裕度分級（單一事實來源）：詳細分析的卡片與表格、PDF 報告、視覺化報告的溫度裕度圖共用同一組門檻。
+/* 裕度分級（單一事實來源）：詳細分析的卡片與表格、PDF 報告、視覺化報告的「溫度 vs 限溫」共用同一組門檻。
    紅色只保留給「超溫」（負裕度）；顏色一律搭配圖示＋文字，不單靠顏色表達。
    fg/bg/bd＝文字／底色／框線（fg 對 bg 對比 ≥ 5.9:1），mk＝狀態記號色。 */
 const MARGIN_LEVELS = [
@@ -3092,35 +3161,204 @@ function riskFootHtml(r,i,top,R,g){
 // =====================================================
 // TAB 2: VISUAL REPORT
 // =====================================================
-function kpiCard(t,v,d,c){return'<div class="kpi-card" style="border-left-color:'+c+';"><div class="title">'+t+'</div><div class="value">'+v+'</div><div class="desc">'+d+'</div></div>';}
-
 var fullscreenBtn={name:'fullscreen',title:'全螢幕',icon:{width:24,height:24,path:'M5 5h5V3H3v7h2V5zm14 0h-5V3h7v7h-2V5zM5 19h5v2H3v-7h2v5zm14 0h-5v2h7v-7h-2v5z'},click:function(gd){if(!document.fullscreenElement){var el=gd.closest('.js-plotly-plot')||gd;var origData=JSON.parse(JSON.stringify(gd.data));var origLayout=JSON.parse(JSON.stringify(gd.layout));delete origLayout.width;delete origLayout.height;var origConfig={responsive:true,displaylogo:false,modeBarButtonsToAdd:['toggleSpikelines',fullscreenBtn],displayModeBar:true};var parent=el.parentNode;var elRect=el.getBoundingClientRect();var placeholder=document.createElement('div');placeholder.id='_fs_placeholder';placeholder.style.cssText='flex:1;min-width:'+elRect.width+'px;min-height:'+elRect.height+'px;';parent.insertBefore(placeholder,el);var wrapper=document.createElement('div');wrapper.id='_fs_wrapper';wrapper.style.cssText='background:#fff;width:100%;height:100%;';wrapper.appendChild(el);document.body.appendChild(wrapper);wrapper.requestFullscreen().then(function(){Plotly.relayout(gd,{width:window.screen.width,height:window.screen.height});});var onExit=function(){if(!document.fullscreenElement){document.removeEventListener('fullscreenchange',onExit);var ph=document.getElementById('_fs_placeholder');if(ph){ph.parentNode.insertBefore(el,ph);ph.remove();}var wr=document.getElementById('_fs_wrapper');if(wr)wr.remove();Plotly.purge(gd);Plotly.newPlot(gd,origData,origLayout,origConfig).then(function(){var flexParent=el.parentNode;if(flexParent){flexParent.querySelectorAll('.js-plotly-plot').forEach(function(sib){if(sib!==el)Plotly.Plots.resize(sib);});}});}};document.addEventListener('fullscreenchange',onExit);}else{document.exitFullscreen();}}};
+/* ── 視覺化報告 ─────────────────────────────────────────────
+   使用者回報「溫度裕度的圖有點重複」：原本兩張圖（溫度裕度總覽＋各元件溫度裕度）畫的是同一組裕度，
+   配色還不一樣（後者是紅→綠漸層，0–10 °C 就畫成紅色，違反「紅色只給超溫」）；詳細分析頁也已經有
+   卡片、分析表與溫升組成。改版後只留一張「溫度 vs 限溫」（MARGIN_LEVELS 配色），其餘放詳細分析頁
+   沒有的東西：設計結果（答案放最上面）→ 體積怎麼決定的（5 步推導）→ 熱源分佈（依分類）→ 整機組成。
+   下面的資料函式畫面與 PDF 共用（單一事實來源）；PDF 直接畫（canvas），不再截圖表。 */
+const VR_CATS = [
+  {key:'RF',      label:'RF',      color:'#2a78d6'},
+  {key:'DIGITAL', label:'Digital', color:'#4a3aa7'},
+  {key:'PWR',     label:'PWR',     color:'#e87ba4'}
+];   // validate_palette --pairs all 通過（最差 CVD ΔE 13.0、一般視覺 16.3）；PWR 的粉紅對白底 < 3:1 → 一律附文字（名稱旁的分類、圖例）
+const VR_THERMAL_COLOR = '#1e3a5f', VR_FIXED_COLOR = '#a3b1c2';   // 整機組成：隨散熱設計變動／參數控制台固定
+function vrN(v){ const n=_num(v); return isFinite(n)?String(+n.toFixed(2)):'—'; }   // 參數值：最多 2 位小數、去尾零
+
+/* 設計狀態：blocked 缺必填、nohot 沒有發熱元件、nosol 允許溫升 ≤ 0（散熱器壓到環溫也不夠）、drc 製程檢查不通過、ok */
+function vrState(R){
+  if(R.blocked)return 'blocked';
+  if(!R.rows.some(r=>r.Total_W>0))return 'nohot';
+  if(!(R.Min_dT_Allowed>0))return 'nosol';
+  return R.drc_failed?'drc':'ok';
+}
+/* 瓶頸＝與 computeAll 同一顆：發熱元件中 Allowed_dT 最小的第一顆 */
+function vrBottleneck(R){ let b=null; R.rows.forEach(r=>{ if(r.Total_W>0&&(!b||r.Allowed_dT<b.Allowed_dT))b=r; }); return b; }
+function vrHeatLoad(R){ return R.rows.reduce((s,r)=>s+(r.Total_W>0?r.Total_W:0),0); }   // 實際熱負載（不含安全係數）
+
+/* 體積怎麼決定的：與 computeAll 同一組公式
+   A ＝ 熱負載 × 安全係數 ÷ (h × η × 允許溫升)；A ＝ 底面 L×W ＋ 2 × 片數 × L × 鰭片高；H ＝ 屏蔽罩＋濾波器＋基板＋鰭片 */
+function vrSteps(R,g){
+  const Q=vrHeatLoad(R), sf=_num(g.Margin), bn=vrBottleneck(R), fe=finEffective(g);
+  const hot=R.rows.filter(r=>r.Total_W>0).length, box=_num(g.H_shield)+_num(g.H_filter), pitch=_num(g.Gap)+_num(g.Fin_t);
+  const f1=v=>(+v).toFixed(1), sfOn=isFinite(sf)&&sf!==1;
+  const hv=calcHValue(g.Gap,R.Fin_Height>0?R.Fin_Height:70);   // 與參數控制台、PDF 顯示的 h 同一個值（最終鰭片高度下）
+  return [
+    {label:'熱負載', v:f1(Q), u:'W', note:hot+' 顆發熱元件合計',
+     f:sfOn?'散熱器依 ×'+fmtSF(sf)+' ＝ '+f1(Q*sf)+' W 設計（安全係數）':'安全係數 1.0：沒有預留餘裕',
+     tip:'各發熱元件「數量 × 單顆功耗」加總。安全係數（參數控制台 Margin）只用來把散熱器放大，不是實際功耗。'},
+    {label:'散熱器允許溫升', v:f1(R.Min_dT_Allowed), u:'°C', note:'由 '+(bn?bn.Component:'—')+' 決定',
+     f:bn?'限溫 '+vrN(bn['Limit(C)'])+' − 局部環溫 '+f1(bn.Loc_Amb)+' − 內部溫降 '+f1(bn.Drop):'',
+     tip:'每顆元件都算一個「散熱器最多能比環溫高幾度」，取最小的那顆（瓶頸）來設計散熱器。各元件的值見「詳細分析」的允許溫升欄。'},
+    {label:'所需散熱面積', v:(+R.Area_req).toFixed(3), u:'m²', note:'h '+hv.h_value.toFixed(2)+' W/m²K · η '+R.eff.toFixed(2),
+     f:'＝ 熱負載'+(sfOn?' × '+fmtSF(sf):'')+' ÷ (h × η × 允許溫升)',
+     tip:'h＝對流 '+hv.h_conv.toFixed(2)+' ＋ 輻射 '+hv.h_rad.toFixed(2)+' W/m²K；η＝鰭片效率 '+R.eta_fin.toFixed(3)+' × 製程係數 '+fe.eta_process+'（'+(fe.isDC?'Die-casting':'Embedded')+(fe.custom?'，自訂':'')+'）'},
+    {label:'鰭片高度', v:f1(R.Fin_Height), u:'mm', note:R.Fin_Count+' 片 · 節距 '+vrN(pitch)+' mm',
+     f:R.Fin_Height>0?'面積 ＝ 底面 L×W ＋ 2 × 片數 × L × 鰭片高':'底面積已足夠，不需要鰭片',
+     tip:'片數＝寬 '+R.W_hsk.toFixed(0)+' mm 以節距（間距 '+vrN(g.Gap)+' ＋ 厚度 '+vrN(g.Fin_t)+' mm）排得下的片數；鰭片高度由所需散熱面積反推。'},
+    {label:'整機高度', v:f1(R.RRU_Height), u:'mm', note:'電子艙 '+vrN(box)+' ＋ 基板 '+vrN(g.t_base)+' ＋ 鰭片 '+f1(R.Fin_Height),
+     f:'體積 ＝ L × W × H',
+     tip:'電子艙＝屏蔽罩 '+vrN(g.H_shield)+' ＋ 腔體濾波器 '+vrN(g.H_filter)+' mm（參數控制台）。只有鰭片高度隨散熱需求變動。'}
+  ];
+}
+
+/* 溫度 vs 限溫：依風險排序（與詳細分析同一個順序），條＝自環溫升到判定溫度（Tj 或 Tc），共用同一條溫度軸 */
+function vrTempItems(R){
+  return tab1SortRows(R.rows,{col:'Allowed_dT',dir:1}).filter(r=>r.Total_W>0).map(r=>({
+    name:String(r.Component||''), src:r._src, label:r.Temp_Label, tRef:r.T_ref, limit:_num(r['Limit(C)']),
+    margin:r.Tj_Margin, lv:marginLevel(r.Tj_Margin), sus:CompMerge.limitSuspect(r)
+  }));
+}
+function vrTempAxis(items,tAmb){
+  const hi=Math.max(tAmb+1,...items.map(x=>Math.max(x.limit,x.tRef)).filter(v=>isFinite(v)));
+  const step=[5,10,20,25,50,100,200].find(s=>(hi-tAmb)/s<=6)||500;
+  const max=Math.ceil(hi/step)*step, ticks=[];
+  for(let t=Math.ceil((tAmb+step*0.35)/step)*step;t<=max+1e-9;t+=step)ticks.push(t);
+  return {min:tAmb, max, ticks, pos:t=>Math.max(0,Math.min(1,(t-tAmb)/(max-tAmb)))};
+}
+/* 熱源分佈：發熱元件依總功耗排序、依分類上色；合計＝實際熱負載（不含安全係數） */
+function vrPowerData(R){
+  const rows=R.rows.filter(r=>r.Total_W>0).sort((a,b)=>b.Total_W-a.Total_W);
+  const total=rows.reduce((s,r)=>s+r.Total_W,0);
+  const cats=VR_CATS.map(c=>{ const w=rows.filter(r=>r._src===c.key).reduce((s,r)=>s+r.Total_W,0); return Object.assign({},c,{w, pct:total>0?w/total*100:0}); }).filter(c=>c.w>0);
+  return {rows, total, cats, max:rows.length?rows[0].Total_W:0};
+}
+function vrCatColor(k){ return (VR_CATS.find(c=>c.key===k)||{color:'#94a3b8'}).color; }
+/* 整機組成：高度與重量各自的分項；thermal＝隨散熱設計變動的部分（鰭片、散熱器） */
+function vrCompData(R,g){
+  const height=[
+    {label:'鰭片', v:R.Fin_Height, thermal:true},
+    {label:'腔體濾波器', v:_num(g.H_filter)},
+    {label:'屏蔽罩', v:_num(g.H_shield)},
+    {label:'散熱器基板', v:_num(g.t_base)}
+  ].sort((a,b)=>b.v-a.v);
+  const weight=[
+    {label:'散熱器（基板＋鰭片）', v:R.hs_weight_kg, thermal:true},
+    {label:'腔體濾波器', v:R.filter_weight_kg},
+    {label:'屏蔽外殼', v:R.shielding_weight_kg},
+    {label:'電路板 PCB', v:R.pcb_weight_kg},
+    {label:'屏蔽罩', v:R.shield_weight_kg}
+  ].sort((a,b)=>b.v-a.v);
+  return {height, hTotal:R.RRU_Height, weight, wTotal:R.total_weight_kg};
+}
+/* 設計狀態的說明（畫面與 PDF 共用）：回傳 {cls:'warn'|'fail'|'info', text} 或 null */
+function vrStateNote(R,st){
+  if(st==='nohot')return {cls:'info', text:'沒有發熱元件（總功耗 0 W），不需要依散熱需求設計鰭片，所以不列體積。'};
+  if(st==='nosol'){
+    const bn=vrBottleneck(R);
+    return {cls:'fail', text:'無法設計：瓶頸 '+bn.Component+' 的允許溫升只有 '+bn.Allowed_dT.toFixed(1)+' °C（限溫 '+vrN(bn['Limit(C)'])+' − 局部環溫 '+bn.Loc_Amb.toFixed(1)+' − 內部溫降 '+bn.Drop.toFixed(1)+'）。散熱器就算壓到環溫也不夠，算不出體積。請降低這顆的內部溫降（Rjc／TIM／基板），或確認限溫與擺放高度。'};
+  }
+  if(st==='drc')return {cls:'fail', text:'DRC 不通過：'+String(R.drc_msg||'').replace(/^⛔\s*/,'')+'。體積與重量不列出；調整參數控制台的鰭片間距、厚度或製程後會重新計算。'};
+  if(st==='ok'&&R.drc_warn)return {cls:'warn', text:String(R.drc_warn).replace(/<br\s*\/?>/gi,'\n')};
+  return null;
+}
+
+function vrResultHtml(R,g){
+  const st=vrState(R);
+  if(st==='blocked')return calcGateHtml(R.missing);
+  const pill=st==='ok'?(R.drc_warn?'<span class="vr-state warn">⚠ DRC 提醒</span>':'<span class="vr-state">✓ DRC 通過</span>')
+            :st==='drc'?'<span class="vr-state fail">✖ DRC 不通過</span>'
+            :st==='nosol'?'<span class="vr-state fail">✖ 無法設計</span>':'';
+  const cell=(cls,lbl,num,unit,note)=>'<div class="vr-cell'+(cls?' '+cls:'')+'"><div class="vr-lbl">'+lbl+'</div><div class="vr-num">'+num+(unit?'<small>'+unit+'</small>':'')+'</div>'+(note?'<div class="vr-note">'+note+'</div>':'')+'</div>';
+  let h='<section class="vr-panel vr-result"><div class="vr-head"><span class="vr-title">設計結果</span><span class="vr-hsub">RRU 整機估算</span>'+pill+'</div>';
+  if(st==='ok'){
+    const hs=R.total_weight_kg>0?R.hs_weight_kg/R.total_weight_kg*100:0;
+    h+='<div class="vr-res">'+
+      cell('main','整機體積',R.Volume_L.toFixed(2),'L','外殼包絡體積（含鰭片）')+
+      cell('','外觀尺寸 L × W × H','<span id="vr-dims">'+R.L_hsk.toFixed(0)+' × '+R.W_hsk.toFixed(0)+' × '+R.RRU_Height.toFixed(1)+'</span>','mm','長寬＝PCB＋防水邊距；高＝下方第 5 步')+
+      cell('','整機重量',R.total_weight_kg.toFixed(1),'kg','散熱器 '+R.hs_weight_kg.toFixed(2)+' kg（'+hs.toFixed(0)+'%）')+
+      '</div>';
+  }else{
+    h+='<div class="vr-res">'+cell('main na','整機體積','—','','')+cell('na','外觀尺寸 L × W × H','—','','')+cell('na','整機重量','—','','')+'</div>';
+  }
+  const note=vrStateNote(R,st);
+  if(note)h+='<div class="vr-alert '+note.cls+'">'+_vEsc(note.text).replace(/\n/g,'<br>')+'</div>';
+  if(st==='ok'||st==='drc'){
+    h+='<div class="vr-chain"><div class="vr-chain-t">體積怎麼決定的<span>散熱器依瓶頸元件設計，鰭片高度由所需散熱面積反推</span></div><div class="vr-steps">'+
+      vrSteps(R,g).map((x,i)=>'<div class="vr-step" title="'+_vEsc(x.tip)+'"><div><span class="no">'+(i+1)+'</span><span class="sl">'+x.label+'</span></div>'+
+        '<div class="sv">'+x.v+'<small>'+x.u+'</small></div><div class="sn">'+_vEsc(x.note)+'</div>'+(x.f?'<div class="sf">'+_vEsc(x.f)+'</div>':'')+'</div>').join('')+
+      '</div></div>';
+  }
+  return h+'</section>';
+}
+
+function vrTempHtml(R,g){
+  const items=vrTempItems(R);
+  if(!items.length)return '';
+  const ax=vrTempAxis(items,g.T_amb), pct=t=>(ax.pos(t)*100).toFixed(2)+'%';
+  const gl=ax.ticks.map(t=>'<i class="vr-gl" style="left:'+pct(t)+'"></i>').join('');
+  let h='<section class="vr-panel vr-temp"><div class="vr-head lite"><span class="vr-title">溫度 vs 限溫</span><span class="vr-hsub">依風險排序 · 條＝自環溫 '+vrN(g.T_amb)+' °C 升到判定溫度（Tj 或 Tc），黑線＝限溫</span></div>'+
+        '<div class="vr-legend">'+MARGIN_LEVELS.map((l,i)=>'<span class="an-mg" style="'+marginVars(l)+'"><i>'+l.icon+'</i>'+l.label+' '+marginRange(i)+'</span>').join('')+'<span>°C 裕度 ＝ 限溫 − 判定溫度</span></div>'+
+        '<div class="vr-list" style="--vr-c3:116px;--vr-c4:70px">';
+  items.forEach(x=>{
+    const ok=isFinite(x.tRef)&&isFinite(x.limit);
+    const bar=!ok?'':gl+'<i class="vr-trk" style="width:'+pct(x.limit)+'"></i>'+
+      '<i class="vr-used" style="width:'+pct(Math.min(x.tRef,x.limit))+';background:'+(x.lv?x.lv.mk:'#94a3b8')+'"></i>'+
+      (x.tRef>x.limit?'<i class="vr-over" style="left:'+pct(x.limit)+';width:calc('+pct(x.tRef)+' - '+pct(x.limit)+')"></i>':'')+
+      '<i class="vr-lim" style="left:'+pct(x.limit)+'"></i>';
+    const tip=x.name+'（'+x.src+'）：'+x.label+' '+(ok?x.tRef.toFixed(1):'—')+' °C ／ 限溫 '+vrN(x.limit)+' °C，裕度 '+(isFinite(x.margin)?x.margin.toFixed(1):'—')+' °C'+(x.lv?'（'+x.lv.label+'）':'');
+    h+='<div class="vr-row" title="'+_vEsc(tip)+'"><span class="vr-name"><span class="vr-nm">'+_vEsc(x.name)+'</span></span><span class="vr-bar">'+bar+'</span>'+
+       '<span class="vr-val"><span class="vr-lbl2">'+x.label+'</span>'+(ok?x.tRef.toFixed(1):'—')+'<span class="vr-dim"> / '+vrN(x.limit)+'</span>'+(x.sus?'<span class="vr-sus" title="'+_vEsc('限溫疑似範例值：'+x.sus.note+'（到元件設定確認或修正）')+'">⚠</span>':'')+'</span>'+
+       '<span class="vr-pct">'+(x.lv?'<span class="an-mg" style="'+marginVars(x.lv)+'"><i>'+x.lv.icon+'</i>'+x.margin.toFixed(1)+'</span>':'—')+'</span></div>';
+  });
+  h+='<div class="vr-row vr-axis-row"><span></span><span class="vr-axis"><span class="first" style="left:0" title="環溫 T_amb">'+vrN(ax.min)+'</span>'+
+     ax.ticks.map(t=>'<span style="left:'+pct(t)+'">'+t+'</span>').join('')+'</span><span class="vr-val vr-dim">°C</span><span></span></div>';
+  return h+'</div></section>';
+}
+
+function vrPowerHtml(R,g){
+  const d=vrPowerData(R);
+  if(!d.rows.length)return '';
+  const sf=_num(g.Margin), sfOn=isFinite(sf)&&sf!==1;
+  let h='<section class="vr-panel vr-power"><div class="vr-head lite"><span class="vr-title">熱源分佈</span><span class="vr-hsub">合計 '+d.total.toFixed(1)+' W · '+d.rows.length+' 顆發熱元件'+
+        (sfOn?' · 散熱器依 ×'+fmtSF(sf)+' ＝ '+(d.total*sf).toFixed(1)+' W 設計':'')+'</span></div>'+
+        '<div class="vr-split">'+d.cats.map(c=>'<span style="flex:'+c.w.toFixed(4)+' 1 0;background:'+c.color+'" title="'+c.label+' '+c.w.toFixed(1)+' W（'+c.pct.toFixed(1)+'%）"></span>').join('')+'</div>'+
+        '<div class="vr-legend">'+d.cats.map(c=>'<span><i style="background:'+c.color+'"></i><b>'+c.label+'</b> '+c.w.toFixed(1)+' W · '+c.pct.toFixed(1)+'%</span>').join('')+'</div>'+
+        '<div class="vr-list" style="--vr-c3:78px;--vr-c4:50px">';
+  d.rows.forEach(r=>{
+    const p=d.total>0?r.Total_W/d.total*100:0, w=d.max>0?r.Total_W/d.max*100:0, q=_num(r.Qty);
+    const tip=r.Component+'（'+r._src+'）：'+(q!==1?q+' × '+fmtW(_num(r['Power(W)']))+' W ＝ ':'')+r.Total_W.toFixed(1)+' W，佔合計 '+p.toFixed(1)+'%';
+    h+='<div class="vr-row" title="'+_vEsc(tip)+'"><span class="vr-name"><span class="vr-nm">'+_vEsc(r.Component)+'</span><span class="vr-src">'+(VR_CATS.find(c=>c.key===r._src)||{label:r._src}).label+'</span></span>'+
+       '<span class="vr-bar"><i class="vr-fill" style="width:'+w.toFixed(2)+'%;background:'+vrCatColor(r._src)+'"></i></span>'+
+       '<span class="vr-val">'+r.Total_W.toFixed(1)+' W</span><span class="vr-pct">'+p.toFixed(1)+'%</span></div>';
+  });
+  return h+'</div></section>';
+}
+
+function vrBarListHtml(list,total,unit,dec){
+  const max=Math.max(0,...list.map(x=>x.v));
+  let h='<div class="vr-list" style="--vr-name:150px;--vr-c3:78px;--vr-c4:50px">';
+  list.forEach(x=>{
+    h+='<div class="vr-row"><span class="vr-name"><span class="vr-nm">'+x.label+'</span></span><span class="vr-bar"><i class="vr-fill" style="width:'+(max>0?x.v/max*100:0).toFixed(2)+'%;background:'+(x.thermal?VR_THERMAL_COLOR:VR_FIXED_COLOR)+'"></i></span>'+
+       '<span class="vr-val">'+x.v.toFixed(dec)+' '+unit+'</span><span class="vr-pct">'+(total>0?x.v/total*100:0).toFixed(1)+'%</span></div>';
+  });
+  return h+'<div class="vr-row total"><span class="vr-name"><span class="vr-nm">合計</span></span><span></span><span class="vr-val">'+total.toFixed(dec)+' '+unit+'</span><span class="vr-pct">100%</span></div></div>';
+}
+function vrCompHtml(R,g){
+  const d=vrCompData(R,g), sw=c=>'<i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:'+c+';vertical-align:-1px;margin:0 4px 0 10px"></i>';
+  return '<section class="vr-panel vr-comp-panel"><div class="vr-head lite"><span class="vr-title">整機組成</span><span class="vr-hsub">'+sw(VR_THERMAL_COLOR)+'隨散熱設計變動'+sw(VR_FIXED_COLOR)+'參數控制台固定</span></div>'+
+    '<div class="vr-comp"><div><div class="vr-sub-t">高度<span>mm · 體積 ＝ L × W × 這個高度</span></div>'+vrBarListHtml(d.height,d.hTotal,'mm',1)+'</div>'+
+    '<div><div class="vr-sub-t">重量<span>kg</span></div>'+vrBarListHtml(d.weight,d.wTotal,'kg',2)+'</div></div></section>';
+}
+
 function renderTab2(){
-  if(!calcResults)return;let R=calcResults;
-  if(R.blocked){
-    document.getElementById('tab2-kpi').innerHTML=calcGateHtml(R.missing);
-    ['tab2-charts','tab2-drc','tab2-dims','tab2-weight'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='';});
-    document.getElementById('tab2-volume').innerHTML='<div class="volume-box" style="background:#fef2f2;border-color:#dc2626;"><h3 style="color:#b91c1c;">★ RRU 整機估算體積 (Estimated Volume)</h3><div class="vol-val" style="color:#b91c1c;font-size:1.8rem;">無法計算：必填欄位未填</div></div>';
-    return;
-  }
-  document.getElementById('tab2-kpi').innerHTML=kpiCard('整機總熱耗',R.Total_Power.toFixed(2)+' W','Total Power','#e74c3c')+kpiCard('系統瓶頸元件',_vEsc(R.Bottleneck_Name),'Margin: '+R.Bottleneck_Tj_Margin+'°C','#f39c12')+kpiCard('所需散熱面積',R.Area_req.toFixed(3)+' m²','Required Area','#3498db')+kpiCard('預估鰭片數量',R.Fin_Count+' Pcs','Fin Count','#9b59b6');
-  let valid=R.rows.filter(r=>r.Total_W>0);
-  let pCfg={responsive:true,displaylogo:false,modeBarButtonsToAdd:['toggleSpikelines',fullscreenBtn],displayModeBar:true};
-  if(valid.length){
-    let cd=document.getElementById('tab2-charts');cd.innerHTML='<div id="chart-margin" style="width:100%;"></div><div style="display:flex;gap:15px;margin-top:15px;"><div id="chart-power" style="flex:1;"></div><div id="chart-tjm" style="flex:1;"></div></div>';
-    let sorted=[...valid].sort((a,b)=>b.Tj_Margin-a.Tj_Margin);let colors=sorted.map(r=>({over:'#e74c3c',tight:'#f39c12',watch:'#f1c40f',ok:'#2ecc71'})[(marginLevel(r.Tj_Margin)||{key:'ok'}).key]);   // 門檻與詳細分析同一組（MARGIN_LEVELS）
-    Plotly.newPlot('chart-margin',[{y:sorted.map(r=>r.Component),x:sorted.map(r=>r['Limit(C)']),type:'bar',orientation:'h',marker:{color:'#E8E8E8'},name:'Limit',hovertemplate:'Limit: %{x}°C<extra></extra>'},{y:sorted.map(r=>r.Component),x:sorted.map(r=>r.T_ref),type:'bar',orientation:'h',marker:{color:colors},name:'T_ref',text:sorted.map(r=>r.Temp_Label+': '+r.T_ref.toFixed(1)+'°C / Limit: '+r['Limit(C)'].toFixed(0)+'°C  (Margin: '+r.Tj_Margin.toFixed(1)+'°C)'),textposition:'outside',hovertemplate:'%{text}<extra></extra>'}],{barmode:'overlay',title:'<b>溫度裕度總覽 (Temperature Margin Overview)</b>',showlegend:false,height:Math.max(300,sorted.length*50+100),margin:{l:10,r:250,t:60,b:40},yaxis:{automargin:true}},pCfg);
-    let pS=[...valid].sort((a,b)=>a.Total_W-b.Total_W);
-    Plotly.newPlot('chart-power',[{y:pS.map(r=>r.Component),x:pS.map(r=>r.Total_W),type:'bar',orientation:'h',marker:{colorscale:'Oranges',color:pS.map(r=>r.Total_W),showscale:true,colorbar:{title:'功耗 (W)'}},text:pS.map(r=>r.Total_W.toFixed(1)+' W'),textposition:'outside'}],{title:'<b>各元件功耗分佈 (Power Breakdown)</b>',showlegend:false,margin:{l:10,r:80,t:60,b:40},xaxis:{title:'功耗 (W)'},yaxis:{automargin:true},annotations:[{text:'Total: '+R.Total_Power.toFixed(2)+' W',xref:'paper',yref:'paper',x:0.95,y:1.06,showarrow:false,font:{size:13,color:'#888'}}]},pCfg);
-    let mS=[...valid].sort((a,b)=>a.Tj_Margin-b.Tj_Margin);
-    Plotly.newPlot('chart-tjm',[{x:mS.map(r=>r.Component),y:mS.map(r=>r.Tj_Margin),type:'bar',marker:{colorscale:[[0,'#d73027'],[0.15,'#f46d43'],[0.3,'#fdae61'],[0.45,'#fee08b'],[0.6,'#d9ef8b'],[0.75,'#a6d96a'],[0.9,'#66bd63'],[1,'#1a9850']],color:mS.map(r=>r.Tj_Margin),showscale:true,colorbar:{title:'Margin (°C)'}}}],{title:'<b>各元件溫度裕度 (Temperature Margin)</b>',xaxis:{title:'元件名稱'},yaxis:{title:'Margin (°C)'}},pCfg);
-  }
-  // DRC + Dims + Volume + Weight
-  if(R.drc_failed){document.getElementById('tab2-drc').innerHTML='<div class="drc-error"><b>DRC FAILED</b><br>'+R.drc_msg+'</div>';document.getElementById('tab2-dims').innerHTML='';document.getElementById('tab2-volume').innerHTML='<div class="volume-box" style="background:#ffebee;border-color:#e74c3c;"><h3 style="color:#c0392b;">★ RRU 整機估算體積 (Estimated Volume)</h3><div class="vol-val" style="color:#e74c3c;">N/A</div></div>';document.getElementById('tab2-weight').innerHTML='';}
-  else{document.getElementById('tab2-drc').innerHTML=R.drc_warn?'<div class="alert alert-warning" style="padding:10px;border-radius:6px;background:#fff3cd;color:#856404;border:1px solid #ffc107;margin-bottom:10px;">'+R.drc_warn+'</div>':'';document.getElementById('tab2-dims').innerHTML='<div class="kpi-row">'+kpiCard('建議鰭片高度',R.Fin_Height.toFixed(2)+' mm','Suggested Fin Height','#2ecc71')+kpiCard('RRU 整機尺寸 (LxWxH)',R.L_hsk.toFixed(0)+' x '+R.W_hsk.toFixed(0)+' x '+R.RRU_Height.toFixed(1),'Estimated Dimensions','#34495e')+'</div>';
-    document.getElementById('tab2-volume').innerHTML='<div class="volume-box"><h3>★ RRU 整機估算體積 (Estimated Volume)</h3><div class="vol-val">'+R.Volume_L.toFixed(2)+' L</div></div>';
-    document.getElementById('tab2-weight').innerHTML='<div class="weight-box"><h3 style="color:#2c3e50;">⚖️ 整機估算重量 (Estimated Weight)</h3><div style="font-family:Nunito,sans-serif;font-size:2.8rem;font-weight:800;color:#34495e;margin:10px 0;">'+R.total_weight_kg.toFixed(1)+' kg</div><small style="color:#7f8c8d;">Heatsink ≈ '+R.hs_weight_kg.toFixed(1)+'kg | Shield ≈ '+R.shield_weight_kg.toFixed(1)+'kg | Filter ≈ '+R.filter_weight_kg.toFixed(1)+'kg | Shielding ≈ '+R.shielding_weight_kg.toFixed(1)+'kg | PCB ≈ '+R.pcb_weight_kg.toFixed(2)+'kg</small></div>';
-  }
+  if(!calcResults)return;
+  const R=calcResults, $=id=>document.getElementById(id);
+  $('tab2-result').innerHTML=vrResultHtml(R,G);
+  if(R.blocked){ $('tab2-charts').innerHTML=''; $('tab2-comp').innerHTML=''; return; }
+  $('tab2-charts').innerHTML=vrTempHtml(R,G)+vrPowerHtml(R,G);
+  $('tab2-comp').innerHTML=vrState(R)==='ok'?vrCompHtml(R,G):'';
 }
 
 // =====================================================
@@ -3958,25 +4196,10 @@ async function generatePDFReport() {
     const R = calcResults;
     const valid = R.rows.filter(r => r.Total_W > 0);
 
-    // Ensure Tab 2 charts are rendered
-    const currentTab = document.querySelector('.tab-btn.active');
-    const wasTab2 = currentTab && currentTab.textContent.includes('視覺化');
-
-    // Capture existing charts (they are rendered on recalc)
+    // 視覺化報告改為直接畫（vrTempPdf／vrPowerPdf／vrCompPdf，與畫面同一組資料函式），不再截圖表；
+    // 這裡只截 3D 與敏感度分析的 Plotly 圖
     let chartImages = {};
-    const chartDivs = ['chart-margin', 'chart-power', 'chart-tjm'];
-    const chartPromises = chartDivs.map(async id => {
-      const el = document.getElementById(id);
-      if (el && el.classList.contains('js-plotly-plot')) {
-        try {
-          // chart-margin needs wider capture to avoid clipping right-side bar labels
-          const w = (id === 'chart-margin') ? 1800 : 900;
-          const h = (id === 'chart-margin') ? Math.max(400, R.rows.filter(r=>r.Total_W>0).length * 50 + 100) : 400;
-          const img = await Plotly.toImage(el, {format:'png', width:w, height:h, scale:2});
-          chartImages[id] = img;
-        } catch(e) {}
-      }
-    });
+    const chartPromises = [];
     // Capture 3D
     const el3d = document.getElementById('tab3-3d');
     if (el3d && el3d.querySelector('.js-plotly-plot')) {
@@ -4103,19 +4326,6 @@ async function generatePDFReport() {
           paddingLeft:()=>3, paddingRight:()=>3, paddingTop:()=>2.5, paddingBottom:()=>2.5
         }}
       ].concat(notes);
-    }
-
-    // Helper: KPI box with accent bar
-    function kpiBox(label, value, desc, color) {
-      return {
-        stack: [
-          {canvas: [{type:'rect', x:0, y:0, w:120, h:3, r:1.5, color: color||cPrimary}]},
-          {text: label, fontSize:7.5, color:'#64748b', alignment:'center', margin:[0,5,0,0]},
-          {text: value, fontSize:15, bold:true, color: color||cDark, alignment:'center', margin:[0,3,0,2]},
-          {text: desc, fontSize:6.5, color:'#94a3b8', alignment:'center'}
-        ],
-        margin: [0,0,0,0]
-      };
     }
 
     // 詳細分析表：與畫面同一套規則（依風險排序、數字靠右、熱阻 3 位小數、不適用「—」、
@@ -4263,6 +4473,144 @@ async function generatePDFReport() {
                 paddingLeft:() => 7, paddingRight:() => 7, paddingTop:k => k === 0 ? 4 : 6, paddingBottom:k => k === 0 ? 4 : 6}};
     }
 
+    // ── 視覺化報告（與畫面同一組資料函式：vrState／vrStateNote／vrSteps／vrTempItems／vrTempAxis／vrPowerData／vrCompData）──
+    const VR_TBL = {hLineWidth:(i, node) => (i === 0 || i === node.table.body.length) ? 0 : 0.3, vLineWidth:() => 0, hLineColor:() => '#e2e8f0',
+                    paddingLeft:() => 3, paddingRight:() => 5, paddingTop:() => 2.6, paddingBottom:() => 2.6};
+    function vrNotePdf(note) {
+      const c = {warn:{bg:'#fffbeb', fg:'#78350f', bd:'#f3d88f'}, fail:{bg:'#fdecec', fg:'#a61b1b', bd:'#f3c1c1'}, info:{bg:'#f1f5f9', fg:'#334155', bd:'#e2e8f0'}}[note.cls];
+      return {table:{widths:['*'], body:[[{text:note.text, fontSize:7, color:c.fg, fillColor:c.bg}]]},
+              layout:{hLineWidth:() => 0.6, vLineWidth:() => 0.6, hLineColor:() => c.bd, vLineColor:() => c.bd, paddingLeft:() => 7, paddingRight:() => 7, paddingTop:() => 4, paddingBottom:() => 4},
+              margin:[0,0,0,8]};
+    }
+    // 設計結果＋體積怎麼決定的（畫面「視覺化報告」最上面那一塊）
+    function vrResultPdf() {
+      const st = vrState(R), ok = st === 'ok';
+      if (st === 'blocked') return [];
+      const stTxt = ok ? (R.drc_warn ? 'DRC 提醒' : 'DRC 通過') : st === 'drc' ? 'DRC 不通過' : st === 'nosol' ? '無法設計' : '';
+      const cell = (lbl, num, unit, note, big) => ({stack:[
+        {text:lbl, fontSize:7, bold:true, color:'#475569'},
+        {text:[{text:num, fontSize:big ? 20 : 13, bold:true, color:big ? '#1e3a5f' : '#0f172a'}, {text:unit ? ' ' + unit : '', fontSize:7.5, bold:true, color:'#334155'}], margin:[0,2,0,1]},
+        {text:note || '', fontSize:6.3, color:'#475569'}
+      ]});
+      const hs = R.total_weight_kg > 0 ? R.hs_weight_kg / R.total_weight_kg * 100 : 0;
+      const cells = ok
+        ? [cell('整機體積', R.Volume_L.toFixed(2), 'L', '外殼包絡體積（含鰭片）', true),
+           cell('外觀尺寸 L × W × H', R.L_hsk.toFixed(0) + ' × ' + R.W_hsk.toFixed(0) + ' × ' + R.RRU_Height.toFixed(1), 'mm', '長寬＝PCB＋防水邊距；高＝下方第 5 步'),
+           cell('整機重量', R.total_weight_kg.toFixed(1), 'kg', '散熱器 ' + R.hs_weight_kg.toFixed(2) + ' kg（' + hs.toFixed(0) + '%）')]
+        : [cell('整機體積', '—', '', '', true), cell('外觀尺寸 L × W × H', '—', '', ''), cell('整機重量', '—', '', '')];
+      const out = [{table:{widths:['34%','40%','26%'], body:[
+          [{columns:[{text:[{text:'設計結果', bold:true, fontSize:8.5}, {text:'   RRU 整機估算', fontSize:6.8}]}, {text:stTxt, width:'auto', fontSize:7, bold:true, margin:[0,1,0,0]}],
+            color:'#f8fafc', fillColor:'#1e3a5f', colSpan:3}, {}, {}],
+          cells
+        ]},
+        layout:{hLineWidth:k => k === 1 ? 2 : 0.6, hLineColor:k => k === 1 ? '#00DFD8' : '#e2e8f0', vLineWidth:(k, node) => (k === 0 || k === node.table.widths.length) ? 0.6 : 0.4, vLineColor:() => '#e2e8f0',
+                paddingLeft:() => 8, paddingRight:() => 8, paddingTop:k => k === 0 ? 4 : 7, paddingBottom:k => k === 0 ? 4 : 7},
+        margin:[0,0,0,6]}];
+      const note = vrStateNote(R, st);
+      if (note) out.push(vrNotePdf(note));
+      if (ok || st === 'drc') {
+        const steps = vrSteps(R, G);
+        out.push({text:[{text:'體積怎麼決定的', bold:true, color:'#1e3a5f'}, {text:'   散熱器依瓶頸元件設計，鰭片高度由所需散熱面積反推', color:'#64748b'}], fontSize:7.5, margin:[0,2,0,4]});
+        out.push({table:{widths:['*','*','*','*','*'], body:[steps.map((x, i) => ({stack:[
+            {text:(i + 1) + '. ' + x.label, fontSize:7, bold:true, color:'#334155'},
+            {text:[{text:x.v, fontSize:11.5, bold:true, color:'#0f172a'}, {text:' ' + x.u, fontSize:6.5, bold:true, color:'#334155'}], margin:[0,2,0,1]},
+            {text:x.note, fontSize:6.2, color:'#334155'},
+            {text:x.f || '', fontSize:5.8, color:'#64748b', margin:[0,2,0,0]}
+          ]}))]},
+          layout:{hLineWidth:() => 0.6, vLineWidth:() => 0.6, hLineColor:() => '#dbe3ee', vLineColor:() => '#dbe3ee', paddingLeft:() => 5, paddingRight:() => 5, paddingTop:() => 4, paddingBottom:() => 5},
+          margin:[0,0,0,12]});
+      }
+      return out;
+    }
+    // 軸標：canvas 不能寫字 → 用 columns 依刻度位置排（刻度太近就不標）
+    function vrAxisPdf(ax, offset, BW) {
+      const X = t => ax.pos(t) * BW, cols = [{width:offset, text:''}, {width:22, text:vrN(ax.min)}];
+      let at = offset + 22;
+      ax.ticks.forEach(t => { const x = offset + X(t) - 11; if (x - at < 2) return; cols.push({width:x - at, text:''}, {width:22, text:String(t), alignment:'center'}); at = x + 22; });
+      cols.push({width:'*', text:'°C', alignment:'right'});
+      return {columns:cols, columnGap:0, fontSize:5.8, color:'#64748b', margin:[0,2,0,0]};
+    }
+    // 溫度 vs 限溫：與畫面同一個順序（依風險）、同一條共用溫度軸、同一組 MARGIN_LEVELS 色
+    function vrTempPdf() {
+      const items = vrTempItems(R);
+      if (!items.length) return [];
+      const ax = vrTempAxis(items, G.T_amb), BW = 240, H = 6, NAME_W = 118, X = t => ax.pos(t) * BW;
+      const body = items.map(x => {
+        const ok = isFinite(x.tRef) && isFinite(x.limit), cv = [];
+        ax.ticks.forEach(t => cv.push({type:'line', x1:X(t), y1:-2, x2:X(t), y2:H + 2, lineWidth:0.4, lineColor:'#e2e8f0'}));
+        if (ok) {
+          cv.push({type:'rect', x:0, y:0, w:X(x.limit), h:H, color:'#e9eef5'});
+          cv.push({type:'rect', x:0, y:0, w:Math.max(X(Math.min(x.tRef, x.limit)), 0.4), h:H, color:x.lv ? x.lv.mk : '#94a3b8'});
+          if (x.tRef > x.limit) cv.push({type:'rect', x:X(x.limit), y:0, w:Math.max(X(x.tRef) - X(x.limit), 0.4), h:H, color:'#d03b3b'});
+          cv.push({type:'line', x1:X(x.limit), y1:-1.5, x2:X(x.limit), y2:H + 1.5, lineWidth:1.2, lineColor:'#0f172a'});
+        }
+        return [
+          {text:x.name, fontSize:6.5, bold:true, color:'#1e293b'},
+          ok ? {canvas:cv, margin:[0,2.4,0,0]} : {text:'算不出（缺值）', fontSize:6, color:'#94a3b8'},
+          {text:[{text:x.label + ' ', fontSize:5.5, bold:true, color:'#475569'}, {text:ok ? x.tRef.toFixed(1) : '—'}, {text:' / ' + vrN(x.limit), color:'#64748b'}, {text:x.sus ? ' (?)' : '', bold:true, color:'#b45309'}], fontSize:6.5, alignment:'right'},
+          x.lv ? {text:x.lv.label + ' ' + x.margin.toFixed(1), fontSize:6.5, bold:true, color:x.lv.fg, fillColor:x.lv.bg, alignment:'right'} : {text:'—', fontSize:6.5, alignment:'right'}
+        ];
+      });
+      const sus = items.filter(x => x.sus);
+      return [
+        {text:'Temperature vs Limit / 溫度 vs 限溫', style:'heading2'},
+        {text:'依風險排序。條＝自環溫 ' + vrN(G.T_amb) + ' °C 升到判定溫度（Tj 或 Tc），黑線＝限溫，紅色＝超出限溫；右欄＝裕度（限溫 − 判定溫度），顏色分級：', fontSize:6.8, color:'#475569', margin:[0,0,0,3]},
+        {table:{body:[MARGIN_LEVELS.map((l, i) => ({text:l.label + ' ' + marginRange(i) + ' °C', fontSize:6, bold:true, color:l.fg, fillColor:l.bg}))]},
+         layout:{hLineWidth:() => 0, vLineWidth:() => 0, paddingLeft:() => 5, paddingRight:() => 5, paddingTop:() => 1.5, paddingBottom:() => 1.5}, margin:[0,0,0,5]},
+        {table:{widths:[NAME_W, BW, '*', 52], dontBreakRows:true, body}, layout:VR_TBL},
+        vrAxisPdf(ax, NAME_W + 8, BW)
+      ].concat(sus.length ? [{text:[{text:'(?) 限溫疑似範例值：', bold:true, color:'#b45309'}, {text:sus.map(x => x.name + ' ' + vrN(x.limit) + ' °C（' + x.sus.note + '）').join('；'), color:'#78350f'}], fontSize:6.2, margin:[0,3,0,0]}] : []);
+    }
+    // 熱源分佈：依總功耗排序、依分類上色；合計＝實際熱負載（不含安全係數）
+    function vrPowerPdf() {
+      const d = vrPowerData(R);
+      if (!d.rows.length) return [];
+      const BW = 240, H = 6, sf = _num(G.Margin), sfOn = isFinite(sf) && sf !== 1;
+      const split = []; let x0 = 0;
+      d.cats.forEach(c => { const w = c.w / d.total * 515; split.push({type:'rect', x:x0, y:0, w:Math.max(w - 1.5, 0.6), h:7, color:c.color}); x0 += w; });
+      const body = d.rows.map(r => {
+        const p = d.total > 0 ? r.Total_W / d.total * 100 : 0, w = d.max > 0 ? r.Total_W / d.max * BW : 0;
+        return [
+          {text:[{text:String(r.Component || ''), bold:true, color:'#1e293b'}, {text:'  ' + (VR_CATS.find(c => c.key === r._src) || {label:r._src}).label, fontSize:5.2, bold:true, color:'#64748b'}], fontSize:6.5},
+          {canvas:[{type:'rect', x:0, y:0, w:Math.max(w, 0.6), h:H, color:vrCatColor(r._src)}], margin:[0,2.4,0,0]},
+          {text:r.Total_W.toFixed(1) + ' W', fontSize:6.5, alignment:'right'},
+          {text:p.toFixed(1) + '%', fontSize:6.3, color:'#475569', alignment:'right'}
+        ];
+      });
+      return [
+        {text:'Heat Sources / 熱源分佈', style:'heading2', margin:[0,14,0,4]},
+        {text:'合計 ' + d.total.toFixed(1) + ' W · ' + d.rows.length + ' 顆發熱元件' + (sfOn ? ' · 散熱器依 ×' + fmtSF(sf) + ' ＝ ' + (d.total * sf).toFixed(1) + ' W 設計（安全係數）' : ''), fontSize:6.8, color:'#475569', margin:[0,0,0,4]},
+        {canvas:split, margin:[0,0,0,2]},
+        ...segLegendPdf(d.cats.map(c => ({color:c.color, t:c.label + ' ' + c.w.toFixed(1) + ' W · ' + c.pct.toFixed(1) + '%'})), 515),
+        {table:{widths:[118, BW, '*', 34], dontBreakRows:true, body}, layout:VR_TBL, margin:[0,5,0,0]}
+      ];
+    }
+    // 整機組成：高度與重量的分項，深色＝隨散熱設計變動（鰭片、散熱器）
+    function vrCompPdf() {
+      const st = vrState(R);
+      if (st !== 'ok') { const note = vrStateNote(R, st); return note ? [vrNotePdf(note)] : []; }
+      const d = vrCompData(R, G), BW = 90;
+      const list = (rows, total, unit, dec) => {
+        const max = Math.max(0, ...rows.map(x => x.v));
+        const body = rows.map(x => [
+          {text:x.label, fontSize:6.5, bold:true, color:'#1e293b'},
+          {canvas:[{type:'rect', x:0, y:0, w:Math.max(max > 0 ? x.v / max * BW : 0, 0.6), h:6, color:x.thermal ? VR_THERMAL_COLOR : VR_FIXED_COLOR}], margin:[0,2.4,0,0]},
+          {text:x.v.toFixed(dec) + ' ' + unit, fontSize:6.5, alignment:'right'},
+          {text:(total > 0 ? x.v / total * 100 : 0).toFixed(1) + '%', fontSize:6.3, color:'#475569', alignment:'right'}
+        ]);
+        body.push([{text:'合計', fontSize:6.5, bold:true}, {text:''}, {text:total.toFixed(dec) + ' ' + unit, fontSize:6.5, bold:true, alignment:'right'}, {text:'100%', fontSize:6.3, bold:true, alignment:'right'}]);
+        return {table:{widths:[66, BW, '*', 30], body}, layout:VR_TBL};
+      };
+      return [
+        {text:'高度組成決定體積（體積 ＝ L × W × 高度），重量組成列出散熱器以外的固定重量；深色＝隨散熱設計變動（鰭片高度由所需散熱面積反推），淺色＝參數控制台固定。', fontSize:6.8, color:'#475569', margin:[0,0,0,4]},
+        ...segLegendPdf([{color:VR_THERMAL_COLOR, t:'隨散熱設計變動'}, {color:VR_FIXED_COLOR, t:'參數控制台固定'}], 515),
+        {columns:[
+          {width:'*', stack:[{text:'高度 (mm)', fontSize:7.5, bold:true, color:cDark, margin:[0,6,0,3]}, list(d.height, d.hTotal, 'mm', 1)]},
+          {width:'*', stack:[{text:'重量 (kg)', fontSize:7.5, bold:true, color:cDark, margin:[0,6,0,3]}, list(d.weight, d.wTotal, 'kg', 2)]}
+        ], columnGap:16}
+      ];
+    }
+
     // Top 3 risk components
     let riskComps = valid.sort((a,b) => a.Allowed_dT - b.Allowed_dT).slice(0,3);
 
@@ -4283,18 +4631,8 @@ async function generatePDFReport() {
 
     // ══ 1. EXECUTIVE SUMMARY (KPI) ══
     content.push({text: '1. Executive Summary', style:'heading1'});
-    content.push({text: 'Key Performance Indicators / \u95dc\u9375\u6307\u6a19\u6458\u8981', fontSize:9, color:cGray, margin:[0,0,0,10]});
-
-    content.push({
-      columns: [
-        kpiBox('Total Power / 整機總熱耗', R.Total_Power.toFixed(2) + ' W', '含 Margin 係數 ' + G.Margin + 'x', cDanger),
-        kpiBox('Bottleneck / 瓶頸元件', R.Bottleneck_Name, 'Margin: ' + R.Bottleneck_Tj_Margin + '\u00b0C', cWarning),
-        kpiBox('Required Area / 所需散熱面積', R.Area_req.toFixed(3) + ' m\u00b2', '散熱器有效表面積', cInfo),
-        kpiBox('Fin Count / 鰭片數量', R.Fin_Count + ' pcs', '間距: ' + G.Gap + 'mm, 厚度: ' + G.Fin_t + 'mm', '#9b59b6')
-      ],
-      columnGap: 10,
-      margin: [0,0,0,15]
-    });
+    content.push({text: 'Design Result / 設計結果（與畫面「視覺化報告」最上面那一塊相同）', fontSize:9, color:cGray, margin:[0,0,0,8]});
+    content.push(...vrResultPdf());
 
     // Design parameters summary with Chinese annotations
     content.push({text: 'Design Parameters / 設計參數', style:'heading2'});
@@ -4394,82 +4732,12 @@ async function generatePDFReport() {
     content.push({text: '', pageBreak:'after'});
     content.push({text: '4. Visual Report / \u8996\u89ba\u5316\u5831\u544a', style:'heading1'});
 
-    if (chartImages['chart-margin']) {
-      content.push({text: 'Temperature Margin Overview / \u6eab\u5ea6\u88d5\u5ea6\u7e3d\u89bd', style:'heading2'});
-      content.push({image: chartImages['chart-margin'], width: 500, margin:[0,0,0,10]});
-    }
-    if (chartImages['chart-power'] || chartImages['chart-tjm']) {
-      content.push({
-        columns: [
-          chartImages['chart-power'] ? {image: chartImages['chart-power'], width: 245} : {},
-          chartImages['chart-tjm'] ? {image: chartImages['chart-tjm'], width: 245} : {}
-        ],
-        columnGap: 10,
-        margin:[0,0,0,10]
-      });
-    }
+    content.push(...vrTempPdf());
+    content.push(...vrPowerPdf());
 
-    // ══ 5. VOLUME & WEIGHT ══
-    content.push({text: '', pageBreak:'after'});
-    content.push({text: '5. Volume & Weight Estimation / 體積與重量估算', style:'heading1'});
-
-    if (R.drc_failed) {
-      content.push({
-        table:{body:[[{text:'DRC FAILED: ' + R.drc_msg, fontSize:10, color:'#fff', bold:true, alignment:'center'}]]},
-        layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingLeft:()=>12, paddingRight:()=>12, paddingTop:()=>10, paddingBottom:()=>10, fillColor:()=>cDanger},
-        margin:[0,0,0,10]
-      });
-    } else {
-      content.push({
-        columns: [
-          {width:'50%', stack:[
-            {text:'Dimensions / 外觀尺寸', fontSize:8.5, bold:true, color:cPrimary, margin:[0,0,0,4]},
-            {table:{body:[
-              [{text:[{text:'Length (L)\n',bold:true,fontSize:8},{text:'整機長度',fontSize:6,color:'#94a3b8',italics:true}]},{text:R.L_hsk.toFixed(1)+' mm',fontSize:8}],
-              [{text:[{text:'Width (W)\n',bold:true,fontSize:8},{text:'整機寬度',fontSize:6,color:'#94a3b8',italics:true}]},{text:R.W_hsk.toFixed(1)+' mm',fontSize:8}],
-              [{text:[{text:'Height (H)\n',bold:true,fontSize:8},{text:'整機高度',fontSize:6,color:'#94a3b8',italics:true}]},{text:R.RRU_Height.toFixed(1)+' mm',fontSize:8}],
-              [{text:[{text:'Fin Height\n',bold:true,fontSize:8},{text:'鰭片高度',fontSize:6,color:'#94a3b8',italics:true}]},{text:R.Fin_Height.toFixed(2)+' mm',fontSize:8}],
-              [{text:[{text:'Fin Count\n',bold:true,fontSize:8},{text:'鰭片數量',fontSize:6,color:'#94a3b8',italics:true}]},{text:R.Fin_Count+' pcs',fontSize:8}]
-            ],widths:['45%','55%']},layout:{hLineWidth:()=>0.3,vLineWidth:()=>0,hLineColor:()=>'#f1f5f9',paddingTop:()=>2,paddingBottom:()=>2,paddingLeft:()=>4,paddingRight:()=>2}}
-          ]},
-          {width:'50%', stack:[
-            {table:{body:[[
-              {text:'Estimated Volume / \u9810\u4f30\u9ad4\u7a4d', fontSize:8, color:cGray, alignment:'center', colSpan:1}
-            ],[
-              {text:R.Volume_L.toFixed(2) + ' L', fontSize:28, bold:true, color:cSuccess, alignment:'center'}
-            ]]}, layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingTop:()=>4, paddingBottom:()=>4, fillColor:(i)=>i===1?'#e6fffa':null}, margin:[10,0,0,8]},
-            {table:{body:[[
-              {text:'Estimated Weight / \u9810\u4f30\u91cd\u91cf', fontSize:8, color:cGray, alignment:'center'}
-            ],[
-              {text:R.total_weight_kg.toFixed(1) + ' kg', fontSize:22, bold:true, color:cDark, alignment:'center'}
-            ]]}, layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingTop:()=>4, paddingBottom:()=>4, fillColor:(i)=>i===1?'#f0f0f0':null}, margin:[10,0,0,0]}
-          ]}
-        ],
-        margin:[0,0,0,10]
-      });
-
-      // Weight breakdown
-      content.push({text:'Weight Breakdown / 重量分項', fontSize:8.5, bold:true, color:cPrimary, margin:[0,5,0,4]});
-      content.push({
-        table:{body:[
-          [{text:'項目 / Item',bold:true,fontSize:7,fillColor:'#f1f5f9'},{text:'重量 (kg)',bold:true,fontSize:7,fillColor:'#f1f5f9',alignment:'center'},{text:'佔比',bold:true,fontSize:7,fillColor:'#f1f5f9',alignment:'center'}],
-          [{text:'散熱器 (基板+鰭片) / Heatsink',fontSize:7},{text:R.hs_weight_kg.toFixed(2),fontSize:7,alignment:'center'},{text:(R.hs_weight_kg/R.total_weight_kg*100).toFixed(1)+'%',fontSize:7,alignment:'center'}],
-          [{text:'屏蔽罩 / Shield',fontSize:7},{text:R.shield_weight_kg.toFixed(2),fontSize:7,alignment:'center'},{text:(R.shield_weight_kg/R.total_weight_kg*100).toFixed(1)+'%',fontSize:7,alignment:'center'}],
-          [{text:'腔體濾波器 / Cavity Filter',fontSize:7},{text:R.filter_weight_kg.toFixed(2),fontSize:7,alignment:'center'},{text:(R.filter_weight_kg/R.total_weight_kg*100).toFixed(1)+'%',fontSize:7,alignment:'center'}],
-          [{text:'屏蔽外殼 / Shielding Case',fontSize:7},{text:R.shielding_weight_kg.toFixed(2),fontSize:7,alignment:'center'},{text:(R.shielding_weight_kg/R.total_weight_kg*100).toFixed(1)+'%',fontSize:7,alignment:'center'}],
-          [{text:'電路板 / PCB',fontSize:7},{text:R.pcb_weight_kg.toFixed(3),fontSize:7,alignment:'center'},{text:(R.pcb_weight_kg/R.total_weight_kg*100).toFixed(1)+'%',fontSize:7,alignment:'center'}],
-          [{text:'合計 / TOTAL',bold:true,fontSize:7,fillColor:'#e3f2fd'},{text:R.total_weight_kg.toFixed(2),bold:true,fontSize:7,alignment:'center',fillColor:'#e3f2fd'},{text:'100%',bold:true,fontSize:7,alignment:'center',fillColor:'#e3f2fd'}]
-        ],widths:['50%','25%','25%']},
-        layout:{
-          hLineWidth: function(i,node){return i===0||i===1||i===node.table.body.length?0.8:0.3;},
-          vLineWidth:()=>0.3,
-          hLineColor: function(i){return i===1?'#94a3b8':'#e2e8f0';},
-          vLineColor:()=>'#e2e8f0',
-          paddingLeft:()=>4, paddingRight:()=>4, paddingTop:()=>3, paddingBottom:()=>3
-        },
-        margin:[0,0,0,10]
-      });
-    }
+    // ══ 5. COMPOSITION（高度與重量組成）══
+    // 內容不多 → 接在第 4 節後面，不另起一頁；整塊不拆頁（標題不會落單在頁尾）
+    content.push({stack: [{text: '5. Composition / 整機組成（高度與重量）', style:'heading1', margin:[0,16,0,8]}, ...vrCompPdf()], unbreakable: true});
 
     // ══ 6. 3D MODEL ══
     if (chartImages['3d']) {
