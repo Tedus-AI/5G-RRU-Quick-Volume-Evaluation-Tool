@@ -6,7 +6,7 @@
  *       k 與 gapThickness；型號查不到／缺 k 時退回參數控制台並標警告；畫面看得出來源。
  *   [B] Pad2 收斂：下拉不再有 Pad2；舊資料仍用 K_Pad2/t_Pad2 算得出來（不靜默變 0）；
  *       遷移橫幅把 Pad2 改成 Pad ＋型號；換類型／取消選型都是 delete key 而非寫 ''。
- *   [C] 快選 carry 白名單 21 項（含 TIM_Model）、物件欄位深拷貝。
+ *   [C] 快選 carry 白名單 22 項（含 TIM_Model、限溫對象 Limit_Ref）、物件欄位深拷貝。
  *   [D] K_Pad2/t_Pad2 移除後的相容性：不再寫入，但既有專案的值不被刪。
  *
  * 執行：
@@ -230,7 +230,7 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
     return { count: VARIANT_CARRY.length, missing, deepCopied: src.Rth[0].value === 0.5,
              aggHasModel: agg[0] && agg[0].src.TIM_Model === 'TG-A6200' };
   });
-  ok('VARIANT_CARRY 共 21 項（與 AI-Thermal 同步）', c1.count === 21, c1.count);
+  ok('VARIANT_CARRY 共 22 項（與 AI-Thermal 同步）', c1.count === 22, c1.count);
   ok('關鍵欄位都有帶（含 TIM_Model）', c1.missing.length === 0, c1.missing);
   ok('物件欄位深拷貝（不共用參照）', c1.deepCopied === true);
   ok('跨專案聚合帶得出 TIM_Model', c1.aggHasModel === true);

@@ -284,7 +284,11 @@ docId → id≠名稱的專案每存一次就多一份分身、原專案永遠�
   **兩邊改得不一樣 → 存檔前跳衝突視窗**（`CompMerge.showConflictDialog`，列出元件、欄位、兩邊的值與
   載入時的值，每一列選「用我的／用資料庫的」，全部選完才能存；取消 → 不寫入、畫面不動）。
 - 相依欄位整組比對（`GROUPS`）：E-Pad 長／寬／`_pad_from`、`R_jc`／`_rjc_from`、`Board_Type`／`_bt_from`、
-  `TIM_Type`／`TIM_Model` —— 不會拼出兩邊都沒有過的組合（例：我的長＋對方的寬）。
+  `TIM_Type`／`TIM_Model`、`Limit(C)`／`Limit_Ref` —— 不會拼出兩邊都沒有過的組合（例：我的長＋對方的寬、
+  對方的限溫數字＋我的限溫對象）。`_limit_ok`（確認標記）刻意**不**綁進限溫那組：它記的是「確認的值」，
+  數字被對方改掉時標記自然對不上、照樣提醒，不需要為它跳衝突。
+- `compMerge.js` 也放了兩個**共用元件語意**函式（`limitRef`／`limitSuspect`，見「限溫對象」一節）：
+  兩個工具的畫面與計算必須判斷一致，放在這份逐字相同的檔案裡才不會各寫一份。
 - **推導欄位不比對**（`MERGE_DERIVED = ['Thick(mm)', '_renamed_from']`，`derivedKeys`）：板厚每次 recalc 都由參數控制台帶入，
   若列入比對，載入時自動帶入的板厚會被當成「我改過這顆」→ 對方刪掉那顆元件時變成假衝突。
   合併後由 `thickApplyToFields` 重新帶入。改名標記 `_renamed_from` 在寫入時由 `renameMarksApply` 重新決定（見下節）。
@@ -372,8 +376,52 @@ fg 對 bg ≥ 5.9:1），畫面用 `marginVars(lv)` 塞進 CSS 變數 `--st-*`�
   「—」排最後；recalc 後保留；排序中的欄位被隱藏 → 退回風險排序。PDF 一律風險排序。欄位順序固定照
   `ALL_TAB1_COLS`（原本取消再勾選會跑到最後）。
 - 按 👁 排除的元件**列在表下**（「未計入計算 N 顆」），PDF 同樣列出。
-- 超溫警告以 `Temp_Label` 寫 `Tj=`／`Tc=`（原本一律寫 Tj）。
-- 契約測試：`tests/tab2-analysis.test.js`（含 PDF docDefinition 攔截比對）。
+- 超溫警告以 `Temp_Label` 寫 `Tj=`／`Tc=`（原本一律寫 Tj）。`Temp_Label` 就是限溫對象（見下一節）。
+- **溫升組成每列可展開**（使用者要求：**不加欄位、原本欄位不動**，用隱藏式收合）：名稱前一顆 `.an-exp`（`aria-expanded`／
+  `aria-controls`），展開時該列正下方插一列 `tr.an-detail`（`colspan` 全部欄位），內容 `budgetDetailHtml`：與卡片同一支
+  `budgetBarHtml`＋判定溫度／限溫／裕度＋內部溫降算式（Tc 列不含 Rjc）＋限溫對象怎麼來的。說明列最左邊「全部展開／收合」。
+  展開狀態 `tab1Expanded`（Set，key＝`tab1RowKey`：`_cid`，沒有 id 的內建範例用「分類|名稱」），recalc、排序後保留。
+  斑馬紋改用 `tr.an-alt`（不可再用 `nth-child`：展開列插在中間會錯位）。溫升條的 CSS（`.rc-bar` 等）不再限定在卡片裡。
+- PDF 不能展開 → 分析表後面另加「Temperature Budget / 溫升組成」一覽（`budgetListPdf`：發熱元件依風險排序，每列一條
+  `budgetCanvasPdf` 畫的溫升條＋判定溫度／限溫／裕度＋各段數字）。卡片與一覽共用 `budgetCanvasPdf`／`segLegendPdf`。
+- 瓶頸成本（改善哪一顆散熱器才會縮小、換算成體積）**使用者說不做**，不要自行加回。
+- 契約測試：`tests/tab2-analysis.test.js`（含 PDF docDefinition 攔截比對）、`tests/limit-ref.test.js` [G]／[H]。
+
+### 限溫對象（`Limit_Ref`：Tj／Tc）與允許溫升基準 ⚠️ 兩個工具共用
+
+「限溫」指的是 Tj（晶片接面）還是 Tc（外殼／本體）。原本是本工具寫死的名稱規則（PWR 類或名稱含 ddr → Tc），
+而且允許溫升不管 Tj 或 Tc **一律扣 P×Rjc**：Tc 類元件 Rjc > 0 時允許溫升被低估，可能錯當成瓶頸、散熱器算太大。
+
+- **每元件欄位 `Limit_Ref`**：`'Tj'`／`'Tc'`；**沒有 key＝自動判定**（選「自動」一律 `delete`，不寫 `''`）。
+  兩個工具都能改（限溫欄底下的小下拉：`自動·Tc`／`Tj 接面`／`Tc 外殼`，「自動」直接寫出判定結果）。
+  值不認得時下拉補「（未知值）」選項，不靜默改掉；計算照自動判定。
+- **單一事實來源 `CompMerge.limitRef(comp, cat)`**（在兩邊逐字相同的 `compMerge.js`）：有填照填的；沒填 →
+  1. AI-Thermal 的元件類型：`DDR`、`eMMC`、`SFP`、`GPS module`、`Power Modules`、`filter`、`CR` → Tc；
+     `Final PA`、`Driver`、`Pre-driver`、`DC-DC`、`LDO`、`HOTSWAP`、`Power MOSFET`、`CLK IC`、`CPU`、
+     `Baseband Processor`、`CLK buffer`、`Ethernet Transceiver`、`retimer` → Tj；
+  2. 沒有類型／類型不在清單 → 舊規則：PWR 類、名稱含 DDR 或 SFP → Tc，其餘 Tj。
+  回傳 `{ ref, auto, why }`；`cat` 吃得下兩個工具的寫法（`pwr`／`PWR`／`pwr_data`）。
+- **計算（`calcThermalResistance`）**：`Temp_Label = limitRef(...).ref`；內部溫降 `Drop` ＝ 從判定溫度的位置到散熱器：
+  Tj → `P×(Rjc＋R_int＋R_TIM)`、**Tc → `P×(R_int＋R_TIM)`**；允許溫升 ＝ 限溫 − 局部環溫 − `Drop`。
+  `computeAll` 的 `T_ref` 依 `Temp_Label` 取 Tj 或 Tc。結果：**每一顆的裕度 ＝ 允許溫升 − 散熱器溫升**、
+  溫升組成各段加總 ＝ `T_ref − T_amb`（`tests/limit-ref.test.js` [C] 的契約）。
+- 真實資料影響（備份 7 個可計算專案＋內建範例）：體積、瓶頸、每列允許溫升與裕度**完全不變**；只有循環器、腔體濾波器、
+  SFP 的標示由 Tj 改成 Tc（它們 Rjc 都是 0）。Tc 類 Rjc > 0 的只有被擋下計算的 CB-GN-HB-2X2M-2B（DDR／SFP 的 0.5 是舊罐頭值）。
+- 快選白名單 `VARIANT_CARRY` 含 `Limit_Ref`（22 項）；Excel 匯出在限溫後面多一欄「限溫對象」（沒指定寫「自動 Tc（依據）」）；
+  PDF 元件清單的限溫寫成「95 Tc*」（`*`＝自動判定）。
+
+### 限溫疑似範例值（`CompMerge.limitSuspect`／`_limit_ok`）：只提醒、不擋計算
+
+限溫明顯不像實際規格，多半是從內建範例或舊資料帶過來還沒改（內建範例的 SFP、Cavity Filter 都是 200 °C，
+備份裡 8T8R-40W／50W 的 SFP、5 個專案的 Cavity Filter 原封不動沿用）。限溫偏高會讓散熱器算得偏小。
+
+- 規則（`LIMIT_SUSPECTS`，兩個工具共用）：光模組（類型 SFP 或名稱含 sfp／光模組）> 85 °C；DDR > 105 °C；
+  功放以外（類型不是 Final PA／Driver／Pre-driver、名稱也不像 PA／driver／amp／GaN／LDMOS）≥ 200 °C。
+- **琥珀色**（不是紅色：紅色留給擋計算的錯誤）：元件設定頂部 `#limit-suspect-banner` 逐顆列出（點限溫跳過去）、
+  限溫格虛線框＋「⚠ 疑似範例值 [確認]」；詳細分析的限溫格標 ⚠；PDF 標 (?) 並在元件清單下列出。按 👁 排除的不列。
+- 「確認是實際值」（先 `confirm`）→ 寫 **`_limit_ok` ＝ 當時的限溫數字**。之後限溫改成別的值會再提醒、改回來不提醒。
+  `_limit_ok` 是底線開頭的內部欄位：兩個工具都會寫、都原樣保留，**不列入 carry 白名單**（快選出來的要重新確認）。
+- 契約測試：`tests/limit-ref.test.js`；規則本身在兩邊共用的 `tests/comp-merge.unit.test.js` [M]／[N]。
 
 ### PDF 字型缺字：`pdfSafeText`／`pdfSanitize`
 
@@ -429,7 +477,7 @@ AI-Thermal 下次存檔覆寫，還讓兩邊數字對不起來 → `rjcCellHtml`
 
 | 欄位 | 誰有畫面可編輯 |
 |---|---|
-| `Component`、`Qty`、`Power(W)`、`Limit(C)` | 兩邊 |
+| `Component`、`Qty`、`Power(W)`、`Limit(C)`、`Limit_Ref` | 兩邊（`Limit_Ref`＝限溫對象 Tj／Tc，兩邊都在限溫欄底下有小下拉）|
 | `Height(mm)` | 只有 5G-RRU（AI-Thermal 一律不寫）|
 | `Thick(mm)` | 只有 5G-RRU，且**由參數控制台的 PCB 板厚度／銅塊厚度推導**（見下節）；AI-Thermal 一律不寫 |
 | `Board_Type`、`Pad_L`、`Pad_W`、`TIM_Model`、`TIM_Type` | 5G-RRU 可編輯（標藍邊提醒會被覆寫）；AI-Thermal 存檔時由 Tab1/Tab2 推導後覆寫 |
@@ -439,10 +487,11 @@ AI-Thermal 下次存檔覆寫，還讓兩邊數字對不起來 → `rjcCellHtml`
 > 內部欄位（底線開頭，兩個工具都原樣保留、不列入 carry 白名單）：`_cid`（元件 id，存檔三方合併配對用，
 > 兩邊都會補發）、`_defaults_ok`（本工具寫：確認過不是舊預設值）、`_rjc_from`／`_bt_from`／`_pad_from`
 > （AI-Thermal 寫：推導來源）、`_excluded`、`_ref_*`（本工具的快選參照）、`_renamed_from`（本工具寫：改過名的元件，
-> AI-Thermal 以名稱當 key 的資料還掛在哪個名稱底下；AI-Thermal 搬完就清掉，見「元件改名」）。
+> AI-Thermal 以名稱當 key 的資料還掛在哪個名稱底下；AI-Thermal 搬完就清掉，見「元件改名」）、`_limit_ok`（兩邊都會寫：
+> 使用者確認「限溫疑似範例值」其實是實際規格時，記下**確認的那個限溫數字**，見「限溫對象」一節）。
 
 ⚠ **「從資料庫快選」的 carry 白名單兩邊都必須列全上表所有欄位**（本工具的 `VARIANT_CARRY`
-／AI-Thermal 的 `SG_VARIANT_CARRY`，目前各 21 項）。漏列的 key 快選時就不會被帶過來（本工具已不套分類預設 → 變成缺值被必填檢查擋下；
+／AI-Thermal 的 `SG_VARIANT_CARRY`，目前各 22 項）。漏列的 key 快選時就不會被帶過來（本工具已不套分類預設 → 變成缺值被必填檢查擋下；
 AI-Thermal 專屬欄位則是整個掉失），複製完再存回共用 DB 就等於把對方工具填的真實值丟掉。新增任何每元件欄位時，
 **同一個 commit 內要把它加進本工具的白名單，並在另一個 repo 同步補上**。
 物件／陣列欄位（`Rth`、`SpecFile`）carry 時必須深拷貝（`carrySrc`）。
