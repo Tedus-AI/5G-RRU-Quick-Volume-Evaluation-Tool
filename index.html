@@ -174,6 +174,40 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .sidebar .dim-derive .dd-sum{font-size:0.68rem;color:#94a3b8;text-align:right;margin:1px 0 5px;}
 .tim-lib-hint{margin-top:7px;font-size:0.72rem;color:#94a3b8;line-height:1.55;}
 .tim-lib-hint b{color:#cbd5e1;}
+.db-restore-modal{width:860px;max-height:88vh;display:flex;flex-direction:column;box-sizing:border-box;}
+.db-restore-modal #dbRestoreBody{overflow:auto;min-height:0;flex:1 1 auto;}
+.db-restore-modal .dbr-file{margin:0 0 12px;color:#334155;font-size:0.85rem;line-height:1.6;}
+.db-restore-modal .dbr-file b{color:#0f172a;}
+.db-restore-modal .dbr-modes{display:flex;gap:10px;margin:0 0 12px;flex-wrap:wrap;}
+.db-restore-modal .dbr-mode{flex:1 1 300px;display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;cursor:pointer;font-size:0.85rem;line-height:1.5;color:#334155;}
+.db-restore-modal .dbr-mode b{color:#0f172a;}
+.db-restore-modal .dbr-mode:has(input:checked){border-color:#0369a1;background:#f0f9ff;box-shadow:inset 0 0 0 1px #0369a1;}
+.db-restore-modal .dbr-mode.dbr-danger:has(input:checked){border-color:#b91c1c;background:#fef2f2;box-shadow:inset 0 0 0 1px #b91c1c;}
+.db-restore-modal h4{margin:14px 0 6px;font-size:0.9rem;color:#1e3a5f;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.db-restore-modal h4 .dbr-bulk{font-weight:400;font-size:0.78rem;}
+.db-restore-modal h4 .dbr-bulk button{font-size:0.78rem;padding:2px 8px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#1e3a5f;cursor:pointer;}
+.db-restore-modal .dbr-wrap{border:1px solid #e2e8f0;border-radius:10px;overflow:auto;max-height:34vh;}
+.db-restore-modal table{width:100%;border-collapse:collapse;font-size:0.82rem;}
+.db-restore-modal th{position:sticky;top:0;background:linear-gradient(180deg,var(--th-bg),var(--th-bg2));color:var(--th-fg);font-weight:700;padding:8px;text-align:left;white-space:nowrap;}
+.db-restore-modal td{padding:7px 8px;border-top:1px solid #e2e8f0;color:#1e293b;vertical-align:middle;}
+.db-restore-modal td.dbr-ck{width:28px;text-align:center;}
+.db-restore-modal td.dbr-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.db-restore-modal .dbr-id{display:block;color:#64748b;font-size:0.74rem;}
+.db-restore-modal .dbr-st{display:inline-block;padding:1px 8px;border-radius:999px;font-size:0.75rem;font-weight:700;white-space:nowrap;border:1px solid;}
+.db-restore-modal .dbr-st-new{color:#166534;background:#f0fdf4;border-color:#86efac;}
+.db-restore-modal .dbr-st-diff{color:#92400e;background:#fffbeb;border-color:#fcd34d;}
+.db-restore-modal .dbr-st-same{color:#475569;background:#f8fafc;border-color:#cbd5e1;}
+.db-restore-modal .dbr-st-del{color:#991b1b;background:#fef2f2;border-color:#fca5a5;}
+.db-restore-modal tr.dbr-same td{color:#64748b;}
+.db-restore-modal .dbr-note{margin:10px 0 0;font-size:0.8rem;color:#475569;line-height:1.6;}
+.db-restore-modal .dbr-warn{margin:10px 0 0;padding:10px 12px;border-radius:10px;background:#fef2f2;border:1px solid #fca5a5;color:#7f1d1d;font-size:0.82rem;line-height:1.6;}
+.db-restore-modal .dbr-warn input{margin-top:6px;padding:6px 10px;border:1px solid #fca5a5;border-radius:6px;font-size:0.9rem;width:160px;}
+.db-restore-modal .dbr-summary{margin:12px 0 0;font-size:0.85rem;color:#0f172a;font-weight:700;}
+.db-restore-modal .dbr-actions{display:flex;gap:10px;margin-top:14px;justify-content:flex-end;flex-wrap:wrap;}
+.db-restore-modal .dbr-actions .cloud-close{margin-top:0;}
+.db-restore-modal .dbr-go{background:#0369a1;color:#fff;}
+.db-restore-modal .dbr-go.dbr-go-danger{background:#b91c1c;}
+.db-restore-modal .dbr-go:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}
 .tim-lib-modal{width:820px;}
 .tim-lib-modal .tlv-note{margin:0 0 14px;color:#475569;font-size:0.85rem;line-height:1.6;}
 .tim-lib-modal .tlv-wrap{max-height:46vh;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;}
@@ -778,6 +812,10 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
         <button onclick="dbAdapter.exportBackup()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">
           💾 備份資料庫
         </button>
+        <button id="btn-db-restore" onclick="dbRestoreStart()" title="從「💾 備份資料庫」下載的 JSON 還原（可只挑部分專案）" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">
+          ♻️ 還原資料庫
+        </button>
+        <input type="file" id="dbRestoreInput" accept=".json,application/json" style="display:none" onchange="dbRestoreFilePicked(this)">
       </div>
     </div>
     <div>
@@ -819,6 +857,16 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
         <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;flex-wrap:wrap;">
           <a class="cloud-close tim-lib-go" href="https://tedus-ai.github.io/AI-Thermal-pad-and-stud-size-Evaluation-Tool/" target="_blank" rel="noopener">↗ 前往 AI-Thermal 維護型號庫</a>
           <button class="cloud-close" onclick="timLibViewClose()">關閉</button>
+        </div>
+      </div>
+    </div>
+    <div class="cloud-modal-overlay" id="dbRestoreModal">
+      <div class="cloud-modal db-restore-modal" role="dialog" aria-modal="true" aria-labelledby="dbr-title">
+        <h3 id="dbr-title">♻️ 還原資料庫</h3>
+        <div id="dbRestoreBody"></div>
+        <div class="dbr-actions">
+          <button class="cloud-close" onclick="dbRestoreClose()">取消</button>
+          <button class="cloud-close dbr-go" id="dbRestoreGo" onclick="dbRestoreConfirm()" disabled>還原</button>
         </div>
       </div>
     </div>
@@ -4023,6 +4071,235 @@ async function cloudDeleteOne(docId,name){
 }
 
 function closeCloudModal(){document.getElementById('cloudModal').classList.remove('active');}
+
+// =====================================================
+// 還原資料庫（「💾 備份資料庫」下載的整份 JSON → 寫回共用資料庫）
+// =====================================================
+// 共用資料庫是兩個工具一起寫的，整份蓋回去會把備份之後別人存的東西抹掉 → 預設「選擇性還原」
+// （只覆蓋勾選的專案／集合，其餘不動），「整份取代」要打字確認。兩種都會先自動下載一份目前的資料庫。
+const DBR_COLLECTION_LABELS={
+  rf_library:'RF 元件庫',digital_library:'Digital 元件庫',pwr_library:'PWR 元件庫',
+  tim_library:'TIM 型號庫',feedback_items:'回饋事項（AI-Thermal）',login_history:'登入紀錄（AI-Thermal）'
+};
+const DBR_CONFIRM_WORD='還原';
+let dbrState=null;   // {fileName, backup, info, mode, projects:Set, collections:Set}
+
+const _dbrIsObj=v=>!!v&&typeof v==='object'&&!Array.isArray(v);
+function _dbrEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function _dbrTime(iso){
+  if(!iso)return '—';
+  const d=new Date(iso);if(isNaN(d))return String(iso);
+  const p=n=>String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+
+/* 檢查讀進來的 JSON 是不是一份「整個資料庫」的備份。回傳錯誤訊息，沒問題回 null。 */
+function dbRestoreValidate(obj){
+  if(!_dbrIsObj(obj))return '檔案內容不是資料庫格式（最外層必須是物件）。';
+  if(!('projects' in obj)&&('rf_data' in obj||'digital_data' in obj||'pwr_data' in obj))
+    return '這是「單一專案」的檔案，不是整個資料庫的備份。請改用工具列的「📥 匯入專案」。';
+  if(!_dbrIsObj(obj.projects))return '檔案裡沒有 projects（專案清單），不像是「💾 備份資料庫」下載的檔案。';
+  const ids=Object.keys(obj.projects);
+  if(!ids.length)return '這份備份裡沒有任何專案，不做還原（避免把資料庫清空）。';
+  const bad=ids.filter(id=>!_dbrIsObj(obj.projects[id]));
+  if(bad.length)return '備份裡有 '+bad.length+' 個專案的內容格式不正確（例如「'+bad[0]+'」），檔案可能已損毀。';
+  return null;
+}
+
+/* 比對備份與目前資料庫：每個專案／集合會被怎樣處理。 */
+function dbRestoreAnalyze(backup,current){
+  const cur=current||{},bp=backup.projects||{},cp=_dbrIsObj(cur.projects)?cur.projects:{};
+  const same=(a,b)=>CompMerge.canon(a)===CompMerge.canon(b);
+  const nameOf=(d,id)=>(d&&d.project_name)||id;
+  const tsOf=d=>(d&&d.meta&&d.meta.timestamp)||'';
+  const projects=Object.keys(bp).map(id=>{
+    const b=bp[id],c=cp[id];
+    const status=!c?'new':same(b,c)?'same':'diff';
+    return {id,name:nameOf(b,id),ts:tsOf(b),curTs:c?tsOf(c):'',curName:c?nameOf(c,id):'',status};
+  }).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  const onlyCur=Object.keys(cp).filter(id=>!(id in bp))
+    .map(id=>({id,name:nameOf(cp[id],id),ts:tsOf(cp[id])})).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  const keep=dbAdapter.RESTORE_KEEP.concat(['projects']);
+  const keys=[...new Set(Object.keys(backup).concat(Object.keys(cur)))].filter(k=>!keep.includes(k));
+  const cnt=v=>_dbrIsObj(v)?Object.keys(v).length:Array.isArray(v)?v.length:(v===undefined?null:1);
+  const collections=keys.map(k=>{
+    const inB=k in backup,inC=k in cur;
+    const status=!inB?'del':!inC?'new':same(backup[k],cur[k])?'same':'diff';
+    return {key:k,label:DBR_COLLECTION_LABELS[k]||k,nb:inB?cnt(backup[k]):null,nc:inC?cnt(cur[k]):null,status};
+  }).sort((a,b)=>{const o=Object.keys(DBR_COLLECTION_LABELS);const ia=o.indexOf(a.key),ib=o.indexOf(b.key);
+    return (ia<0?99:ia)-(ib<0?99:ib)||a.key.localeCompare(b.key);});
+  const newest=projects.reduce((m,p)=>p.ts>m?p.ts:m,'');
+  return {projects,onlyCur,collections,newest};
+}
+
+async function dbRestoreStart(){
+  if(!fbOk||!dbAdapter.isReady||!dbAdapter.isReady()){
+    alert(dbAdapter.isSharePointMode&&dbAdapter.isSharePointMode()?'⚠️ 請先登入 SharePoint，再還原資料庫。':'⚠️ 請先開啟資料庫（📂 資料庫目錄），再還原。');return;
+  }
+  if(dbAdapter.isCorrupted&&dbAdapter.isCorrupted()){
+    alert('⚠️ 資料庫目前處於唯讀保護（檔案讀取異常），無法還原。\n請先重新整理頁面；若仍異常，請直接在 SharePoint 用「版本歷史」還原 thermal_db.json。');return;
+  }
+  if(!(await _ensureLockBeforeWrite('還原資料庫')))return;
+  const inp=document.getElementById('dbRestoreInput');
+  inp.value='';inp.click();
+}
+
+async function dbRestoreFilePicked(inp){
+  const f=inp.files&&inp.files[0];inp.value='';
+  if(!f)return;
+  let obj=null;
+  try{obj=JSON.parse(await f.text());}
+  catch(e){alert('❌ 讀不懂這個檔案（不是有效的 JSON）：\n'+f.name);return;}
+  const err=dbRestoreValidate(obj);
+  if(err){alert('❌ 無法還原：'+err+'\n\n檔案：'+f.name);return;}
+  try{await dbAdapter.refresh();}catch(e){alert('❌ 讀取目前資料庫失敗，未做任何變更：'+(e.message||e));return;}
+  const current=dbAdapter.peekDb();
+  const info=dbRestoreAnalyze(obj,current);
+  dbrState={fileName:f.name,backup:obj,info,mode:'select',
+    projects:new Set(info.projects.filter(p=>p.status==='new').map(p=>p.id)),   // 預設只勾「資料庫已經沒有」的
+    collections:new Set()};
+  renderDbRestore();
+  document.getElementById('dbRestoreModal').classList.add('active');
+}
+
+function dbRestoreClose(){
+  document.getElementById('dbRestoreModal').classList.remove('active');
+  dbrState=null;
+}
+
+function dbrSetMode(m){if(!dbrState)return;dbrState.mode=m;renderDbRestore();}
+function dbrToggle(kind,id,on){if(!dbrState)return;const s=dbrState[kind];on?s.add(id):s.delete(id);renderDbRestore(true);}
+function dbrBulk(kind,which){
+  if(!dbrState)return;
+  const list=kind==='projects'?dbrState.info.projects.map(p=>({id:p.id,status:p.status})):dbrState.info.collections.filter(c=>c.status!=='del').map(c=>({id:c.key,status:c.status}));
+  const s=dbrState[kind];s.clear();
+  list.forEach(x=>{if(x.status==='same')return;if(which==='all'||(which==='new'&&x.status==='new'))s.add(x.id);});
+  renderDbRestore();
+}
+
+const DBR_ST={new:['dbr-st-new','新增'],diff:['dbr-st-diff','會覆蓋'],same:['dbr-st-same','相同'],del:['dbr-st-del','會刪除']};
+function _dbrBadge(st,txt){const b=DBR_ST[st];return '<span class="dbr-st '+b[0]+'">'+(txt||b[1])+'</span>';}
+
+function renderDbRestore(keepScroll){
+  const body=document.getElementById('dbRestoreBody');if(!body||!dbrState)return;
+  const st=dbrState,info=st.info,full=st.mode==='full';
+  const scroll=[...body.querySelectorAll('.dbr-wrap')].map(w=>w.scrollTop);
+  const prevBody=body.scrollTop;
+  const confirmVal=(document.getElementById('dbr-confirm')||{}).value||'';
+  let h='<p class="dbr-file">備份檔：<b>'+_dbrEsc(st.fileName)+'</b>　·　'+info.projects.length+' 個專案'+
+    (info.newest?'　·　最後一次存檔 '+_dbrTime(info.newest):'')+'</p>';
+  h+='<div class="dbr-modes" role="radiogroup" aria-label="還原方式">'+
+    '<label class="dbr-mode"><input type="radio" name="dbr-mode" value="select" '+(full?'':'checked')+' onchange="dbrSetMode(\'select\')">'+
+      '<span><b>選擇性還原（建議）</b><br>只覆蓋下面勾選的專案／資料，其他專案不動 —— 別人在備份之後存的修改都會保留。</span></label>'+
+    '<label class="dbr-mode dbr-danger"><input type="radio" name="dbr-mode" value="full" '+(full?'checked':'')+' onchange="dbrSetMode(\'full\')">'+
+      '<span><b>整份取代</b><br>資料庫整份變回備份時的樣子：備份之後新增的專案會被<b>刪除</b>、所有修改都會被蓋回去。</span></label>'+
+    '</div>';
+
+  // 專案
+  h+='<h4>專案（'+info.projects.length+'）'+(full?'':'<span class="dbr-bulk"><button onclick="dbrBulk(\'projects\',\'new\')">只勾新增</button> <button onclick="dbrBulk(\'projects\',\'all\')">全選</button> <button onclick="dbrBulk(\'projects\',\'none\')">全不選</button></span>')+'</h4>';
+  h+='<div class="dbr-wrap"><table><thead><tr>'+(full?'':'<th></th>')+'<th>專案</th><th>備份裡的最後存檔</th><th>目前資料庫</th><th>還原後</th></tr></thead><tbody>';
+  info.projects.forEach(p=>{
+    const on=full?p.status!=='same':st.projects.has(p.id);
+    const res=p.status==='same'?_dbrBadge('same','不變'):on?_dbrBadge(p.status):_dbrBadge('same','不動');
+    const curTxt=p.status==='new'?'（沒有這個專案）':_dbrEsc(p.curName)+(p.curName!==p.name?'':'')+'<span class="dbr-id">最後存檔 '+_dbrTime(p.curTs)+'</span>';
+    h+='<tr class="'+(p.status==='same'?'dbr-same':'')+'">'+
+      (full?'':'<td class="dbr-ck"><input type="checkbox" aria-label="還原 '+_dbrEsc(p.name)+'" '+(p.status==='same'?'disabled title="內容與目前資料庫相同"':'')+(on?' checked':'')+' onchange="dbrToggle(\'projects\',\''+_dbrEsc(p.id).replace(/'/g,'\\\'')+'\',this.checked)"></td>')+
+      '<td><b>'+_dbrEsc(p.name)+'</b>'+(p.name!==p.id?'<span class="dbr-id">id：'+_dbrEsc(p.id)+'</span>':'')+'</td>'+
+      '<td class="dbr-num">'+_dbrTime(p.ts)+'</td><td>'+curTxt+'</td><td>'+res+'</td></tr>';
+  });
+  if(full)info.onlyCur.forEach(p=>{
+    h+='<tr><td><b>'+_dbrEsc(p.name)+'</b>'+(p.name!==p.id?'<span class="dbr-id">id：'+_dbrEsc(p.id)+'</span>':'')+'</td>'+
+      '<td class="dbr-num">（備份裡沒有）</td><td><span class="dbr-id">最後存檔 '+_dbrTime(p.ts)+'</span></td><td>'+_dbrBadge('del')+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  if(!full&&info.onlyCur.length)h+='<p class="dbr-note">另有 '+info.onlyCur.length+' 個專案只在目前資料庫裡（備份之後才建立），選擇性還原不會動到它們。</p>';
+
+  // 其他資料
+  const cols=info.collections;
+  if(cols.length){
+    h+='<h4>其他資料（全工具共用）'+(full?'':'<span class="dbr-bulk">整個集合一起還原；預設不勾</span>')+'</h4>';
+    h+='<div class="dbr-wrap"><table><thead><tr>'+(full?'':'<th></th>')+'<th>資料</th><th>備份筆數</th><th>目前筆數</th><th>還原後</th></tr></thead><tbody>';
+    cols.forEach(c=>{
+      if(!full&&c.status==='del')return;   // 選擇性還原不刪集合
+      const on=full?c.status!=='same':st.collections.has(c.key);
+      const res=c.status==='same'?_dbrBadge('same','不變'):on?_dbrBadge(c.status,c.status==='diff'?'整個蓋回':null):_dbrBadge('same','不動');
+      h+='<tr class="'+(c.status==='same'?'dbr-same':'')+'">'+
+        (full?'':'<td class="dbr-ck"><input type="checkbox" aria-label="還原 '+_dbrEsc(c.label)+'" '+(c.status==='same'?'disabled title="內容與目前資料庫相同"':'')+(on?' checked':'')+' onchange="dbrToggle(\'collections\',\''+c.key+'\',this.checked)"></td>')+
+        '<td><b>'+_dbrEsc(c.label)+'</b>'+(c.label!==c.key?'<span class="dbr-id">'+_dbrEsc(c.key)+'</span>':'')+'</td>'+
+        '<td class="dbr-num">'+(c.nb==null?'—':c.nb)+'</td><td class="dbr-num">'+(c.nc==null?'—':c.nc)+'</td><td>'+res+'</td></tr>';
+    });
+    h+='</tbody></table></div>';
+  }
+
+  const n=dbRestoreCounts();
+  h+='<p class="dbr-summary">'+dbRestoreSummary(n)+'</p>';
+  h+='<p class="dbr-note">還原前會先<b>自動下載一份目前的資料庫</b>（檔名結尾 <code>_before_restore</code>），還原錯了可以用它再還原回來。'+
+     '編輯鎖與版本計數不會被備份蓋掉。</p>';
+  if(full)h+='<div class="dbr-warn">⚠️ 整份取代會影響所有人（包含 AI-Thermal 的使用者）。確定要做，請在下面輸入「<b>'+DBR_CONFIRM_WORD+'</b>」：<br>'+
+     '<input id="dbr-confirm" autocomplete="off" oninput="dbrUpdateGo()" value="'+_dbrEsc(confirmVal)+'" aria-label="輸入 '+DBR_CONFIRM_WORD+' 以確認"></div>';
+  body.innerHTML=h;
+  if(keepScroll){body.querySelectorAll('.dbr-wrap').forEach((w,i)=>{if(scroll[i]!=null)w.scrollTop=scroll[i];});body.scrollTop=prevBody;}
+  dbrUpdateGo();
+}
+
+function dbRestoreCounts(){
+  const st=dbrState,info=st.info,full=st.mode==='full';
+  const pick=full?info.projects.filter(p=>p.status!=='same'):info.projects.filter(p=>st.projects.has(p.id));
+  const cols=full?info.collections.filter(c=>c.status!=='same'):info.collections.filter(c=>st.collections.has(c.key));
+  return {add:pick.filter(p=>p.status==='new').length,over:pick.filter(p=>p.status==='diff').length,
+          del:full?info.onlyCur.length:0,cols:cols.length};
+}
+function dbRestoreSummary(n){
+  const parts=[];
+  if(n.add)parts.push('新增 '+n.add+' 個專案');
+  if(n.over)parts.push('覆蓋 '+n.over+' 個專案');
+  if(n.del)parts.push('刪除 '+n.del+' 個專案');
+  if(n.cols)parts.push('還原 '+n.cols+' 份共用資料');
+  return parts.length?'還原後：'+parts.join('、')+'。':'沒有勾選任何要還原的項目。';
+}
+function dbrUpdateGo(){
+  const btn=document.getElementById('dbRestoreGo');if(!btn||!dbrState)return;
+  const n=dbRestoreCounts(),full=dbrState.mode==='full';
+  const any=n.add+n.over+n.del+n.cols>0;
+  const typed=!full||((document.getElementById('dbr-confirm')||{}).value||'').trim()===DBR_CONFIRM_WORD;
+  btn.disabled=!(any&&typed);
+  btn.classList.toggle('dbr-go-danger',full);
+  btn.textContent=full?'整份取代':'還原勾選的項目';
+}
+
+async function dbRestoreConfirm(){
+  if(!dbrState)return;
+  const st=dbrState,full=st.mode==='full',n=dbRestoreCounts();
+  if(!(n.add+n.over+n.del+n.cols))return;
+  if(full&&((document.getElementById('dbr-confirm')||{}).value||'').trim()!==DBR_CONFIRM_WORD)return;
+  if(!(await _ensureLockBeforeWrite('還原資料庫')))return;
+  const plan=full?{mode:'full'}:{mode:'select',projects:[...st.projects],collections:[...st.collections]};
+  const btn=document.getElementById('dbRestoreGo');
+  if(btn){btn.disabled=true;btn.textContent='還原中…';}
+  try{
+    try{await dbAdapter.refresh();}catch(e){throw new Error('讀取目前資料庫失敗：'+(e.message||e));}
+    dbAdapter.exportBackup('before_restore');   // 安全網：先留一份還原前的資料庫
+    await dbAdapter.restoreBackup(st.backup,plan);
+  }catch(e){
+    alert('❌ 還原失敗，資料庫沒有被變更：'+(e.message||e));
+    if(btn){dbrUpdateGo();}
+    return;
+  }
+  const fileName=st.fileName;
+  dbRestoreClose();
+  variantsCache=null;
+  try{await loadLibraryFromLocal();}catch(e){console.warn('[restore] reload library failed:',e);}
+  // 目前開著的專案：被刪了 → 清掉身分；被覆蓋了 → 交給 checkProjectFreshness（沒未存修改就重新載入，有就跳琥珀色提示）
+  let curNote='';
+  if(currentProjectId){
+    const still=await dbAdapter.getDoc('projects',currentProjectId);
+    if(!still){projectIdentitySet(null,projectNameGet());projBase=null;_staleNotice=null;renderStaleBanner();
+      curNote='\n\n目前畫面上的專案不在還原後的資料庫裡，要保留請按「💾 儲存專案」另存一份。';}
+    else{try{await checkProjectFreshness(true);}catch(e){console.warn('[restore] freshness check failed:',e);}}
+  }
+  renderTab0();
+  alert('✅ 已從「'+fileName+'」還原資料庫。\n'+dbRestoreSummary(n)+'\n\n還原前的資料庫已另外下載一份（_before_restore）。'+curNote);
+}
 
 // =====================================================
 // LOGIN

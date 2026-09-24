@@ -119,11 +119,29 @@ const fileDb = {
       });
   },
 
-  exportBackup() {
+  // 整份快取（唯讀！還原資料庫的比對畫面用，呼叫端不可修改）
+  peekCache() { return dbCache; },
+
+  // 還原資料庫（dbAdapter.restoreBackup）：先重讀磁碟（另一個工具可能剛寫過），在最新內容上套用 mutateFn 再寫回。
+  // 寫入仍走 _writeFile → _assertWritable（壞檔唯讀、projects 歸零保險絲照樣生效）。
+  async mutateWholeDb(mutateFn) {
+    this._assertReady();
+    await this._readFile();
+    if (dbCorrupted) this._assertWritable(false);   // 讀到壞檔 → 直接丟唯讀錯誤，不動快取
+    const next = _fdbClone(dbCache);
+    mutateFn(next);                                  // 先算完再換快取：算的途中丟例外 → 快取不變
+    const prev = dbCache;
+    dbCache = next;
+    try { await this._writeFile(); }
+    catch (e) { dbCache = prev; throw e; }
+    lastReadProjects = Object.keys(dbCache.projects || {}).length;
+  },
+
+  exportBackup(tag) {
     const blob = new Blob([JSON.stringify(dbCache, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `thermal_db_backup_${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `thermal_db_backup_${new Date().toISOString().slice(0,10)}${tag ? '_' + tag : ''}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
   },

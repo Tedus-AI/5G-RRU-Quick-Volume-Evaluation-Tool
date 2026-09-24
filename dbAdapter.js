@@ -79,8 +79,50 @@ const dbAdapter = {
     return await fileDb.pickFile();
   },
 
-  exportBackup() {
-    this._backend().exportBackup();
+  exportBackup(tag) {
+    this._backend().exportBackup(tag);
+  },
+
+  /* ─── 還原資料庫（從「💾 備份資料庫」下載的 JSON）───────────
+     plan.mode：
+       'select' → 只覆蓋勾選的專案（plan.projects：id 陣列）與整個集合（plan.collections：頂層 key 陣列），其餘不動；
+       'full'   → 資料庫整份變成備份的內容（備份裡沒有的專案／集合會被刪掉）。
+     兩種模式都不碰 RESTORE_KEEP（編輯鎖是「現在誰在用」、version 是現在的計數），
+     寫入都在「寫入當下的最新內容」上重算（SharePoint 412 會重讀重算）。 */
+  RESTORE_KEEP: ['lock', 'version'],
+
+  restorePlanApply(cache, backup, plan) {
+    const keep = this.RESTORE_KEEP;
+    const clone = v => (v == null ? v : JSON.parse(JSON.stringify(v)));
+    if (plan.mode === 'full') {
+      Object.keys(cache).forEach(k => { if (!keep.includes(k)) delete cache[k]; });
+      Object.keys(backup).forEach(k => { if (!keep.includes(k)) cache[k] = clone(backup[k]); });
+      if (!cache.projects || typeof cache.projects !== 'object') cache.projects = {};
+      return cache;
+    }
+    (plan.projects || []).forEach(id => {
+      const d = backup.projects && backup.projects[id];
+      if (!d) return;
+      if (!cache.projects || typeof cache.projects !== 'object') cache.projects = {};
+      cache.projects[id] = clone(d);
+    });
+    (plan.collections || []).forEach(k => {
+      if (k === 'projects' || keep.includes(k) || !(k in backup)) return;
+      cache[k] = clone(backup[k]);
+    });
+    return cache;
+  },
+
+  /* 目前資料庫的整份內容（複本，還原比對用） */
+  peekDb() {
+    const b = this._backend();
+    return typeof b.peekCache === 'function' ? JSON.parse(JSON.stringify(b.peekCache() || {})) : {};
+  },
+
+  async restoreBackup(backup, plan) {
+    const b = this._backend();
+    if (typeof b.mutateWholeDb !== 'function') throw new Error('目前的資料庫後端不支援還原');
+    await b.mutateWholeDb(cache => this.restorePlanApply(cache, backup, plan));
   },
 
   /* ─── Auth methods (SharePoint mode) ─────────────────── */

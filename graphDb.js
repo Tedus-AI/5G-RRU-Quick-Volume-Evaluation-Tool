@@ -476,11 +476,28 @@ const graphDb = {
       });
   },
 
-  exportBackup() {
+  // 整份快取（唯讀！還原資料庫的比對畫面用，呼叫端不可修改）
+  peekCache() { return dbCache; },
+
+  // 還原資料庫（dbAdapter.restoreBackup）：走 _withOptimisticWrite → 412 時在最新內容上重算，
+  // 期間別人對其他專案的寫入不會被整檔 PUT 回滾；壞檔唯讀、projects 歸零保險絲照樣生效。
+  async mutateWholeDb(mutateFn) {
+    if (!this.isSignedIn()) throw new Error('尚未登入 SharePoint');
+    await this._readFile();
+    await this._withOptimisticWrite((cache) => {
+      const next = _clone(cache);
+      mutateFn(next);                                // 先算完再動快取：算的途中丟例外 → 快取不變
+      Object.keys(cache).forEach(k => { delete cache[k]; });
+      Object.assign(cache, next);
+    });
+    lastReadProjects = Object.keys(dbCache.projects || {}).length;
+  },
+
+  exportBackup(tag) {
     const blob = new Blob([JSON.stringify(dbCache, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `thermal_db_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `thermal_db_backup_${new Date().toISOString().slice(0, 10)}${tag ? '_' + tag : ''}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
   }
