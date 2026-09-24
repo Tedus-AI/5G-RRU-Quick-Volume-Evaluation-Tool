@@ -223,9 +223,76 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .scale-bar{display:flex;flex-direction:column;align-items:center;margin:10px 0 15px;}
 .scale-bar .bar{width:100%;max-width:600px;height:12px;background:linear-gradient(to right,#d73027,#fee08b,#1a9850);border-radius:6px;border:1px solid #ddd;}
 .scale-bar .labels{display:flex;justify-content:space-between;width:100%;max-width:600px;font-size:0.78rem;color:#555;font-weight:600;margin-top:4px;}
-.risk-row{display:flex;gap:12px;margin-bottom:15px;flex-wrap:wrap;}
-.risk-card{flex:1;min-width:160px;background:#fff;border-radius:8px;padding:12px;box-shadow:var(--card-shadow);text-align:center;}
-.risk-card .rank{font-size:0.85rem;color:#666;}.risk-card .rval{font-family:"Nunito",sans-serif;font-size:1.3rem;font-weight:800;color:#333;}.risk-card .rdelta{font-size:0.78rem;color:#888;}
+/* ── 詳細分析：前三名風險卡片 ──
+   卡片底色依「裕度分級」上色（MARGIN_LEVELS，PDF 共用同一組色值），表頭帶沿用表格的深藍色票。
+   --st-fg/--st-bg/--st-bd/--st-mk 由 JS 逐張帶入：文字色／底色／框線／狀態記號色。 */
+#tab1-risk{container-type:inline-size;}
+.risk-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);gap:14px;margin-bottom:16px;}
+@container (max-width:760px){.risk-row{grid-template-columns:1fr;}}
+.risk-card{display:flex;flex-direction:column;min-width:0;background:var(--st-bg,#f8fafc);border:1px solid var(--st-bd,#e2e8f0);border-radius:10px;overflow:hidden;color:#1e293b;}
+.risk-card .rc-head{display:flex;align-items:center;gap:8px;padding:7px 12px;background:linear-gradient(180deg,var(--th-bg),var(--th-bg2));color:var(--th-fg);border-bottom:3px solid var(--st-mk,var(--th-accent));}
+.risk-card .rc-rank{font-family:"Nunito",sans-serif;font-weight:900;font-size:1.1rem;line-height:1;}
+.risk-card .rc-role{font-size:0.8rem;font-weight:700;letter-spacing:0.04em;}
+.risk-card .rc-cat{margin-left:auto;font-size:0.66rem;font-weight:800;letter-spacing:0.08em;padding:2px 8px;border-radius:999px;background:rgba(248,250,252,0.16);}
+.risk-card .rc-body{display:flex;flex-direction:column;gap:10px;padding:12px 14px 12px;flex:1;}
+.risk-card .rc-top{display:flex;align-items:flex-start;gap:10px;}
+.risk-card .rc-id{flex:1;min-width:0;}
+.risk-card .rc-name{font-size:1.1rem;font-weight:800;line-height:1.25;overflow-wrap:anywhere;}
+.risk-card .rc-pw{margin-top:3px;font-size:0.78rem;color:#475569;font-variant-numeric:tabular-nums;}
+.risk-card .rc-mg{text-align:right;flex-shrink:0;color:var(--st-fg,#334155);}
+.risk-card .rc-mg-lbl{font-size:0.74rem;font-weight:700;}
+.risk-card .rc-mg-num{font-family:"Nunito",sans-serif;font-size:1.95rem;font-weight:900;line-height:1.05;white-space:nowrap;}
+.risk-card .rc-mg-num small{font-size:0.85rem;font-weight:800;margin-left:2px;}
+.risk-card .rc-pill{display:inline-flex;align-items:center;gap:4px;margin-top:3px;padding:1px 9px;border-radius:999px;background:#fff;border:1.5px solid var(--st-mk,#94a3b8);font-size:0.74rem;font-weight:800;white-space:nowrap;}
+/* 溫升組成條：環溫(左端) → 各段溫升 → Tj/Tc；右端直線＝限溫。白底 track 讓淺色段在任何狀態底色上都看得清楚 */
+.risk-card .rc-bar{position:relative;height:14px;border-radius:4px;background:#fff;box-shadow:inset 0 0 0 1px rgba(15,23,42,0.14);}
+.risk-card .rc-seg{position:absolute;top:0;bottom:0;border-right:2px solid #fff;}
+.risk-card .rc-seg:first-child{border-radius:4px 0 0 4px;}
+.risk-card .rc-over{position:absolute;top:0;bottom:0;border-radius:0 4px 4px 0;background:repeating-linear-gradient(135deg,rgba(208,59,59,0.92) 0 3px,rgba(255,255,255,0.55) 3px 6px);}
+.risk-card .rc-limit{position:absolute;top:-4px;bottom:-4px;width:2px;background:#0f172a;border-radius:1px;}
+.risk-card .rc-axis{position:relative;height:14px;margin-top:3px;font-size:0.68rem;color:#475569;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.risk-card .rc-axis span{position:absolute;top:0;}
+.risk-card .rc-legend{display:flex;flex-wrap:wrap;gap:3px 10px;font-size:0.72rem;color:#334155;font-variant-numeric:tabular-nums;}
+.risk-card .rc-legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px;}
+.risk-card .rc-legend .rc-lg-ref{color:#475569;}
+.risk-card .rc-foot{margin-top:auto;padding-top:9px;border-top:1px dashed var(--st-bd,#e2e8f0);font-size:0.78rem;line-height:1.5;color:#334155;}
+.risk-card .rc-foot b{color:#0f172a;}
+.risk-card .rc-foot .rc-warn{color:var(--st-fg,#334155);font-weight:700;}
+/* ── 詳細分析表：數字靠右、等寬數字；裕度格依分級上色；前三名標名次（不再整列塗色） ── */
+.an-cap{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin:4px 0 8px;font-size:0.8rem;color:#475569;}
+.an-cap b{color:#1e293b;}
+.an-cap .an-reset{border:1px solid #cbd5e1;background:#fff;color:#0550ae;border-radius:6px;padding:1px 8px;font-size:0.76rem;font-weight:700;cursor:pointer;}
+.an-cap .an-reset:hover{border-color:#0550ae;}
+.an-legend{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px 6px;}
+.an-table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:var(--card-shadow);margin-bottom:10px;font-size:0.82rem;}
+.an-table th{background:linear-gradient(180deg,var(--th-bg),var(--th-bg2));color:var(--th-fg);padding:0;font-weight:700;white-space:nowrap;border-bottom:3px solid var(--th-accent);vertical-align:bottom;}
+.an-table th .an-sort{display:flex;flex-direction:column;align-items:center;gap:1px;width:100%;padding:9px 8px 7px;background:none;border:0;color:inherit;font:inherit;cursor:pointer;}
+.an-table th.an-num .an-sort{align-items:flex-end;}
+.an-table th.an-txt .an-sort{align-items:flex-start;}
+.an-table th .an-sort:hover{background:rgba(248,250,252,0.08);}
+.an-table th .an-sort:focus-visible{outline:2px solid var(--th-accent);outline-offset:-2px;}
+.an-table th .an-unit{font-size:0.68rem;font-weight:600;opacity:0.8;}
+.an-table th .an-lbl{display:inline-flex;align-items:center;gap:3px;}
+.an-table th .an-arrow{font-size:0.62rem;color:var(--th-accent);}
+.an-table th .an-arrow:empty{display:none;}
+.an-table td{padding:7px 10px;border-top:1px solid #e2e8f0;}
+.an-table tbody tr:nth-child(even){background:#fafbfc;}
+.an-table tbody tr:hover{background:#f1f5f9;}
+.an-table td.an-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.an-table td.an-na{color:#94a3b8;}
+.an-table td.an-ref{font-weight:800;color:#0f172a;}
+.an-table td.an-side{color:#64748b;}
+.an-table td.an-name{text-align:left;font-weight:600;min-width:150px;}
+.an-table .an-sub{font-size:0.7rem;color:#64748b;font-weight:400;}
+.an-rank{display:inline-block;min-width:26px;margin-right:6px;padding:0 5px;border-radius:5px;font-size:0.72rem;font-weight:800;text-align:center;border:1.5px solid var(--th-bg);color:var(--th-bg);}
+.an-rank.r1{background:var(--th-bg);color:var(--th-fg);}
+.an-tag{display:inline-block;margin-left:6px;padding:0 6px;border-radius:4px;background:#f1f5f9;color:#64748b;font-size:0.68rem;font-weight:700;}
+.an-mg{display:inline-block;min-width:64px;padding:1px 7px;border-radius:5px;background:var(--st-bg);color:var(--st-fg);border:1px solid var(--st-bd);font-weight:800;text-align:right;}
+.an-mg i{font-style:normal;float:left;margin-right:6px;}
+.an-reftag{display:inline-block;margin-right:6px;font-size:0.66rem;font-weight:800;color:#475569;letter-spacing:0.04em;}
+.an-table tr.an-cold td{color:#64748b;}
+.an-excluded{margin:0 0 12px;padding:8px 12px;border:1px dashed #cbd5e1;border-radius:8px;background:#f8fafc;font-size:0.8rem;color:#475569;}
+.an-excluded .an-cat{margin-left:4px;font-size:0.66rem;font-weight:800;color:#64748b;}
 .sa-controls{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:18px;margin-bottom:20px;display:flex;gap:15px;align-items:flex-end;flex-wrap:wrap;}
 .sa-controls>div{display:flex;flex-direction:column;}.sa-controls label{font-size:0.78rem;color:#666;margin-bottom:4px;}
 .sa-controls input,.sa-controls select{padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:0.85rem;}
@@ -1322,18 +1389,89 @@ const COL_TIPS = {
   'R_jc':'結點到殼的內部熱阻 (°C/W)','Limit(C)':'元件允許最高運作溫度'
 };
 const TAB2_TIPS = {
-  'Component':'元件型號或代號','Allowed_dT':'散熱器剩餘可用的溫升裕度。數值越小代表該元件越容易過熱 (瓶頸)。公式：Limit - Loc_Amb - Drop',
-  'Tj_Margin':'距溫度上限的裕度。公式：Limit - Tj (或 Tc)。負值代表超溫！',
-  'Tj':'元件晶片接面溫度。公式：Tc + Q×Rjc','Tc':'元件外殼溫度。公式：T_hsk_eff + Q×(Rint+Rtim)',
-  'Total_W':'該元件的總發熱量 (單顆功耗 × 數量)','Loc_Amb':'該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)',
-  'Drop':'熱量從晶片核心傳導到散熱器表面的溫差。公式：Power × (Rjc + Rint + Rtim)',
-  'R_jc':'結點到殼的內部熱阻','R_int':'元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值',
-  'R_TIM':'元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)。◆ = k/t 取自 TIM 型號庫的型號；⚠ = 來源有問題（滑鼠移到數字上看說明）','Limit(C)':'元件允許最高運作溫度'
+  'Component':'元件型號或代號。#1～#3 ＝ 允許溫升最小的前三名（與上方卡片同序）；「不發熱」＝ 0 瓦／0 顆，不參與瓶頸判斷',
+  'Allowed_dT':'散熱器剩餘可用的溫升裕度。數值越小代表該元件越容易過熱 (瓶頸)，最小的那顆決定散熱器大小。公式：限溫 − 局部環溫 − 內部溫降',
+  'Tj_Margin':'距溫度上限的裕度。公式：限溫 − Tj；DDR 與 PWR 元件以 Tc 判定（格內標 Tj／Tc）。負值＝超溫。顏色：✖ 超溫 <0、▲ 偏緊 0–10、● 留意 10–20、✓ 充裕 ≥20 °C',
+  'Tj':'元件晶片接面溫度。公式：Tc + 單顆功耗 × Rjc。粗體＝這顆用來判定裕度的溫度',
+  'Tc':'元件外殼溫度。公式：散熱器局部溫度 + 單顆功耗 × (R_int + R_TIM)。粗體＝這顆用來判定裕度的溫度',
+  'Total_W':'該元件的總發熱量 (單顆功耗 × 數量)。數量 > 1 時第二行列出「數量 × 單顆」—— 內部溫降用的是單顆功耗',
+  'Loc_Amb':'該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)',
+  'Drop':'熱量從晶片核心傳導到散熱器表面的溫差。公式：單顆功耗 × (Rjc + R_int + R_TIM)',
+  'R_jc':'結點到殼的內部熱阻 (°C/W)，取自規格書',
+  'R_int':'元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值。導熱方式 IC top／None 不穿板 → 顯示「—」',
+  'R_TIM':'元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)。介面材料 None → 顯示「—」。◆ = k/t 取自 TIM 型號庫的型號；⚠ = 來源有問題（滑鼠移到數字上看說明）',
+  'Limit(C)':'元件允許最高運作溫度'
 };
-const TAB2_LABELS = {'Allowed_dT':'允許溫升','Tj_Margin':'Tj 裕度','Tj':'Tj','Tc':'Tc','Total_W':'總功耗','Loc_Amb':'局部環溫','Drop':'內部溫降','R_jc':'Rjc','R_int':'基板熱阻','R_TIM':'介面熱阻','Limit(C)':'限溫'};
+const TAB2_LABELS = {'Allowed_dT':'允許溫升','Tj_Margin':'Tj／Tc 裕度','Tj':'Tj','Tc':'Tc','Total_W':'總功耗','Loc_Amb':'局部環溫','Drop':'內部溫降','R_jc':'Rjc','R_int':'基板熱阻','R_TIM':'介面熱阻','Limit(C)':'限溫'};
+const TAB2_UNITS = {'Allowed_dT':'°C','Tj_Margin':'°C','Tj':'°C','Tc':'°C','Total_W':'W','Loc_Amb':'°C','Drop':'°C','R_jc':'°C/W','R_int':'°C/W','R_TIM':'°C/W','Limit(C)':'°C'};
 const ALL_TAB1_COLS = ['Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','Drop','R_jc','R_int','R_TIM','Limit(C)'];
 var tab1SelectedCols = ['Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','Drop','R_jc','R_int','R_TIM','Limit(C)'];
 function toggleTab1Col(col,checked){if(checked&&!tab1SelectedCols.includes(col))tab1SelectedCols.push(col);else if(!checked)tab1SelectedCols=tab1SelectedCols.filter(c=>c!==col);renderTab1();}
+
+/* 裕度分級（單一事實來源）：詳細分析的卡片與表格、PDF 報告、視覺化報告的溫度裕度圖共用同一組門檻。
+   紅色只保留給「超溫」（負裕度）；顏色一律搭配圖示＋文字，不單靠顏色表達。
+   fg/bg/bd＝文字／底色／框線（fg 對 bg 對比 ≥ 5.9:1），mk＝狀態記號色。 */
+const MARGIN_LEVELS = [
+  {key:'over', lt:0,        label:'超溫', icon:'✖', fg:'#a61b1b', bg:'#fdecec', bd:'#f3c1c1', mk:'#d03b3b'},
+  {key:'tight',lt:10,       label:'偏緊', icon:'▲', fg:'#9a3b12', bg:'#fdf0ea', bd:'#f5cdb8', mk:'#ec835a'},
+  {key:'watch',lt:20,       label:'留意', icon:'●', fg:'#7a5200', bg:'#fef6e0', bd:'#f3d88f', mk:'#fab219'},
+  {key:'ok',   lt:Infinity, label:'充裕', icon:'✓', fg:'#1d6b24', bg:'#eaf7ea', bd:'#bfe0c1', mk:'#0ca30c'}
+];
+function marginLevel(m){return (typeof m==='number'&&isFinite(m))?MARGIN_LEVELS.find(l=>m<l.lt):null;}
+function marginVars(lv){return lv?'--st-fg:'+lv.fg+';--st-bg:'+lv.bg+';--st-bd:'+lv.bd+';--st-mk:'+lv.mk+';':'';}
+function marginRange(i){const L=MARGIN_LEVELS;return i===0?'<'+L[0].lt:i===L.length-1?'≥'+L[i-1].lt:L[i-1].lt+'–'+L[i].lt;}   // '<0'、'0–10'、'10–20'、'≥20'
+
+/* 溫升組成：從環溫一路加到 Tj（或 Tc），每一段各吃掉多少。各段加總 ＝ T_ref − T_amb（與 computeAll 同一組公式）。
+   順序＝熱從空氣往晶片走：高度（局部環溫）→ 散熱器 → 介面 TIM → 基板（Via／銅塊）→ Rjc。
+   高度是環境條件（灰）；其餘四段是熱路徑，用同一色相由淺到深（validate_palette --ordinal 驗過）。 */
+const BUDGET_SEGS = [
+  {key:'h',   label:'高度',   color:'#94a3b8', tip:'元件高度造成的局部溫升（高度 × 0.03 °C/mm）'},
+  {key:'hsk', label:'散熱器', color:'#6da7ec', tip:'散熱器相對環溫的溫升＝瓶頸的允許溫升 ÷ 安全係數（所有元件共用）'},
+  {key:'tim', label:'介面',   color:'#2a78d6', tip:'單顆功耗 × 介面熱阻 R_TIM'},
+  {key:'int', label:'基板',   color:'#1c5cab', tip:'單顆功耗 × 基板熱阻 R_int（Via／銅塊）'},
+  {key:'jc',  label:'Rjc',    color:'#0d366b', tip:'單顆功耗 × Rjc（以 Tc 判定的元件不含這段）'}
+];
+function tempBudget(r,R,g){
+  const P=_num(r['Power(W)']);
+  const v={h:_num(r['Height(mm)'])*g.Slope, hsk:R.T_hsk_base-g.T_amb, tim:P*r.R_TIM, int:P*r.R_int, jc:r.Temp_Label==='Tc'?0:P*r.R_jc};
+  const segs=BUDGET_SEGS.map(s=>Object.assign({},s,{v:v[s.key]}));
+  return {segs, ok:segs.every(s=>isFinite(s.v))&&isFinite(r.T_ref), tAmb:g.T_amb, limit:_num(r['Limit(C)']), tRef:r.T_ref, label:r.Temp_Label};
+}
+
+/* 詳細分析表的格子內容（螢幕與 PDF 共用）：溫度／功耗 1 位小數、熱阻 3 位小數；
+   不適用（IC top／None 沒有基板熱阻、TIM=None 沒有介面熱阻）或算不出來 → 「—」＋說明 */
+function tab2Cell(r,c){
+  if(c==='R_int'&&(r.Board_Type==='IC top'||r.Board_Type==='None'))return {text:'—',na:true,tip:'導熱方式 '+r.Board_Type+'：不穿板，沒有基板熱阻'};
+  if(c==='R_TIM'&&r.TIM_Type==='None')return {text:'—',na:true,tip:'介面材料 None：不計介面熱阻'};
+  const v=(c==='Limit(C)'||c==='R_jc')?_num(r[c]):r[c];
+  if(typeof v!=='number'||!isFinite(v))return {text:'—',na:true,tip:''};
+  return {text:v.toFixed(/^R_/.test(c)?3:1),na:false,tip:''};
+}
+function fmtW(v){return String(+(+v).toFixed(3));}   // 單顆功耗：最多 3 位小數、去尾零（0.55 不可顯示成 0.6，乘回去會對不上總功耗）
+function fmtQtyPower(r){
+  const Q=_num(r.Qty),P=_num(r['Power(W)']);
+  if(!isFinite(Q)||!isFinite(P))return '';
+  return Q===1?fmtW(P)+' W':Q+' × '+fmtW(P)+' W ＝ '+(Q*P).toFixed(1)+' W';
+}
+function fmtSF(v){return v%1===0?v.toFixed(1):String(+v.toFixed(2));}
+
+/* 排序：預設依風險（允許溫升由小到大）；點欄位標題可改排序，第一次點一律「最差的在上面」。
+   不發熱的元件（0 瓦／0 顆）一律排在後面；算不出的值（—）排在最後。 */
+var tab1Sort = {col:'Allowed_dT', dir:1};
+const TAB2_SORT_ASC_FIRST = ['Component','Allowed_dT','Tj_Margin','Limit(C)'];
+function tab1SortBy(col){
+  tab1Sort = tab1Sort.col===col ? {col, dir:-tab1Sort.dir} : {col, dir:TAB2_SORT_ASC_FIRST.includes(col)?1:-1};
+  renderTab1();
+}
+function tab1SortRows(rows,sort){
+  const key=r=>{if(sort.col==='Component')return String(r.Component||'');const v=(sort.col==='Limit(C)'||sort.col==='R_jc')?_num(r[sort.col]):r[sort.col];return (typeof v==='number'&&isFinite(v))?v:null;};
+  return rows.map((r,i)=>({r,i,hot:r.Total_W>0,k:key(r)})).sort((a,b)=>{
+    if(a.hot!==b.hot)return a.hot?-1:1;
+    if(a.k===null||b.k===null)return a.k===null&&b.k===null?a.i-b.i:(a.k===null?1:-1);
+    const d=typeof a.k==='string'?a.k.localeCompare(b.k,'zh-Hant'):a.k-b.k;
+    return d!==0?d*sort.dir:a.i-b.i;
+  }).map(x=>x.r);
+}
 
 /* 導熱方式＝元件把熱送到 HSK 表面的路徑。與 AI-Thermal Tab2 的「主散熱路徑」同一組詞彙
    （Copper Coin / Thermal Via / IC top / None），它存檔時直接寫成本欄的值。
@@ -2708,44 +2846,114 @@ function renderTab1(){
     return;
   }
   if(!calcResults||!calcResults.rows.length)return;let R=calcResults;
-  // Overheat alerts
+  // Overheat alerts —— 以 Tc 判定的元件（DDR、PWR）要寫 Tc，不可一律寫 Tj
   let oh=R.rows.filter(r=>r.Tj_Margin<0&&r.Total_W>0);let html='';
-  if(oh.length){html+='<div class="alert alert-danger">🔥 <b>超溫警告！以下元件已超過溫度上限：</b><br>';oh.forEach(r=>html+='<b>'+_vEsc(r.Component)+'</b> 超溫 <b>'+Math.abs(r.Tj_Margin).toFixed(1)+'°C</b> (Tj='+r.Tj.toFixed(1)+'°C, Limit='+_vEsc(r['Limit(C)'])+'°C)<br>');html+='</div>';}
+  if(oh.length){html+='<div class="alert alert-danger">🔥 <b>超溫警告！以下元件已超過溫度上限：</b><br>';oh.forEach(r=>html+='<b>'+_vEsc(r.Component)+'</b> 超溫 <b>'+Math.abs(r.Tj_Margin).toFixed(1)+'°C</b> ('+r.Temp_Label+'='+r.T_ref.toFixed(1)+'°C, 限溫='+_vEsc(r['Limit(C)'])+'°C)<br>');html+='</div>';}
   document.getElementById('tab1-alerts').innerHTML=html;
-  // Risk Top 3
-  let valid=R.rows.filter(r=>r.Total_W>0).sort((a,b)=>a.Allowed_dT-b.Allowed_dT).slice(0,3);
-  let riskLabels=['#1 最高風險','#2 次高風險','#3 第三風險'];
-  let riskBorderColors=['#c0392b','#2980b9','#e67e22'];
-  let rh='<div class="risk-row">';
-  valid.forEach((r,i)=>{rh+='<div class="risk-card" style="border-top:3px solid '+riskBorderColors[i]+';"><div class="rank" style="color:'+riskBorderColors[i]+';font-weight:700;">'+riskLabels[i]+'</div><div class="rval" style="font-size:1.1rem;">'+_vEsc(r.Component)+'</div><div style="font-size:0.82rem;color:#555;margin-top:4px;">允許溫升: '+r.Allowed_dT.toFixed(1)+'°C</div><div class="rdelta">Tj 裕度: '+r.Tj_Margin.toFixed(1)+'°C</div></div>';});
-  rh+='</div>';document.getElementById('tab1-risk').innerHTML=rh;
+  // 前三名：允許溫升最小的三顆（#1 就是決定散熱器大小的瓶頸，與 computeAll 同一個判斷）
+  let top=R.rows.filter(r=>r.Total_W>0).sort((a,b)=>a.Allowed_dT-b.Allowed_dT).slice(0,3);
+  document.getElementById('tab1-risk').innerHTML=top.length?'<div class="risk-row">'+top.map((r,i)=>riskCardHtml(r,i,top,R,G)).join('')+'</div>':'';
   document.getElementById('tab1-scale').innerHTML='';
-  // Risk highlight data
-  let riskNames=valid.map(r=>r.Component);
-  let riskBg=['#fadbd8','#d4e6f1','#fdebd0'];
-  let riskColor=['#c0392b','#2980b9','#e67e22'];
   // Column toggle
   let ctHtml='<div class="col-toggle"><div style="font-weight:600;font-size:0.85rem;color:#475569;margin-bottom:8px;">⚙️ 自訂顯示欄位</div><div class="col-checks">';
   ALL_TAB1_COLS.forEach(c=>{let lb=TAB2_LABELS[c]||c;let ck=tab1SelectedCols.includes(c)?'checked':'';ctHtml+='<label><input type="checkbox" '+ck+' onchange="toggleTab1Col(\''+c+'\',this.checked)"> '+lb+' ('+c+')</label>';});
   ctHtml+='</div></div>';document.getElementById('tab1-col-toggle').innerHTML=ctHtml;
-  // Table with tooltips
-  let cols=['Component'].concat(tab1SelectedCols.filter(c=>ALL_TAB1_COLS.includes(c)));
-  let th='<table class="comp-table"><thead><tr>';
-  cols.forEach(c=>{let lb=TAB2_LABELS[c]||c;let tp=TAB2_TIPS[c]||'';th+='<th title="'+tp+'">'+lb+'</th>';});
+  // 表格：欄位順序固定（不隨勾選順序跳動）；預設依風險排序
+  let cols=['Component'].concat(ALL_TAB1_COLS.filter(c=>tab1SelectedCols.includes(c)));
+  let sort=cols.includes(tab1Sort.col)?tab1Sort:{col:'Allowed_dT',dir:1};
+  let rows=tab1SortRows(R.rows,sort);
+  let isRisk=sort.col==='Allowed_dT'&&sort.dir===1;
+  let th='<div class="an-cap">';
+  th+=isRisk?'<span><b>依風險排序</b>：允許溫升由小到大，越上面越先超溫 · 點欄位標題可改排序</span>'
+            :'<span>目前依「<b>'+_vEsc(TAB2_LABELS[sort.col]||'元件名稱')+'</b>」'+(sort.dir===1?'由小到大':'由大到小')+'排序</span><button type="button" class="an-reset" onclick="tab1Sort={col:\'Allowed_dT\',dir:1};renderTab1();">↺ 恢復風險排序</button>';
+  th+='<span class="an-legend">裕度 ＝ 限溫 − Tj（DDR、PWR 以 Tc 判定）：'+MARGIN_LEVELS.map((l,i)=>'<span class="an-mg" style="'+marginVars(l)+'min-width:0;"><i>'+l.icon+'</i>'+l.label+' '+_vEsc(marginRange(i))+'</span>').join('')+'<span>°C</span></span>';
+  th+='</div>';
+  th+='<div class="comp-table-wrap"><table class="an-table"><thead><tr>';
+  cols.forEach(c=>{
+    let num=c!=='Component',on=sort.col===c;
+    th+='<th class="'+(num?'an-num':'an-txt')+'" data-col="'+c+'" aria-sort="'+(on?(sort.dir===1?'ascending':'descending'):'none')+'" title="'+_vEsc(TAB2_TIPS[c]||'')+'">'
+      +'<button type="button" class="an-sort" onclick="tab1SortBy(\''+c+'\')"><span class="an-lbl">'+(c==='Component'?'元件名稱':(TAB2_LABELS[c]||c))+'<span class="an-arrow">'+(on?(sort.dir===1?'▲':'▼'):'')+'</span></span>'
+      +'<span class="an-unit">'+(TAB2_UNITS[c]||'&nbsp;')+'</span></button></th>';
+  });
   th+='</tr></thead><tbody>';
-  R.rows.forEach((r,ri)=>{let rIdx=riskNames.indexOf(r.Component);let isRisk=rIdx>=0;let rowBg=isRisk?riskBg[rIdx]:(ri%2===1?'#fafbfc':'');th+='<tr style="'+(rowBg?'background:'+rowBg+';':'')+'">';cols.forEach(c=>{let v=r[c];let st='';
-    if(c==='Tj_Margin'&&typeof v==='number'&&v<0)st='color:#c0392b;font-weight:600;';
-    if(c==='Component'&&isRisk){let lbl='<span style="color:'+riskColor[rIdx]+';font-weight:700;">[#'+(rIdx+1)+']</span> '+_vEsc(v);th+='<td style="'+st+'">'+lbl+'</td>';}
-    else{if(typeof v==='number')v=!isFinite(v)?'—':((c.includes('R_')&&c!=='R_jc')?v.toFixed(4):v.toFixed(1));else v=_vEsc(v);
-      // R_TIM 要看得出 k/t 是「來自型號」還是「來自參數控制台」（每個數字都要回答得出哪來的）
-      let tip='',mark='';
-      if(c==='R_TIM'){
-        tip=(r.TIM_SrcDetail||'')+(r.TIM_Warn?'\n⚠ '+r.TIM_Warn:'');
-        if(r.TIM_Warn)mark='<span class="tim-mark tim-mark-warn" title="'+_vEsc(r.TIM_Warn)+'">⚠</span>';
-        else if(r.TIM_Src==='model')mark='<span class="tim-mark" title="'+_vEsc('k/t 來自 TIM 型號庫：'+(r.TIM_SrcLabel||''))+'">◆</span>';
+  rows.forEach(r=>{
+    let rank=top.indexOf(r),cold=!(r.Total_W>0);
+    th+='<tr'+(cold?' class="an-cold"':'')+'>';
+    cols.forEach(c=>{
+      if(c==='Component'){
+        th+='<td class="an-name" data-col="Component">'+(rank>=0?'<span class="an-rank r'+(rank+1)+'" title="允許溫升第 '+(rank+1)+' 小（與上方卡片同序）">#'+(rank+1)+'</span>':'')+_vEsc(r.Component)
+          +(cold?'<span class="an-tag" title="0 瓦／0 顆：不發熱，不參與瓶頸判斷">不發熱</span>':'')+'</td>';
+        return;
       }
-      th+='<td style="'+st+'"'+(tip?' title="'+_vEsc(tip)+'"':'')+'>'+v+mark+'</td>';}});th+='</tr>';});
-  th+='</tbody></table>';document.getElementById('tab1-table').innerHTML=th;
+      let f=tab2Cell(r,c),cls='an-num'+(f.na?' an-na':''),inner=f.text,tip=f.tip;
+      if(c==='Tj_Margin'&&!f.na){
+        let lv=marginLevel(r.Tj_Margin);
+        inner='<span class="an-reftag">'+r.Temp_Label+'</span><span class="an-mg" style="'+marginVars(lv)+'"><i>'+lv.icon+'</i>'+f.text+'</span>';
+        tip=r.Temp_Label+' 裕度：'+lv.label+'（限溫 − '+r.Temp_Label+'）';
+      }
+      if((c==='Tj'||c==='Tc')&&!f.na)cls+=(r.Temp_Label===c)?' an-ref':' an-side';
+      if(c==='Allowed_dT'&&rank===0)cls+=' an-ref';
+      if(c==='Total_W'&&!f.na&&_num(r.Qty)!==1&&isFinite(_num(r['Power(W)'])))inner+='<div class="an-sub">'+_num(r.Qty)+' × '+fmtW(_num(r['Power(W)']))+'</div>';
+      // R_TIM 要看得出 k/t 是「來自型號」還是「來自參數控制台」（每個數字都要回答得出哪來的）；記號放在數字左邊，數字才對得齊
+      if(c==='R_TIM'&&!f.na){
+        tip=(r.TIM_SrcDetail||'')+(r.TIM_Warn?'\n⚠ '+r.TIM_Warn:'');
+        if(r.TIM_Warn)inner='<span class="tim-mark tim-mark-warn" title="'+_vEsc(r.TIM_Warn)+'">⚠</span>'+inner;
+        else if(r.TIM_Src==='model')inner='<span class="tim-mark" title="'+_vEsc('k/t 來自 TIM 型號庫：'+(r.TIM_SrcLabel||''))+'">◆</span>'+inner;
+      }
+      th+='<td class="'+cls+'" data-col="'+c+'"'+(tip?' title="'+_vEsc(tip)+'"':'')+'>'+inner+'</td>';
+    });
+    th+='</tr>';
+  });
+  th+='</tbody></table></div>';
+  // 按 👁 排除的元件不在計算裡 → 列出來，免得以為漏算
+  let ex=[];['rf','digital','pwr'].forEach(cat=>(components[cat]||[]).forEach(c=>{if(c&&c._excluded)ex.push('<span>'+_vEsc(c.Component||'(未命名)')+'<span class="an-cat">'+cat.toUpperCase()+'</span></span>');}));
+  if(ex.length)th+='<div class="an-excluded">👁 <b>未計入計算 '+ex.length+' 顆</b>（在「元件設定」按 👁 排除，再按一次即納入）：'+ex.join('、')+'</div>';
+  document.getElementById('tab1-table').innerHTML=th;
+}
+
+// 前三名卡片：底色＝裕度分級、表頭帶＝名次；中間一條「溫升組成」說明溫度是在哪一段被吃掉的
+function riskCardHtml(r,i,top,R,g){
+  const lv=marginLevel(r.Tj_Margin),roles=['設計瓶頸','次高風險','第三風險'];
+  let h='<div class="risk-card" data-rank="'+(i+1)+'" data-level="'+(lv?lv.key:'')+'" style="'+marginVars(lv)+'">';
+  h+='<div class="rc-head"><span class="rc-rank">#'+(i+1)+'</span><span class="rc-role">'+roles[i]+'</span><span class="rc-cat">'+_vEsc(r._src||'')+'</span></div>';
+  h+='<div class="rc-body"><div class="rc-top"><div class="rc-id"><div class="rc-name">'+_vEsc(r.Component)+'</div><div class="rc-pw">'+fmtQtyPower(r)+'</div></div>';
+  h+='<div class="rc-mg"><div class="rc-mg-lbl">'+r.Temp_Label+' 裕度</div><div class="rc-mg-num">'+(isFinite(r.Tj_Margin)?r.Tj_Margin.toFixed(1):'—')+'<small>°C</small></div>'
+    +(lv?'<span class="rc-pill">'+lv.icon+' '+lv.label+'</span>':'')+'</div></div>';
+  h+=budgetBarHtml(tempBudget(r,R,g));
+  h+='<div class="rc-foot">'+riskFootHtml(r,i,top,R,g)+'</div></div></div>';
+  return h;
+}
+function budgetBarHtml(b){
+  if(!b.ok)return '';
+  const used=b.tRef-b.tAmb,room=b.limit-b.tAmb,span=Math.max(used,room);
+  if(!(span>0))return '';
+  const shown=b.segs.filter(s=>s.v>0.005);
+  const lim=Math.max(0,Math.min(100,room/span*100));
+  let x=0,bar='';
+  shown.forEach(s=>{const w=s.v/span*100;bar+='<span class="rc-seg" style="left:'+x+'%;width:'+w+'%;background:'+s.color+';" title="'+_vEsc(s.label+' +'+s.v.toFixed(1)+' °C：'+s.tip)+'"></span>';x+=w;});
+  if(used>room)bar+='<span class="rc-over" style="left:'+lim+'%;width:'+(Math.min(x,100)-lim)+'%;" title="超過限溫 '+(used-room).toFixed(1)+' °C"></span>';
+  bar+='<span class="rc-limit" style="left:calc('+lim+'% - 1px);" title="限溫 '+b.limit+' °C"></span>';
+  const aria='溫升組成：'+shown.map(s=>s.label+' '+s.v.toFixed(1)).join('、')+' °C；'+b.label+' '+b.tRef.toFixed(1)+' °C，限溫 '+b.limit+' °C';
+  let h='<div><div class="rc-bar" role="img" aria-label="'+_vEsc(aria)+'">'+bar+'</div>';
+  h+='<div class="rc-axis"><span style="left:0;">環溫 '+b.tAmb.toFixed(1)+'</span><span style="'+(lim>55?'right:'+(100-lim)+'%;':'left:'+lim+'%;')+'">限溫 '+b.limit+'</span></div>';
+  h+='<div class="rc-legend">'+shown.map(s=>'<span title="'+_vEsc(s.tip)+'"><i style="background:'+s.color+';"></i>'+s.label+' '+s.v.toFixed(1)+'</span>').join('')
+    +'<span class="rc-lg-ref">＝ '+b.label+' '+b.tRef.toFixed(1)+' °C'+(b.label==='Tc'?'（以 Tc 判定，不含 Rjc）':'')+'</span></div></div>';
+  return h;
+}
+// 卡片底部說明（畫面與 PDF 共用同一份文字）：每行是一串 {t, b}（b＝粗體），warn＝要用狀態色強調的行
+function riskNotes(r,i,top,R,g){
+  const a=r.Allowed_dT,f=v=>v.toFixed(1),sf=_num(g.Margin),lines=[];
+  if(a<0)lines.push({warn:true,runs:[{t:'允許溫升 '+f(a)+' °C：內部溫降 '+f(r.Drop)+' °C 已超過「限溫 − 局部環溫」'+f(_num(r['Limit(C)'])-r.Loc_Amb)+' °C，散熱器壓到環溫也救不了 → 先改善 Rjc／TIM／基板或降功耗'}]});
+  if(i===0){
+    if(a>=0)lines.push({runs:[{t:'散熱器依這顆設計',b:true},{t:'：散熱器溫升 '+f(R.T_hsk_base-g.T_amb)+' °C ＝ 允許溫升 '+f(a)+' ÷ 安全係數 '+fmtSF(sf)+(sf===1?'，未預留餘裕':sf<1?'（< 1：散熱器偏小）':'')}]});
+    if(top[1]){const gain=Math.max(top[1].Allowed_dT,0)-Math.max(a,0);lines.push({runs:[{t:'只改善這顆，散熱器最多多 '},{t:f(gain)+' °C',b:true},{t:' 可用，之後換 #2 成為瓶頸'}]});}
+  }else if(a>=0){
+    lines.push({runs:[{t:'允許溫升 '},{t:f(a)+' °C',b:true},{t:'，比 #1 多 '+f(a-top[0].Allowed_dT)+' °C'}]});
+  }
+  return lines;
+}
+function riskFootHtml(r,i,top,R,g){
+  return riskNotes(r,i,top,R,g).map(l=>'<div'+(l.warn?' class="rc-warn"':'')+'>'+l.runs.map(x=>x.b?'<b>'+_vEsc(x.t)+'</b>':_vEsc(x.t)).join('')+'</div>').join('');
 }
 
 // =====================================================
@@ -2767,7 +2975,7 @@ function renderTab2(){
   let pCfg={responsive:true,displaylogo:false,modeBarButtonsToAdd:['toggleSpikelines',fullscreenBtn],displayModeBar:true};
   if(valid.length){
     let cd=document.getElementById('tab2-charts');cd.innerHTML='<div id="chart-margin" style="width:100%;"></div><div style="display:flex;gap:15px;margin-top:15px;"><div id="chart-power" style="flex:1;"></div><div id="chart-tjm" style="flex:1;"></div></div>';
-    let sorted=[...valid].sort((a,b)=>b.Tj_Margin-a.Tj_Margin);let colors=sorted.map(r=>r.Tj_Margin<0?'#e74c3c':r.Tj_Margin<10?'#f39c12':r.Tj_Margin<20?'#f1c40f':'#2ecc71');
+    let sorted=[...valid].sort((a,b)=>b.Tj_Margin-a.Tj_Margin);let colors=sorted.map(r=>({over:'#e74c3c',tight:'#f39c12',watch:'#f1c40f',ok:'#2ecc71'})[(marginLevel(r.Tj_Margin)||{key:'ok'}).key]);   // 門檻與詳細分析同一組（MARGIN_LEVELS）
     Plotly.newPlot('chart-margin',[{y:sorted.map(r=>r.Component),x:sorted.map(r=>r['Limit(C)']),type:'bar',orientation:'h',marker:{color:'#E8E8E8'},name:'Limit',hovertemplate:'Limit: %{x}°C<extra></extra>'},{y:sorted.map(r=>r.Component),x:sorted.map(r=>r.T_ref),type:'bar',orientation:'h',marker:{color:colors},name:'T_ref',text:sorted.map(r=>r.Temp_Label+': '+r.T_ref.toFixed(1)+'°C / Limit: '+r['Limit(C)'].toFixed(0)+'°C  (Margin: '+r.Tj_Margin.toFixed(1)+'°C)'),textposition:'outside',hovertemplate:'%{text}<extra></extra>'}],{barmode:'overlay',title:'<b>溫度裕度總覽 (Temperature Margin Overview)</b>',showlegend:false,height:Math.max(300,sorted.length*50+100),margin:{l:10,r:250,t:60,b:40},yaxis:{automargin:true}},pCfg);
     let pS=[...valid].sort((a,b)=>a.Total_W-b.Total_W);
     Plotly.newPlot('chart-power',[{y:pS.map(r=>r.Component),x:pS.map(r=>r.Total_W),type:'bar',orientation:'h',marker:{colorscale:'Oranges',color:pS.map(r=>r.Total_W),showscale:true,colorbar:{title:'功耗 (W)'}},text:pS.map(r=>r.Total_W.toFixed(1)+' W'),textposition:'outside'}],{title:'<b>各元件功耗分佈 (Power Breakdown)</b>',showlegend:false,margin:{l:10,r:80,t:60,b:40},xaxis:{title:'功耗 (W)'},yaxis:{automargin:true},annotations:[{text:'Total: '+R.Total_Power.toFixed(2)+' W',xref:'paper',yref:'paper',x:0.95,y:1.06,showarrow:false,font:{size:13,color:'#888'}}]},pCfg);
@@ -3486,6 +3694,28 @@ function loadScript(src) {
   });
 }
 
+/* PDF 用的中文字型是 fontsource 的 Noto Sans TC「chinese-traditional」子集：沒有全形標點（（）：，／＝）、
+   箭頭、幾何符號與 dingbats（→ ▲ ● ✓ ✖ ◆ ⚠）、希臘字母（η）與 emoji，pdfmake 又不會換字型 → 印成方框。
+   產生 PDF 前把整份內容換成字型有的字：全形 → 半形、常用符號改寫、其餘符號拿掉。只在使用這個字型時套用。 */
+const PDF_GLYPH_MAP = {'：':': ','，':', ','；':'; ','→':'->','←':'<-','⇒':'=>','≥':'>=','≤':'<=','≈':'~','℃':'°C','・':'·',
+  'η':'eta','θ':'theta','Δ':'d','α':'alpha','β':'beta','μ':'u','Ψ':'Psi'};
+function pdfSafeText(s){
+  return String(s)
+    .replace(/[！-～←-⇿≤≥≈℃Ͱ-Ͽ・]/g, c => PDF_GLYPH_MAP[c] !== undefined ? PDF_GLYPH_MAP[c]
+      : (c >= '！' && c <= '～') ? String.fromCharCode(c.charCodeAt(0) - 0xFEE0) : c)
+    .replace(/[─-➿⬀-⯿️]|[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '');
+}
+function pdfSanitize(node){
+  if (typeof node === 'string') return pdfSafeText(node);
+  if (Array.isArray(node)) return node.map(pdfSanitize);
+  if (node && typeof node === 'object') {
+    const out = {};
+    for (const k in node) out[k] = (k === 'image' || k === 'canvas' || typeof node[k] === 'function') ? node[k] : pdfSanitize(node[k]);
+    return out;
+  }
+  return node;
+}
+
 async function ensurePdfmake() {
   if (typeof pdfMake !== 'undefined' && pdfMake.createPdf) return;
   console.log('[PDF] Loading pdfmake...');
@@ -3675,11 +3905,11 @@ async function generatePDFReport() {
     };
     const detailColAnnotations = {
       'Component': '元件名稱',
-      'Allowed_dT': '允許溫升裕度 (Limit-Loc_Amb-Drop)',
-      'Tj_Margin': 'Tj 裕度 (Limit-Tj)',
+      'Allowed_dT': '允許溫升 (Limit-Loc_Amb-Drop)',
+      'Tj_Margin': '裕度 (Limit-Tj, DDR/PWR 用 Tc)',
       'Tj': '晶片接面溫度',
       'Tc': '元件外殼溫度',
-      'Total_W': '總發熱量 (W)',
+      'Total_W': '總發熱量 (數量 × 單顆)',
       'Loc_Amb': '局部環境溫度',
       'Drop': '內部溫降 (core到HSK)',
       'R_jc': '結到殼熱阻',
@@ -3687,33 +3917,6 @@ async function generatePDFReport() {
       'R_TIM': '界面材料熱阻',
       'Limit(C)': '元件限溫'
     };
-
-    // ── Color scale helper (matches web tool's RdYlGn gradient) ──
-    // pdfmake only supports hex colors, NOT rgba()
-    function thermalColor(v, mn, mx) {
-      if (typeof v !== 'number') return null;
-      if (v < 0) return '#f8d7da';  // red tint for negative
-      let ratio = (mx > mn) ? (v - mn) / (mx - mn) : 0.5;
-      ratio = Math.max(0, Math.min(1, ratio));
-      // RdYlGn: red(0) → yellow(0.5) → green(1), blended with white for pastel
-      let r, g, b;
-      if (ratio < 0.5) {
-        let t = ratio / 0.5;
-        r = Math.round(215 + (255 - 215) * (1 - t));
-        g = Math.round(60 + (210 - 60) * t);
-        b = Math.round(60 + (80 - 60) * t);
-      } else {
-        let t = (ratio - 0.5) / 0.5;
-        r = Math.round(255 + (46 - 255) * t);
-        g = Math.round(210 + (204 - 210) * t);
-        b = Math.round(80 + (113 - 80) * t);
-      }
-      // Blend with white (0.82 white + 0.18 color) for pastel effect
-      r = Math.round(255 * 0.82 + r * 0.18);
-      g = Math.round(255 * 0.82 + g * 0.18);
-      b = Math.round(255 * 0.82 + b * 0.18);
-      return '#' + ((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
-    }
 
     // Helper: build component table with annotations
     function compTable(arr, category) {
@@ -3771,45 +3974,48 @@ async function generatePDFReport() {
       };
     }
 
-    // Build detailed analysis table with gradient colors + risk highlight
+    // 詳細分析表：與畫面同一套規則（依風險排序、數字靠右、熱阻 3 位小數、不適用「—」、
+    // 裕度依 MARGIN_LEVELS 上色、Tj/Tc 標出判定溫度、前三名標名次、按 👁 排除的元件列在表下）
     function detailTable() {
-      const cols = ['Component','Allowed_dT','Tj_Margin','Tj','Tc','Total_W','Loc_Amb','Drop','R_jc','R_int','R_TIM','Limit(C)'];
-      // Risk component highlight colors (matching the Top 3 cards above)
-      let riskNames = riskComps.map(r => r.Component);
-      let riskHighlightBg = ['#fadbd8', '#d4e6f1', '#fdebd0'];  // pastel: red, blue, orange
-      let riskHighlightBorder = ['#c0392b', '#2980b9', '#e67e22'];
-      // Bilingual header labels
+      const cols = ['Component'].concat(ALL_TAB1_COLS);
+      const rows = tab1SortRows(R.rows, {col:'Allowed_dT', dir:1});
       const headerRow = cols.map(c => ({
-        text: [{text: c.replace('_','\n') + '\n', bold:true, fontSize:6, color:'#334155'}, {text: detailColAnnotations[c] || '', fontSize:5, color:'#94a3b8', italics:true}],
-        fillColor:'#f1f5f9', alignment:'center'
+        text: [{text: (c === 'Tj_Margin' ? 'Tj/Tc\nMargin' : c.replace('_','\n')) + '\n', bold:true, fontSize:6, color:'#334155'},
+               {text: (detailColAnnotations[c] || '') + (TAB2_UNITS[c] ? '\n' + TAB2_UNITS[c] : ''), fontSize:5, color:'#94a3b8', italics:true}],
+        fillColor:'#f1f5f9', alignment: c === 'Component' ? 'left' : 'right'
       }));
       const body = [headerRow];
-      // Compute min/max for color scale (same as web tool)
-      let allVals = R.rows.map(r => r.Allowed_dT).concat(R.rows.map(r => r.Tj_Margin)).filter(v => typeof v === 'number' && isFinite(v));
-      let mn = Math.min(...allVals), mx = Math.max(...allVals);
-      R.rows.forEach((row, ri) => {
-        let riskIdx = riskNames.indexOf(row.Component);
-        let isRisk = riskIdx >= 0;
+      rows.forEach((row, ri) => {
+        const rank = riskComps.indexOf(row), cold = !(row.Total_W > 0);
+        const zebra = ri % 2 === 1 ? '#fafbfc' : null, ink = cold ? '#64748b' : '#334155';
         body.push(cols.map(c => {
-          let v = row[c];
-          let fillColor = ri % 2 === 1 ? '#fafbfc' : null;
-          // Highlight entire row for top 3 risk components
-          if (isRisk) fillColor = riskHighlightBg[riskIdx];
-          let fontColor = null;
-          if (c === 'Tj_Margin' && typeof v === 'number' && v < 0) fontColor = cDanger;
-          // Bold component name for risk rows + show rank marker
-          let cellText;
-          if (c === 'Component' && isRisk) {
-            cellText = [{text: '[#' + (riskIdx+1) + '] ', fontSize:6, bold:true, color: riskHighlightBorder[riskIdx]}, {text: String(v||''), fontSize:6.5}];
-          } else {
-            // 0 瓦元件其餘欄位免填 → 算不出的值顯示「—」，不印 NaN
-            if (typeof v === 'number') v = !isFinite(v) ? '—' : ((c.includes('R_') && c !== 'R_jc') ? v.toFixed(4) : v.toFixed(1));
-            cellText = String(v != null ? v : '');
+          if (c === 'Component') {
+            const runs = [];
+            if (rank >= 0) runs.push({text: '#' + (rank + 1) + ' ', bold:true, color:'#1e3a5f'});
+            runs.push({text: String(row.Component || ''), bold: rank >= 0});
+            if (cold) runs.push({text: ' (不發熱)', fontSize:5.5, color:'#94a3b8'});
+            return {text: runs, fontSize:6.5, color: ink, fillColor: zebra};
           }
-          return {text: cellText, fontSize:6.5, alignment: c==='Component'?'left':'center', fillColor, color: fontColor || '#334155'};
+          const f = tab2Cell(row, c);
+          const cell = {text: f.text, fontSize:6.5, alignment:'right', fillColor: zebra, color: f.na ? '#94a3b8' : ink};
+          if (c === 'Tj_Margin' && !f.na) {
+            const lv = marginLevel(row.Tj_Margin);
+            cell.text = [{text: row.Temp_Label + ' ', fontSize:5, color:'#64748b'}, {text: f.text, bold:true, color: lv.fg}];
+            cell.fillColor = lv.bg;
+          }
+          if ((c === 'Tj' || c === 'Tc') && !f.na) { if (row.Temp_Label === c) cell.bold = true; else cell.color = '#64748b'; }
+          if (c === 'Allowed_dT' && rank === 0) cell.bold = true;
+          if (c === 'Total_W' && !f.na && _num(row.Qty) !== 1 && isFinite(_num(row['Power(W)'])))
+            cell.text = [{text: f.text + '\n'}, {text: _num(row.Qty) + ' × ' + fmtW(_num(row['Power(W)'])), fontSize:5, color:'#94a3b8'}];
+          if (c === 'R_TIM' && !f.na && (row.TIM_Warn || row.TIM_Src === 'model'))
+            cell.text = [{text: row.TIM_Warn ? '(!) ' : '(型號) ', fontSize:4.5, color: row.TIM_Warn ? '#b45309' : '#94a3b8'}, {text: f.text}];
+          return cell;
         }));
       });
-      return [
+      const out = [
+        {text: [{text:'依風險排序', bold:true, color:cDark}, {text:'：允許溫升由小到大，越上面越先超溫。裕度 ＝ 限溫 − Tj（DDR、PWR 以 Tc 判定），顏色分級：', color:'#475569'}], fontSize:6.8, margin:[0,0,0,3]},
+        {table: {body: [MARGIN_LEVELS.map((l, i) => ({text: l.label + ' ' + marginRange(i) + ' °C', fontSize:6, bold:true, color:l.fg, fillColor:l.bg}))]},
+         layout: {hLineWidth:()=>0, vLineWidth:()=>0, paddingLeft:()=>5, paddingRight:()=>5, paddingTop:()=>1.5, paddingBottom:()=>1.5}, margin:[0,0,0,6]},
         {table: {headerRows:1, widths: [85,'auto','auto','auto','auto','auto','auto','auto','auto','auto','auto','auto'], body}, layout: {
           hLineWidth: function(i,node){return i===0||i===1||i===node.table.body.length?0.8:0.3;},
           vLineWidth:()=>0.3,
@@ -3818,6 +4024,65 @@ async function generatePDFReport() {
           paddingLeft:()=>3, paddingRight:()=>3, paddingTop:()=>2.5, paddingBottom:()=>2.5
         }}
       ];
+      const ex = [];
+      ['rf','digital','pwr'].forEach(cat => (components[cat] || []).forEach(cp => { if (cp && cp._excluded) ex.push(String(cp.Component || '(未命名)') + ' (' + cat.toUpperCase() + ')'); }));
+      if (ex.length) out.push({text: [{text: '未計入計算 ' + ex.length + ' 顆', bold:true}, {text: '（在「元件設定」按眼睛圖示排除）：' + ex.join('、')}], fontSize:6.5, color:'#475569', margin:[0,5,0,0]});
+      return out;
+    }
+
+    // 前三名卡片（與畫面同一份資料：MARGIN_LEVELS 底色、tempBudget 溫升組成、riskNotes 說明文字）
+    const CARD_GAP = 8, CARD_UNIT = (515 - 2 * CARD_GAP) / 3.3, CARD_W = [CARD_UNIT * 1.3, CARD_UNIT, CARD_UNIT];
+    function budgetBarPdf(b, w) {
+      if (!b.ok) return {text:''};
+      const used = b.tRef - b.tAmb, room = b.limit - b.tAmb, span = Math.max(used, room);
+      if (!(span > 0)) return {text:''};
+      const H = 7, shown = b.segs.filter(s => s.v > 0.005), lim = Math.max(0, Math.min(1, room / span)) * w;
+      const cv = [{type:'rect', x:0, y:0, w:w, h:H, color:'#ffffff', lineColor:'#cbd5e1', lineWidth:0.5}];
+      let x = 0;
+      shown.forEach(s => { const sw = s.v / span * w; cv.push({type:'rect', x:x, y:0, w:Math.max(sw - 0.8, 0.4), h:H, color:s.color}); x += sw; });
+      if (used > room) cv.push({type:'rect', x:lim, y:0, w:Math.max(Math.min(x, w) - lim, 0), h:H, color:'#d03b3b'});
+      cv.push({type:'line', x1:lim, y1:-2, x2:lim, y2:H + 2, lineWidth:1.2, lineColor:'#0f172a'});
+      const axis = lim >= w * 0.4
+        ? {columns:[{width:lim, columns:[{text:'環溫 ' + b.tAmb.toFixed(1)}, {text:'限溫 ' + b.limit, alignment:'right'}]}, {width:'*', text:''}]}
+        : {columns:[{width:'*', text:'環溫 ' + b.tAmb.toFixed(1)}, {width:'auto', text:'限溫 ' + b.limit}]};
+      // 圖例：色塊用表格格子的底色畫（字型沒有 ■），依卡片寬度換行
+      const est = t => Array.from(t).reduce((a, ch) => a + (ch.charCodeAt(0) > 255 ? 6 : 3.3), 0);
+      const lines = []; let cur = [], curW = 0;
+      shown.forEach(s => { const t = s.label + ' ' + s.v.toFixed(1), iw = 16 + est(t);
+        if (cur.length && curW + iw > w) { lines.push(cur); cur = []; curW = 0; }
+        cur.push({s, t}); curW += iw; });
+      if (cur.length) lines.push(cur);
+      const legend = lines.map(row => ({
+        table:{widths: row.flatMap(() => [5, 'auto']), body:[row.flatMap(it => [{text:'', fillColor:it.s.color}, {text:it.t, fontSize:6, color:'#334155'}])]},
+        layout:{hLineWidth:() => 0, vLineWidth:() => 0, paddingLeft:k => k % 2 ? 2.5 : 0, paddingRight:k => k % 2 ? 7 : 0, paddingTop:() => 0.5, paddingBottom:() => 0.5},
+        margin:[0,1.5,0,0]}));
+      return {stack:[
+        {canvas:cv, margin:[0,6,0,0]},
+        Object.assign(axis, {fontSize:5.5, color:'#475569', margin:[0,3,0,0]})
+      ].concat(legend, [{text:'＝ ' + b.label + ' ' + b.tRef.toFixed(1) + ' °C' + (b.label === 'Tc' ? '（以 Tc 判定，不含 Rjc）' : ''), fontSize:6, color:'#475569', margin:[0,2,0,0]}])};
+    }
+    function riskCardPdf(r, i, top, w) {
+      const lv = marginLevel(r.Tj_Margin) || {label:'', fg:'#334155', bg:'#f8fafc', bd:'#e2e8f0', mk:'#94a3b8'};
+      const roles = ['設計瓶頸','次高風險','第三風險'], inner = w - 14;
+      const stack = [
+        {columns:[
+          {width:'*', stack:[{text:String(r.Component || ''), bold:true, fontSize:9.5, color:cDark}, {text:fmtQtyPower(r), fontSize:6, color:'#475569', margin:[0,1,0,0]}]},
+          {width:'auto', stack:[
+            {text:r.Temp_Label + ' 裕度', fontSize:6, bold:true, color:lv.fg, alignment:'right'},
+            {text:[{text:isFinite(r.Tj_Margin) ? r.Tj_Margin.toFixed(1) : '—', fontSize:15, bold:true}, {text:' °C', fontSize:6.5, bold:true}], color:lv.fg, alignment:'right'},
+            {text:lv.label, fontSize:6.5, bold:true, color:lv.fg, alignment:'right'}
+          ]}
+        ], columnGap:6},
+        budgetBarPdf(tempBudget(r, R, G), inner),
+        {canvas:[{type:'line', x1:0, y1:0, x2:inner, y2:0, lineWidth:0.5, lineColor:lv.bd, dash:{length:2}}], margin:[0,5,0,3]}
+      ].concat(riskNotes(r, i, top, R, G).map(l => ({text:l.runs.map(x => ({text:x.t, bold:!!x.b})), fontSize:6.2, color:l.warn ? lv.fg : '#334155', bold:!!l.warn, margin:[0,0,0,1.5]})));
+      return {width:w, table:{widths:['*'], body:[
+          [{columns:[{text:[{text:'#' + (i + 1) + '  ', fontSize:10, bold:true}, {text:roles[i], fontSize:7, bold:true}], color:'#f8fafc'},
+                     {text:String(r._src || ''), width:'auto', fontSize:5.5, bold:true, color:'#cbd5e1', margin:[0,2.5,0,0]}], fillColor:'#1e3a5f'}],
+          [{stack:stack, fillColor:lv.bg}]
+        ]},
+        layout:{hLineWidth:k => k === 1 ? 2 : 0.6, hLineColor:k => k === 1 ? lv.mk : lv.bd, vLineWidth:() => 0.6, vLineColor:() => lv.bd,
+                paddingLeft:() => 7, paddingRight:() => 7, paddingTop:k => k === 0 ? 4 : 6, paddingBottom:k => k === 0 ? 4 : 6}};
     }
 
     // Top 3 risk components
@@ -3932,7 +4197,7 @@ async function generatePDFReport() {
     let ohComps = R.rows.filter(r => r.Tj_Margin < 0 && r.Total_W > 0);
     if (ohComps.length) {
       content.push({
-        table:{body:[[{text:'OVERHEAT WARNING: ' + ohComps.map(r=>r.Component+' ('+Math.abs(r.Tj_Margin).toFixed(1)+'\u00b0C over)').join(', '), fontSize:8, color:'#fff', bold:true}]]},
+        table:{body:[[{text:'OVERHEAT WARNING: ' + ohComps.map(r=>r.Component+' ('+r.Temp_Label+' '+Math.abs(r.Tj_Margin).toFixed(1)+'\u00b0C over)').join(', '), fontSize:8, color:'#fff', bold:true}]]},
         layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingLeft:()=>8, paddingRight:()=>8, paddingTop:()=>6, paddingBottom:()=>6, fillColor:()=>cDanger},
         margin:[0,0,0,8]
       });
@@ -3941,22 +4206,7 @@ async function generatePDFReport() {
     // Risk Top 3
     if (riskComps.length) {
       content.push({text: 'Top 3 Thermal Risk / 熱風險排名', style:'heading2'});
-      let rankLabels = ['#1 最高風險', '#2 次高風險', '#3 第三風險'];
-      let rankColors = ['#c0392b', '#2980b9', '#e67e22'];
-      content.push({
-        columns: riskComps.map((r,i) => ({
-          stack:[
-            {canvas: [{type:'rect', x:0, y:0, w:160, h:3, r:1.5, color: rankColors[i]||cWarning}]},
-            {text: rankLabels[i] || '#'+(i+1), fontSize:7.5, color: rankColors[i]||cGray, alignment:'center', bold:true, margin:[0,4,0,0]},
-            {text: r.Component, fontSize:11, bold:true, alignment:'center', margin:[0,3,0,2]},
-            {text: '允許溫升: '+r.Allowed_dT.toFixed(1)+'\u00b0C', fontSize:8, alignment:'center', color: r.Allowed_dT<5?cDanger:cWarning},
-            {text: 'Tj 裕度: '+r.Tj_Margin.toFixed(1)+'\u00b0C', fontSize:7.5, alignment:'center', color:'#64748b'}
-          ],
-          width: '*'
-        })),
-        columnGap:10,
-        margin:[0,0,0,12]
-      });
+      content.push({columns: riskComps.map((r, i) => riskCardPdf(r, i, riskComps, CARD_W[i])), columnGap: CARD_GAP, margin:[0,0,0,12]});
     }
 
     content.push(...detailTable());
@@ -4205,6 +4455,12 @@ async function generatePDFReport() {
       },
       content: content
     };
+
+    // 字型缺字 → 換成有的字（見 pdfSafeText）；頁首頁尾是函式，包一層
+    if (fontName === 'NotoSansTC') {
+      docDefinition.content = pdfSanitize(docDefinition.content);
+      ['header','footer'].forEach(k => { const fn = docDefinition[k]; docDefinition[k] = (...a) => pdfSanitize(fn(...a)); });
+    }
 
     // Generate and download
     const fileName = 'RRU_Report_' + (projectName.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'_')) + '_' + now.toISOString().slice(0,10) + '.pdf';
