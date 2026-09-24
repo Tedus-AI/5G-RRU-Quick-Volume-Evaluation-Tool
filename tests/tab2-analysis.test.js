@@ -84,7 +84,7 @@ function ok(name, cond, extra) {
   ok('卡片底色＝裕度分級（不是白底、也不是依名次上色）',
      JSON.stringify(a.levels) === JSON.stringify(a.expectLevels) &&
      a.bgs.every((bg, i) => bg === hex2rgb(a.expectBg[i]) && bg !== 'rgb(255, 255, 255)'), { levels: a.levels, bgs: a.bgs });
-  ok('裕度標出 Tj／Tc（DDR、PWR 以 Tc 判定）', JSON.stringify(a.lbls) === JSON.stringify(['Tj 裕度', 'Tc 裕度', 'Tc 裕度']), a.lbls);
+  ok('裕度標出 Tj／Tc（依限溫對象；範例的 DDR、PWR 自動判定為 Tc）', JSON.stringify(a.lbls) === JSON.stringify(['Tj 裕度', 'Tc 裕度', 'Tc 裕度']), a.lbls);
   ok('狀態不單靠顏色：圖示＋文字', a.pills.every(p => /^[✖▲●✓] (超溫|偏緊|留意|充裕)$/.test(p)), a.pills);
   ok('功耗寫出 數量 × 單顆（單顆不四捨五入成對不上的值）', a.pw[1] === '2 × 0.55 W ＝ 1.1 W' && a.pw[0] === '35 W', a.pw);
 
@@ -211,7 +211,7 @@ function ok(name, cond, extra) {
   ok('總功耗：數量 > 1 列出「數量 × 單顆」，數量 1 不列', /^212\.0\s*4 × 52\.99$/.test(e.finalW) && !e.cpuWSub, e.finalW);
   ok('表頭帶單位', JSON.stringify(e.units) === JSON.stringify([' ', '°C', '°C', '°C', '°C', 'W', '°C', '°C', '°C/W', '°C/W', '°C/W', '°C']), e.units);
   ok('表頭是可聚焦的排序鈕、aria-sort 標在排序中的欄位', e.buttons && JSON.stringify(e.sortAttr) === JSON.stringify(['Allowed_dT:ascending']), e.sortAttr);
-  ok('說明列寫出排序依據與裕度分級', /依風險排序/.test(e.cap) && /DDR、PWR 以 Tc 判定/.test(e.cap) && /超溫 <0/.test(e.cap) && /充裕 ≥20/.test(e.cap), e.cap);
+  ok('說明列寫出排序依據與裕度分級', /依風險排序/.test(e.cap) && /限溫 − Tj 或 Tc（依元件的限溫對象）/.test(e.cap) && /超溫 <0/.test(e.cap) && /充裕 ≥20/.test(e.cap), e.cap);
   ok('表格沒有 NaN', e.nan === false);
 
   console.log('\n[F] 點欄位標題排序');

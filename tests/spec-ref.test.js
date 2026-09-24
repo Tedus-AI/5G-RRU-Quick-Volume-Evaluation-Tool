@@ -10,7 +10,7 @@
  *   [A] specMarkFrom：單一物件與陣列都逐份標；沒有 path 的不動；沒給專案名不動。
  *   [B] 快選一顆有三份規格書的元件 → 三份都帶 _from，且與快選快取不共用參照。
  *   [C] 舊格式（單一物件）行為不變。
- *   [D] carry 白名單仍含 SpecFile（21 項，與 AI-Thermal 的 SG_VARIANT_CARRY 對齊）。
+ *   [D] carry 白名單仍含 SpecFile（22 項＝加上限溫對象 Limit_Ref，與 AI-Thermal 的 SG_VARIANT_CARRY 對齊）。
  *
  * 執行：
  *   npx http-server . -p 8123 -c-1 &      # 於 repo 根目錄
@@ -118,7 +118,7 @@ function ok(name, cond, extra) {
 
   console.log('\n[D] carry 白名單');
   const d = await page.evaluate(() => ({ n: VARIANT_CARRY.length, hasSpec: VARIANT_CARRY.includes('SpecFile') }));
-  ok('VARIANT_CARRY 仍含 SpecFile 且為 21 項', d.n === 21 && d.hasSpec, d);
+  ok('VARIANT_CARRY 仍含 SpecFile 且為 22 項', d.n === 22 && d.hasSpec, d);
 
   ok('頁面無 JS 例外', errors.length === 0, errors.slice(0, 3));
 
