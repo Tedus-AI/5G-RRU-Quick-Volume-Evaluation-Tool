@@ -160,7 +160,7 @@ const AIT_PROJECT = {
       alert: window.__alerts.join('\n'),
       banner: txt('comp-missing-banner'),
       t1: txt('tab1-alerts'), t1table: document.getElementById('tab1-table').innerHTML,
-      t2: txt('tab2-kpi'), t2vol: txt('tab2-volume'), t3: txt('tab3-3d'),
+      t2: txt('tab2-result'), t2rest: txt('tab2-charts') + txt('tab2-comp'), t3: txt('tab3-3d'),
     };
   });
   ok('缺的欄位沒有被補上分類預設值', e.noDefaults, e);
@@ -171,7 +171,7 @@ const AIT_PROJECT = {
   ok('載入時的提示就告知有幾顆缺值、無法計算', /2 顆元件的必填欄位還沒填/.test(e.alert) && /無法計算體積/.test(e.alert), e.alert);
   ok('元件設定的紅色橫幅列出元件與欄位', /無法計算體積/.test(e.banner) && /Circulators-B20B28/.test(e.banner) && /L1452-TMPA1004S/.test(e.banner), e.banner.slice(0, 120));
   ok('詳細分析頁：顯示擋下原因、不顯示計算表', /無法計算體積/.test(e.t1) && e.t1table === '', e.t1.slice(0, 60));
-  ok('視覺化報告頁：擋下原因＋體積顯示「無法計算」', /無法計算體積/.test(e.t2) && /無法計算：必填欄位未填/.test(e.t2vol), [e.t2.slice(0, 40), e.t2vol]);
+  ok('視覺化報告頁：顯示擋下原因、不畫任何圖表與整機組成', /無法計算體積/.test(e.t2) && e.t2rest === '', [e.t2.slice(0, 40), e.t2rest.slice(0, 40)]);
   ok('3D 頁顯示擋下原因', /無法計算體積/.test(e.t3), e.t3.slice(0, 40));
 
   const e2 = await page.evaluate(async () => {
@@ -213,7 +213,7 @@ const AIT_PROJECT = {
   console.log('\n[G] 點欄位名稱 → 跳到那一格');
   // 使用者多半是在「視覺化報告」頁看到擋下原因 → 從那裡點欄位名稱
   await page.evaluate(() => { switchTab(2); });
-  await page.click('#tab2-kpi a:has-text("限溫")');
+  await page.click('#tab2-result a:has-text("限溫")');
   await page.waitForTimeout(250);
   const g = await page.evaluate(() => {
     const a = document.activeElement;

@@ -10,7 +10,7 @@
  * 配反時 Bottom 多出來的那幾 mm 會被加到寬度 → 可能多排一片鰭片 → 鰭片高與體積偏樂觀。
  *
  * 驗證情境：
- *   [A] 使用者截圖的數字：519 × 401，Tab2 的「RRU 整機尺寸」與參數控制台的即時算式一致。
+ *   [A] 使用者截圖的數字：519 × 401，視覺化報告的「外觀尺寸」與參數控制台的即時算式一致。
  *   [B] 四個邊距都不同的值（能分辨配對）：Top/Bottom 只影響長、Left/Right 只影響寬。
  *   [C] 鰭片數由「寬」決定、3D 視圖的鰭片沿「長」延伸（方向與邊距配對一致）。
  *   [D] 單一事實來源：rruFootprint 與 computeAll 的長寬、體積 = L×W×H 一致。
@@ -68,10 +68,10 @@ function ok(name, cond, extra) {
   };
   const read = () => page.evaluate(() => {
     const R = calcResults;
-    const kpi = (document.getElementById('tab2-dims') || {}).textContent || '';
+    const kpi = (document.getElementById('vr-dims') || {}).textContent || '';
     return {
       L: R.L_hsk, W: R.W_hsk, H: R.RRU_Height, FH: R.Fin_Height, nf: R.Fin_Count, V: R.Volume_L,
-      kpi: (kpi.match(/(\d+)\s*x\s*(\d+)\s*x\s*([\d.]+)/) || []).slice(1),
+      kpi: (kpi.match(/(\d+)\s*[x×]\s*(\d+)\s*[x×]\s*([\d.]+)/) || []).slice(1),
       ddL: document.getElementById('dd-L') && document.getElementById('dd-L').textContent,
       ddLsum: document.getElementById('dd-L-sum') && document.getElementById('dd-L-sum').textContent,
       ddW: document.getElementById('dd-W') && document.getElementById('dd-W').textContent,
@@ -85,7 +85,7 @@ function ok(name, cond, extra) {
   const a = await read();
   ok('長 = 500 + Top 8 + Bottom 11 = 519', a.L === 519, a);
   ok('寬 = 385 + Left 8 + Right 8 = 401', a.W === 401, a);
-  ok('Tab2「RRU 整機尺寸 (LxWxH)」顯示 519 x 401', a.kpi[0] === '519' && a.kpi[1] === '401', a.kpi);
+  ok('視覺化報告「外觀尺寸 L × W × H」顯示 519 x 401', a.kpi[0] === '519' && a.kpi[1] === '401', a.kpi);
   ok('參數控制台即時算式：長 519 mm ＝ PCB 500 ＋ Top 8 ＋ Bottom 11',
      a.ddL === '519 mm' && /PCB 500\s*＋\s*Top 8\s*＋\s*Bottom 11/.test(a.ddLsum || ''), [a.ddL, a.ddLsum]);
   ok('參數控制台即時算式：寬 401 mm ＝ PCB 385 ＋ Left 8 ＋ Right 8',
