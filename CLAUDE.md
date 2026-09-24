@@ -340,6 +340,21 @@ AI-Thermal 有好幾份資料用「元件名稱」當 key：TH/ME 頁的 `therma
 - `_readFile`：metadata 多取 `size`。**本 session 第一次讀檔就讀到空內容、但檔案大小不是 0（或拿不到大小）→
   唯讀保護**，不可 bootstrap 空骨架（否則下一次寫入就把整份共用 DB 抹掉）；真的是 0 bytes 才建立空骨架。
 
+### 還原資料庫（header「♻️ 還原資料庫」，`dbRestore*`）
+
+「💾 備份資料庫」下載的是整份 `thermal_db.json`；還原是它的反向入口。共用 DB 是兩個工具一起寫的，
+整份蓋回去會抹掉備份之後別人存的東西 → **預設「選擇性還原」**，「整份取代」要輸入「還原」才能按。
+
+- 流程：`dbRestoreStart`（先過 `_ensureLockBeforeWrite`，沒連線／唯讀保護／保護沒解除 → 不開檔案選擇）→
+  `dbRestoreValidate`（單一專案檔指路「匯入專案」；0 個專案拒絕，不把 DB 清空）→ `dbAdapter.refresh()` 後
+  `dbRestoreAnalyze` 逐專案標「新增／會覆蓋／相同」、集合同樣比對 → 視窗勾選（預設只勾「新增」＝資料庫已經沒有的）。
+- 寫入：`dbAdapter.restoreBackup(backup, plan)` → 後端 `mutateWholeDb`（graphDb 走 `_withOptimisticWrite`，412 在最新內容上重算；
+  fileDb 先重讀磁碟）。套用規則單一事實來源 `dbAdapter.restorePlanApply`；**`RESTORE_KEEP`（`lock`、`version`）永遠不被備份蓋掉**
+  （備份裡可能帶著當時別人的編輯鎖）。壞檔唯讀、projects 歸零保險絲照樣生效。
+- **寫入前一定先 `exportBackup('before_restore')`** 下載一份目前的 DB（還原錯了用它再還原回來）。
+- 還原後：`loadLibraryFromLocal`；目前開著的專案被刪 → 身分清空；被覆蓋 → `checkProjectFreshness(true)`（沒未存修改就重新載入）。
+- 契約測試：`tests/db-restore.test.js`（真的 graphDb ＋假 Graph API，含 412）。
+
 ### 參數控制台可調寬／收合
 
 `#sidebar-resizer` 同時是拖曳把手與收合鈕：`mousedown` 後位移超過 4px 才算拖曳，
