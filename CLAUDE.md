@@ -285,9 +285,9 @@ docId → id≠名稱的專案每存一次就多一份分身、原專案永遠�
   載入時的值，每一列選「用我的／用資料庫的」，全部選完才能存；取消 → 不寫入、畫面不動）。
 - 相依欄位整組比對（`GROUPS`）：E-Pad 長／寬／`_pad_from`、`R_jc`／`_rjc_from`、`Board_Type`／`_bt_from`、
   `TIM_Type`／`TIM_Model` —— 不會拼出兩邊都沒有過的組合（例：我的長＋對方的寬）。
-- **推導欄位不比對**（`MERGE_DERIVED = ['Thick(mm)']`，`derivedKeys`）：板厚每次 recalc 都由參數控制台帶入，
+- **推導欄位不比對**（`MERGE_DERIVED = ['Thick(mm)', '_renamed_from']`，`derivedKeys`）：板厚每次 recalc 都由參數控制台帶入，
   若列入比對，載入時自動帶入的板厚會被當成「我改過這顆」→ 對方刪掉那顆元件時變成假衝突。
-  合併後由 `thickApplyToFields` 重新帶入。
+  合併後由 `thickApplyToFields` 重新帶入。改名標記 `_renamed_from` 在寫入時由 `renameMarksApply` 重新決定（見下節）。
 - 型別差異不算修改（`normalizeComp`：`"5.2"` 與 `5.2` 相同、`''` 等於沒有 key）。
 - 專案名稱也三方比對（`MERGE_SCALARS = ['project_name']`）：AI-Thermal 改了名、本工具沒改 → 保留新名稱。
 - 元件配對用 **`_cid`（元件 id）**：載入時 `CompMerge.ensureProjectCids` 補發（快照與畫面同一份 id）、
@@ -307,6 +307,25 @@ docId → id≠名稱的專案每存一次就多一份分身、原專案永遠�
 - **兩個後端的 `getDoc` 回複本、`setDoc`／`updateDoc` 存複本**：不可再讓畫面持有 DB 快取的活參照。
   （`getCollection` 仍回快取本身，呼叫端只能讀。）
 - 契約測試：`tests/merge-save.test.js`（整合）、`tests/comp-merge.unit.test.js`（純邏輯）。
+
+### 元件改名：`_renamed_from`（讓 AI-Thermal 把以名稱當 key 的資料搬過去）
+
+AI-Thermal 有好幾份資料用「元件名稱」當 key：TH/ME 頁的 `thermal_specs`／`hidden_components`、Tab3 的
+`validation_data`／`vd_hidden_components`、Tab1 標註的 `componentRef`。本工具**不碰這些資料**，所以在這裡改元件名稱，
+那些資料會變孤兒（AI-Thermal 的 TH/ME 頁那一列變空白、推導不出導熱方式／E-Pad → 回到本工具變必填紅框）。
+
+- 存檔時 `renameMarksApply(fields, cur, base)`：比對**資料庫最新內容**裡同一顆元件（`_cid`；舊資料還沒有 id 時用
+  載入時快照裡的名稱對）的那些資料「掛在哪個名稱底下」（它的 `_renamed_from`，沒有就是它的名稱）：
+  跟這次要寫的名稱不同 → 標 `_renamed_from = 那個名稱`；相同 → 不標（刪 key）。
+  結果：沒改名不標、改回原名不標、連改兩次仍指向最早的名稱、AI-Thermal 已經搬過（清掉標記）之後再改名 → 指向搬過去的名稱。
+- ⚠ **一定要在寫入當下拿資料庫最新內容算，不可在改名當下標**：AI-Thermal 可能在我們載入之後已經搬過一次，
+  畫面上的舊標記會指向一個已經不存在的名稱。
+- 沒有可以對照的資料庫內容 → **一律不標**：新專案、覆蓋別的專案、重建已刪除的專案、「複製專案」（新文件沒有
+  AI-Thermal 的資料，畫面上的標記也一起清掉）；「📋 複製元件」的複本是新的一顆，也不帶標記。
+- AI-Thermal 讀到標記：載入時先搬它畫面上那一份，存檔時在最新內容上搬好所有資料，**同一次寫入裡清掉標記**。
+  本工具只寫、不讀這個標記（除了下一次存檔時重新計算）。
+- `_renamed_from` 是底線開頭的內部欄位：不列入 carry 白名單、合併時不比對（`MERGE_DERIVED`）。
+- 契約測試：`tests/merge-save.test.js` [I]；AI-Thermal 端 `tests/merge-save.test.js` [K]。
 
 ### SharePoint 讀寫防護（`graphDb.js`）
 
@@ -376,7 +395,8 @@ AI-Thermal 下次存檔覆寫，還讓兩邊數字對不起來 → `rjcCellHtml`
 
 > 內部欄位（底線開頭，兩個工具都原樣保留、不列入 carry 白名單）：`_cid`（元件 id，存檔三方合併配對用，
 > 兩邊都會補發）、`_defaults_ok`（本工具寫：確認過不是舊預設值）、`_rjc_from`／`_bt_from`／`_pad_from`
-> （AI-Thermal 寫：推導來源）、`_excluded`、`_ref_*`（本工具的快選參照）。
+> （AI-Thermal 寫：推導來源）、`_excluded`、`_ref_*`（本工具的快選參照）、`_renamed_from`（本工具寫：改過名的元件，
+> AI-Thermal 以名稱當 key 的資料還掛在哪個名稱底下；AI-Thermal 搬完就清掉，見「元件改名」）。
 
 ⚠ **「從資料庫快選」的 carry 白名單兩邊都必須列全上表所有欄位**（本工具的 `VARIANT_CARRY`
 ／AI-Thermal 的 `SG_VARIANT_CARRY`，目前各 21 項）。漏列的 key 快選時就不會被帶過來（本工具已不套分類預設 → 變成缺值被必填檢查擋下；

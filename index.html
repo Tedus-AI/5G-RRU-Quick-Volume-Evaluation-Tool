@@ -2659,7 +2659,7 @@ function removeComp(cat,i){components[cat].splice(i,1);recalc();}
 function toggleComp(cat,i){components[cat][i]._excluded=!components[cat][i]._excluded;recalc();}
 // 📋 複製元件：深拷貝（不與原元件共用 Rth／SpecFile 參照）。規格書仍指向原元件上傳的那份檔案
 // → 複本標 _from，AI-Thermal 刪掉或取代複本的規格書時才不會把原元件的檔案一起刪掉。
-function copyComp(cat,i){const cp=JSON.parse(JSON.stringify(components[cat][i]));cp._cid=CompMerge.newCid();specMarkFromIfUnset(cp,currentProjectLoadedName||projectNameGet()||'本專案');components[cat].push(cp);recalc();}
+function copyComp(cat,i){const cp=JSON.parse(JSON.stringify(components[cat][i]));cp._cid=CompMerge.newCid();delete cp._renamed_from;specMarkFromIfUnset(cp,currentProjectLoadedName||projectNameGet()||'本專案');components[cat].push(cp);recalc();}
 // 數字欄位：清空＝「沒填」→ 刪 key。不可寫 0：0 是一個值，缺值會被當成有填而靜默算下去。
 function updateCompNum(cat,i,col,raw){
   const c=components[cat]&&components[cat][i];if(!c)return;
@@ -3119,8 +3119,35 @@ async function projectNameTakenBy(name,exceptId){
 // =====================================================
 let projBase=null,projClean=null,_saveBusy=false,_staleNotice=null,_freshAt=0,_freshBusy=false;
 const MERGE_SCALARS=['project_name'];
-// 本工具每次 recalc 都會重新推導的欄位：合併時不比對（見 compMerge.js 的 derivedKeys），合併後由 thickApplyToFields 重新帶入
-const MERGE_DERIVED=['Thick(mm)'];
+// 合併時不比對的欄位（見 compMerge.js 的 derivedKeys）：
+// - Thick(mm)：本工具每次 recalc 都會重新推導，合併後由 thickApplyToFields 重新帶入；
+// - _renamed_from：寫入時由 renameMarksApply 依資料庫最新內容重新決定（AI-Thermal 搬完資料會清掉）。
+const MERGE_DERIVED=['Thick(mm)','_renamed_from'];
+/* 元件改名標記 `_renamed_from`（兩個工具共用的內部欄位，見 CLAUDE.md「元件改名」）：
+   AI-Thermal 有好幾份資料用「元件名稱」當 key（TH/ME 頁的規格、Tab3 實測、標註），本工具不碰那些資料 →
+   寫入時比對資料庫裡同一顆元件（_cid）的那些資料「掛在哪個名稱底下」（它的 _renamed_from，沒有就是它的名稱）：
+   跟這次要寫的名稱不同 → 標上那個名稱，AI-Thermal 下次存檔時把資料搬過去並清掉標記；相同 → 不標。
+   沒有可以對照的資料庫內容（新專案、覆蓋別的專案、複製專案、重建已刪除的專案）→ 一律不標。
+   ⚠ 一定要在寫入當下、拿資料庫最新內容算（不是改名當下標）：AI-Thermal 可能在我們載入之後已經搬過一次，
+   拿載入時的舊標記會指向一個已經不存在的名稱。 */
+function renameMarksApply(fields,cur,base){
+  CompMerge.CATS.forEach(f=>{
+    const curList=(cur&&cur[f])||[],baseList=(base&&base[f])||[];
+    (fields[f]||[]).forEach(c=>{
+      if(!c)return;
+      let o=null;
+      if(cur){
+        o=c._cid?curList.find(x=>x&&x._cid===c._cid)||null:null;
+        if(!o&&c._cid){   // 資料庫裡的舊資料還沒有元件 id（兩個工具都還沒存過）→ 用載入時快照裡的名稱對
+          const b=baseList.find(x=>x&&x._cid===c._cid);
+          if(b&&b.Component)o=curList.find(x=>x&&!x._cid&&x.Component===b.Component)||null;
+        }
+      }
+      const keyed=o?(o._renamed_from!==undefined?o._renamed_from:o.Component):undefined;
+      if(keyed&&keyed!==c.Component)c._renamed_from=keyed;else delete c._renamed_from;
+    });
+  });
+}
 function projBaseFrom(doc){
   if(!doc)return null;
   const o={project_name:doc.project_name,global_params:doc.global_params};
@@ -3293,6 +3320,7 @@ async function cloudSaveProject(){
           thickApplyToFields(fields);   // 對方可能改了導熱方式 → 板厚依參數控制台重新帶入
           merged=m;
         }
+        renameMarksApply(fields,base&&cur?cur:null,base);   // 改過名的元件標上舊名稱（給 AI-Thermal 搬資料用）
         written=fields;
         return fields;
       });
@@ -3341,10 +3369,11 @@ async function confirmCopyProject(){
   const fields=_buildProjectFields(name,existing);
   // 規格書只複製「參照」：實體檔仍在來源專案的 SPEC 資料夾 → 逐份標 _from
   ['rf_data','digital_data','pwr_data'].forEach(f=>(fields[f]||[]).forEach(c=>specMarkFromIfUnset(c,srcName)));
+  renameMarksApply(fields,null,null);   // 新專案沒有 AI-Thermal 以名稱當 key 的資料 → 不帶改名標記
   try{
     await dbAdapter.updateDoc('projects',docId,fields);
     // 畫面上的元件從此代表「複本」→ 同樣標上 _from，之後存檔才不會把標記洗掉
-    ['rf','digital','pwr'].forEach(cat=>(components[cat]||[]).forEach(c=>specMarkFromIfUnset(c,srcName)));
+    ['rf','digital','pwr'].forEach(cat=>(components[cat]||[]).forEach(c=>{specMarkFromIfUnset(c,srcName);delete c._renamed_from;}));
     variantsCache=null; renderTab0();
     projectIdentitySet(docId,name);   // 複製後切換到新專案（之後存檔寫到新 id）
     projBase=projBaseFrom(fields);markProjectClean();_staleNotice=null;renderStaleBanner();
