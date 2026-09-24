@@ -803,8 +803,8 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
       <div class="hdr-right">
         <button onclick="doLogout()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">🏠 返回首頁</button>
         <span id="db-banner-text" style="font-size:12px; color:#ffffffaa;">未選擇資料庫</span>
-        <button id="btn-pick-db" onclick="handlePickDb()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">
-          📂 資料庫目錄
+        <button id="btn-pick-db" onclick="handlePickDb()" title="不在公司／連不到 SharePoint 時：開啟本機的資料庫 JSON（例如「💾 備份資料庫」下載的檔案）直接使用，修改會存回那個檔案" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">
+          💻 離線資料庫
         </button>
         <button id="btn-sp-login" onclick="handleSpLogin()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer; display:none;">🔐 登入 SharePoint</button>
         <button id="btn-sp-logout" onclick="handleSpLogout()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer; display:none;">🚪 登出</button>
@@ -1137,10 +1137,14 @@ async function handleSpLogin(){
   try{
     const result=await dbAdapter.signIn();
     if(result && result.success){
+      const wasOffline=dbAdapter.isOffline();
+      if(wasOffline){dbAdapter.setOffline(false);if(!cloudLocked){cloudLocked=true;_applyCloudLockUI();}}
       await graphDb._readFile();
       fbOk=true;
       _updateSpHeaderSignedIn();
       await loadLibraryFromLocal();
+      if(wasOffline)await dbSwitchProjectCheck();
+      renderTab0();
       updateLockStatusBar();   // 登入後立即顯示「誰正在用」（若有人佔用）
     }else if(result && result.reason==='cancelled'){
       // user cancelled
@@ -1324,7 +1328,7 @@ async function _ensureLockBeforeWrite(action){
 
 // 每 60 秒重新讀檔輪詢鎖狀態（登入 SharePoint 時），保持置頂佔用橫幅即時，並維護自己的鎖
 setInterval(async ()=>{
-  if(DB_MODE==='sharepoint'&&dbAdapter.isSignedIn&&dbAdapter.isSignedIn()){
+  if(dbAdapter.isSharePointMode()&&dbAdapter.isSignedIn&&dbAdapter.isSignedIn()){
     try{await dbAdapter.peekLock();}catch(e){return;}
     updateLockStatusBar();
     try{await _maintainLock();}catch(e){console.warn('[lock] maintain error:',e);}
@@ -1837,8 +1841,7 @@ async function initFirebase() {
 
   // ── 資料庫初始化（SharePoint 或 本機）──
   if (DB_MODE === 'sharepoint') {
-    const btnPick = document.getElementById('btn-pick-db');
-    if (btnPick) btnPick.style.display = 'none';
+    // 「💻 離線資料庫」在 SharePoint 模式也保留：不在公司時靠它開本機檔案
     const btnLogin = document.getElementById('btn-sp-login');
     if (btnLogin) btnLogin.style.display = '';
   }
@@ -4134,7 +4137,9 @@ function dbRestoreAnalyze(backup,current){
 
 async function dbRestoreStart(){
   if(!fbOk||!dbAdapter.isReady||!dbAdapter.isReady()){
-    alert(dbAdapter.isSharePointMode&&dbAdapter.isSharePointMode()?'⚠️ 請先登入 SharePoint，再還原資料庫。':'⚠️ 請先開啟資料庫（📂 資料庫目錄），再還原。');return;
+    // 沒連任何資料庫（例如不在公司、沒登入 SharePoint）→ 直接把選的檔案當「離線資料庫」開啟，不強制登入
+    await handlePickDb({from:'restore'});
+    return;
   }
   if(dbAdapter.isCorrupted&&dbAdapter.isCorrupted()){
     alert('⚠️ 資料庫目前處於唯讀保護（檔案讀取異常），無法還原。\n請先重新整理頁面；若仍異常，請直接在 SharePoint 用「版本歷史」還原 thermal_db.json。');return;
@@ -5236,13 +5241,56 @@ function showDbBanner(message, type) {
   text.style.color = type === 'success' ? '#90ee90' : '#ffcc00';
 }
 
-async function handlePickDb() {
-  const result = await dbAdapter.pickFile();
-  if (result && result.success) {
-    fbOk = true;
-    showDbBanner(`✅ 本機資料庫：${result.filename}`, 'success');
-    await loadLibraryFromLocal();
+// 「💻 離線資料庫」：開一份本機的資料庫 JSON 直接用（不需要 SharePoint）。
+// 先挑檔（要在這次點擊裡叫出檔案視窗，前面不可先跳 confirm 或等網路），挑好了才切換；取消 → 什麼都不變。
+async function handlePickDb(opts) {
+  opts = opts || {};
+  if (typeof window.showOpenFilePicker !== 'function') {
+    alert('⚠️ 這個瀏覽器不能直接讀寫本機檔案，離線資料庫請改用 Chrome 或 Edge 開啟本工具。');
+    return;
   }
+  let result;
+  try { result = await fileDb.pickFile(); }
+  catch (e) { alert('❌ 無法開啟這個檔案當離線資料庫：' + (e.message || e)); return; }
+  if (result && result.reason === 'corrupt') {
+    alert('❌ 這個檔案讀不懂（不是有效的資料庫 JSON），沒有切換。\n檔案：' + result.filename);
+    return;
+  }
+  if (!result || !result.success) return;   // 取消
+  // 從 SharePoint 切過來：先把自己的編輯鎖還回去，免得別人被卡到鎖過期
+  if (dbAdapter.isSharePointMode() && dbAdapter.hasLock && dbAdapter.hasLock()) {
+    try { await dbAdapter.releaseLock(); } catch (e) { console.warn('[offline] releaseLock failed:', e); }
+  }
+  if (DB_MODE === 'sharepoint') dbAdapter.setOffline(true);
+  if (!cloudLocked) { cloudLocked = true; _applyCloudLockUI(); }   // 換了資料庫 → 寫入保護重新啟用
+  fbOk = true;
+  const spOn = DB_MODE === 'sharepoint';
+  if (spOn) {   // header：可以隨時按「登入 SharePoint」回去
+    const bl = document.getElementById('btn-sp-login'), bo = document.getElementById('btn-sp-logout'), ui = document.getElementById('sp-user-info');
+    if (bl) bl.style.display = '';
+    if (bo) bo.style.display = 'none';
+    if (ui) { ui.style.display = 'none'; ui.textContent = ''; }
+  }
+  showDbBanner(`💻 離線資料庫：${result.filename}`, 'success');
+  await loadLibraryFromLocal();
+  await dbSwitchProjectCheck();
+  renderTab0();
+  updateLockStatusBar();
+  const n = Object.keys(((fileDb.peekCache && fileDb.peekCache()) || {}).projects || {}).length;
+  alert('✅ 已改用離線資料庫：' + result.filename + '（' + n + ' 個專案）\n\n' +
+    '・載入／儲存專案都直接讀寫這個本機檔案，不需要 SharePoint。\n' +
+    '・要存檔一樣先解除「🔒 資料庫保護」；瀏覽器問是否允許修改檔案時請按「允許」。\n' +
+    (spOn ? '・回公司後按「🔐 登入 SharePoint」切回共用資料庫；離線時改的專案，可用「♻️ 還原資料庫」選這個檔案、勾選那些專案寫回去。' : ''));
+}
+
+// 換了資料庫之後：畫面上開著的專案在新資料庫裡沒有 → 當成還沒存過的新專案（存檔才不會誤判成「原專案被刪除」）；
+// 有 → 照一般規則檢查是否要重新載入。
+async function dbSwitchProjectCheck() {
+  if (!currentProjectId) return;
+  let d = null;
+  try { d = await dbAdapter.getDoc('projects', currentProjectId); } catch (e) {}
+  if (!d) { projectIdentitySet(null, projectNameGet()); projBase = null; _staleNotice = null; renderStaleBanner(); return; }
+  try { await checkProjectFreshness(true); } catch (e) { console.warn('[db switch] freshness check failed:', e); }
 }
 
 async function handleCreateDb() {

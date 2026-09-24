@@ -345,7 +345,7 @@ AI-Thermal 有好幾份資料用「元件名稱」當 key：TH/ME 頁的 `therma
 「💾 備份資料庫」下載的是整份 `thermal_db.json`；還原是它的反向入口。共用 DB 是兩個工具一起寫的，
 整份蓋回去會抹掉備份之後別人存的東西 → **預設「選擇性還原」**，「整份取代」要輸入「還原」才能按。
 
-- 流程：`dbRestoreStart`（先過 `_ensureLockBeforeWrite`，沒連線／唯讀保護／保護沒解除 → 不開檔案選擇）→
+- 流程：`dbRestoreStart`（沒連任何資料庫 → 轉「離線資料庫」挑檔，見下節；唯讀保護／保護沒解除 → 不開檔案選擇）→
   `dbRestoreValidate`（單一專案檔指路「匯入專案」；0 個專案拒絕，不把 DB 清空）→ `dbAdapter.refresh()` 後
   `dbRestoreAnalyze` 逐專案標「新增／會覆蓋／相同」、集合同樣比對 → 視窗勾選（預設只勾「新增」＝資料庫已經沒有的）。
 - 寫入：`dbAdapter.restoreBackup(backup, plan)` → 後端 `mutateWholeDb`（graphDb 走 `_withOptimisticWrite`，412 在最新內容上重算；
@@ -354,6 +354,24 @@ AI-Thermal 有好幾份資料用「元件名稱」當 key：TH/ME 頁的 `therma
 - **寫入前一定先 `exportBackup('before_restore')`** 下載一份目前的 DB（還原錯了用它再還原回來）。
 - 還原後：`loadLibraryFromLocal`；目前開著的專案被刪 → 身分清空；被覆蓋 → `checkProjectFreshness(true)`（沒未存修改就重新載入）。
 - 契約測試：`tests/db-restore.test.js`（真的 graphDb ＋假 Graph API，含 412）。
+
+### 離線資料庫（header「💻 離線資料庫」，`dbAdapter.setOffline`）
+
+不在公司／連不到 SharePoint 時，改讀寫一份本機的資料庫 JSON（例如「💾 備份資料庫」下載的檔案）。
+**不可再強制要求登入 SharePoint**（使用者明確要求：不在公司也要能用離線資料庫）。
+
+- 執行期切換：`DB_MODE` 仍是 `'sharepoint'`，`dbAdapter._offline = true` 時 `_backend()` 走 `fileDb`、
+  `isSharePointMode()` 回 `false` → 沒有共用編輯鎖、存檔前先重讀磁碟（與本機模式同一套路徑）。
+  判斷「現在是不是 SharePoint」一律用 `dbAdapter.isSharePointMode()`，**不要直接比 `DB_MODE`**（auth 相關的
+  `signIn`／`isSignedIn`／`getAccountInfo` 例外：它們問的是 SharePoint 帳號本身）。
+- 入口：header「💻 離線資料庫」（`handlePickDb`），以及**沒連任何資料庫時按「♻️ 還原資料庫」**（`dbRestoreStart` 直接轉
+  `handlePickDb`，不再跳「請先登入 SharePoint」）。先挑檔（`showOpenFilePicker` 要在同一次點擊裡叫出，前面不可先
+  `confirm` 或等網路），挑好才切換；取消 → 不變；檔案讀不懂 → `fileDb.pickFile` 整個退回上一份、不切換。
+  沒有 `showOpenFilePicker`（Firefox／Safari）→ 提示改用 Chrome／Edge。
+- 切換時：SharePoint 的編輯鎖先還回去、寫入保護重新啟用；開著的專案在新資料庫裡沒有 → `dbSwitchProjectCheck`
+  把它當未存的新專案（身分清空）。按「🔐 登入 SharePoint」成功 → `setOffline(false)` 切回。
+- 回公司同步：離線改的專案用「♻️ 還原資料庫」選那個本機檔、勾選專案寫回 SharePoint。
+- 契約測試：`tests/offline-db.test.js`。
 
 ### 參數控制台可調寬／收合
 

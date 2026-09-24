@@ -22,12 +22,26 @@ const fileDb = {
   },
 
   async pickFile() {
+    if (typeof window.showOpenFilePicker !== 'function') return { success: false, reason: 'unsupported' };
     try {
-      [fileHandle] = await window.showOpenFilePicker({
+      const [picked] = await window.showOpenFilePicker({
         types: [{ description: 'JSON Database', accept: { 'application/json': ['.json'] } }],
         multiple: false
       });
-      await this._readFile();
+      // 挑檔只給讀取權；趁還在同一次點擊裡先要寫入權（拿不到也照常開啟，存檔時瀏覽器會再問一次）
+      try { if (picked.requestPermission) await picked.requestPermission({ mode: 'readwrite' }); } catch (e) {}
+      // 換檔：上一份檔案的狀態不可沿用（壞檔旗標、歸零保險絲基準）；新檔讀不懂 → 整個退回上一份
+      const prev = { fileHandle, dbCache, dbCorrupted, lastReadProjects, sawRealData };
+      fileHandle = picked;
+      dbCorrupted = false;
+      lastReadProjects = 0;
+      sawRealData = false;
+      try { await this._readFile(); }
+      catch (e) { ({ fileHandle, dbCache, dbCorrupted, lastReadProjects, sawRealData } = prev); throw e; }
+      if (dbCorrupted) {
+        ({ fileHandle, dbCache, dbCorrupted, lastReadProjects, sawRealData } = prev);
+        return { success: false, reason: 'corrupt', filename: picked.name };
+      }
       await this._saveHandle(fileHandle);
       return { success: true, filename: fileHandle.name };
     } catch(e) {

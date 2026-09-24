@@ -212,9 +212,12 @@ const CURRENT = {
   });
   await page.evaluate(() => { _ensureLockBeforeWrite = async () => false; });
   ok('資料庫保護沒解除 → 不開檔案選擇', (await clicks()) === 0);
-  await page.evaluate(() => { _ensureLockBeforeWrite = async () => true; fbOk = false; });
-  ok('沒連線資料庫 → 不開檔案選擇＋提示', (await clicks()) === 0 && /請先登入 SharePoint/.test(await page.evaluate(() => window.__alerts.pop() || '')));
-  await page.evaluate(() => { fbOk = true; });
+  await page.evaluate(() => { _ensureLockBeforeWrite = async () => true; fbOk = false;
+    window.__offlinePick = 0; window.__realPickDb = handlePickDb; handlePickDb = async () => { window.__offlinePick++; }; });
+  ok('沒連線資料庫 → 不強制登入 SharePoint，改開「離線資料庫」挑檔（見 offline-db.test.js）',
+    (await clicks()) === 0 && (await page.evaluate(() => window.__offlinePick)) === 1
+    && !(await page.evaluate(() => window.__alerts.some(a => /請先登入 SharePoint/.test(a)))));
+  await page.evaluate(() => { fbOk = true; handlePickDb = window.__realPickDb; });
   ok('一切正常 → 開檔案選擇', (await clicks()) === 1);
 
   console.log('\n[G] 目前開著的專案被覆蓋 → 自動重新載入');

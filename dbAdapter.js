@@ -2,12 +2,19 @@
 // DB_MODE is defined in config.js (loaded before this file)
 
 const dbAdapter = {
+  // 離線資料庫：不在公司／連不到 SharePoint 時，改讀寫一份本機的資料庫 JSON（例如備份檔）。
+  // 執行期切換（DB_MODE 仍是 'sharepoint'）；開了就走 fileDb，所有「SharePoint 模式」的判斷都視為否
+  // （沒有共用編輯鎖、存檔前先重讀磁碟）。按「登入 SharePoint」成功後切回。
+  _offline: false,
+  setOffline(on) { this._offline = !!on; },
+  isOffline() { return this._offline; },
+
   _backend() {
-    return DB_MODE === 'sharepoint' ? graphDb : fileDb;
+    return this.isSharePointMode() ? graphDb : fileDb;
   },
 
   isSharePointMode() {
-    return DB_MODE === 'sharepoint';
+    return DB_MODE === 'sharepoint' && !this._offline;
   },
 
   async init() {
@@ -38,7 +45,7 @@ const dbAdapter = {
   },
 
   getDbInfo() {
-    if (DB_MODE === 'sharepoint') {
+    if (this.isSharePointMode()) {
       const acct = graphDb.getAccountInfo();
       if (acct) return `SharePoint ｜ ${acct.name} (${acct.email})`;
       return 'SharePoint ｜ 未登入';
@@ -75,7 +82,7 @@ const dbAdapter = {
   },
 
   async pickFile() {
-    if (DB_MODE === 'sharepoint') return await graphDb.openFile();
+    if (this.isSharePointMode()) return await graphDb.openFile();
     return await fileDb.pickFile();
   },
 
@@ -148,27 +155,27 @@ const dbAdapter = {
 
   /* ─── Pessimistic lock methods ────────────────────────── */
   async acquireLock() {
-    if (DB_MODE !== 'sharepoint') return null;
+    if (!this.isSharePointMode()) return null;
     return await graphDb.acquireLock();
   },
 
   async releaseLock() {
-    if (DB_MODE !== 'sharepoint') return;
+    if (!this.isSharePointMode()) return;
     return await graphDb.releaseLock();
   },
 
   hasLock() {
-    if (DB_MODE !== 'sharepoint') return true;
+    if (!this.isSharePointMode()) return true;
     return graphDb.hasLock();
   },
 
   getLockInfo() {
-    if (DB_MODE !== 'sharepoint') return null;
+    if (!this.isSharePointMode()) return null;
     return graphDb.getLockInfo();
   },
 
   async peekLock() {
-    if (DB_MODE !== 'sharepoint') return null;
+    if (!this.isSharePointMode()) return null;
     return await graphDb.peekLock();
   }
 };
