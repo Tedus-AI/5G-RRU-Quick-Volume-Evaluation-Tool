@@ -344,6 +344,49 @@ AI-Thermal 有好幾份資料用「元件名稱」當 key：TH/ME 頁的 `therma
 讀寫一律 try/catch。⚠ **寬度變動後要呼叫 `resizePlots()`**，否則 Plotly 圖停在舊寬度；
 登入前／登出後由 `_setShellVisible(false)` 把側欄、分隔線、主區一起藏起來。
 
+### 詳細分析頁（`renderTab1`）：前三名卡片＋分析表（改前先看這裡）
+
+**裕度分級是單一事實來源 `MARGIN_LEVELS`**（`marginLevel(m)`）：`<0` 超溫 ✖、`0–10` 偏緊 ▲、`10–20` 留意 ●、
+`≥20` 充裕 ✓（°C，比 `Tj_Margin`）。卡片底色、表格裕度格、PDF 卡片／表格、視覺化報告「溫度裕度總覽」圖的門檻
+全部讀它 —— 不要在別處再寫一次 `<10`、`<20`。每級帶 `fg/bg/bd/mk` 四個色值（文字／底色／框線／記號，
+fg 對 bg ≥ 5.9:1），畫面用 `marginVars(lv)` 塞進 CSS 變數 `--st-*`，PDF 直接讀同一組 hex。
+**紅色只給超溫**；顏色一律搭配圖示＋文字（使用者要求卡片不要白底 → 改成依分級上色，不是依名次上色）。
+
+- **卡片保留三張**（使用者明確要求不要改成摘要列），#1 較寬（`1.3fr 1fr 1fr`，PDF 同比例）。
+  容器寬 < 760px（`@container`）改單欄。卡片只取 `Total_W > 0`，#1 ＝ `computeAll` 的瓶頸（同一個排序）。
+- **溫升組成條**（`tempBudget(r, R, G)`）：`高度 H×Slope` → `散熱器 T_hsk_base − T_amb` → `介面 P×R_TIM` →
+  `基板 P×R_int` → `Rjc P×R_jc`（**以 Tc 判定的元件不含 Rjc 段**），各段加總 ＝ `T_ref − T_amb`，與
+  `computeAll` 同一組公式（`P` 是**單顆**功耗）。改 `computeAll` 的溫度鏈就要一起改這裡（契約測試會抓）。
+  條的右端直線＝限溫；超溫時超出的那段畫紅色斜線。段色：高度灰、熱路徑四段同一色相淺→深
+  （`validate_palette --ordinal` 驗過；淺段需要白底 track，所以條是白底不是卡片底色）。
+- **卡片說明文字 `riskNotes()` 畫面與 PDF 共用**（回傳 `{warn, runs:[{t, b}]}`）。#1：散熱器依這顆設計
+  （散熱器溫升 ＝ 允許溫升 ÷ 安全係數；係數 1.0 寫「未預留餘裕」）＋「只改善這顆最多多出幾度（之後換 #2）」
+  ＝ `max(A₂,0) − max(A₁,0)`；允許溫升 < 0 → 「散熱器壓到環溫也救不了」＋改善方向。
+- **分析表格式 `tab2Cell(r, c)`（畫面與 PDF 共用）**：溫度／功耗 1 位、熱阻 3 位小數（原本 Rjc 1 位 → 0.16 顯示成 0.2）；
+  `IC top`／`None` 的 `R_int`、`TIM_Type = None` 的 `R_TIM` → 「—」（不適用，不是 0）；算不出 → 「—」。
+  數字靠右＋`tabular-nums`；表頭第二行是單位（`TAB2_UNITS`）；判定用的溫度（Tj 或 Tc）粗體、另一個淡色；
+  裕度格標 `Tj`／`Tc`；數量 > 1 的總功耗第二行寫「數量 × 單顆」（`fmtW`：最多 3 位小數，0.55 不可顯示成 0.6）。
+  前三名用名次徽章 `#1～#3`，**不再整列塗色**。
+- **排序**（`tab1Sort`／`tab1SortRows`）：預設依風險（允許溫升小→大）；點表頭（`<button>`＋`aria-sort`）
+  第一次一律「最差的在上」（裕度／允許溫升／限溫／名稱小→大，其餘大→小），再點反向；**不發熱的元件永遠在後**、
+  「—」排最後；recalc 後保留；排序中的欄位被隱藏 → 退回風險排序。PDF 一律風險排序。欄位順序固定照
+  `ALL_TAB1_COLS`（原本取消再勾選會跑到最後）。
+- 按 👁 排除的元件**列在表下**（「未計入計算 N 顆」），PDF 同樣列出。
+- 超溫警告以 `Temp_Label` 寫 `Tj=`／`Tc=`（原本一律寫 Tj）。
+- 契約測試：`tests/tab2-analysis.test.js`（含 PDF docDefinition 攔截比對）。
+
+### PDF 字型缺字：`pdfSafeText`／`pdfSanitize`
+
+PDF 的中文字型是 fontsource 的 Noto Sans TC **「chinese-traditional」子集**：**沒有**全形標點（（）：，／＝）、
+箭頭（→）、幾何符號與 dingbats（▲ ● ■ ✓ ✖ ◆ ⚠）、希臘字母（η）與 emoji；pdfmake 又不會換字型 → 印成方框
+（原本「防水邊距（T/B…）」「界面材料類型（下方為型號）」就是方框）。有的：半形 ASCII、`° × ÷ — − – · • …`、`、「」`。
+
+- `generatePDFReport` 在 `createPdf` 前對整份 `content`（與頁首頁尾函式的回傳）跑 `pdfSanitize`：全形 → 半形、
+  `→`→`->`、`≥`→`>=`、`η`→`eta`，其餘符號拿掉。只在用 `NotoSansTC` 時套用；`image`／`canvas` 不碰。
+- 所以 PDF 文字**可以**跟畫面共用同一份字串（例如 `riskNotes`），不必另寫一份半形版；但**不要依賴符號傳達意思**
+  （圖示會被拿掉）—— PDF 的狀態用「文字＋底色」，圖例色塊用表格格子的 `fillColor` 畫。
+- 要加新符號前先查字型：`fontTools` 讀 `chinese-traditional-400-normal.ttf` 的 cmap。
+
 ### `R_jc`（熱阻 Rjc）：AI-Thermal 推導過就鎖定
 
 熱阻是**規格書的值**，單一事實來源在 AI-Thermal Tab1 的熱阻表（θJC）。在本工具改它只會被
