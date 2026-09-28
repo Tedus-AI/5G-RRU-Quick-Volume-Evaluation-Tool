@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>📡 5G RRU 體積估算引擎 Pro</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Barlow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
@@ -605,6 +605,8 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
 <script src="graphDb.js?v=__APP_VERSION__"></script>
 <script src="dbAdapter.js?v=__APP_VERSION__"></script>
 <script src="compMerge.js?v=__APP_VERSION__"></script>
+<!-- 3D 模擬視圖（viewer3d.js）用的 three.js：importmap 一定要在 module script 之前 -->
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 </head>
 <body>
 <div id="update-banner" role="alert" aria-live="assertive">
@@ -637,8 +639,7 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
         <li><strong>散熱器尺寸優化</strong>：根據瓶頸元件裕度與安全係數，自動推算所需鰭片高度、數量與整機體積</li>
         <li><strong>重量預估</strong>：含散熱器、Shield、Filter、Shielding、PCB 等分項重量</li>
         <li><strong>敏感度分析 & Tornado Chart</strong>：支援 Gap / T_amb / Power Scale 變數掃描</li>
-        <li><strong>3D 模擬視圖</strong>：真實比例展示電子艙 + 散熱器 + 鰭片結構</li>
-        <li><strong>AI 寫實渲染輔助</strong>：一鍵生成精確提示詞</li>
+        <li><strong>3D 模擬視圖</strong>：寫實 3D 模型（外殼、濾波器、屏蔽罩、PCB、元件、基板凹槽），可調整元件橫向位置、I/O 與天線座；下載目前畫面、輸出兩頁 A4 的 3D 模型 PDF</li>
         <li><strong>專案存取</strong>：JSON 格式載入/儲存</li>
       </ul>
     </div>
@@ -959,13 +960,12 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
     <div id="tab2-comp"></div>
   </div>
 
-  <!-- Tab 3: 3D 模擬視圖 -->
+  <!-- Tab 3: 3D 模擬視圖（viewer3d.js 掛進 #tab3-3d） -->
   <div class="tab-content" id="tab3">
     <h3>🧊 3D SIMULATION (3D 模擬視圖)</h3>
-    <p style="color:#888;font-size:0.82rem;margin-bottom:12px;">模型展示：底部電子艙 + 頂部散熱鰭片，鰭片數量與間距皆為真實比例。鰭片含底部→頂部熱梯度配色。</p>
-    <div id="tab3-3d" style="width:100%;height:600px;"></div>
-    <div id="tab3-info" style="margin-top:10px;"></div>
-    <div id="tab3-ai"></div>
+    <p style="color:#64748b;font-size:0.82rem;margin-bottom:10px;">寫實 3D 模型：外殼、腔體濾波器、屏蔽罩、PCB、元件與基板凹槽全部由參數控制台與元件設定產生。元件的橫向位置、轉向、數位 I/O、天線座與屏蔽罩設定<b>跟著專案存</b>（按「💾 儲存專案」）；元件相對高度在這裡改會直接寫回元件設定並重算。</p>
+    <div id="tab3-msg" hidden></div>
+    <div id="tab3-3d"></div>
   </div>
 
   <!-- Tab 4: 敏感度分析 -->
@@ -1875,6 +1875,8 @@ window.addEventListener('beforeunload', function(e){
   if (typeof dbAdapter !== 'undefined' && dbAdapter.isSharePointMode && dbAdapter.isSharePointMode() && dbAdapter.hasLock && dbAdapter.hasLock()) {
     e.preventDefault(); e.returnValue = ''; return '';
   }
+  // 專案有還沒存的修改（元件設定、參數、3D 頁的調整）→ 一樣提醒
+  if (typeof projectIsDirty === 'function' && projectIsDirty()) { e.preventDefault(); e.returnValue = ''; return ''; }
 });
 // 頁面確實卸載了才釋放鎖（fire-and-forget；送不出去靠 TTL 兜底）。按「留下」不會觸發 pagehide → 鎖保留。
 window.addEventListener('pagehide', function(){
@@ -2388,7 +2390,7 @@ function updateHDisplay(){
 // =====================================================
 // TAB SWITCHING
 // =====================================================
-function switchTab(i){document.querySelectorAll('.tab-btn').forEach((b,j)=>b.classList.toggle('active',j===i));document.querySelectorAll('.tab-content').forEach((c,j)=>c.classList.toggle('active',j===i));if(i===3)setTimeout(()=>renderTab3(),50);setTimeout(function(){var tab=document.getElementById('tab'+i);if(tab){tab.querySelectorAll('.js-plotly-plot').forEach(function(gd){Plotly.Plots.resize(gd);});}},80);}
+function switchTab(i){const was3=tab3Active();if(was3&&i!==3&&window.RRU3D)RRU3D.left();document.querySelectorAll('.tab-btn').forEach((b,j)=>b.classList.toggle('active',j===i));document.querySelectorAll('.tab-content').forEach((c,j)=>c.classList.toggle('active',j===i));if(i===3)setTimeout(()=>{if(tab3Stale||!window.RRU3D)renderTab3();else RRU3D.resize();},50);setTimeout(function(){var tab=document.getElementById('tab'+i);if(tab){tab.querySelectorAll('.js-plotly-plot').forEach(function(gd){Plotly.Plots.resize(gd);});}},80);}
 function switchSubTab(i){document.querySelectorAll('.sub-tab-btn').forEach((b,j)=>b.classList.toggle('active',j===i));document.querySelectorAll('.sub-content').forEach((c,j)=>c.classList.toggle('active',j===i));}
 
 // =====================================================
@@ -3413,66 +3415,117 @@ function renderTab2(){
 }
 
 // =====================================================
-// TAB 3: 3D + AI RENDERING SECTION
+// TAB 3: 3D 模擬視圖（viewer3d.js）
+// -----------------------------------------------------
+// 檢視器是獨立的 ES module（viewer3d.js，three.js 走 importmap），載入後設定 window.RRU3D 並發出 rru3d-ready。
+// 這裡只負責「餵資料」：build3dData() 把參數控制台、computeAll 的結果、元件設定與 AI-Thermal 的規格
+// 整理成檢視器要的格式；檢視器不自己算熱。
+// 3D 頁的調整（元件橫向位置、轉向、數位 I/O、天線座、屏蔽罩設定）是專案的一部分：
+//   layout3d＝{ posW:{_cid:[每顆橫向 mm 或 null]}, rot:{_cid:[每顆 0／90]}, io:[…], ant:[…], shd:{…} }
+//   → 跟著「💾 儲存專案」寫進共用 DB（專案層級欄位，只有本工具寫；以 _cid 為 key，元件改名不會掉）。
+// 元件相對高度在 3D 上改＝寫回元件設定的 Height(mm) 並重算（跟在元件設定改是同一件事）。
 // =====================================================
-function renderTab3(){
-  if(!calcResults)return;let R=calcResults;
-  if(R.blocked){document.getElementById('tab3-3d').innerHTML=calcGateHtml(R.missing);document.getElementById('tab3-info').innerHTML='';document.getElementById('tab3-ai').innerHTML='';return;}
-  if(R.drc_failed||R.Fin_Height<=0){document.getElementById('tab3-3d').innerHTML='<div class="drc-error">🚫 '+(R.drc_msg||'無效尺寸')+'</div>';document.getElementById('tab3-info').innerHTML='';document.getElementById('tab3-ai').innerHTML='';return;}
-  let L=R.L_hsk,W=R.W_hsk,hb=G.H_shield+G.H_filter,zbs=hb,zbe=hb+G.t_base,zfs=zbe,zfe=zbe+R.Fin_Height;
-  let ijk={i:[7,0,0,0,4,4,6,6,4,0,3,2],j:[3,4,1,2,5,6,5,2,0,1,6,3],k:[0,7,2,3,6,7,1,1,5,5,7,6]};
-  let tr=[];
-  tr.push({type:'mesh3d',x:[0,L,L,0,0,L,L,0],y:[0,0,W,W,0,0,W,W],z:[0,0,0,0,hb,hb,hb,hb],...ijk,color:'#5D6D7E',opacity:1,flatshading:true,name:'Electronics Body',showscale:false});
-  tr.push({type:'mesh3d',x:[0,L,L,0,0,L,L,0],y:[0,0,W,W,0,0,W,W],z:[zbs,zbs,zbs,zbs,zbe,zbe,zbe,zbe],...ijk,color:'#BDC3C7',opacity:1,flatshading:true,name:'Heatsink Base',showscale:false});
-  if(R.Fin_Count>0){let tfw=R.Fin_Count*G.Fin_t+(R.Fin_Count-1)*G.Gap;let yo=(W-tfw)/2;
-    for(let i=0;i<R.Fin_Count;i++){let f0=yo+i*(G.Fin_t+G.Gap),f1=f0+G.Fin_t;if(f1>W)break;
-      tr.push({type:'mesh3d',x:[0,L,L,0,0,L,L,0],y:[f0,f0,f1,f1,f0,f0,f1,f1],z:[zfs,zfs,zfs,zfs,zfe,zfe,zfe,zfe],...ijk,intensity:[0,0,0,0,1,1,1,1],cmin:0,cmax:1,colorscale:[[0,'#E67E22'],[0.45,'#BDC3C7'],[1,'#D6EAF8']],showscale:false,flatshading:true,name:i===0?'Fins':'',showlegend:i===0});}}
-  let md=Math.max(L,W,R.RRU_Height)*1.1;
-  Plotly.newPlot('tab3-3d',tr,{scene:{xaxis:{title:'Length',range:[0,md]},yaxis:{title:'Width',range:[0,md]},zaxis:{title:'Height',range:[0,md]},aspectmode:'manual',aspectratio:{x:1,y:1,z:1},camera:{projection:{type:'orthographic'},eye:{x:1.2,y:1.2,z:1.2}},bgcolor:'white'},margin:{l:0,r:0,b:0,t:0},height:600},{responsive:true,displaylogo:false,modeBarButtonsToAdd:[fullscreenBtn],displayModeBar:true});
-  // Reduce scroll zoom sensitivity by intercepting wheel at capture phase,
-  // replacing with a smaller deltaY so Plotly's native handler zooms gently
-  (function(){
-    var el=document.getElementById('tab3-3d');
-    if(el._wheelFixed)return;
-    el._wheelFixed=true;
-    el.addEventListener('wheel',function(e){
-      e.stopImmediatePropagation();
-      e.preventDefault();
-      var reduced=new WheelEvent('wheel',{
-        deltaX:e.deltaX,
-        deltaY:e.deltaY*0.15,
-        deltaZ:e.deltaZ,
-        deltaMode:e.deltaMode,
-        clientX:e.clientX,clientY:e.clientY,
-        screenX:e.screenX,screenY:e.screenY,
-        ctrlKey:e.ctrlKey,shiftKey:e.shiftKey,altKey:e.altKey,metaKey:e.metaKey,
-        bubbles:true,cancelable:true
-      });
-      el._wheelFixed=false;
-      el.dispatchEvent(reduced);
-      el._wheelFixed=true;
-    },{capture:true,passive:false});
-  })();
-  document.getElementById('tab3-info').innerHTML='<div class="alert alert-info">📐 <b>外觀尺寸：</b>長 '+L.toFixed(1)+' x 寬 '+W.toFixed(1)+' x 高 '+R.RRU_Height.toFixed(1)+' mm</div><div class="alert alert-success">⚡ <b>鰭片規格：</b>數量 '+R.Fin_Count+' pcs | 高度 '+R.Fin_Height.toFixed(1)+' mm | 厚度 '+G.Fin_t+' mm | 間距 '+G.Gap+' mm</div>';
-
-  // AI Rendering Section
-  let prompt=`5G RRU 無線射頻單元工業設計渲染圖\n\n核心結構（極其嚴格參照圖 1 的幾何形狀）：\n請務必精確生成 ${R.Fin_Count} 片散熱鰭片。關鍵要求：這些鰭片必須是「平直、互相平行且垂直於底面」的長方形薄板結構。嚴禁生成尖刺狀、錐形或任何斜向角度的鰭片。\n\n外觀細節與材質（參考圖 2）：\n材質採用白色粉體烤漆壓鑄鋁（霧面質感）。\n\n技術規格：\n整體尺寸約 ${L.toFixed(0)}x${W.toFixed(0)}x${R.RRU_Height.toFixed(0)}mm。\n\n光線設定：\n專業攝影棚打光，強調對比與柔和陰影。使用邊緣光（Rim Lighting）來勾勒並凸顯每一片散熱鰭片的俐落線條。\n\n視覺規格：\n一律生成3D等角視圖，純白背景，8k 高解析度，照片級真實影像渲染。`;
-  let aiHtml=`<hr style="margin:20px 0;"><h3>🎨 RRU 寫實渲染生成流程 (AI)</h3>
-  <div class="ai-section"><h4>準備工作</h4>
-  <div style="display:flex;gap:15px;margin:15px 0;flex-wrap:wrap;">
-    <div style="flex:1;min-width:250px;"><h4>Step 1. 下載 3D 模擬圖</h4><div class="alert alert-info">請將滑鼠移至上方 3D 圖表的右上角，點擊相機圖示 (Download plot as a png) 下載目前的模型底圖。</div></div>
-    <div style="flex:1;min-width:250px;"><h4>Step 2. 下載 I/O 寫實參考圖</h4><div style="display:flex;align-items:center;gap:12px;margin:10px 0;"><img src="reference_style.png" alt="RRU I/O 參考圖" style="max-width:200px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.15);cursor:pointer;" onclick="window.open('reference_style.png','_blank')"><a href="reference_style.png" download="reference_style.png" style="display:inline-block;padding:8px 16px;background:#0984e3;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:0.9rem;white-space:nowrap;">⬇️ 下載原始高解析度圖檔</a></div></div>
-  </div>
-  <h4>Step 3. 複製提示詞 (Prompt)</h4>
-  <textarea class="prompt-box" id="ai-prompt">${prompt}</textarea>
-  <div style="margin-top:10px;"><button class="copy-btn" onclick="copyPrompt()">📋 複製提示詞 (Copy Prompt)</button> <span id="copy-status" style="color:#00b894;font-weight:600;"></span></div>
-  <h4 style="margin-top:15px;">Step 4. 執行 AI 生成</h4>
-  <div class="alert alert-success">1. 開啟 <b>Gemini</b> 對話視窗。<br>2. 確認模型設定為 <b>思考型 (Thinking) + Nano Banana (Imagen 3)</b>。<br>3. 依序上傳兩張圖片 (3D 模擬圖 + 寫實參考圖)。<br>4. 貼上提示詞並送出。</div>
-  </div>`;
-  document.getElementById('tab3-ai').innerHTML=aiHtml;
+var layout3d=null;            // 目前專案的 3D 調整（見上）；沒有調整＝null（var：init 之前就可能被讀到）
+var projThermalSpecs={};      // 目前專案的 thermal_specs（AI-Thermal TH/ME 頁，唯讀：3D 用元件本體大小／高度）
+var tab3Stale=true;           // 資料變了但 3D 頁不在畫面上 → 切過去時再畫（3D 重建要花時間）
+var dbSpecs3dCache=null,dbSpecs3dBusy=false;
+function specKey3d(n){return String(n||'').replace(/ /g,'_').replace(/\//g,'-');}   // ＝AI-Thermal 的 sgSpecKey
+function tab3Active(){const t=document.getElementById('tab3');return !!(t&&t.classList.contains('active'));}
+function l3dHas(){return !!layout3d&&Object.keys(layout3d).some(k=>{const v=layout3d[k];return Array.isArray(v)?true:v&&typeof v==='object'&&Object.keys(v).length>0;});}
+function l3dComps(){return ['rf','digital','pwr'].flatMap(cat=>(components[cat]||[]).filter(c=>c&&c.Component));}
+// layout3d（以 _cid 為 key）→ 檢視器的編輯狀態（以元件名稱為 key；同名的以第一顆為準）
+function l3dToEdit(L){
+  const E={posW:{},hgt:{},rot:{},io:null,ant:null,shd:{}};
+  if(!L)return E;
+  l3dComps().forEach(c=>{
+    const id=c._cid,n=String(c.Component);if(!id)return;
+    if(L.posW&&Array.isArray(L.posW[id])&&!(n in E.posW))E.posW[n]=L.posW[id].slice();
+    if(L.rot&&Array.isArray(L.rot[id])&&!(n in E.rot))E.rot[n]=L.rot[id].slice();
+  });
+  if(Array.isArray(L.io))E.io=CompMerge.clone(L.io);
+  if(Array.isArray(L.ant))E.ant=CompMerge.clone(L.ant);
+  if(L.shd&&typeof L.shd==='object')E.shd=CompMerge.clone(L.shd);
+  return E;
 }
-
-function copyPrompt(){let t=document.getElementById('ai-prompt').value;navigator.clipboard.writeText(t).then(()=>{document.getElementById('copy-status').textContent='✅ 已複製！';setTimeout(()=>document.getElementById('copy-status').textContent='',2000);}).catch(()=>{let ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);document.getElementById('copy-status').textContent='✅ 已複製！';setTimeout(()=>document.getElementById('copy-status').textContent='',2000);});}
+// 檢視器的編輯狀態 → layout3d；已經刪掉的元件的調整不留
+function l3dFromEdit(E){
+  const byName={};l3dComps().forEach(c=>{const n=String(c.Component);if(c._cid&&!(n in byName))byName[n]=c._cid;});
+  const pick=(src,keep)=>{const o={};Object.keys(src||{}).forEach(n=>{const id=byName[n],a=src[n];if(id&&Array.isArray(a)&&a.some(keep))o[id]=a.map(v=>typeof v==='number'&&isFinite(v)?v:null);});return o;};
+  const L={},posW=pick(E.posW,v=>typeof v==='number'),rot=pick(E.rot,v=>v===90);
+  if(Object.keys(posW).length)L.posW=posW;
+  if(Object.keys(rot).length)L.rot=rot;
+  if(Array.isArray(E.io))L.io=CompMerge.clone(E.io);
+  if(Array.isArray(E.ant))L.ant=CompMerge.clone(E.ant);
+  if(E.shd&&Object.keys(E.shd).length)L.shd=CompMerge.clone(E.shd);
+  return Object.keys(L).length?L:null;
+}
+// 檢視器每存一次調整就交過來（saveEdit）：元件相對高度寫回元件設定 → 重算；其餘轉成 layout3d
+function r3dOnEdit(E){
+  let hChg=false;
+  Object.keys(E.hgt||{}).forEach(n=>{
+    const v=E.hgt[n];if(typeof v!=='number'||!isFinite(v))return;
+    const c=l3dComps().find(q=>String(q.Component)===n);
+    if(c&&_num(c['Height(mm)'])!==v){c['Height(mm)']=v;hChg=true;}
+  });
+  E.hgt={};
+  ['rf','digital','pwr'].forEach(cat=>CompMerge.ensureCids(components[cat]));   // layout3d 以 _cid 為 key（沒有的補發）
+  layout3d=l3dFromEdit(E);
+  if(hChg)recalc();   // 元件設定、詳細分析、體積都跟著變；3D 頁也會用新的結果重畫
+}
+// 資料庫裡所有有規格的元件（同名元件查本體大小／高度用）：背景讀一次，讀完重畫 3D
+function dbSpecs3d(){
+  if(!dbSpecs3dCache&&!dbSpecs3dBusy&&typeof dbAdapter!=='undefined'&&dbAdapter.isReady&&dbAdapter.isReady()){
+    dbSpecs3dBusy=true;
+    dbAdapter.getCollection('projects').then(projs=>{
+      const out={};
+      Object.entries(projs||{}).forEach(([id,p])=>{const ts=p&&p.thermal_specs;if(!ts)return;
+        Object.entries(ts).forEach(([k,s])=>{if(s&&!out[k]&&(s.heatSourceSize||s.heatSourceHeight))out[k]={size:s.heatSourceSize,h:s.heatSourceHeight,proj:p.project_name||id};});});
+      dbSpecs3dCache=out;
+    }).catch(e=>{console.warn('[3D] specs load failed:',e);dbSpecs3dCache={};})
+      .finally(()=>{dbSpecs3dBusy=false;tab3Stale=true;if(tab3Active())renderTab3();});
+  }
+  const out=Object.assign({},dbSpecs3dCache||{});
+  Object.entries(projThermalSpecs||{}).forEach(([k,s])=>{if(s&&(s.heatSourceSize||s.heatSourceHeight))out[k]={size:s.heatSourceSize,h:s.heatSourceHeight,proj:projectNameGet()||'目前專案'};});
+  return out;
+}
+function build3dData(){
+  const R=calcResults,g=G,fe=finEffective(g),hv=calcHValue(g.Gap,R.Fin_Height),fs=document.getElementById('fin_tech_selector_v2');
+  const rows=R.rows.map(x=>{
+    const s=(projThermalSpecs||{})[specKey3d(x.Component)];
+    return {key:x._cid||String(x.Component),name:String(x.Component||''),cat:x._src,type:x.Type||'',qty:x.Qty,P:x['Power(W)'],hgt:x['Height(mm)'],
+      padL:x.Pad_L,padW:x.Pad_W,thick:x['Thick(mm)'],bt:x.Board_Type,tim:x.TIM_Type,timModel:x.TIM_Model||'',timT:x.TIM_t,
+      baseL:x.Base_L,baseW:x.Base_W,W:x.Total_W,Tc:x.Tc,Tj:x.Tj,Tref:x.T_ref,ref:x.Temp_Label,lim:x['Limit(C)'],margin:x.Tj_Margin,adt:x.Allowed_dT,
+      spec:s?{size:s.heatSourceSize,h:s.heatSourceHeight,boss:s.bossSize,epad:s.epadSize,gap:s.icToHSK,dir:s.heatDirection}:null};
+  });
+  return {
+    key:currentProjectId||'__new__',name:projectNameGet()||'（未命名）',
+    g:{L_pcb:g.L_pcb,W_pcb:g.W_pcb,t_PCB:g.t_PCB,t_base:g.t_base,H_shield:g.H_shield,H_filter:g.H_filter,Top:g.Top,Btm:g.Btm,Left:g.Left,Right:g.Right,
+       Coin_L:g.Coin_L_Setting,Coin_W:g.Coin_W_Setting,Coin_T:g.Coin_T_Setting,Gap:g.Gap,Fin_t:g.Fin_t,T_amb:g.T_amb,Margin:g.Margin,Slope:g.Slope,
+       tech:fs?fs.value:g.fin_tech_selector_v2,Draft:g.Draft_Angle},
+    r:{L:R.L_hsk,W:R.W_hsk,H:R.RRU_Height,FH:R.Fin_Height,n:R.Fin_Count,T_base:R.T_hsk_base,T_root:R.T_root,G_root:R.G_root,h:hv.h_value,eta:R.eta_fin,
+       k_fin:fe.k_fin,isDC:fe.isDC,V:R.Volume_L,kg:R.total_weight_kg,Q:R.rows.filter(x=>x.Total_W>0).reduce((a,x)=>a+x.Total_W,0),TP:R.Total_Power,
+       bn:R.Bottleneck_Name,MDA:R.Min_dT_Allowed},
+    rows,specs:dbSpecs3d(),edit:l3dToEdit(layout3d),dirty:projectIsDirty(),
+  };
+}
+function renderTab3(force){
+  const R=calcResults;if(!R)return;
+  if(!force&&!tab3Active()){tab3Stale=true;return;}   // 不在畫面上：切過來再畫
+  tab3Stale=false;
+  const msg=document.getElementById('tab3-msg'),box=document.getElementById('tab3-3d');
+  const show=html=>{msg.innerHTML=html;msg.hidden=!html;box.hidden=!!html;};
+  if(R.blocked){show(calcGateHtml(R.missing));return;}
+  if(R.drc_failed||R.Fin_Height<=0){show('<div class="drc-error">🚫 '+(R.drc_msg||'無效尺寸')+'</div>');return;}
+  if(!window.RRU3D){const f=window.__rru3dFail;
+    show(f==='webgl'?'<div class="alert alert-danger">⚠️ 這台電腦的瀏覽器無法啟用 WebGL，3D 視窗無法顯示（其他分頁不受影響）。</div>'
+      :f?'<div class="alert alert-danger">⚠️ 3D 引擎載入失敗（需要網路連到 cdn.jsdelivr.net 載入 three.js）；其他分頁不受影響。</div>'
+      :'<div class="alert alert-info">⏳ 載入 3D 引擎…</div>');return;}
+  show('');
+  try{RRU3D.update(build3dData(),{onEdit:r3dOnEdit});}
+  catch(e){console.error('[3D] update failed:',e);show('<div class="alert alert-danger">⚠️ 3D 模型建立失敗：'+_vEsc(e.message||String(e))+'</div>');}
+}
+window.addEventListener('rru3d-ready',()=>{tab3Stale=true;if(tab3Active())renderTab3();});
+window.addEventListener('rru3d-fail',()=>{if(tab3Active())renderTab3(true);});
 
 // =====================================================
 // SENSITIVITY ANALYSIS
@@ -3677,6 +3730,8 @@ function renderGlobalsBanner(){
 
 function handleFileLoad(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=function(ev){try{let d=JSON.parse(ev.target.result);
   CompMerge.ensureProjectCids(d);
+  layout3d=d.layout3d&&typeof d.layout3d==='object'?CompMerge.clone(d.layout3d):null;   // 3D 頁的調整跟著檔案走
+  projThermalSpecs=d.thermal_specs&&typeof d.thermal_specs==='object'?d.thermal_specs:{};
   setGlobalsNotes(loadGlobalsForProject(d.global_params),d.global_params);
   // 缺哪一類就是空的，不可沿用上一個專案的元件
   components.rf=Array.isArray(d.rf_data)?d.rf_data:[];components.digital=Array.isArray(d.digital_data)?d.digital_data:[];components.pwr=Array.isArray(d.pwr_data)?d.pwr_data:[];
@@ -3789,7 +3844,7 @@ function projScreenDigest(){
   const g={};PROJECT_GLOBAL_KEYS.forEach(k=>g[k]=G[k]);
   const fs=document.getElementById('fin_tech_selector_v2');g.fin_tech_selector_v2=fs?fs.value:undefined;
   const norm=arr=>(arr||[]).map(CompMerge.normalizeComp);
-  return CompMerge.canon({name:projectNameGet(),g,rf:norm(components.rf),digital:norm(components.digital),pwr:norm(components.pwr)});
+  return CompMerge.canon({name:projectNameGet(),g,rf:norm(components.rf),digital:norm(components.digital),pwr:norm(components.pwr),l3d:l3dHas()?layout3d:null});
 }
 function markProjectClean(){projClean=projScreenDigest();}
 function projectIsDirty(){return projClean!==null&&projScreenDigest()!==projClean;}
@@ -3878,6 +3933,7 @@ function promptProjectName(){
 function saveProject(){readGlobals();let d={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},project_name:projectNameGet(),global_params:{},rf_data:components.rf,digital_data:components.digital,pwr_data:components.pwr};
   ['T_amb','Margin','L_pcb','W_pcb','t_PCB','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Coin_T_Setting','K_Coin','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle','fin_custom_emb','fin_eta_emb','fin_kfin_emb','fin_custom_dc','fin_eta_dc','fin_kfin_dc'].forEach(k=>d.global_params[k]=G[k]);
   d.global_params.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;
+  if(l3dHas())d.layout3d=CompMerge.clone(layout3d);   // 3D 頁的調整
   let b=new Blob([JSON.stringify(d,null,4)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(b);let pn=projectNameGet()||'Project';a.download='RRU_'+pn+'_'+new Date().toISOString().slice(0,10)+'.json';a.click();}
 
 // =====================================================
@@ -3899,8 +3955,12 @@ function _buildProjectFields(name, existing){
   // 快取，釋放編輯鎖（整份快取寫回）時沒按儲存也會被寫進共用 DB。
   // `_filled` 是舊版「自動補值」的 UI 標記（已不再補值），若還殘留在資料裡就順手去掉。
   const strip=arr=>(arr||[]).map(c=>{const{_filled,...rest}=c||{};return JSON.parse(JSON.stringify(rest));});
-  return {meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},project_name:name,global_params:mergedGlobals,
+  const fields={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},project_name:name,global_params:mergedGlobals,
           rf_data:strip(components.rf),digital_data:strip(components.digital),pwr_data:strip(components.pwr)};
+  // 3D 頁的調整（專案層級、只有本工具寫；以 _cid 為 key）：有調整、或資料庫裡原本有（全部回到自動 → 寫空物件）才寫
+  if(l3dHas())fields.layout3d=CompMerge.clone(layout3d);
+  else if(existing&&existing.layout3d)fields.layout3d={};
+  return fields;
 }
 
 async function cloudSaveProject(){
@@ -4045,6 +4105,10 @@ async function cloudLoadOne(docId,opts){
     const d=JSON.parse(JSON.stringify(src));
     // 元件 id（三方合併靠它配對）：舊資料沒有 → 這裡補發，快照與畫面用同一份 id
     CompMerge.ensureProjectCids(d);
+    // 3D 頁的調整（layout3d）與 AI-Thermal 的規格（3D 用元件本體大小／高度，唯讀）；不可沿用上一個專案的
+    layout3d=d.layout3d&&typeof d.layout3d==='object'?CompMerge.clone(d.layout3d):null;
+    projThermalSpecs=d.thermal_specs&&typeof d.thermal_specs==='object'?d.thermal_specs:{};
+    dbSpecs3dCache=null;
     // 載入時快照：一定要在下面的轉型／板厚遷移「之前」取（那些是本工具這次的修改，存檔時要算我的）
     const base=projBaseFrom(d);
     // 專案載入時重讀型號庫：AI-Thermal 端可能剛新增/改過型號，k 與填縫厚度要吃到最新值
@@ -4479,18 +4543,13 @@ async function generatePDFReport() {
     const valid = R.rows.filter(r => r.Total_W > 0);
 
     // 視覺化報告改為直接畫（vrTempPdf／vrPowerPdf／vrCompPdf，與畫面同一組資料函式），不再截圖表；
-    // 這裡只截 3D 與敏感度分析的 Plotly 圖
+    // 這裡只截敏感度分析的 Plotly 圖；3D 圖由 viewer3d.js 渲染
     let chartImages = {};
     const chartPromises = [];
-    // Capture 3D
-    const el3d = document.getElementById('tab3-3d');
-    if (el3d && el3d.querySelector('.js-plotly-plot')) {
-      chartPromises.push((async () => {
-        try {
-          const gd = el3d.querySelector('.js-plotly-plot') || el3d;
-          chartImages['3d'] = await Plotly.toImage(gd, {format:'png', width:900, height:600, scale:2});
-        } catch(e) {}
-      })());
+    // 3D：由 viewer3d.js 在畫面外渲染一張等角圖（白底、組裝、寫實；不動使用者目前的視角與顯示方式）
+    if (window.RRU3D && !R.blocked && !R.drc_failed && R.Fin_Height > 0) {
+      try { renderTab3(true); const img = RRU3D.snapshot(1800, 1150); if (img) chartImages['3d'] = img; }
+      catch(e) { console.warn('[PDF] 3D snapshot failed:', e); }
     }
     // Capture sensitivity charts (inside sa-sweep-results / sa-tornado-results containers)
     ['sa-cl','sa-cr','tv','tt'].forEach(id => {
@@ -5309,5 +5368,7 @@ async function loadLibraryFromLocal() {
   recalc();
 }
 </script>
+<!-- 3D 模擬視圖：載入失敗（連不到 CDN）→ Tab3 顯示原因，其他分頁不受影響 -->
+<script type="module" src="viewer3d.js?v=__APP_VERSION__" onerror="window.__rru3dFail=window.__rru3dFail||'load';window.dispatchEvent(new Event('rru3d-fail'))"></script>
 </body>
 </html>

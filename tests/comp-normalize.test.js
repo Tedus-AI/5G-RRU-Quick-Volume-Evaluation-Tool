@@ -149,6 +149,7 @@ const AIT_PROJECT = {
     await cloudLoadOne('RRU_5G');
   }, AIT_PROJECT);
   const e = await page.evaluate(() => {
+    renderTab3(true);   // 3D 頁不在畫面上時不畫 → 這裡強制畫一次（擋下原因由工具顯示，不需要 3D 引擎）
     const cir = components.rf.find(x => x.Component === 'Circulators-B20B28');
     const L = calcResults.missing || [];
     const txt = id => (document.getElementById(id) || {}).textContent || '';
@@ -160,7 +161,7 @@ const AIT_PROJECT = {
       alert: window.__alerts.join('\n'),
       banner: txt('comp-missing-banner'),
       t1: txt('tab1-alerts'), t1table: document.getElementById('tab1-table').innerHTML,
-      t2: txt('tab2-result'), t2rest: txt('tab2-charts') + txt('tab2-comp'), t3: txt('tab3-3d'),
+      t2: txt('tab2-result'), t2rest: txt('tab2-charts') + txt('tab2-comp'), t3: txt('tab3-msg'),
     };
   });
   ok('缺的欄位沒有被補上分類預設值', e.noDefaults, e);
