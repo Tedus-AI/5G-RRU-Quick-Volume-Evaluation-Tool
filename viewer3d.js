@@ -768,8 +768,15 @@ function buildFins(fg) {
     geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
     return geo;
   };
-  const zs = Array.from({ length: n }, (_, i) => zf0 + i * pitch + tr / 2), bosses = LAY.bosses || [];
-  const hitB = z => bosses.filter(b => z + tr / 2 > b.z0 && z - tr / 2 < b.z1).sort((a, b) => a.x0 - b.x0);
+  // 鰭片一律從基板完整長到鰭尖；補肉是疊上去的實心塊，跟鰭片干涉就直接呈現干涉（使用者要求）。
+  // ⚠ 不要改回「碰到補肉的鰭片整段從補肉頂面才長」：鰭片只有一部分厚度壓在補肉上時（跨在補肉邊緣），
+  //   露在補肉外面的那半片根部也被截掉，看起來整片鰭片被挖空。
+  // 唯一要讓開的是「凹槽」穿出基板頂面、伸進補肉裡的那一段（元件本體在裡面，從 PCB 側看進凹槽不能看到鰭片）：
+  // 那一段從凹槽頂往上長 —— 凹槽四周有 BOSS_WALL、頂上有 T_MIN 的補肉包著，從外面看不到這個切口
+  const zs = Array.from({ length: n }, (_, i) => zf0 + i * pitch + tr / 2), holes = [];
+  (LAY.bosses || []).forEach(b => b.insts.forEach(o => { const pk = o.pocket; if (!pk) return; const top = pk.depth - LAY.tb;   // 凹槽頂離基板頂面的高度
+    if (top > 0) holes.push({ x0: o.x - pk.L / 2, x1: o.x + pk.L / 2, z0: o.z - pk.W / 2, z1: o.z + pk.W / 2, s0: Math.min(top + 0.05, FH - 1) }); }));
+  const hitB = z => holes.filter(h => z + tr / 2 > h.z0 && z - tr / 2 < h.z1).sort((a, b) => a.x0 - b.x0);
   const plain = zs.filter(z => !hitB(z).length);
   if (plain.length) {
     const im = new THREE.InstancedMesh(geoOf(0, L, 0), MAT.powderFin, plain.length); im.castShadow = im.receiveShadow = true;
@@ -779,7 +786,7 @@ function buildFins(fg) {
   }
   zs.filter(z => hitB(z).length).forEach(z => {
     const segs = []; let x = 0;
-    hitB(z).forEach(b => { if (b.x0 > x) segs.push([x, b.x0, 0]); segs.push([Math.max(x, b.x0), b.x1, Math.min(b.h, FH - 1)]); x = Math.max(x, b.x1); });
+    hitB(z).forEach(h => { if (h.x0 > x) segs.push([x, h.x0, 0]); if (h.x1 > x) segs.push([Math.max(x, h.x0), h.x1, h.s0]); x = Math.max(x, h.x1); });
     if (x < L) segs.push([x, L, 0]);
     segs.forEach(([xa, xb, s0]) => { if (xb - xa < 0.5) return; const m = mesh(geoOf(xa, xb, s0, true), MAT.powderFin, 'fin'); m.userData.sec = 'al'; m.position.set(0, yTop, z); fg.add(m); reg('fins', m); });
   });
@@ -813,7 +820,7 @@ function buildHSK() {
   LAY.inst.forEach(o => { const m = timMesh(o); if (m) { grp.add(m); reg('pocket', m); } });
   // 補肉：凹槽穿出基板（或 SFP 光口的框超出端牆）的地方，在鰭片側加高
   const bg = new THREE.Group(); bg.name = 'boss'; grp.add(bg); grp.userData.boss = bg; buildBosses(bg);
-  // 鰭片：片數、厚度、間距照計算結果（Die-casting 畫成根厚尖薄的梯形）；經過補肉的那段從補肉頂面長起（鰭尖高度不變）
+  // 鰭片：片數、厚度、間距照計算結果（Die-casting 畫成根厚尖薄的梯形）；一律從基板長到鰭尖，補肉疊在上面（只讓開凹槽，見 buildFins）
   const fg = new THREE.Group(); fg.name = 'fins'; grp.add(fg); grp.userData.fins = fg; buildFins(fg);
   // PCB 鎖在 HSK 上的螺絲孔、分模面鎖附孔（示意）
   LAY.holes.forEach(([x, z]) => { const h = mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.3, 16), MAT.hole, 'hole'); h.position.set(x, D - 0.1, z); grp.add(h); reg('rib', h); });
