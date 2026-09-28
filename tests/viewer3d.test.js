@@ -18,6 +18,7 @@
  *   [J] 版面：3D 頁自動收合參數控制台；並排門檻依 3D 頁本身的寬度；尺寸標註不被工具列／視角方塊蓋住；
  *       畫面大小變了、還沒動過視角 → 自動重新對焦（自己縮放過就不動）
  *   [L] Die-casting 鰭片：梯形斷面（根部 T_root、鰭尖 Fin_t）、節距＝Fin_t＋Gap、整排在散熱器寬度內
+ *   [M] 補肉疊在鰭片上：鰭片一律從基板長到鰭尖（跨在補肉邊緣的也不截短），只有穿過凹槽的那段從凹槽頂往上長
  *   [K] 瀏覽器沒有 WebGL：工具照常可用、Tab3 顯示原因、沒有未攔截的錯誤
  *
  * 執行：
@@ -306,16 +307,20 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   await page.waitForTimeout(500);
   await page.evaluate(() => { RRU3D.resize(); document.querySelector('#tab3 [data-view="iso"]').click(); });
   await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 15000 });
+  // ResizeObserver 的通知跟著畫面更新送出；軟體繪圖（SwiftShader）一幀可能要好幾秒 → 等兩次 requestAnimationFrame 真的跑完（通知一定已送達），不要用固定毫秒數
+  const frames2 = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
   await page.evaluate(() => setSidebarCollapsed(false));
-  await page.waitForTimeout(900);
+  await frames2();
+  await page.waitForFunction(() => { const fs = RRU3D.dbg.frameSize(), st = document.getElementById('r3d-stage'); return !!fs && Math.abs(fs[0] - st.clientWidth) <= 2 && Math.abs(fs[1] - st.clientHeight) <= 2; }, null, { timeout: 30000 }).catch(() => {});
   K.open = await measure();
-  // 自己縮放過 → 畫面大小再變也不重新對焦（不搶使用者的鏡頭）
+  // 自己調過視角（滾輪；deltaY 0 → 標記「使用者動過」但相機不動，免得縮放的慣性干擾判斷）→ 畫面大小再變也不重新對焦（不搶使用者的鏡頭）
   const zm = await page.evaluate(async () => {
-    const D = RRU3D.dbg, sl = ms => new Promise(r => setTimeout(r, ms));
-    document.getElementById('r3d-cv').dispatchEvent(new WheelEvent('wheel', { deltaY: -240, bubbles: true, cancelable: true })); await sl(700);
-    const c0 = D.camera.position.clone(), fs0 = JSON.stringify(D.frameSize());
-    setSidebarCollapsed(true); await sl(900);
-    return { view: D.curView(), moved: +D.camera.position.distanceTo(c0).toFixed(2), sameFrame: JSON.stringify(D.frameSize()) === fs0, collapsed: document.body.classList.contains('sidebar-collapsed') };
+    const D = RRU3D.dbg, raf2 = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    document.getElementById('r3d-cv').dispatchEvent(new WheelEvent('wheel', { deltaY: 0, bubbles: true, cancelable: true })); await raf2();
+    const c0 = D.camera.position.clone(), fs0 = JSON.stringify(D.frameSize()), st = document.getElementById('r3d-stage'), sz0 = [st.clientWidth, st.clientHeight];
+    setSidebarCollapsed(true); await raf2(); await raf2();
+    return { view: D.curView(), moved: +D.camera.position.distanceTo(c0).toFixed(2), sameFrame: JSON.stringify(D.frameSize()) === fs0,
+             resized: sz0[0] !== st.clientWidth || sz0[1] !== st.clientHeight, collapsed: document.body.classList.contains('sidebar-collapsed') };
   });
   await page.setViewportSize({ width: 1600, height: 1000 });
   ok('切到 3D 頁時參數控制台自動收合 → 1440×900 也是 3D 畫面＋編輯面板並排（3D ≥ 900 px）', K[1440].collapsed && K[1440].sideBySide && K[1440].stageW >= 900, K[1440]);
@@ -323,7 +328,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   ok('在 3D 頁自己展開參數控制台（1440×900）→ 編輯面板排到下方、3D 仍 ≥ 900 px、外框跟著內容撐高', !K.open.collapsed && K.open.stacked && K.open.stageW >= 900 && K.open.appBottom <= 0, K.open);
   ok('畫面大小變了、還沒動過視角 → 用新的大小重新對焦（仍是等角視角）', K.open.framedAtSize && K.open.view === 'iso', K.open);
   ok('尺寸標註都在 3D 畫面內、不被工具列／視角方塊／平移鍵蓋住（三種情況）', [K[1440], K[1920], K.open].every(k => k.labels >= 3 && !k.hit.length && k.inStage), K);
-  ok('自己用滾輪縮放過 → 畫面大小再變也不自動重新對焦', zm.collapsed && zm.view === null && zm.sameFrame && zm.moved < 1, zm);
+  ok('自己用滾輪調過視角 → 畫面大小再變也不自動重新對焦', zm.collapsed && zm.resized && zm.view === null && zm.sameFrame && zm.moved < 1, zm);
 
   console.log('\n[L] Die-casting 鰭片：根厚尖薄（拔模角）、節距＝Fin_t＋Gap、整排在散熱器寬度內');
   const setIn = (id, v) => page.evaluate(([id, v]) => { const e = document.getElementById(id); e.value = String(v); e.dispatchEvent(new Event('change', { bubbles: true })); }, [id, v]);
@@ -350,6 +355,43 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   ok('片數＝computeAll；節距＝Fin_t＋Gap（跟 G_root＝節距 − T_root 同一個定義）', Ld.count === Ld.n && near(Ld.pitch, Ld.Fin_t + Ld.Gap, 0.01), Ld);
   ok('整排鰭片（根部）在散熱器寬度內、左右置中', Ld.root0 >= -0.01 && Ld.root1 <= Ld.W + 0.01 && near(Ld.root0, Ld.W - Ld.root1, 0.01), Ld);
   ok('元件清單寫出鰭尖→根部厚度與拔模角', Ld.spec, Ld);
+
+  console.log('\n[M] 補肉疊在鰭片上：鰭片一律從基板長到鰭尖（跨在補肉邊緣的也不截短），只讓開凹槽');
+  await page.evaluate(() => { const s = document.getElementById('fin_tech_selector_v2'); s.value = 'Embedded Fin (0.95)'; s.dispatchEvent(new Event('change', { bubbles: true })); });
+  await setIn('Fin_t', 1.2);
+  // 補肉位置不動，找一個 Gap 讓某片鰭片剛好跨在補肉的邊緣（使用者回報「整片鰭片被挖空」的情況）
+  const gM = await page.evaluate(() => {
+    const b = (RRU3D.dbg.LAY().bosses || [])[0]; if (!b) return null;
+    const W = calcResults.W_hsk, t = G.Fin_t;
+    for (let k = 0; k < 400; k++) { const gp = +(9 + k * 0.01).toFixed(2), n = calcFinCount(W, gp, t), pitch = t + gp, zf0 = (W - ((n - 1) * pitch + t)) / 2;
+      for (let i = 0; i < n; i++) { const z = zf0 + i * pitch + t / 2; if (Math.abs(z - b.z0) < t * 0.2 || Math.abs(z - b.z1) < t * 0.2) return gp; } }
+    return null;
+  });
+  await setIn('Gap', gM);
+  await page.waitForFunction(() => !calcResults.drc_failed && !RRU3D.dbg.P().r.isDC, null, { timeout: 30000 });
+  await page.waitForTimeout(800);
+  const M = await page.evaluate(() => {
+    const D = RRU3D.dbg, L = D.LAY(), P = D.P(), fins = D.HSK().userData.fins, t = P.g.Fin_t, b = L.bosses[0];
+    const holes = []; (L.bosses || []).forEach(bb => bb.insts.forEach(o => { const pk = o.pocket; if (pk && pk.depth - L.tb > 0) holes.push({ x0: o.x - pk.L / 2, x1: o.x + pk.L / 2, z0: o.z - pk.W / 2, z1: o.z + pk.W / 2, top: pk.depth - L.tb }); }));
+    const cut = [], intrude = [], byZ = {};
+    fins.children.forEach(m => {
+      const pos = m.geometry.attributes.position; let x0 = 1e9, x1 = -1e9, y0 = 1e9;
+      for (let i = 0; i < pos.count; i++) { x0 = Math.min(x0, pos.getX(i)); x1 = Math.max(x1, pos.getX(i)); y0 = Math.min(y0, pos.getY(i)); }
+      (m.isInstancedMesh ? Array.from({ length: m.count }, (_, i) => m.instanceMatrix.array[i * 16 + 14]) : [m.position.z]).forEach(z => {
+        const k = Math.round(z * 1000) / 1000; (byZ[k] = byZ[k] || []).push({ x0, x1, y0 });
+        const over = h => x0 < h.x1 - 0.01 && x1 > h.x0 + 0.01 && z + t / 2 > h.z0 && z - t / 2 < h.z1;
+        if (y0 > 0.01) { const h = holes.find(h => x0 >= h.x0 - 0.01 && x1 <= h.x1 + 0.01 && z + t / 2 > h.z0 && z - t / 2 < h.z1); if (!h) cut.push({ z: +z.toFixed(2), x0, x1, y0 }); else if (y0 < h.top) intrude.push({ z, y0, top: h.top }); }
+        else holes.forEach(h => { if (over(h)) intrude.push({ z: +z.toFixed(2), x0, x1, top: h.top }); });
+      });
+    });
+    const edge = Object.keys(byZ).map(Number).find(z => (z + t / 2 > b.z0 && z - t / 2 < b.z1) && !(z - t / 2 >= b.z0 && z + t / 2 <= b.z1));
+    const eSegs = edge != null ? byZ[Math.round(edge * 1000) / 1000] : null;
+    return { gap: G.Gap, boss: [b.z0, b.z1, b.h], holes: holes.length, edge, eSegs, cut, intrude,
+             edgeFull: !!eSegs && eSegs.every(s => s.y0 < 0.01) && Math.min(...eSegs.map(s => s.x0)) < 0.01 && Math.max(...eSegs.map(s => s.x1)) > P.r.L - 0.01 };
+  });
+  ok('有一片鰭片跨在補肉邊緣 → 它照樣從基板完整長到鰭尖（不被挖空）', M.edge != null && M.edgeFull, M);
+  ok('不是從基板長起的鰭片段只出現在凹槽範圍內（其他地方一律完整）', M.cut.length === 0, M.cut);
+  ok('鰭片不會穿進凹槽（穿過凹槽的那段從凹槽頂往上長）', M.holes > 0 && M.intrude.length === 0, M);
 
   ok('沒有 JS 錯誤', errors.length === 0, errors);
   await browser.close();
