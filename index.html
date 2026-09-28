@@ -52,6 +52,10 @@ body.sidebar-collapsed #sidebar-resizer .grip{display:none;}
 body.sidebar-collapsed #sidebar-resizer .peek{display:block;}
 body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .sidebar h2{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+/* 標題列（含收合鈕）捲動時固定在頂端：側欄本身是捲動容器，h2 黏在它的頂端。負邊距把側欄的內距
+   也蓋住（底色同側欄），捲上來的欄位才不會從標題列上方或兩側露出來；看起來跟原本的位置一樣。
+   ⚠ top 要是 −20px（＝側欄上內距）：sticky 的 top 是從捲動容器的內距以內算起，寫 0 會停在距頂端 20px，上面露出一條捲上去的欄位 */
+.sidebar h2{position:sticky;top:-20px;z-index:5;background:var(--sidebar-bg);margin:-20px -20px 15px;padding:20px 20px 10px;}
 .sidebar-toggle{background:transparent;border:1px solid #475569;border-radius:6px;color:#cbd5e1;
   cursor:pointer;padding:3px 6px;line-height:0;flex:0 0 auto;}
 .sidebar-toggle:hover{background:#334155;border-color:#94a3b8;color:#fff;}
@@ -2087,8 +2091,17 @@ function setSidebarCollapsed(on,persist){
   if(rz)rz.title=on?'展開參數控制台':'拖曳調整參數控制台寬度；點一下收合／展開';
   const bt=document.querySelector('.sidebar-toggle');
   if(bt)bt.title=on?'展開參數控制台':'收合參數控制台（也可以點中間的分隔線；拖曳分隔線可調寬度）';
-  if(persist!==false)_lsSet(LS_SB_C,on?'1':'0');
+  if(persist!==false){_lsSet(LS_SB_C,on?'1':'0');sbAuto3d=false;}   // 使用者自己按的 → 以他的選擇為準（見 sbAutoFor3d）
   resizePlots();
+}
+
+/* 3D 頁要的是畫面寬：切到 3D 頁自動收合參數控制台（不寫進 localStorage，不改使用者平常的偏好），
+   離開 3D 頁時還原。已經是收合的就不動；在 3D 頁自己展開／收合過 → 以使用者的選擇為準、離開時也不還原 */
+var sbAuto3d=false;
+function sbAutoFor3d(enter){
+  const on=document.body.classList.contains('sidebar-collapsed');
+  if(enter){ if(!on){ setSidebarCollapsed(true,false); sbAuto3d=true; } }
+  else if(sbAuto3d){ sbAuto3d=false; if(on)setSidebarCollapsed(false,false); }
 }
 
 function toggleSidebar(){ setSidebarCollapsed(!document.body.classList.contains('sidebar-collapsed')); }
@@ -2390,7 +2403,7 @@ function updateHDisplay(){
 // =====================================================
 // TAB SWITCHING
 // =====================================================
-function switchTab(i){const was3=tab3Active();if(was3&&i!==3&&window.RRU3D)RRU3D.left();document.querySelectorAll('.tab-btn').forEach((b,j)=>b.classList.toggle('active',j===i));document.querySelectorAll('.tab-content').forEach((c,j)=>c.classList.toggle('active',j===i));if(i===3)setTimeout(()=>{if(tab3Stale||!window.RRU3D)renderTab3();else RRU3D.resize();},50);setTimeout(function(){var tab=document.getElementById('tab'+i);if(tab){tab.querySelectorAll('.js-plotly-plot').forEach(function(gd){Plotly.Plots.resize(gd);});}},80);}
+function switchTab(i){const was3=tab3Active();if(was3&&i!==3&&window.RRU3D)RRU3D.left();if(i===3&&!was3)sbAutoFor3d(true);else if(was3&&i!==3)sbAutoFor3d(false);document.querySelectorAll('.tab-btn').forEach((b,j)=>b.classList.toggle('active',j===i));document.querySelectorAll('.tab-content').forEach((c,j)=>c.classList.toggle('active',j===i));if(i===3)setTimeout(()=>{if(tab3Stale||!window.RRU3D)renderTab3();else RRU3D.resize();},50);setTimeout(function(){var tab=document.getElementById('tab'+i);if(tab){tab.querySelectorAll('.js-plotly-plot').forEach(function(gd){Plotly.Plots.resize(gd);});}},80);}
 function switchSubTab(i){document.querySelectorAll('.sub-tab-btn').forEach((b,j)=>b.classList.toggle('active',j===i));document.querySelectorAll('.sub-content').forEach((c,j)=>c.classList.toggle('active',j===i));}
 
 // =====================================================

@@ -15,7 +15,9 @@
  *   [G] 切到別的分頁：取消選取、方向鍵不會動到 3D；有未存的修改（含 3D 調整）離開頁面會提醒
  *   [H] PDF 報告第 6 節：3D 圖由檢視器在畫面外渲染（JPEG），不改使用者目前的視角與顯示方式
  *   [I] 3D 頁的「輸出 PDF」（兩頁 A4）與「下載目前畫面」（PNG）在工具裡是一般下載
- *   [J] 版面：並排門檻依 3D 頁本身的寬度（左邊有參數控制台）；尺寸標註不被工具列／視角方塊蓋住
+ *   [J] 版面：3D 頁自動收合參數控制台；並排門檻依 3D 頁本身的寬度；尺寸標註不被工具列／視角方塊蓋住；
+ *       畫面大小變了、還沒動過視角 → 自動重新對焦（自己縮放過就不動）
+ *   [L] Die-casting 鰭片：梯形斷面（根部 T_root、鰭尖 Fin_t）、節距＝Fin_t＋Gap、整排在散熱器寬度內
  *   [K] 瀏覽器沒有 WebGL：工具照常可用、Tab3 顯示原因、沒有未攔截的錯誤
  *
  * 執行：
@@ -274,8 +276,22 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   const png = fs.readFileSync(await sdl.path());
   ok('下載目前畫面：PNG（含標註）', png.slice(1, 4).toString() === 'PNG' && /_3D畫面_\d{8}-\d{4}\.png$/.test(sdl.suggestedFilename()) && png.length > 20000, [sdl.suggestedFilename(), png.length]);
 
-  console.log('\n[J] 版面：3D 頁放在工具裡（左邊有參數控制台）→ 並排門檻依 3D 頁本身的寬度；尺寸標註不被工具列／視角方塊蓋住');
+  console.log('\n[J] 版面：3D 頁自動收合參數控制台；並排門檻依 3D 頁本身的寬度；尺寸標註不被蓋住；畫面大小變了自動重新對焦');
   await page.evaluate(() => { document.querySelector('#tab3 [data-state="asm"]').click(); document.querySelector('#tab3 [data-mode="real"]').click(); });
+  const measure = () => page.evaluate(() => {
+    const R = el => el.getBoundingClientRect(), stEl = document.getElementById('r3d-stage');
+    const vis = el => { const r = R(el); if (!r.width || !r.height) return false; for (let e = el; e; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden') return false; } return true; };
+    const root = document.querySelector('#tab3 .r3d'), st = R(stEl), side = R(root.querySelector('.side'));
+    const overlays = [...root.querySelectorAll('.tools .tgrp, #r3d-vcube > *, #r3d-hint, #r3d-selbar')].filter(vis).map(R);
+    const labels = [...root.querySelectorAll('#r3d-labels .dim')].filter(vis);
+    const hit = [];
+    labels.forEach(el => { const a = R(el); overlays.forEach(o => { if (Math.min(a.right, o.right) - Math.max(a.left, o.left) > 0 && Math.min(a.bottom, o.bottom) - Math.max(a.top, o.top) > 0) hit.push(el.innerText.replace(/\s+/g, ' ')); }); });
+    const inStage = labels.every(el => { const a = R(el); return a.left >= st.left && a.right <= st.right && a.top >= st.top && a.bottom <= st.bottom; });
+    const fs = RRU3D.dbg.frameSize() || [0, 0];
+    return { stageW: Math.round(st.width), sideBySide: side.left >= st.right - 1, stacked: side.top >= st.bottom - 1, labels: labels.length, hit, inStage,
+             appBottom: Math.round(R(root.querySelector('.app')).bottom - R(root).bottom), collapsed: document.body.classList.contains('sidebar-collapsed'),
+             framedAtSize: Math.abs(fs[0] - stEl.clientWidth) <= 2 && Math.abs(fs[1] - stEl.clientHeight) <= 2, view: RRU3D.dbg.curView() };
+  });
   const K = {};
   for (const [w, hh] of [[1440, 900], [1920, 1080]]) {
     await page.setViewportSize({ width: w, height: hh });
@@ -283,24 +299,57 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     await page.evaluate(() => { RRU3D.resize(); document.querySelector('#tab3 [data-view="iso"]').click(); });
     await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 15000 });
     await page.waitForTimeout(400);
-    K[w] = await page.evaluate(() => {
-      const R = el => el.getBoundingClientRect();
-      const vis = el => { const r = R(el); if (!r.width || !r.height) return false; for (let e = el; e; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden') return false; } return true; };
-      const root = document.querySelector('#tab3 .r3d'), st = R(document.getElementById('r3d-stage')), side = R(root.querySelector('.side'));
-      const overlays = [...root.querySelectorAll('.tools .tgrp, #r3d-vcube > *, #r3d-hint, #r3d-selbar')].filter(vis).map(R);
-      const labels = [...root.querySelectorAll('#r3d-labels .dim')].filter(vis);
-      const hit = [];
-      labels.forEach(el => { const a = R(el); overlays.forEach(o => { if (Math.min(a.right, o.right) - Math.max(a.left, o.left) > 0 && Math.min(a.bottom, o.bottom) - Math.max(a.top, o.top) > 0) hit.push(el.innerText.replace(/\s+/g, ' ')); }); });
-      const inStage = labels.every(el => { const a = R(el); return a.left >= st.left && a.right <= st.right && a.top >= st.top && a.bottom <= st.bottom; });
-      return { stageW: Math.round(st.width), sideBySide: side.left >= st.right - 1, stacked: side.top >= st.bottom - 1, labels: labels.length, hit, inStage,
-               rootH: Math.round(R(root).height), appBottom: Math.round(R(root.querySelector('.app')).bottom - R(root).bottom) };
-    });
+    K[w] = await measure();
   }
+  // 1440×900：使用者在 3D 頁自己展開參數控制台 → 3D 畫面變了 → 還沒動過視角 → 用新的大小重新對焦
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.waitForTimeout(500);
+  await page.evaluate(() => { RRU3D.resize(); document.querySelector('#tab3 [data-view="iso"]').click(); });
+  await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 15000 });
+  await page.evaluate(() => setSidebarCollapsed(false));
+  await page.waitForTimeout(900);
+  K.open = await measure();
+  // 自己縮放過 → 畫面大小再變也不重新對焦（不搶使用者的鏡頭）
+  const zm = await page.evaluate(async () => {
+    const D = RRU3D.dbg, sl = ms => new Promise(r => setTimeout(r, ms));
+    document.getElementById('r3d-cv').dispatchEvent(new WheelEvent('wheel', { deltaY: -240, bubbles: true, cancelable: true })); await sl(700);
+    const c0 = D.camera.position.clone(), fs0 = JSON.stringify(D.frameSize());
+    setSidebarCollapsed(true); await sl(900);
+    return { view: D.curView(), moved: +D.camera.position.distanceTo(c0).toFixed(2), sameFrame: JSON.stringify(D.frameSize()) === fs0, collapsed: document.body.classList.contains('sidebar-collapsed') };
+  });
   await page.setViewportSize({ width: 1600, height: 1000 });
-  ok('1440×900（參數控制台展開）：編輯面板排到下方，3D 畫面夠寬（≥ 900 px）', K[1440].stacked && K[1440].stageW >= 900, K[1440]);
-  ok('1920×1080：3D 畫面與編輯面板並排，3D 畫面 ≥ 900 px', K[1920].sideBySide && K[1920].stageW >= 900, K[1920]);
-  ok('尺寸標註都在 3D 畫面內、不被工具列／視角方塊／平移鍵蓋住（兩種版面）', [1440, 1920].every(w => K[w].labels >= 3 && !K[w].hit.length && K[w].inStage), K);
-  ok('單欄時外框跟著內容撐高（編輯面板不會溢出外框）', K[1440].appBottom <= 0, K[1440]);
+  ok('切到 3D 頁時參數控制台自動收合 → 1440×900 也是 3D 畫面＋編輯面板並排（3D ≥ 900 px）', K[1440].collapsed && K[1440].sideBySide && K[1440].stageW >= 900, K[1440]);
+  ok('1920×1080：並排，3D 畫面 ≥ 900 px', K[1920].sideBySide && K[1920].stageW >= 900, K[1920]);
+  ok('在 3D 頁自己展開參數控制台（1440×900）→ 編輯面板排到下方、3D 仍 ≥ 900 px、外框跟著內容撐高', !K.open.collapsed && K.open.stacked && K.open.stageW >= 900 && K.open.appBottom <= 0, K.open);
+  ok('畫面大小變了、還沒動過視角 → 用新的大小重新對焦（仍是等角視角）', K.open.framedAtSize && K.open.view === 'iso', K.open);
+  ok('尺寸標註都在 3D 畫面內、不被工具列／視角方塊／平移鍵蓋住（三種情況）', [K[1440], K[1920], K.open].every(k => k.labels >= 3 && !k.hit.length && k.inStage), K);
+  ok('自己用滾輪縮放過 → 畫面大小再變也不自動重新對焦', zm.collapsed && zm.view === null && zm.sameFrame && zm.moved < 1, zm);
+
+  console.log('\n[L] Die-casting 鰭片：根厚尖薄（拔模角）、節距＝Fin_t＋Gap、整排在散熱器寬度內');
+  const setIn = (id, v) => page.evaluate(([id, v]) => { const e = document.getElementById(id); e.value = String(v); e.dispatchEvent(new Event('change', { bubbles: true })); }, [id, v]);
+  await page.evaluate(() => { const s = document.getElementById('fin_tech_selector_v2'); s.value = 'Die-casting Fin (0.90)'; s.dispatchEvent(new Event('change', { bubbles: true })); });
+  await setIn('Fin_t', 2); await setIn('Gap', 10);     // 範例的 1.2／11.6 在 Die-casting 會被 DRC 擋下（AR > 45）
+  await page.waitForFunction(() => !calcResults.drc_failed && RRU3D.dbg.P().r.isDC, null, { timeout: 30000 });
+  await page.waitForTimeout(800);
+  const Ld = await page.evaluate(() => {
+    const D = RRU3D.dbg, P = D.P(), R = calcResults, fins = D.HSK().userData.fins, zs = new Set();
+    let shape = null;
+    fins.children.forEach(m => {
+      const pos = m.geometry.attributes.position; let y0 = 1e9, y1 = -1e9;
+      for (let i = 0; i < pos.count; i++) { y0 = Math.min(y0, pos.getY(i)); y1 = Math.max(y1, pos.getY(i)); }
+      let b0 = 1e9, b1 = -1e9, t0 = 1e9, t1 = -1e9;
+      for (let i = 0; i < pos.count; i++) { const y = pos.getY(i), z = pos.getZ(i); if (Math.abs(y - y0) < 1e-3) { b0 = Math.min(b0, z); b1 = Math.max(b1, z); } if (Math.abs(y - y1) < 1e-3) { t0 = Math.min(t0, z); t1 = Math.max(t1, z); } }
+      if (!shape && Math.abs((y1 - y0) - P.r.FH) < 0.01) shape = { type: m.geometry.type, root: +(b1 - b0).toFixed(3), tip: +(t1 - t0).toFixed(3) };
+      (m.isInstancedMesh ? Array.from({ length: m.count }, (_, i) => m.instanceMatrix.array[i * 16 + 14]) : [m.position.z]).forEach(z => zs.add(Math.round(z * 1000) / 1000));
+    });
+    const z = [...zs].sort((a, b) => a - b);
+    return { T_root: R.T_root, Fin_t: G.Fin_t, Gap: G.Gap, n: R.Fin_Count, W: R.W_hsk, shape, count: z.length, pitch: (z[z.length - 1] - z[0]) / (z.length - 1),
+             root0: z[0] - R.T_root / 2, root1: z[z.length - 1] + R.T_root / 2, spec: document.querySelector('#tab3 .r3d').textContent.includes('尖→根') };
+  });
+  ok('鰭片斷面是梯形：根部厚＝T_root、鰭尖厚＝Fin_t（computeAll 的值）', !!Ld.shape && Ld.shape.type === 'ExtrudeGeometry' && near(Ld.shape.root, Ld.T_root, 0.01) && near(Ld.shape.tip, Ld.Fin_t, 0.01), Ld);
+  ok('片數＝computeAll；節距＝Fin_t＋Gap（跟 G_root＝節距 − T_root 同一個定義）', Ld.count === Ld.n && near(Ld.pitch, Ld.Fin_t + Ld.Gap, 0.01), Ld);
+  ok('整排鰭片（根部）在散熱器寬度內、左右置中', Ld.root0 >= -0.01 && Ld.root1 <= Ld.W + 0.01 && near(Ld.root0, Ld.W - Ld.root1, 0.01), Ld);
+  ok('元件清單寫出鰭尖→根部厚度與拔模角', Ld.spec, Ld);
 
   ok('沒有 JS 錯誤', errors.length === 0, errors);
   await browser.close();

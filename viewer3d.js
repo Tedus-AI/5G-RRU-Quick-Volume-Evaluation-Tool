@@ -183,8 +183,15 @@ let P = null;                                  // 目前的專案
 /* 散熱器基板溫度：工具的 T_hsk_eff = T_hsk_base + 元件相對高度 × Slope → 沿長度方向線性上升（只在 PCB 範圍內有定義） */
 function rootT(x) { const g = P.g; return P.r.T_base + Math.min(Math.max(x - g.Btm, 0), g.L_pcb) * g.Slope; }
 /* 1D 鰭片方程式：θ(s)/θb = cosh(m(Lc−s)) / cosh(m·Lc)，m = √(2h / (k·t)) */
+/* 鰭片規格文字（元件清單、PDF 共用）：Die-casting 寫出鰭尖→根部厚度、拔模角與根部間隙（跟 computeAll 的 T_root／G_root 同一組） */
+function finSpecTxt() {
+  const g = P.g, r = P.r;
+  if (r.isDC && r.T_root > g.Fin_t) return '厚 ' + g.Fin_t + '→' + f2(r.T_root) + '（尖→根，拔模 ' + g.Draft + '°）· 間距 ' + g.Gap + '（根部 ' + f2(r.G_root) + '）';
+  return '厚 ' + g.Fin_t + ' · 間距 ' + g.Gap;
+}
 function finT(x, s) {
-  const m = Math.sqrt(2 * P.r.h / (P.r.k_fin * P.g.Fin_t / 1000)), Lc = (P.r.FH + P.g.Fin_t / 2) / 1000;
+  const tf = P.r.isDC && P.r.T_root > P.g.Fin_t ? (P.g.Fin_t + P.r.T_root) / 2 : P.g.Fin_t;   // Die-casting：跟 computeAll 算 η_fin 一樣用平均厚度
+  const m = Math.sqrt(2 * P.r.h / (P.r.k_fin * tf / 1000)), Lc = (P.r.FH + tf / 2) / 1000;
   return P.g.T_amb + (rootT(x) - P.g.T_amb) * Math.cosh(m * (Lc - s / 1000)) / Math.cosh(m * Lc);
 }
 let T_LO = 45, T_HI = 100;
@@ -748,7 +755,8 @@ function buildFins(fg) {
   fg.children.slice().forEach(c => { fg.remove(c); if (c.geometry) c.geometry.dispose(); });
   parts.fins = [];
   const g = P.g, r = P.r, L = r.L, W = r.W, FH = r.FH, yTop = LAY.yTop, t = g.Fin_t, n = r.n, gap = g.Gap, isDC = r.isDC && r.T_root > t;
-  const tr = isDC ? r.T_root : t, pitch = tr + gap, tfw = n * tr + (n - 1) * gap, zf0 = (W - tfw) / 2;
+  // 節距＝鰭尖厚＋間距（跟 computeAll 同一個定義：Die-casting 的 G_root＝節距 − T_root）；根部總寬＝(n−1)×節距＋根厚，置中
+  const tr = isDC ? r.T_root : t, pitch = t + gap, tfw = (n - 1) * pitch + tr, zf0 = (W - tfw) / 2;
   const geoOf = (xa, xb, s0, sharp) => {             // x 從 xa 到 xb、從高度 s0 長到鰭尖；頂點色＝1D 鰭片方程式的溫度（分段的用平切面，接縫才不會出現溝）
     const len = xb - xa, h = FH - s0; let geo;
     if (isDC) {
@@ -1439,7 +1447,7 @@ const VIEWS = {
   left:  { d: V(-1, 0, 0), std: 1 }, right: { d: V(1, 0, 0), std: 1 },
   top:   { d: V(0, 1, 0), up: V(0, 0, -1), std: 1 }, bottom: { d: V(0, -1, 0), up: V(0, 0, 1), std: 1 },
 };
-let curView = 'iso';
+let curView = 'iso', frameSize = null;               // frameSize＝上次對焦時的畫面大小（畫面變大／變小時據此重新對焦）
 function fitDist(dir, tgt, box, fill = 0.8) {       // 依視窗長寬比，把外框的 8 個角都放進畫面（fill＝佔畫面比例）
   const cam = camera.clone(); cam.aspect = camera.aspect; cam.up.set(0, 1, 0); cam.updateProjectionMatrix();
   const pts = []; for (let i = 0; i < 8; i++) pts.push(V(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z));
@@ -1496,7 +1504,7 @@ function frame(view, instant) {
   const box = soloBox() || ((std || portrait()) && dimsBox(dir)) || bbox, ctr = box.getCenter(new THREE.Vector3());   // 只看一個部件 → 對焦那一件；正視或直式畫面 → 連尺寸標註一起放進畫面
   const fo = ORTHO ? fitOrtho(dir, up, box, ctr, std ? 0.9 : 0.8) : fitPersp(dir, up, box, ctr, /^sec/.test(view) ? 0.9 : 0.8);
   const toPos = fo.tgt.clone().addScaledVector(dir, fo.d), toTgt = fo.tgt.clone();
-  curView = view; markViews();
+  curView = view; markViews(); frameSize = [stage.clientWidth, stage.clientHeight];
   if (instant || reduceMotion) { camera.position.copy(toPos); camera.up.copy(up); controls.target.copy(toTgt); controls.update(); return; }
   camTween = { t0: performance.now(), dur: 900, p0: camera.position.clone(), t0v: controls.target.clone(), p1: toPos, t1: toTgt, u0: camera.up.clone(), u1: up };
 }
@@ -1523,6 +1531,7 @@ function panView(dx, dy) {
   const t = controls.target, d = camera.position.distanceTo(t), h = 2 * d * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   const mv = V(1, 0, 0).applyQuaternion(camera.quaternion).multiplyScalar(-dx * 0.12 * h).add(V(0, 1, 0).applyQuaternion(camera.quaternion).multiplyScalar(-dy * 0.12 * h));
   camTween = null; camera.position.add(mv); t.add(mv); controls.update();
+  if (curView) { curView = null; markViews(); }        // 平移過就不是預設視角了
 }
 function recenter() {
   const dir = camera.position.clone().sub(controls.target).normalize(), box = soloBox() || (ORTHO && dimsBox(dir)) || bbox;   // 跟對焦同一套：正交才把尺寸標註算進去
@@ -1987,7 +1996,7 @@ function scheduleRebuild() { clearTimeout(rbTimer); rbTimer = setTimeout(() => r
 function treeItems() {
   const g = P.g, r = P.r, L = LAY, pk = L.inst.filter(o => o.pocket).length, SH = L.shd, coin = L.inst.filter(o => o.ct.kind === 'coin').length;
   return [
-    { key: 'fins', tag: 'param', name: '散熱鰭片 × ' + r.n, spec: f1(r.FH) + ' 高 · 厚 ' + g.Fin_t + ' · 間距 ' + g.Gap + ' mm' + (r.isDC ? '（根厚 ' + f2(r.T_root) + '）' : '') },
+    { key: 'fins', tag: 'param', name: '散熱鰭片 × ' + r.n, spec: f1(r.FH) + ' 高 · ' + finSpecTxt() + ' mm' },
     { key: 'hsk', tag: 'param', name: '散熱器殼體', spec: '牆厚 上' + g.Top + '/下' + g.Btm + '/左' + g.Left + '/右' + g.Right + ' · 基板 ' + g.t_base + '（PCB 貼在內側）' },
     { key: 'pocket', tag: 'data', name: '基板凹槽 × ' + pk + '＋TIM', spec: 'HSK 側元件：本體高＋TIM；銅塊：底板 ' + g.Coin_T + '＋TIM；Via：有 TIM 才挖' },
     { key: 'boss', tag: 'data', name: '補肉 × ' + L.bosses.length, spec: '凹槽底不到 ' + T_MIN + ' mm 或 SFP 光口超出端牆 → 鰭片側加高' },
@@ -2435,8 +2444,11 @@ const composer = new EffectComposer(renderer, rt);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
 const gtao = new GTAOPass(scene, camera, 4, 4);
-gtao.updateGtaoMaterial({ radius: 20, distanceExponent: 1.2, thickness: 10, scale: 1.5, samples: 16, distanceFallOff: 1, screenSpaceRadius: false });
-gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
+// ⚠ 半徑／厚度不要調回 20／10：屏蔽罩隔牆（2 mm 厚、十幾 mm 高）的牆腳會出現一條帶顆粒的亮帶，影子像跟牆腳脫開，
+//   看起來整道牆浮在頂板上（使用者回報過；幾何上是貼齊的）。去雜點加強（24 點、3 圈）＋對深度／法線的邊界更敏感，
+//   牆腳、轉角就乾淨；整機外觀（鰭片間的陰影）幾乎不變。取樣數維持 16（每一幀都會重畫，不要加重 GTAO 本身）
+gtao.updateGtaoMaterial({ radius: 8, distanceExponent: 1.2, thickness: 3, scale: 1.5, samples: 16, distanceFallOff: 1, screenSpaceRadius: false });
+gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 1, normalPhi: 2, radius: 10, rings: 3, samples: 24 });
 composer.addPass(gtao);
 composer.addPass(new OutputPass());
 const labelRenderer = new CSS2DRenderer({ element: $('labels') });
@@ -2474,6 +2486,8 @@ let wasPortrait = null;
 new ResizeObserver(() => {
   resize();
   if (REFRAME && onScreen() && rru) { REFRAME = false; frame(state.st === 'flat' ? 'flat' : state.st === 'exp' ? 'exp' : 'iso', true); }
+  // 畫面大小變了（工具收合／展開參數控制台、視窗縮放），而使用者還沒自己轉過／平移／縮放（curView 還在）→ 用新的大小重新對焦同一個視角
+  else if (rru && onScreen() && curView && !camTween && frameSize && (Math.abs(stage.clientWidth - frameSize[0]) > 2 || Math.abs(stage.clientHeight - frameSize[1]) > 2)) frame(curView, true);
   const pt = portrait();
   if (rru && state.st === 'flat' && wasPortrait !== null && pt !== wasPortrait) { applyState('flat', true); frame('flat', true); }
   wasPortrait = pt; if (rru) updateVis();
@@ -2485,6 +2499,7 @@ ROOT.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', ()
 /* 自己轉／平移過 → 畫面已經不是那個預設視角：按鈕不再亮（再按一次就回正）；轉場還在跑就中斷，不跟使用者搶鏡頭 */
 controls.addEventListener('start', () => { camTween = null; });
 canvas.addEventListener('pointerdown', e => { if (!drag && (e.button === 0 || e.button === 2)) { curView = null; markViews(); } });
+canvas.addEventListener('wheel', () => { if (curView) { curView = null; markViews(); } }, { passive: true });   // 縮放過也算自己調過（畫面大小變了不再自動重新對焦）
 ROOT.querySelectorAll('.vc-f').forEach(b => b.addEventListener('click', () => frame(b.dataset.std)));
 ROOT.querySelectorAll('.vc-cross [data-std]').forEach(b => b.addEventListener('click', () => frame(b.dataset.std)));
 ROOT.querySelectorAll('[data-pan]').forEach(b => b.addEventListener('click', e => { const v = b.dataset.pan; if (v === 'c') { recenter(); return; } const [x, y] = v.split(',').map(Number), k = e.shiftKey ? 3 : 1; panView(x * k, y * k); }));
@@ -2755,7 +2770,7 @@ const PDF_LAYERS = F => {
     { n: '屏蔽罩', t: LAY.df, col: '#cdd2d8', txt: PC.ink, note: S.on ? '頂板 ' + S.roof + ' · 腔深 ' + f1(LAY.shd.depth) : '只有空間' },
     { n: 'PCB', t: g.t_PCB || 2, col: '#4f8a5b', txt: '#fff', note: '貼基板內側' },
     { n: '基板', t: g.t_base, col: '#9aa8b5', txt: PC.ink, note: '凹槽 ' + F.pockets.length + ' · 補肉 ' + F.bosses.length },
-    { n: '鰭片', t: r.FH, col: '#e2e7ec', txt: PC.ink, note: r.n + ' 片 · 厚 ' + g.Fin_t + ' · 間距 ' + g.Gap },
+    { n: '鰭片', t: r.FH, col: '#e2e7ec', txt: PC.ink, note: r.n + ' 片 · ' + finSpecTxt() },
   ];
 };
 /* 高度組成（依比例的橫條）：由左（濾波器底面）到右（鰭片頂端）；窄的層把名稱放到上方、自動錯開 */
@@ -2791,7 +2806,7 @@ function pdfPage1(sh, F, when) {
     ['外觀尺寸 L × W × H', r.L + ' × ' + r.W + ' × ' + f1(r.H), 'mm', '長＝鰭片方向（吊掛後上下）'],
     ['體積', r.V.toFixed(2), 'L', ''],
     ['重量', r.kg.toFixed(1), 'kg', '工具的重量模型（含屏蔽罩一項）'],
-    ['鰭片', r.n + ' 片 × ' + f1(r.FH), 'mm', '間距 ' + g.Gap + ' · 厚 ' + g.Fin_t + ' mm · ' + g.tech],
+    ['鰭片', r.n + ' 片 × ' + f1(r.FH), 'mm', finSpecTxt() + ' mm · ' + g.tech],
     ['熱負載', f1(F.heat), 'W', '發熱元件實際功耗合計'],
     ['基板溫度', f1(r.T_base), '°C', '環境溫度 ' + g.T_amb + ' °C'],
     ['瓶頸元件', bnr ? bnr.name : '—', '', bnr ? '裕度 ' + f1(estMargin(bnr)) + ' °C · ' + bnSub : ''],
@@ -3152,7 +3167,7 @@ window.RRU3D = {
   update, gate, snapshot, left, resize,
   dbg: { LAY: () => LAY, P: () => P, ed, scene, camera, controls, A, state, select, setEdit, setTab, rebuild, ioList, antList, saveEdit, sel: () => SELK,
     frame, setProjection, ortho: () => ORTHO, acam, panView, recenter, soloBox, ioLayout, rotateSel, applySolo, SHD: () => SHD, HSK: () => HSK, PCB: () => PCB, FIL: () => FIL,
-    busy: () => !!(camTween || tween), pdf: () => PDF_OUT, pdfBusy: () => pdfBusy, screws: () => LAY.screws, loops: () => LAY.loops, shotCanvas,
+    busy: () => !!(camTween || tween), frameSize: () => frameSize, curView: () => curView, pdf: () => PDF_OUT, pdfBusy: () => pdfBusy, screws: () => LAY.screws, loops: () => LAY.loops, shotCanvas,
     screenOf: k => { const o = findSel(k); if (!o) return null; holder.updateMatrixWorld(true); const c = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()).project(acam()), r = canvas.getBoundingClientRect();
       return { x: r.left + (c.x + 1) / 2 * r.width, y: r.top + (1 - c.y) / 2 * r.height }; } },
 };

@@ -10,6 +10,8 @@
  *       橫幅逐顆列出被改的元件；專案已有全域值 → 照用不回推。
  *   [D] 參數控制台：拖曳調寬（含上下限）、點一下收合／展開、標題列按鈕、
  *       localStorage 記憶、寬度變動後 Plotly 重算、登入前分隔線不顯示。
+ *   [E] 標題列（含收合鈕）捲動時固定在頂端；切到 3D 頁自動收合、離開還原（不寫 localStorage、
+ *       使用者在 3D 頁自己展開／本來就收合時照使用者的）。
  *
  * 執行：
  *   npx http-server . -p 8123 -c-1 &      # 於 repo 根目錄
@@ -226,6 +228,35 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   await page.waitForFunction(() => typeof calcResults !== 'undefined' && calcResults);
   const d6 = await page.evaluate(() => document.getElementById('sidebar').getBoundingClientRect().width);
   ok('重新載入後還原上次寬度（300）', Math.round(d6) === 300, d6);
+
+  console.log('\n[E] 標題列固定在頂端；切到 3D 頁自動收合、離開還原（不改使用者偏好）');
+  const e1 = await page.evaluate(() => {
+    const sb = document.getElementById('sidebar'), h2 = sb.querySelector('h2'), bt = sb.querySelector('.sidebar-toggle');
+    sb.scrollTop = sb.scrollHeight;
+    const s = sb.getBoundingClientRect(), h = h2.getBoundingClientRect(), b = bt.getBoundingClientRect();
+    const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+    return { scrolled: sb.scrollTop > 200, top: Math.round(h.top - s.top), btnVisible: b.top >= s.top && b.bottom <= s.bottom,
+             hitBtn: !!hit && (hit === bt || bt.contains(hit)), bg: getComputedStyle(h2).backgroundColor };
+  });
+  ok('側欄捲到底：標題列仍貼在頂端，收合鈕看得到也點得到', e1.scrolled && e1.top === 0 && e1.btnVisible && e1.hitBtn, e1);
+  ok('標題列有底色（捲上來的欄位不會透出來）', e1.bg !== 'rgba(0, 0, 0, 0)' && e1.bg !== 'transparent', e1.bg);
+  await page.evaluate(() => { document.getElementById('sidebar').scrollTop = 0; });
+  const e2 = await page.evaluate(async () => {
+    const sleep = ms => new Promise(r => setTimeout(r, ms)), col = () => document.body.classList.contains('sidebar-collapsed');
+    const ls = () => { try { return localStorage.getItem('rru.sidebarCollapsed'); } catch (e) { return null; } };
+    const r = { before: col(), lsBefore: ls() };
+    switchTab(3); await sleep(80); r.in3 = col(); r.lsIn3 = ls();
+    switchTab(1); await sleep(80); r.out = col(); r.lsOut = ls();
+    switchTab(3); await sleep(80); toggleSidebar(); r.userOpen = col(); switchTab(0); await sleep(80); r.afterUser = col();   // 在 3D 頁自己展開
+    setSidebarCollapsed(true); switchTab(3); await sleep(80); r.pre3 = col(); switchTab(0); await sleep(80); r.preOut = col();   // 本來就收合
+    setSidebarCollapsed(false);
+    return r;
+  });
+  ok('切到 3D 頁 → 參數控制台自動收合', !e2.before && e2.in3, e2);
+  ok('離開 3D 頁 → 自動還原展開', e2.out === false, e2);
+  ok('自動收合不寫進 localStorage（不改使用者平常的偏好）', e2.lsIn3 === e2.lsBefore && e2.lsOut === e2.lsBefore, e2);
+  ok('在 3D 頁自己展開 → 以使用者的選擇為準，離開時不再動', e2.userOpen === false && e2.afterUser === false, e2);
+  ok('本來就收合 → 進 3D 頁不動、離開也不會展開', e2.pre3 === true && e2.preOut === true, e2);
 
   ok('頁面無 JS 例外', errors.length === 0, errors.slice(0, 3));
   await browser.close();

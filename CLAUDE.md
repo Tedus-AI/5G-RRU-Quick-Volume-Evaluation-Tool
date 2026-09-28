@@ -382,6 +382,15 @@ AI-Thermal 有好幾份資料用「元件名稱」當 key：TH/ME 頁的 `therma
 讀寫一律 try/catch。⚠ **寬度變動後要呼叫 `resizePlots()`**，否則 Plotly 圖停在舊寬度；
 登入前／登出後由 `_setShellVisible(false)` 把側欄、分隔線、主區一起藏起來。
 
+- **標題列（含收合鈕）捲動時固定在頂端**（使用者要求）：側欄本身是捲動容器，`.sidebar h2` 用 `position:sticky; top:-20px`
+  （sticky 的 top 從捲動容器的內距以內算，側欄上內距 20px → 寫 0 會停在距頂端 20px、上面露出一條捲上去的欄位），
+  負邊距＋同色底蓋住側欄的內距（捲上來的欄位不會從標題列上方或兩側露出來）。不要拿掉：參數很多，捲下去以後
+  收合鈕就是唯一不用捲回頂端的出口。
+- **切到 3D 模擬視圖自動收合**（使用者要求：3D 畫面要大）：`switchTab` → `sbAutoFor3d(true)`；離開 3D 頁
+  `sbAutoFor3d(false)` 還原。規則：自動收合**不寫進 localStorage**（`setSidebarCollapsed(on, false)`，不改使用者平常的偏好）；
+  進 3D 頁時本來就收合 → 不動、離開也不展開；在 3D 頁自己按了展開／收合（`persist` 預設的呼叫都會清掉 `sbAuto3d`）
+  → 以使用者的選擇為準，離開時不還原。
+
 ### 詳細分析頁（`renderTab1`）：前三名卡片＋分析表（改前先看這裡）
 
 **裕度分級是單一事實來源 `MARGIN_LEVELS`**（`marginLevel(m)`）：`<0` 超溫 ✖、`0–10` 偏緊 ▲、`10–20` 留意 ●、
@@ -471,6 +480,12 @@ fg 對 bg ≥ 5.9:1），畫面用 `marginVars(lv)` 塞進 CSS 變數 `--st-*`�
   並排時的高度掛在 `.app` 上。⚠ 不要改回原型照視窗寬抓的 980 px：工具左邊有參數控制台，1440／1600 寬時 3D 畫面
   只剩 670～830 px、工具列擠成 4 行、尺寸標註被右側平移鍵蓋住。對焦（透視 `fitPersp`、正交 `fitOrtho`）與 ◎ 回到中心
   都用 `safeInsets()` 避開工具列（上）、視角方塊與平移鍵（右）、提示列（下）。
+  畫面大小變了（收合／展開參數控制台、視窗縮放）而使用者還沒自己調過視角（`curView` 還在；旋轉、平移、滾輪縮放、
+  平移鍵都會清掉它）→ ResizeObserver 用新的大小重新對焦同一個視角（`frameSize` 記上次對焦時的大小）。
+- **Die-casting 鰭片＝根厚尖薄的梯形**（`buildFins`，`r.isDC && r.T_root > Fin_t`）：鰭尖厚 `Fin_t`、根部厚 `T_root`
+  ＝ `Fin_t + 2·FH·tan(Draft_Angle)`，都是 `computeAll` 算好的值（3D 不自己算）。⚠ **節距＝`Fin_t + Gap`**（跟 computeAll 同一個
+  定義，`G_root`＝節距 − `T_root`），根部總寬＝(n−1)×節距＋`T_root` 置中 —— 原本寫成 `T_root + Gap`，Die-casting 時整排鰭片
+  會比散熱器寬。熱分佈上色的鰭片方程式也跟 `calcEtaFin` 一樣用平均厚度。規格文字（元件清單、3D PDF）一律走 `finSpecTxt()`。
 - **不影響工具其他頁面**：版面由模組自己掛進 `#tab3-3d`；樣式全部限定在 `.r3d`（`#r3d-css`），id 一律 `r3d-` 前綴，
   模組內查 DOM 一律 `ROOT.querySelector` —— **不可用 `document.querySelector`**（工具本身也有 `#loading`、`[data-tab]` 之類）。
   視窗寬度的 `@media` 改成 `@container r3d`（旁邊有參數控制台，視窗寬 ≠ 3D 頁可用的寬）。
