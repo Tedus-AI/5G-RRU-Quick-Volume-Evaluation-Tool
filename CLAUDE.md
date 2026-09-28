@@ -23,7 +23,8 @@
   "pwr_library":     { ... },   // 共用
   "projects": {
     "<project_id>": {
-      // 5G-RRU 寫: meta, project_name, global_params, rf_data, digital_data, pwr_data
+      // 5G-RRU 寫: meta, project_name, global_params, rf_data, digital_data, pwr_data,
+      //            layout3d（3D 頁的調整，以 _cid 為 key；見「3D 模擬視圖」）
       // AI-Thermal Tab2 寫: thermal_specs, hidden_components,
       //                     param_temp, param_temp_custom,
       //                     param_backoff, param_backoff_rt,
@@ -452,8 +453,53 @@ fg 對 bg ≥ 5.9:1），畫面用 `marginVars(lv)` 塞進 CSS 變數 `--st-*`�
 - **PDF**：第 1 節＝設計結果＋5 步（取代原本「整機總熱耗（含係數）／瓶頸 Margin 0 °C／散熱面積／鰭片數」4 格 KPI）；
   第 4 節＝溫度 vs 限溫＋熱源分佈，**用 canvas 直接畫**（`vrTempPdf`／`vrPowerPdf`；原本截 900px 的 Plotly 圖縮到
   245pt，字小到看不清）；第 5 節＝整機組成（`vrCompPdf`，接在第 4 節後面不另起一頁、`unbreakable`）。
-  PDF 不再截視覺化報告的圖，只截 3D 與敏感度分析。
+  PDF 不再截視覺化報告的圖，只截敏感度分析（3D 圖由 `viewer3d.js` 渲染，見「3D 模擬視圖」）。
 - 契約測試：`tests/visual-report.test.js`。
+
+### 3D 模擬視圖（Tab3：`viewer3d.js`）⚠️ 改 3D 頁前先看這裡
+
+原本是 Plotly 方塊（電子艙＋基板＋鰭片）加「AI 寫實渲染」提示詞流程，改成寫實 3D 模型（外殼、腔體濾波器、
+屏蔽罩、PCB、元件、基板凹槽與補肉、分模面螺絲柱、防水膠條）。由 claude.ai 上的原型 v8 接進來，**原型不再維護，
+`viewer3d.js` 就是單一事實來源**。
+
+- **模組**：`viewer3d.js` 是 ES module（`<script type="module" src="viewer3d.js?v=__APP_VERSION__">`），three.js r170 由
+  head 的 importmap 指到 `cdn.jsdelivr.net`。模組載入失敗（`onerror`）或 WebGL 開不起來 → `window.__rru3dFail`，
+  Tab3 顯示原因，其他分頁不受影響。WebGL 失敗時模組以 `await new Promise(() => {})` 停在那一步，**不要改回 `throw`**
+  （每個沒有 WebGL 的使用者都會多一筆未攔截的錯誤）。
+- **版面**：3D 畫面＋右側編輯面板（330 px）並排的門檻是 `@container r3d (max-width:1280px)`，**依 3D 頁本身的寬度**判斷，
+  並排時 3D 畫面至少約 920 px；比這窄就單欄（編輯面板排到下方）。外框 `.r3d` 不設固定高度（單欄時要跟著內容撐高），
+  並排時的高度掛在 `.app` 上。⚠ 不要改回原型照視窗寬抓的 980 px：工具左邊有參數控制台，1440／1600 寬時 3D 畫面
+  只剩 670～830 px、工具列擠成 4 行、尺寸標註被右側平移鍵蓋住。對焦（透視 `fitPersp`、正交 `fitOrtho`）與 ◎ 回到中心
+  都用 `safeInsets()` 避開工具列（上）、視角方塊與平移鍵（右）、提示列（下）。
+- **不影響工具其他頁面**：版面由模組自己掛進 `#tab3-3d`；樣式全部限定在 `.r3d`（`#r3d-css`），id 一律 `r3d-` 前綴，
+  模組內查 DOM 一律 `ROOT.querySelector` —— **不可用 `document.querySelector`**（工具本身也有 `#loading`、`[data-tab]` 之類）。
+  視窗寬度的 `@media` 改成 `@container r3d`（旁邊有參數控制台，視窗寬 ≠ 3D 頁可用的寬）。
+- **資料只由工具餵，3D 不自己算熱**：`renderTab3()` → `build3dData()` → `RRU3D.update(data, {onEdit: r3dOnEdit})`。
+  data＝參數控制台＋`computeAll` 的結果（`r.L／W／H／FH／n／V…` 跟 KPI 同一組）＋每列計算結果（帶 `_cid`）＋
+  AI-Thermal 的規格（`projThermalSpecs`＝目前專案的 `thermal_specs`，唯讀；`dbSpecs3d()`＝全資料庫同名元件的本體大小／高度，背景讀一次）。
+  - 3D 頁不在畫面上時 `renderTab3` 只標 `tab3Stale`，切過去才重建（3D 重建要花時間）；同一個專案重算後保留視角與選取。
+  - 擋下計算／DRC 不通過：`#tab3-msg` 顯示跟其他頁同一份 `calcGateHtml`，3D 收起來。
+- **3D 頁的調整＝專案欄位 `layout3d`**（專案層級，只有本工具寫；AI-Thermal 原樣保留、不讀）：
+  `{ posW: {_cid: [每顆橫向 mm（元件中心距 PCB 左緣）或 null＝自動]}, rot: {_cid: [每顆 0／90]}, io: [{id, type, pos, y?}], ant: [{id, type, pos}], shd: {on, roof, wall, rim, fmax} }`
+  - **以 `_cid` 為 key**（元件改名不會掉）；檢視器內部用元件名稱，`l3dToEdit`／`l3dFromEdit` 轉換，刪掉的元件的調整不留。
+  - 跟著「💾 儲存專案」寫（`_buildProjectFields`：有調整才寫；全部回到自動而資料庫原本有 → 寫 `{}` 清掉）。
+    載入、匯入／匯出本機檔、複製專案都帶著；換專案不沿用上一個專案的調整。
+  - 未存修改：`projScreenDigest` 含 layout3d → `projectIsDirty`；有未存修改（任何修改）離開頁面會提醒（`beforeunload`）。
+- **元件相對高度在 3D 改＝寫回元件設定的 `Height(mm)` 並 `recalc()`**（`r3dOnEdit` 處理檢視器暫存的 `E.hgt` 後清空；
+  layout3d 不存高度）。按住／拖曳的過程只估這一顆的溫度，放開才重算；工具在 `saveEdit()` 裡已經重算並更新畫面時，
+  檢視器接下來那次重建會跳過（`SKIP_REBUILD`）。高度量到**元件中心**（跟元件設定同一個意思）。
+- **機構規則**（都在 `viewer3d.js`）：PCB 的 HSK 側板面貼在基板內側（距分模面 `H_shield`）；HSK 側凸出的元件在基板挖凹槽
+  （元件本體＋TIM，每邊 +0.5 mm），凹槽底到鰭片側不到 `T_MIN = 3 mm` 就在鰭片側補肉（四周 `BOSS_WALL = 3 mm`）；
+  屏蔽罩頂板 2.5／隔牆 2／外框 3 mm，腔體最低共振 ≥ 1.2 × f_max（預設 3.8 GHz）；分模面螺絲（M3）在牆內往內凸成螺絲柱、
+  防水膠條繞孔走（Ω 形）、PCB／屏蔽罩外框與頂板／濾波器上蓋在螺絲柱處缺口、螺絲從濾波器背面鎖進 HSK 牙孔，
+  自動避開接頭、靠板邊的元件、PCB 鎖附孔、接到外框的屏蔽罩牆（碰到元件 → 元件分頁提醒）；
+  元件本體大小／高度依序取 AI-Thermal 規格 → 同名元件 → 同類元件（標「暫定」）；SFP 籠與 I/O 的 SFP 光口綁在一起。
+- **輸出**：工具列「📷 下載目前畫面」（WebGL 畫布＋畫面上的標註 → PNG）、「輸出 PDF」（兩頁 A4：外觀與三視圖、
+  內部結構與佈局；每頁 200 dpi 圖片、自己組成 PDF，不需要字型檔）—— 在工具裡都是一般下載。
+  PDF 報告第 6 節的 3D 圖＝`RRU3D.snapshot()` 在畫面外渲染（白底、組裝、寫實），**不改使用者目前的視角與顯示方式**。
+- 切到別的分頁 → `RRU3D.left()` 取消選取；3D 頁不在畫面上時不處理按鍵、不重畫。
+- 契約測試：`tests/viewer3d.test.js`（需要 WebGL＋three.js：`THREE_DIR=<three@0.170.0 的本機副本>`，沒給就連 CDN；
+  [J] 兩種螢幕寬的版面與標註遮擋、[K] 沒有 WebGL 的瀏覽器）；`tests/dimensions.test.js` [C] 驗 3D 吃同一組 L／W／鰭片數。
 
 ### 限溫對象（`Limit_Ref`：Tj／Tc）與允許溫升基準 ⚠️ 兩個工具共用
 
@@ -706,7 +752,7 @@ await dbAdapter.updateDoc('projects', docId, {
 ### 運作方式
 
 - 原始碼裡只放佔位符 `__APP_VERSION__`（出現在 `index.html` 的 `window.APP_VERSION`、
-  5 支本地 JS（`config.js` / `fileDb.js` / `graphDb.js` / `dbAdapter.js` / `compMerge.js`）的
+  6 支本地 JS（`config.js` / `fileDb.js` / `graphDb.js` / `dbAdapter.js` / `compMerge.js` / `viewer3d.js`）的
   `?v=__APP_VERSION__` 快取戳記、以及 `version.json`）。
 - `.github/workflows/deploy-pages.yml` 在每次 push 到 `main` 時，用
   `TZ='Asia/Taipei' date +%Y.%m.%d.%H%M`＋短 SHA 算出版本號，`sed` 戳進上述佔位符，

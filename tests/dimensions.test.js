@@ -107,22 +107,17 @@ function ok(name, cond, extra) {
   console.log('\n[C] 鰭片方向與邊距配對一致');
   await setInputs({ L_pcb: 500, W_pcb: 385, Top: 8, Btm: 11, Left: 8, Right: 8 });
   const c = await page.evaluate(() => {
-    const R = calcResults;
-    const tr = window.__plots['tab3-3d'] || [];
-    const fins = tr.filter(t => /fin/i.test(String(t.name || '')) || (t.intensity && t.intensity.length));
-    const base = tr.find(t => t.name === 'Heatsink Base');
+    const R = calcResults, d = build3dData();   // 3D 頁（viewer3d.js）吃的資料
     return {
       nf: R.Fin_Count, expectNf: calcFinCount(R.W_hsk, G.Gap, G.Fin_t),
       nfIfLengthUsed: calcFinCount(R.L_hsk, G.Gap, G.Fin_t),
-      finCount3d: fins.length,
-      finsSpanL: fins.length > 0 && fins.every(f => Math.min(...f.x) === 0 && Math.max(...f.x) === R.L_hsk),
-      finsWithinW: fins.length > 0 && fins.every(f => Math.max(...f.y) <= R.W_hsk + 1e-9),
-      baseLW: base ? [Math.max(...base.x), Math.max(...base.y)] : null, L: R.L_hsk, W: R.W_hsk,
+      d3: [d.r.L, d.r.W, d.r.n, d.g.Top, d.g.Btm, d.g.Left, d.g.Right], L: R.L_hsk, W: R.W_hsk,
     };
   });
   ok('鰭片數由「寬」決定：Fin_Count = calcFinCount(W, Gap, Fin_t)', c.nf === c.expectNf && c.nf !== c.nfIfLengthUsed, c);
-  ok('3D 視圖：每片鰭片沿「長」延伸（x 由 0 到 L）、排在寬度範圍內', c.finsSpanL && c.finsWithinW && c.finCount3d === c.nf, c);
-  ok('3D 視圖的底板 = L × W（與 KPI 同一組數字）', c.baseLW && c.baseLW[0] === c.L && c.baseLW[1] === c.W, c);
+  // 鰭片沿「長」、排在「寬」範圍內的實際幾何在 tests/viewer3d.test.js [B] 驗（需要 WebGL）
+  ok('3D 頁吃同一組 L × W、鰭片數與邊距（與 KPI 同一組數字）', c.d3[0] === c.L && c.d3[1] === c.W && c.d3[2] === c.nf &&
+     JSON.stringify(c.d3.slice(3)) === JSON.stringify([8, 11, 8, 8]), c);
 
   console.log('\n[D] 單一事實來源與體積');
   const d = await page.evaluate(() => {
