@@ -21,6 +21,8 @@
  *   [M] 補肉疊在鰭片上：鰭片一律從基板長到鰭尖（跨在補肉邊緣的也不截短），只有穿過凹槽的那段從凹槽頂往上長
  *   [N] 工具列「視窗」組：全螢幕（整頁進瀏覽器全螢幕、只剩 3D 檢視器，照樣重畫）、儲存（沒解除資料庫保護 → 頁內密碼小視窗，
  *       解除後接著存；訊息在畫面內提示，不跳原生對話框）；右下角專案名稱；部件可複選；部件沿長邊中心軸翻轉 180°
+ *   [O] 翻轉交叉測試：組裝／爆炸（含直立）× 15 種部件組合＝整組剛體翻、攤開＝各自原地翻；翻轉途中剛體；隨機切換序列不留殘值；
+ *       鰭片尺寸標註、剖面疊層、攤開標題、報告截圖、拖曳都跟著翻轉正確
  *   [K] 瀏覽器沒有 WebGL：工具照常可用、Tab3 顯示原因、沒有未攔截的錯誤
  *
  * 執行：
@@ -482,33 +484,215 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   const s4 = await soloState();
   ok('四件都選 → 等於「全部」', s4.solo === null && s4.pressed.all === 'true', s4);
 
-  // 部件翻轉 180°（爆炸、只看濾波器）
+  // 部件翻轉 180°（爆炸、只看濾波器）：只顯示一件 → 繞它自己的長邊中心軸
   await page.click('#tab3 [data-state="exp"]'); await soloClick('fil');
   await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
-  const pose = () => page.evaluate(() => { const D = RRU3D.dbg, o = D.FIL(), s = D.SHD(); o.updateWorldMatrix(true, true);
+  const pose = () => page.evaluate(() => { const D = RRU3D.dbg, o = D.FIL(), P = { fil: D.FIL(), shd: D.SHD(), pcb: D.PCB(), hsk: D.HSK() }, m = {}; o.updateWorldMatrix(true, true);
+    Object.keys(P).forEach(k => { P[k].updateMatrix(); m[k] = P[k].matrix.elements.slice(); });
     const c = D.partCenter('fil').clone().applyMatrix4(o.matrixWorld), q = o.getWorldQuaternion(new D.camera.quaternion.constructor()), V = D.camera.position.constructor;
-    return { c: c.toArray(), x: new V(1, 0, 0).applyQuaternion(q).toArray(), y: new V(0, 1, 0).applyQuaternion(q).toArray(), shd: s.position.toArray().concat(s.quaternion.toArray()),
-      pflip: JSON.stringify(D.state.pflip), pressed: document.getElementById('r3d-t-pflip').getAttribute('aria-pressed') }; });
+    return { c: c.toArray(), x: new V(1, 0, 0).applyQuaternion(q).toArray(), y: new V(0, 1, 0).applyQuaternion(q).toArray(), m,
+      pflip: String(D.state.pflip), pressed: document.getElementById('r3d-t-pflip').getAttribute('aria-pressed') }; });
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  const relErr = (A, B) => page.evaluate(([A, B]) => { const M4 = RRU3D.dbg.camera.matrix.constructor, ks = Object.keys(A); let d = 0;
+    ks.forEach(i => ks.forEach(j => { if (i >= j) return; const a = new M4().fromArray(A[i]).invert().multiply(new M4().fromArray(A[j])), b = new M4().fromArray(B[i]).invert().multiply(new M4().fromArray(B[j]));
+      for (let n = 0; n < 16; n++) d = Math.max(d, Math.abs(a.elements[n] - b.elements[n])); })); return d; }, [A, B]);
   const p0 = await pose();
   await page.click('#r3d-t-pflip'); await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
   const p1 = await pose();
-  ok('只看濾波器按「翻轉」→ 濾波器沿長邊（x）中心軸轉 180°：中心不動、長邊方向不變、上下顛倒', dist(p0.c, p1.c) < 0.01 && dot(p0.x, p1.x) > 0.9999 && dot(p0.y, p1.y) < -0.9999 && p1.pflip === '{"fil":true}' && p1.pressed === 'true', [p0, p1]);
-  ok('沒選到的部件不動', JSON.stringify(p0.shd) === JSON.stringify(p1.shd), [p0.shd, p1.shd]);
+  ok('只看濾波器按「翻轉」→ 濾波器沿長邊（x）中心軸轉 180°：中心不動、長邊方向不變、上下顛倒', dist(p0.c, p1.c) < 0.01 && dot(p0.x, p1.x) > 0.9999 && dot(p0.y, p1.y) < -0.9999 && p1.pflip === 'true' && p1.pressed === 'true', [p0.c, p1.c, p1.pflip]);
+  const r01 = await relErr(p0.m, p1.m);
+  ok('沒顯示的部件跟著同一個剛體變換（四件相對位置不變 → 再顯示出來時已經在對的位置）', r01 < 1e-6, r01);
   const snap = await page.evaluate(() => { const u = RRU3D.snapshot(400, 250); return !!u && u.startsWith('data:image/jpeg'); });
   const pS = await pose();
-  ok("翻轉後產生報告用的 3D 圖（組裝、不翻）→ 不動到畫面上的翻轉", snap && pS.pflip === '{"fil":true}' && dist(p1.c, pS.c) < 0.01 && dot(p1.y, pS.y) > 0.9999, pS);
-  await soloClick('fil');   // 全部 → 翻轉對四件：濾波器已翻 → 其他三件也翻；再按全部翻回
+  ok('翻轉後產生報告用的 3D 圖（組裝、不翻）→ 不動到畫面上的翻轉', snap && pS.pflip === 'true' && dist(p1.c, pS.c) < 0.01 && dot(p1.y, pS.y) > 0.9999, pS.pflip);
+  await soloClick('fil');   // 回到「全部」：翻轉照樣開著（整組一起翻）；再按一次全部翻回原位
   await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
   const pa = await page.evaluate(() => [RRU3D.dbg.state.solo, document.getElementById('r3d-t-pflip').getAttribute('aria-pressed')]);
+  const pA = await pose();
   await page.click('#r3d-t-pflip'); await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
-  const pb = await page.evaluate(() => JSON.stringify(RRU3D.dbg.state.pflip));
-  await page.click('#r3d-t-pflip'); await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
-  const p3 = await pose();
-  ok('「全部」時翻轉＝四件一起翻；再按一次全部翻回原位', pa[0] === null && pa[1] === 'false' && pb === '{"fil":true,"shd":true,"pcb":true,"hsk":true}' && p3.pflip === '{}'
-    && dist(p0.c, p3.c) < 0.01 && dot(p0.y, p3.y) > 0.9999, [pa, pb, p3]);
+  const p3 = await pose(), r03 = await relErr(p0.m, p3.m), r0A = await relErr(p0.m, pA.m);
+  ok('回到「全部」時翻轉照樣開著、四件整組翻（相對位置不變）；再按一次全部翻回原位', pa[0] === null && pa[1] === 'true' && r0A < 1e-6 && p3.pflip === 'false'
+    && dist(p0.c, p3.c) < 0.01 && dot(p0.y, p3.y) > 0.9999 && r03 < 1e-6, [pa, r0A, p3.pflip, r03]);
   await page.click('#tab3 [data-state="asm"]');
   await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
+
+  console.log('\n[O] 翻轉交叉測試：狀態 × 直立 × 15 種部件組合、翻轉途中剛體、隨機切換序列、標註／剖面／報告／拖曳');
+  {
+    // 頁面內的檢查工具：部件外框與期望姿態由測試自己算（不呼叫被測的 withFlips／flipPivot）
+    await page.evaluate(() => {
+      const D = RRU3D.dbg, T = D.camera.position.constructor, Q = D.camera.quaternion.constructor, M4 = D.camera.matrix.constructor;
+      const parts = () => ({ fil: D.FIL(), shd: D.SHD(), pcb: D.PCB(), hsk: D.HSK() });
+      const locBox = k => { const o = parts()[k]; o.updateWorldMatrix(true, true); const inv = new M4().copy(o.matrixWorld).invert(), mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
+        const add = (x, bb) => { if (!bb || bb.isEmpty()) return;
+          for (let i = 0; i < 8; i++) { const p = new T(i & 1 ? bb.max.x : bb.min.x, i & 2 ? bb.max.y : bb.min.y, i & 4 ? bb.max.z : bb.min.z).applyMatrix4(x.matrixWorld).applyMatrix4(inv);
+            ['x', 'y', 'z'].forEach((a, j) => { mn[j] = Math.min(mn[j], p[a]); mx[j] = Math.max(mx[j], p[a]); }); } };
+        const walk = x => { if (x.userData && (x.userData.noCenter || x.userData.secHelper)) return;          // 不含尺寸標註、剖面輔助
+          if (x.isInstancedMesh) { x.computeBoundingBox(); add(x, x.boundingBox); } else if (x.isMesh) { if (!x.geometry.boundingBox) x.geometry.computeBoundingBox(); add(x, x.geometry.boundingBox); }
+          x.children.forEach(walk); };
+        walk(o); return { mn, mx }; };
+      const boxAt = (k, m) => { const b = locBox(k), mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
+        for (let i = 0; i < 8; i++) { const v = new T(i & 1 ? b.mx[0] : b.mn[0], i & 2 ? b.mx[1] : b.mn[1], i & 4 ? b.mx[2] : b.mn[2]).applyMatrix4(m);
+          ['x', 'y', 'z'].forEach((a, j) => { mn[j] = Math.min(mn[j], v[a]); mx[j] = Math.max(mx[j], v[a]); }); }
+        return { mn, mx }; };
+      const QXv = new Q().setFromAxisAngle(new T(1, 0, 0), Math.PI);
+      window.__shown = () => Object.keys(parts()).filter(k => !D.state.solo || D.state.solo.includes(k));
+      // 期望：沒翻＝targets0；組裝／爆炸翻＝顯示中的部件（沒翻時）合起來的外框中心、繞 x 轉 180°，四件同一個剛體變換；攤開翻＝各自繞自己的中心
+      window.__expect = () => { const st = D.state.st, T0 = D.targets0(st), ks = Object.keys(parts());
+        if (!D.state.pflip) return T0;
+        const E = {};
+        if (st === 'flat') { ks.forEach(k => { const [p, q] = T0[k], b = locBox(k), c = new T((b.mn[0] + b.mx[0]) / 2, (b.mn[1] + b.mx[1]) / 2, (b.mn[2] + b.mx[2]) / 2);
+          E[k] = [p.clone().add(new T(0, 2 * c.y, 2 * c.z).applyQuaternion(q)), q.clone().multiply(QXv)]; }); return E; }
+        const mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
+        __shown().forEach(k => { const b = boxAt(k, new M4().compose(T0[k][0], T0[k][1], new T(1, 1, 1))); for (let j = 0; j < 3; j++) { mn[j] = Math.min(mn[j], b.mn[j]); mx[j] = Math.max(mx[j], b.mx[j]); } });
+        const c = new T((mn[0] + mx[0]) / 2, (mn[1] + mx[1]) / 2, (mn[2] + mx[2]) / 2);
+        ks.forEach(k => { const [p, q] = T0[k]; E[k] = [c.clone().add(p.clone().sub(c).applyQuaternion(QXv)), QXv.clone().multiply(q)]; });
+        return E; };
+      window.__diff = () => { const E = __expect(), P = parts(); let dp = 0, dq = 0; const bad = [];
+        Object.keys(P).forEach(k => { const a = P[k].position.distanceTo(E[k][0]), b = 1 - Math.abs(P[k].quaternion.dot(E[k][1]));
+          dp = Math.max(dp, a); dq = Math.max(dq, b); if (a > 1e-3 || b > 1e-9) bad.push(k); });
+        return { dp, dq, bad }; };
+      window.__mats = () => { const P = parts(), r = {}; Object.keys(P).forEach(k => { P[k].updateMatrix(); r[k] = P[k].matrix.elements.slice(); }); return r; };
+      window.__relErr = (A, B, ks) => { let d = 0; ks.forEach(i => ks.forEach(j => { if (i >= j) return;
+        const a = new M4().fromArray(A[i]).invert().multiply(new M4().fromArray(A[j])), b = new M4().fromArray(B[i]).invert().multiply(new M4().fromArray(B[j]));
+        for (let n = 0; n < 16; n++) d = Math.max(d, Math.abs(a.elements[n] - b.elements[n])); })); return d; };
+      window.__wbox = ks => { const P = parts(), out = {}; ks.forEach(k => { P[k].updateWorldMatrix(true, false); out[k] = boxAt(k, P[k].matrixWorld); }); return out; };
+    });
+    const settle = () => page.evaluate(() => RRU3D.dbg.settle());
+    const clk = sel => page.evaluate(s => document.querySelector(s).click(), sel);
+    const sclk = k => clk('#tab3 [data-solo="' + k + '"]');
+    const ALL = ['fil', 'shd', 'pcb', 'hsk'];
+    const setSubset = async S => {          // 用真的按鈕把部件組合切到 S（null／四件 → 全部）
+      const cur = await page.evaluate(() => RRU3D.dbg.state.solo);
+      if (!S || S.length === 4) { if (cur) await sclk(''); return; }
+      if (!cur) await sclk(S[0]);
+      const now = new Set(await page.evaluate(() => RRU3D.dbg.state.solo));
+      for (const k of S) if (!now.has(k)) { await sclk(k); now.add(k); }
+      for (const k of [...now]) if (!S.includes(k)) { await sclk(k); now.delete(k); }
+    };
+    const subsets = []; for (let m = 1; m < 16; m++) subsets.push(ALL.filter((k, i) => m & (1 << i)));
+    const flipOff = async () => { if (await page.evaluate(() => RRU3D.dbg.state.pflip)) { await clk('#r3d-t-pflip'); await settle(); } };
+    const unionOf = wb => { const mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9]; Object.values(wb).forEach(x => { for (let j = 0; j < 3; j++) { mn[j] = Math.min(mn[j], x.mn[j]); mx[j] = Math.max(mx[j], x.mx[j]); } }); return mn.concat(mx); };
+    const maxAbs = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
+    const frames2 = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));   // CSS 標籤要等畫面更新一次
+
+    // [O1] 狀態 × 直立 × 15 種組合：部件組合一件一件切換（翻轉開著切換也照樣對）
+    for (const [st, up] of [['asm', false], ['asm', true], ['exp', false], ['exp', true], ['flat', false]]) {
+      await clk('#tab3 [data-state="' + st + '"]'); await settle();
+      if (st !== 'flat' && (await page.evaluate(() => RRU3D.dbg.state.upright)) !== up) { await clk('#r3d-t-up'); await settle(); }
+      const w = { d: 0, off: 0, rel: 0, box: 0, hp: 0, where: [], pressed: [] };
+      for (const S of subsets) {
+        await flipOff(); await setSubset(S); await settle();
+        const b = await page.evaluate(() => ({ m: __mats(), wb: __wbox(__shown()), d: __diff(), hp: RRU3D.dbg.HSK().parent.parent.position.toArray() }));
+        await clk('#r3d-t-pflip'); await settle();
+        const f = await page.evaluate(() => ({ m: __mats(), wb: __wbox(__shown()), d: __diff(), hp: RRU3D.dbg.HSK().parent.parent.position.toArray(), pressed: document.getElementById('r3d-t-pflip').getAttribute('aria-pressed') }));
+        const rel = st === 'flat' ? 0 : await page.evaluate(([A, B]) => __relErr(A, B, ['fil', 'shd', 'pcb', 'hsk']), [b.m, f.m]);
+        const box = st === 'flat' ? Math.max(...Object.keys(b.wb).map(k => maxAbs(unionOf({ k: b.wb[k] }), unionOf({ k: f.wb[k] })))) : maxAbs(unionOf(b.wb), unionOf(f.wb));
+        const d = Math.max(b.d.dp, f.d.dp, b.d.dq * 1e6, f.d.dq * 1e6);
+        if (d > 1e-3) w.where.push(S.join('+') + ':' + b.d.bad.concat(f.d.bad).join(','));
+        w.d = Math.max(w.d, d); w.rel = Math.max(w.rel, rel); w.box = Math.max(w.box, box); w.hp = Math.max(w.hp, maxAbs(b.hp, f.hp));
+        if (f.pressed !== 'true') w.pressed.push(S.join('+'));
+        await clk('#r3d-t-pflip'); await settle();
+        w.off = Math.max(w.off, (await page.evaluate(() => __diff())).dp);
+      }
+      const lbl = { asm: '組裝', exp: '爆炸', flat: '拆機攤開' }[st] + (up ? '＋直立安裝' : '');
+      ok(lbl + '：15 種部件組合，翻轉開／關後每一件的姿態都等於期望（' + (st === 'flat' ? '各自原地翻面' : '顯示中的部件整組翻') + '；關掉回原位）、翻轉鈕亮著',
+        w.d < 1e-3 && w.off < 1e-3 && !w.pressed.length, w);
+      if (st !== 'flat') ok(lbl + '：翻轉後四件的相對位置完全不變（不會互相穿插）', w.rel < 1e-6, w.rel);
+      ok(lbl + '：翻轉後顯示中的部件' + (st === 'flat' ? '各自' : '合起來') + '的外框不變、整台在地面上的位置不動', w.box < 1e-3 && w.hp < 1e-6, [w.box, w.hp]);
+      if (up) { await clk('#r3d-t-up'); await settle(); }
+    }
+    await flipOff(); await setSubset(null); await settle();
+
+    // [O2] 翻轉動畫途中整組保持剛體（翻上去、翻回來；翻到一半再按一次）
+    const mids = [];
+    for (const [st, S] of [['asm', null], ['exp', ['fil', 'shd']], ['asm', ['shd', 'pcb', 'hsk']], ['exp', null], ['asm', ['fil', 'hsk']]]) {
+      await clk('#tab3 [data-state="' + st + '"]'); await settle(); await setSubset(S); await settle(); await flipOff();
+      mids.push(await page.evaluate(() => { const D = RRU3D.dbg, base = __mats(), out = [];
+        for (let n = 0; n < 2; n++) { document.getElementById('r3d-t-pflip').click(); const tw = D.tween();
+          [0.2, 0.5, 0.8].forEach(e => { D.tweenApply(tw, e); out.push(__relErr(base, __mats(), ['fil', 'shd', 'pcb', 'hsk'])); }); D.settle(); }
+        return Math.max(...out); }));
+    }
+    const half = await page.evaluate(() => { const D = RRU3D.dbg, base = __mats(), b = document.getElementById('r3d-t-pflip'), rel = [];
+      b.click(); D.tweenApply(D.tween(), 0.45); b.click(); const tw = D.tween();
+      [0.3, 0.7].forEach(e => { D.tweenApply(tw, e); rel.push(__relErr(base, __mats(), ['fil', 'shd', 'pcb', 'hsk'])); }); D.settle();
+      return { rel: Math.max(...rel), d: __diff().dp, pflip: D.state.pflip }; });
+    ok('翻轉動畫途中（20／50／80%，翻上去與翻回來；5 種狀態＋組合）四件相對位置都不變 → 轉的途中也不會互相穿插', Math.max(...mids) < 1e-6, mids);
+    ok('翻到一半再按一次 → 轉回來的途中照樣是剛體、最後回原位', half.rel < 1e-6 && half.d < 1e-3 && half.pflip === false, half);
+    await setSubset(null); await settle();
+
+    // [O3] 隨機切換序列（部件、全部、翻轉、三種狀態、直立、PCB 翻面；三成的動作在動畫跑到一半就按下一個）
+    let seed = 7; const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    const acts = ['fil', 'shd', 'pcb', 'hsk', '', 'flip', 'flip', 'asm', 'exp', 'flat', 'up', 'pcbflip'], bad = []; let checked = 0;
+    for (let i = 0; i < 200; i++) {
+      const a = acts[Math.floor(rnd() * acts.length)];
+      await page.evaluate(a => { const q = s => document.querySelector(s);
+        if (['fil', 'shd', 'pcb', 'hsk', ''].includes(a)) q('#tab3 [data-solo="' + a + '"]').click();
+        else if (a === 'flip') q('#r3d-t-pflip').click();
+        else if (a === 'up') { if (!q('#r3d-t-up').disabled) q('#r3d-t-up').click(); }
+        else if (a === 'pcbflip') { if (!q('#r3d-t-flip').disabled) q('#r3d-t-flip').click(); }
+        else q('#tab3 [data-state="' + a + '"]').click(); }, a);
+      if (rnd() < 0.3) { const e = rnd(); await page.evaluate(e => { const t = RRU3D.dbg.tween(); if (t) RRU3D.dbg.tweenApply(t, e); }, e); continue; }
+      await settle(); checked++;
+      const r = await page.evaluate(() => { const D = RRU3D.dbg, d = __diff(), sh = __shown(), P = { fil: D.FIL(), shd: D.SHD(), pcb: D.PCB(), hsk: D.HSK() };
+        return { d, vis: Object.keys(P).every(k => P[k].visible === sh.includes(k)),
+          pressed: document.getElementById('r3d-t-pflip').getAttribute('aria-pressed') === String(D.state.pflip),
+          solo: [...document.querySelectorAll('#tab3 [data-solo]')].every(b => b.getAttribute('aria-pressed') === String(b.dataset.solo ? !!D.state.solo && sh.includes(b.dataset.solo) : !D.state.solo)) }; });
+      if (r.d.dp > 1e-3 || r.d.dq > 1e-9 || !r.vis || !r.pressed || !r.solo) bad.push({ i, a, r });
+    }
+    ok('隨機切換 200 步（' + checked + ' 步停下來檢查）：每一件的姿態都等於「目前狀態＋顯示組合＋翻轉」的期望值、按鈕狀態一致、沒有哪一件殘留翻轉', bad.length === 0, bad.slice(0, 3));
+    await page.evaluate(() => { const D = RRU3D.dbg; if (D.state.pflip) document.getElementById('r3d-t-pflip').click(); document.querySelector('#tab3 [data-solo=""]').click();
+      if (D.state.flip) document.getElementById('r3d-t-flip').click(); if (D.state.upright) document.getElementById('r3d-t-up').click();
+      document.querySelector('#tab3 [data-state="asm"]').click(); D.settle(); });
+    const back = await page.evaluate(() => { const D = RRU3D.dbg, T0 = D.targets0('asm'), P = { fil: D.FIL(), shd: D.SHD(), pcb: D.PCB(), hsk: D.HSK() }; let d = 0;
+      Object.keys(P).forEach(k => { d = Math.max(d, P[k].position.distanceTo(T0[k][0]), (1 - Math.abs(P[k].quaternion.dot(T0[k][1]))) * 1e6); }); return d; });
+    ok('序列結束：關翻轉＋全部＋組裝 → 四件完全回到原本的組裝位置', back < 1e-3, back);
+
+    // [O4] 標註、剖面疊層、報告截圖、拖曳
+    await clk('#r3d-t-pflip'); await settle();
+    const fin = await page.evaluate(() => { const D = RRU3D.dbg, V = D.camera.position.constructor, M4 = D.camera.matrix.constructor, fins = D.HSK().userData.fins; let mn = 1e9, mx = -1e9;
+      fins.updateWorldMatrix(true, true);
+      fins.traverse(o => { if (!o.isMesh) return; const g = o.geometry; if (!g.boundingBox) g.computeBoundingBox(); const bb = g.boundingBox;
+        for (let i = 0; i < (o.isInstancedMesh ? o.count : 1); i++) { const im = new M4(); if (o.isInstancedMesh) o.getMatrixAt(i, im); const w = new M4().multiplyMatrices(o.matrixWorld, im);
+          for (let c = 0; c < 8; c++) { const y = new V(c & 1 ? bb.max.x : bb.min.x, c & 2 ? bb.max.y : bb.min.y, c & 4 ? bb.max.z : bb.min.z).applyMatrix4(w).y; mn = Math.min(mn, y); mx = Math.max(mx, y); } } });
+      let dim = null; D.scene.traverse(o => { if (o.userData && o.userData.fin) dim = o.userData.fin; }); dim.updateWorldMatrix(true, true);
+      const ln = dim.children.find(c => c.isLine), pa = ln.geometry.attributes.position, ys = [0, 1].map(i => new V(pa.getX(i), pa.getY(i), pa.getZ(i)).applyMatrix4(ln.matrixWorld).y).sort((a, b) => a - b);
+      return { fins: [mn, mx], dim: ys, vis: dim.parent.visible }; });
+    ok('組裝＋全部＋翻轉：「鰭片」尺寸標註跟著移到翻過去的鰭片位置（上下範圍一致）', fin.vis && Math.abs(fin.fins[0] - fin.dim[0]) < 0.05 && Math.abs(fin.fins[1] - fin.dim[1]) < 0.05, fin);
+    await clk('#r3d-t-sec'); await page.waitForTimeout(200);
+    const su1 = await page.evaluate(() => [...document.querySelectorAll('#r3d-stackup .su-row span')].map(e => e.textContent).concat(document.querySelector('#r3d-stackup h3').textContent));
+    await clk('#r3d-t-pflip'); await settle();
+    const su0 = await page.evaluate(() => [...document.querySelectorAll('#r3d-stackup .su-row span')].map(e => e.textContent));
+    ok('剖面的疊層清單照畫面由上往下：翻轉中濾波器在最上面、關掉翻轉回到鰭片在最上面', /翻轉中/.test(su1[su1.length - 1]) && /濾波器/.test(su1[0]) && su0[0] === '鰭片', [su1, su0]);
+    await clk('#r3d-t-sec'); await settle();
+    await clk('#tab3 [data-state="flat"]'); await settle(); await frames2();
+    const fl0 = await page.evaluate(() => ({ tags: [...document.querySelectorAll('#r3d-labels .dim.src')].filter(e => e.style.display !== 'none').length }));
+    await clk('#r3d-t-pflip'); await settle(); await frames2();
+    const fl1 = await page.evaluate(() => ({ tags: [...document.querySelectorAll('#r3d-labels .dim.src')].filter(e => e.style.display !== 'none').length,
+      titles: [...document.querySelectorAll('#r3d-labels .ptitle')].filter(e => e.style.display !== 'none').map(e => e.textContent) }));
+    ok('拆機攤開＋翻轉：四件標題都改成翻面後朝上的那一面，貼在原本那一面上的參數標註收起來', fl0.tags > 0 && fl1.tags === 0 && fl1.titles.length === 4 && fl1.titles.every(t => /翻面/.test(t))
+      && fl1.titles.some(t => /鰭片朝上/.test(t)) && fl1.titles.some(t => /濾波器側朝上/.test(t)), [fl0, fl1]);
+    await clk('#r3d-t-pflip'); await settle();
+    await clk('#tab3 [data-state="asm"]'); await settle(); await setSubset(['fil', 'shd']); await settle(); await clk('#r3d-t-pflip'); await settle();
+    const sn = await page.evaluate(() => { const D = RRU3D.dbg, before = __mats(), u = RRU3D.snapshot(400, 250), after = __mats(); let d = 0;
+      Object.keys(before).forEach(k => before[k].forEach((v, i) => { d = Math.max(d, Math.abs(v - after[k][i])); }));
+      return { ok: !!u, d, pflip: D.state.pflip, solo: JSON.stringify(D.state.solo), diff: __diff().dp }; });
+    ok('組裝＋濾波器＋屏蔽罩＋翻轉時產生報告用的 3D 圖 → 畫面上的姿態、部件組合、翻轉都原封不動', sn.ok && sn.d < 1e-9 && sn.pflip === true && sn.solo === '["fil","shd"]' && sn.diff < 1e-3, sn);
+    // 翻轉時拖曳元件：只看 PCB 翻過來（濾波器側朝上）→ 拖 Final PA，元件跟著游標的方向走（不會反向）
+    await flipOff(); await setSubset(['pcb']); await settle(); await clk('#r3d-t-pflip'); await settle(); await clk('#r3d-t-edit');
+    const drags = [];
+    for (const [dx, dy] of [[-60, 0], [0, -60], [60, 0], [0, 60]]) {
+      const s0 = await page.evaluate(() => RRU3D.dbg.screenOf('c:Final PA#0'));
+      await page.mouse.move(s0.x, s0.y); await page.mouse.down();
+      await page.mouse.move(s0.x + dx * 0.3, s0.y + dy * 0.3, { steps: 3 }); await page.mouse.move(s0.x + dx, s0.y + dy, { steps: 6 });
+      const s1 = await page.evaluate(() => RRU3D.dbg.screenOf('c:Final PA#0'));
+      await page.mouse.up(); await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
+      drags.push([dx, dy, +(s1.x - s0.x).toFixed(1), +(s1.y - s0.y).toFixed(1)]);
+    }
+    // 碰到板邊／高度上限時只會少走（不會反向）→ 四個方向都不可反向，而且至少兩個方向完全跟著游標
+    ok('翻轉時拖曳元件：往四個方向拖，元件都不會反向、沒被擋住的方向完全跟著游標（不會因為翻面而反向）',
+      drags.every(([dx, dy, mx, my]) => dx * mx + dy * my >= 0) && drags.filter(([dx, dy, mx, my]) => dx * mx + dy * my > 0.85 * 3600).length >= 2, drags);
+    await clk('#r3d-t-edit'); await flipOff(); await setSubset(null); await settle();
+  }
 
   ok('沒有 JS 錯誤', errors.length === 0, errors);
   await browser.close();
