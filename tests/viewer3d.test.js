@@ -641,8 +641,10 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     }
     ok('隨機切換 200 步（' + checked + ' 步停下來檢查）：每一件的姿態都等於「目前狀態＋顯示組合＋翻轉」的期望值、按鈕狀態一致、沒有哪一件殘留翻轉', bad.length === 0, bad.slice(0, 3));
     await page.evaluate(() => { const D = RRU3D.dbg; if (D.state.pflip) document.getElementById('r3d-t-pflip').click(); document.querySelector('#tab3 [data-solo=""]').click();
-      if (D.state.flip) document.getElementById('r3d-t-flip').click(); if (D.state.upright) document.getElementById('r3d-t-up').click();
-      document.querySelector('#tab3 [data-state="asm"]').click(); D.settle(); });
+      if (D.state.flip) { document.querySelector('#tab3 [data-state="flat"]').click(); document.getElementById('r3d-t-flip').click(); }   // 「PCB 翻面」只在攤開時能按
+      document.querySelector('#tab3 [data-state="asm"]').click(); if (D.state.upright) document.getElementById('r3d-t-up').click(); D.settle(); });
+    const reset = await page.evaluate(() => { const D = RRU3D.dbg; return !D.state.pflip && !D.state.flip && !D.state.upright && !D.state.solo && D.state.st === 'asm'; });
+    ok('序列結束的收尾：翻轉、PCB 翻面、直立、部件組合都回到預設（後面的檢查不受序列影響）', reset, reset);
     const back = await page.evaluate(() => { const D = RRU3D.dbg, T0 = D.targets0('asm'), P = { fil: D.FIL(), shd: D.SHD(), pcb: D.PCB(), hsk: D.HSK() }; let d = 0;
       Object.keys(P).forEach(k => { d = Math.max(d, P[k].position.distanceTo(T0[k][0]), (1 - Math.abs(P[k].quaternion.dot(T0[k][1]))) * 1e6); }); return d; });
     ok('序列結束：關翻轉＋全部＋組裝 → 四件完全回到原本的組裝位置', back < 1e-3, back);
@@ -667,10 +669,11 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     await clk('#tab3 [data-state="flat"]'); await settle(); await frames2();
     const fl0 = await page.evaluate(() => ({ tags: [...document.querySelectorAll('#r3d-labels .dim.src')].filter(e => e.style.display !== 'none').length }));
     await clk('#r3d-t-pflip'); await settle(); await frames2();
-    const fl1 = await page.evaluate(() => ({ tags: [...document.querySelectorAll('#r3d-labels .dim.src')].filter(e => e.style.display !== 'none').length,
+    const fl1 = await page.evaluate(() => ({ tags: [...document.querySelectorAll('#r3d-labels .dim.src')].filter(e => e.style.display !== 'none').length, pcbFlip: RRU3D.dbg.state.flip,
       titles: [...document.querySelectorAll('#r3d-labels .ptitle')].filter(e => e.style.display !== 'none').map(e => e.textContent) }));
-    ok('拆機攤開＋翻轉：四件標題都改成翻面後朝上的那一面，貼在原本那一面上的參數標註收起來', fl0.tags > 0 && fl1.tags === 0 && fl1.titles.length === 4 && fl1.titles.every(t => /翻面/.test(t))
-      && fl1.titles.some(t => /鰭片朝上/.test(t)) && fl1.titles.some(t => /濾波器側朝上/.test(t)), [fl0, fl1]);
+    const pcbUp = fl1.pcbFlip ? 'HSK 側朝上' : '濾波器側朝上';   // 「PCB 翻面」開著時再翻一次＝HSK 側朝上
+    ok('拆機攤開＋翻轉：四件標題都改成翻面後朝上的那一面（PCB＝「PCB 翻面」與翻轉互斥或），貼在原本那一面上的參數標註收起來', fl0.tags > 0 && fl1.tags === 0 && fl1.titles.length === 4 && fl1.titles.every(t => /翻面/.test(t))
+      && fl1.titles.some(t => /鰭片朝上/.test(t)) && fl1.titles.some(t => /^③ PCB/.test(t) && t.includes(pcbUp)), [fl0, fl1]);
     await clk('#r3d-t-pflip'); await settle();
     await clk('#tab3 [data-state="asm"]'); await settle(); await setSubset(['fil', 'shd']); await settle(); await clk('#r3d-t-pflip'); await settle();
     const sn = await page.evaluate(() => { const D = RRU3D.dbg, before = __mats(), u = RRU3D.snapshot(400, 250), after = __mats(); let d = 0;
