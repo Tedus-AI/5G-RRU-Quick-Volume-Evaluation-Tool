@@ -3453,7 +3453,7 @@ function renderTab2(){
 // 這裡只負責「餵資料」：build3dData() 把參數控制台、computeAll 的結果、元件設定與 AI-Thermal 的規格
 // 整理成檢視器要的格式；檢視器不自己算熱。
 // 3D 頁的調整（元件橫向位置、轉向、數位 I/O、天線座、屏蔽罩設定）是專案的一部分：
-//   layout3d＝{ posW:{_cid:[每顆橫向 mm 或 null]}, rot:{_cid:[每顆 0／90]}, io:[…], ant:[…], shd:{…} }
+//   layout3d＝{ posW:{_cid:[每顆橫向 mm 或 null]}, rot:{_cid:[每顆 0／90]}, io:[…], ant:[…], shd:{…}, pair:false（通道配對關掉才寫） }
 //   → 跟著「💾 儲存專案」寫進共用 DB（專案層級欄位，只有本工具寫；以 _cid 為 key，元件改名不會掉）。
 // 元件相對高度在 3D 上改＝寫回元件設定的 Height(mm) 並重算（跟在元件設定改是同一件事）。
 // =====================================================
@@ -3463,7 +3463,7 @@ var tab3Stale=true;           // 資料變了但 3D 頁不在畫面上 → 切�
 var dbSpecs3dCache=null,dbSpecs3dBusy=false;
 function specKey3d(n){return String(n||'').replace(/ /g,'_').replace(/\//g,'-');}   // ＝AI-Thermal 的 sgSpecKey
 function tab3Active(){const t=document.getElementById('tab3');return !!(t&&t.classList.contains('active'));}
-function l3dHas(){return !!layout3d&&Object.keys(layout3d).some(k=>{const v=layout3d[k];return Array.isArray(v)?true:v&&typeof v==='object'&&Object.keys(v).length>0;});}
+function l3dHas(){return !!layout3d&&Object.keys(layout3d).some(k=>{const v=layout3d[k];return k==='pair'?v===false:Array.isArray(v)?true:v&&typeof v==='object'&&Object.keys(v).length>0;});}
 function l3dComps(){return ['rf','digital','pwr'].flatMap(cat=>(components[cat]||[]).filter(c=>c&&c.Component));}
 // layout3d（以 _cid 為 key）→ 檢視器的編輯狀態（以元件名稱為 key；同名的以第一顆為準）
 function l3dToEdit(L){
@@ -3477,6 +3477,7 @@ function l3dToEdit(L){
   if(Array.isArray(L.io))E.io=CompMerge.clone(L.io);
   if(Array.isArray(L.ant))E.ant=CompMerge.clone(L.ant);
   if(L.shd&&typeof L.shd==='object')E.shd=CompMerge.clone(L.shd);
+  if(L.pair===false)E.pair=false;   // 通道配對（FDD）關掉：3D 的 RF 元件照舊排法（預設開，開著不寫）
   return E;
 }
 // 檢視器的編輯狀態 → layout3d；已經刪掉的元件的調整不留
@@ -3489,6 +3490,7 @@ function l3dFromEdit(E){
   if(Array.isArray(E.io))L.io=CompMerge.clone(E.io);
   if(Array.isArray(E.ant))L.ant=CompMerge.clone(E.ant);
   if(E.shd&&Object.keys(E.shd).length)L.shd=CompMerge.clone(E.shd);
+  if(E.pair===false)L.pair=false;
   return Object.keys(L).length?L:null;
 }
 // 檢視器每存一次調整就交過來（saveEdit）：元件相對高度寫回元件設定 → 重算；其餘轉成 layout3d
