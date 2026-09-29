@@ -225,6 +225,19 @@ function roleOf(r) {
   if (/power ?mod/i.test(s)) return 'pmod';
   return 'ic';
 }
+/* 元件預設的水平轉向（使用者定義「全部轉」）：Final PA、Driver 預設轉 90° —— 長邊橫跨訊號方向（沿寬度），
+   其他元件照 AI-Thermal 規格的方向（長邊沿長度方向）。使用者在 3D 轉的＝跟預設方向差 90°（layout3d.turn） */
+const defRot = role => role === 'pa' || role === 'drv';
+/* 舊版 layout3d.rot 是絕對角度（0＝原方向，一列裡沒動過的也補 0）→ 轉成 turn：
+   PA／Driver 一律回到預設（舊的 90＝現在的預設、舊的 0＝沒動過）；其他元件的 90 照舊（它們的預設沒變） */
+function migrateRot(E) {
+  const legacy = E.rot || {}; E.rot = {};
+  Object.keys(legacy).forEach(n => {
+    const a = legacy[n], r = P.rows.find(q => q.name === n);
+    if (!r || !Array.isArray(a) || (n in E.turn) || defRot(roleOf(r)) || !a.some(v => v === 90)) return;
+    E.turn[n] = a.map(v => v === 90 ? 90 : 0);
+  });
+}
 /* 沒有本體高度時，參考資料庫裡同類元件的 AI-Thermal 規格（暫定，畫面上標出來） */
 const ROLE_REF_CACHE = new Map();
 function roleRef(role) {                       // 資料庫裡同角色、有本體高度的元件（依名稱排序取第一個，結果固定）
@@ -264,12 +277,13 @@ function contactOf(r) {
 const A = { ref: 'center' };          // 元件相對高度量到元件中心（跟工具的「元件相對高度」同一個意思）
 let LAY = null;
 /* 使用者在 3D 頁的調整（跟著專案存：工具把它轉成專案的 layout3d，以元件 _cid 為 key；這裡用元件名稱當 key）：
-   posW＝元件橫向位置（元件中心距 PCB 左緣，每顆一個值，null＝自動）、rot＝元件水平旋轉（每顆 0 或 90）、
+   posW＝元件橫向位置（元件中心距 PCB 左緣，每顆一個值，null＝自動）、turn＝元件水平轉向（每顆 0 或 90＝跟預設方向差 90°，見 defRot；
+   舊版存的 rot 是絕對角度，載入時由 migrateRot 轉成 turn）、
    io／ant＝數位 I/O 與天線座清單（null＝預設；I/O 另有高度 y）、shd＝屏蔽罩設定（沒改的用預設值）；
    hgt＝元件相對高度：只是「還沒寫回」的暫存 → saveEdit 時由工具寫回元件設定並重算，寫回後就清空。 */
 const HOST = { E: null, onEdit: null, onSave: null };
 let SKIP_REBUILD = false, REFRAME = false;
-const normEdit = v => Object.assign({ posW: {}, hgt: {}, rot: {}, io: null, ant: null, shd: {} }, v || {});
+const normEdit = v => Object.assign({ posW: {}, hgt: {}, turn: {}, rot: {}, io: null, ant: null, shd: {} }, v || {});
 function ed() { if (!HOST.E) HOST.E = normEdit(null); return HOST.E; }
 function saveEdit() {
   const E = ed(); ioList(); antList();                     // 預設清單在第一次改的時候才落地（改別的東西也一併存，內容相同）
@@ -456,13 +470,14 @@ function layout() {
     const role = roleOf(r); if (role === 'filter') return;
     const body = bodyOf(r, role), ct = contactOf(r);
     const side = (r.bt === 'Copper Coin' || r.bt === 'Thermal Via') ? 'filter' : 'hsk';
-    const mz = E.posW[r.name] || [], mr = (E.rot && E.rot[r.name]) || [];
+    const mz = E.posW[r.name] || [], mt = (E.turn && E.turn[r.name]) || [], dr = defRot(role);
     const auto = !!F && F.shared.includes(r), gRow = F && F.grpOf.has(r) ? F.grpOf.get(r) : -1;   // FDD：沒拆的列（每一路每一組一顆）／照清單的列屬於哪一組
     const k = auto ? G : PR.on && PR.multi.includes(r) ? r.qty / N : 0;   // 通道配對：這一列每一路 k 顆（TDD 並聯的 → 那一路再等分成 k 格並排）
     for (let i = 0; i < r.qty; i++) {
-      const rot = role !== 'sfp' && mr[i] === 90;         // SFP 插口一定朝 I/O 端，不能轉
-      const bL = rot ? body.W : body.L, bW = rot ? body.L : body.W, cL = rot ? ct.W : ct.L, cW = rot ? ct.L : ct.W;
-      inst.push({ row: r, role, body, ct, side, rot, bL, bW, cL, cW, fpL: Math.max(bL, cL), fpW: Math.max(bW, cW), i, key: r.name + '#' + i,
+      const turn = role !== 'sfp' && mt[i] === 90, rot = role !== 'sfp' && turn !== dr;   // SFP 插口一定朝 I/O 端，不能轉；PA／Driver 預設轉 90°
+      const cf = ct.kind === 'coin';                    // 銅塊底板固定跟著板子方向（Coin_L 沿長度），不跟元件轉；凸台＝元件本體才跟著轉
+      const bL = rot ? body.W : body.L, bW = rot ? body.L : body.W, cL = rot && !cf ? ct.W : ct.L, cW = rot && !cf ? ct.L : ct.W;
+      inst.push({ row: r, role, body, ct, side, rot, turn, bL, bW, cL, cW, fpL: Math.max(bL, cL), fpW: Math.max(bW, cW), i, key: r.name + '#' + i,
         lane: (N && r.cat === 'RF' && r.qty === N) ? i : k ? Math.floor(i / k) : -1, sub: k && !auto ? i % k : -1, subN: k && !auto ? k : 1,
         grp: auto ? i % G : gRow, fdd: auto ? 'auto' : gRow >= 0 ? 'fixed' : '',
         manualZ: typeof mz[i] === 'number' ? mz[i] : null });
@@ -1228,7 +1243,8 @@ function buildBody(c, o, tP) {
   // 凸台≈PA 本體大小，穿過 PCB 開孔、頂面跟濾波器側板面齊平，PA 直接焊在凸台上。散熱孔區＝HSK 側鍍金方塊
   if (o.ct.kind === 'coin') {
     const ct = Math.max(0.1, P.g.Coin_T || 2.5);
-    const plate = add(mesh(new RoundedBoxGeometry(o.ct.L, ct, o.ct.W, 2, Math.min(0.8, ct / 3)), MAT.copper, 'comp'), 'path'); plate.position.set(0, tP + ct / 2, 0); plate.userData.sec = 'cu';
+    // 底板固定跟著板子方向（Coin_L 沿長度）：元件群組轉 90° 時，底板在群組座標裡的長寬對調
+    const plate = add(mesh(new RoundedBoxGeometry(o.rot ? o.ct.W : o.ct.L, ct, o.rot ? o.ct.L : o.ct.W, 2, Math.min(0.8, ct / 3)), MAT.copper, 'comp'), 'path'); plate.position.set(0, tP + ct / 2, 0); plate.userData.sec = 'cu';
     const ped = add(box(o.body.L, tP + 0.02, o.body.W, MAT.copper, 'comp', 0, tP / 2, 0), 'path'); ped.userData.sec = 'cu';
   } else if (o.ct.kind === 'via') {
     const m = add(box(o.ct.L, 0.15, o.ct.W, MAT.gold, 'comp', 0, tP + 0.075, 0), 'path'); m.castShadow = false;
@@ -1951,11 +1967,11 @@ function renderComp() {
           '<button type="button" class="ibtn" data-hold="1" title="' + r.qty + ' 顆一起往右（按住連續，Shift＝10 mm）" aria-label="' + n + ' 整列往右">▶</button></div>'
         : stepHtml(r.name + '#0', n)) +
       '<button type="button" class="ibtn c-rot" aria-pressed="false" aria-label="' + n + ' 水平轉 90°">⟳</button>' +
-      '<button type="button" class="ibtn c-r" title="橫向回到自動、元件相對高度回到原值、取消旋轉" aria-label="重設 ' + n + '">↺</button></div>' +
+      '<button type="button" class="ibtn c-r" title="橫向回到自動、元件相對高度回到原值、轉向回到預設" aria-label="重設 ' + n + '">↺</button></div>' +
       (multi ? Array.from({ length: r.qty }, (_, i) => '<div class="cr sub" data-row="' + n + '" data-i="' + i + '" hidden><span class="cn">' + eyeBtn('c-eye1', n + ' 第 ' + (i + 1) + ' 顆') + '<b>#' + (i + 1) + '</b><small class="c-ch"></small></span><span></span>' +
         stepHtml(r.name + '#' + i, n + ' 第 ' + (i + 1) + ' 顆') +
         '<button type="button" class="ibtn c-rot1" aria-pressed="false" aria-label="' + n + ' 第 ' + (i + 1) + ' 顆水平轉 90°">⟳</button>' +
-        '<button type="button" class="ibtn c-r1" title="這一顆：橫向回到自動、取消旋轉" aria-label="重設 ' + n + ' 第 ' + (i + 1) + ' 顆">↺</button></div>').join('') : '');
+        '<button type="button" class="ibtn c-r1" title="這一顆：橫向回到自動、轉向回到預設" aria-label="重設 ' + n + ' 第 ' + (i + 1) + ' 顆">↺</button></div>').join('') : '');
   }).join('');
 }
 function compRowInsts(name) { return LAY.inst.filter(o => o.row.name === name); }
@@ -1974,10 +1990,11 @@ function refreshComp() {
       (au.length ? '。3D 上由通道配對自動錯開（' + auG.map(g => grpLabel(g) + ' ' + f1(au.find(o => o.grp === g).x - P.g.Btm)).join('／') + ' mm），這格只影響溫度計算' : '');
     row.querySelector('.cn small').textContent = r.cat + ' ×' + r.qty + ' · ' + (side === 'hsk' ? 'HSK 側' : '濾波器側') + (au.length ? ' · 3D 自動錯開' : '') +
       (hChg && r.W > 0 ? ' · 估 ' + (dt >= 0 ? '+' : '') + f1(dt) + ' °C' + (risk === 'new' ? ' · 會變瓶頸' : '') : '');
-    const manN = list.filter(isManualZ).length, rotN = list.filter(o => o.rot).length, rb = row.querySelector('.c-rot'), isSfp = list[0].role === 'sfp';
-    rb.disabled = isSfp; rb.setAttribute('aria-pressed', rotN && rotN === list.length ? 'true' : rotN ? 'mixed' : 'false');
-    rb.title = isSfp ? 'SFP 插口一定朝 I/O 端，不能轉' : rotN === list.length ? '已轉 90°（再按一下轉回）' : rotN ? rotN + '/' + list.length + ' 顆已轉 · 按一下整列轉 90°' : '水平轉 90°（整列一起；展開後可以一顆一顆轉，或選一顆按 R）';
-    row.querySelector('.c-r').disabled = !hChg && !manN && !rotN;
+    const manN = list.filter(isManualZ).length, turnN = list.filter(o => o.turn).length, rb = row.querySelector('.c-rot'), isSfp = list[0].role === 'sfp', dr = defRot(list[0].role);
+    rb.disabled = isSfp; rb.setAttribute('aria-pressed', turnN && turnN === list.length ? 'true' : turnN ? 'mixed' : 'false');   // 按下＝跟預設方向不一樣
+    rb.title = isSfp ? 'SFP 插口一定朝 I/O 端，不能轉' : (dr ? 'Final PA／Driver 預設已轉 90°（長邊橫跨訊號方向）。' : '') + (turnN === list.length ? '已跟預設方向轉 90°（再按一下回到預設）'
+      : turnN ? turnN + '/' + list.length + ' 顆已轉 · 按一下整列轉 90°' : '水平轉 90°（整列一起；展開後可以一顆一顆轉，或選一顆按 R）');
+    row.querySelector('.c-r').disabled = !hChg && !manN && !turnN;
     const hidN = list.filter(o => HIDEI.has('c:' + o.key)).length, eye = row.querySelector('.c-eye');
     eye.setAttribute('aria-pressed', hidN && hidN === list.length ? 'true' : hidN ? 'mixed' : 'false'); row.classList.toggle('hid', hidN > 0 && hidN === list.length);
     eye.title = hidN === list.length ? '已在 3D 隱藏（再按一下顯示）' : hidN ? hidN + '/' + list.length + ' 顆已隱藏 · 按一下整列隱藏'
@@ -1990,9 +2007,9 @@ function refreshComp() {
     row.classList.toggle('sel', !!SELK && SELK.startsWith('c:' + name + '#') && !open);
     $('ctab').querySelectorAll('.cr.sub[data-row="' + CSS.escape(name) + '"]').forEach(sr => {
       sr.hidden = !open; const o = list[+sr.dataset.i]; if (!o) return;
-      const r1 = sr.querySelector('.c-rot1'); r1.disabled = isSfp; r1.setAttribute('aria-pressed', String(!!o.rot));
-      r1.title = isSfp ? 'SFP 插口一定朝 I/O 端，不能轉' : o.rot ? '已轉 90°（再按一下轉回）' : '只轉這一顆 90°';
-      sr.querySelector('.c-r1').disabled = !isManualZ(o) && !o.rot;
+      const r1 = sr.querySelector('.c-rot1'); r1.disabled = isSfp; r1.setAttribute('aria-pressed', String(!!o.turn));
+      r1.title = isSfp ? 'SFP 插口一定朝 I/O 端，不能轉' : o.turn ? '已跟預設方向轉 90°（再按一下回到預設）' : '只轉這一顆 90°' + (dr ? '（預設已轉 90°）' : '');
+      sr.querySelector('.c-r1').disabled = !isManualZ(o) && !o.turn;
       sr.classList.toggle('sel', SELK === 'c:' + o.key);
       const hid1 = HIDEI.has('c:' + o.key), e1 = sr.querySelector('.c-eye1');
       e1.setAttribute('aria-pressed', String(hid1)); e1.title = hid1 ? '已在 3D 隱藏（再按一下顯示）' : '在 3D 隱藏這一顆'; sr.classList.toggle('hid', hid1);
@@ -2057,17 +2074,17 @@ function wireComp() {
       return;
     }
     if (e.target.closest('.cx')) { if (CEXP.has(name)) CEXP.delete(name); else CEXP.add(name); refreshComp(); return; }
-    if (e.target.classList.contains('c-rot')) {             // 整列轉 90°（全部已轉 → 轉回）
-      const all = list.every(o => o.rot); E.rot = Object.assign({}, E.rot);
-      if (all) delete E.rot[name]; else E.rot[name] = Array.from({ length: list[0].row.qty }, () => 90);
+    if (e.target.classList.contains('c-rot')) {             // 整列跟預設方向轉 90°（全部已轉 → 回到預設）
+      const all = list.every(o => o.turn); E.turn = Object.assign({}, E.turn);
+      if (all) delete E.turn[name]; else E.turn[name] = Array.from({ length: list[0].row.qty }, () => 90);
       saveEdit(); rebuild(null, true); return;
     }
-    if (e.target.classList.contains('c-r')) { delete E.posW[name]; delete E.hgt[name]; if (E.rot) delete E.rot[name]; list.forEach(o => { if (o.port) o.port.pos = null; }); saveEdit(); rebuild(null, true); return; }
+    if (e.target.classList.contains('c-r')) { delete E.posW[name]; delete E.hgt[name]; if (E.turn) delete E.turn[name]; list.forEach(o => { if (o.port) o.port.pos = null; }); saveEdit(); rebuild(null, true); return; }
     const sub = row.classList.contains('sub') ? list[+row.dataset.i] : null;
     if (sub && e.target.classList.contains('c-rot1')) { rotateKey('c:' + sub.key); return; }
     if (sub && e.target.classList.contains('c-r1')) {
       lateralAuto(sub);
-      if (sub.rot) { const a = (E.rot[name] || []).slice(); a[sub.i] = 0; E.rot = Object.assign({}, E.rot, { [name]: a }); if (a.every(v => v !== 90)) delete E.rot[name]; }
+      if (sub.turn) { const a = (E.turn[name] || []).slice(); a[sub.i] = 0; E.turn = Object.assign({}, E.turn, { [name]: a }); if (a.every(v => v !== 90)) delete E.turn[name]; }
       saveEdit(); rebuild(null, true); return;
     }
     if (e.target.closest('button') || e.target.tagName === 'INPUT') return;
@@ -2521,11 +2538,11 @@ function liveBoss() {             // 補肉（含 I/O 接頭造成的）與鰭�
   LAY.bosses = bossesNow(); delete PBOX.hsk; const bg = HSK.userData.boss; bg.children.slice().forEach(c => { bg.remove(c); disposeTree(c); }); parts.boss = []; buildBosses(bg); applyModeTo(bg);
   buildFins(HSK.userData.fins); applyModeTo(HSK.userData.fins); applyHide();
 }
-/* 一顆水平轉 90°（再轉一次轉回）；SFP 插口一定朝 I/O 端，不能轉 */
+/* 一顆跟預設方向水平轉 90°（再轉一次回到預設）；SFP 插口一定朝 I/O 端，不能轉 */
 function rotateKey(k) {
   const t = selTarget(k); if (!t || t.kind !== 'c' || t.o.role === 'sfp') return;
-  const E = ed(), r = t.o.row, arr = ((E.rot || {})[r.name] || []).slice(); while (arr.length < r.qty) arr.push(0);
-  arr[t.o.i] = arr[t.o.i] === 90 ? 0 : 90; E.rot = Object.assign({}, E.rot, { [r.name]: arr }); if (arr.every(v => v !== 90)) delete E.rot[r.name];
+  const E = ed(), r = t.o.row, arr = ((E.turn || {})[r.name] || []).slice(); while (arr.length < r.qty) arr.push(0);
+  arr[t.o.i] = arr[t.o.i] === 90 ? 0 : 90; E.turn = Object.assign({}, E.turn, { [r.name]: arr }); if (arr.every(v => v !== 90)) delete E.turn[r.name];
   saveEdit(); rebuild(null, true);
 }
 const rotateSel = () => rotateKey(SELK);
@@ -2747,7 +2764,7 @@ function tipHtml(o, what) {
   else h += '<hr>' + trow('元件相對高度', f1(o.hgt) + ' mm' + (est ? '（原 ' + f1(r.hgt) + '）' : '') + shTxt);
   h += trow('橫向', '距左緣 ' + f1(o.z - P.g.Left) + ' mm（' + ({ manual: '手動', io: '對齊 SFP 光口', auto: '自動' }[o.src] || '自動') + '）');
   if (o.lane >= 0) h += trow('通道', 'CH' + (o.lane + 1) + (LAY.G && o.grp >= 0 ? ' · ' + esc(grpLabel(o.grp)) + ' 那一組' : o.subN > 1 ? ' · 第 ' + (o.sub + 1) + '/' + o.subN + ' 格' : ''));
-  h += trow('本體', f2(o.body.L) + '×' + f2(o.body.W) + '×' + (o.body.h != null ? f2(o.body.h) : '?') + (o.rot ? '（轉 90°）' : ''));
+  h += trow('本體', f2(o.body.L) + '×' + f2(o.body.W) + '×' + (o.body.h != null ? f2(o.body.h) : '?') + (o.rot ? (o.turn ? '（轉 90°）' : '（預設轉 90°）') : o.turn ? '（轉回原方向）' : ''));
   h += '<div style="color:var(--ink3);font-size:0.7rem">尺寸：' + esc(o.body.sizeSrc) + '<br>高度：' + esc(o.body.hSrc) + '</div>';
   if (o.clash) h += '<div class="warn">⚠ 比屏蔽罩腔深高 ' + f2(o.clash) + ' mm，會頂到頂板</div>';
   if (est) h += riskHtml(r, hgtOf(r));
@@ -3316,7 +3333,7 @@ function pdfBom(c, X, Y, W, maxH, F) {
     const lat = list.map(o => f1(o.z - g.Left) + (isManualZ(o) ? '*' : '') + (o.port ? '（對齊 ' + ioLabel(ioList().indexOf(o.port)) + ' 光口）' : ''));
     const rotN = list.filter(o => o.rot);
     return [ri + 1, row.name, list[0].side === 'hsk' ? 'HSK 側' : '濾波器側', row.qty, row.bt || '—', f1(hgtOf(row)) + (hChg ? '*' : ''), lat.join(' / '),
-            !rotN.length ? '—' : rotN.length === list.length ? '全部 90°' : rotN.map(o => '#' + (o.i + 1)).join('、') + ' 90°'];
+            !rotN.length ? '—' : rotN.length === list.length ? (defRot(list[0].role) && !list.some(o => o.turn) ? '預設 90°' : '全部 90°') : rotN.map(o => '#' + (o.i + 1)).join('、') + ' 90°'];
   });
   let fs = 7, lh = 9, pad = 3.2;
   const wrap = (txt, w, f) => { const parts = String(txt).split(' / '); const lines = []; let cur = ''; parts.forEach((p, i) => { const t = cur ? cur + ' / ' + p : p; if (cur && pW(c, t, { s: f, m: true }) > w) { lines.push(cur + ' /'); cur = p; } else cur = t; }); if (cur) lines.push(cur); return lines; };
@@ -3544,6 +3561,7 @@ function update(data, hooks) {
   const newProj = !P || P.key !== data.key;
   HOST.E = normEdit(data.edit);
   P = Object.assign({}, data); delete P.specs; delete P.edit; delete P.dirty;
+  migrateRot(HOST.E);                                  // 舊版的絕對角度 → 跟預設方向差幾度
   SAVED.pending = !!data.dirty; if (!data.dirty) SAVED.at = null;
   if (newProj) { SELK = null; CEXP.clear(); if (!onScreen()) REFRAME = true; }
   $('loading').hidden = true; gate(null);

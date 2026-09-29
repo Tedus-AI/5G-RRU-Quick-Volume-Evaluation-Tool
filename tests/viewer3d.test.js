@@ -27,6 +27,8 @@
  *       換專案清掉、不存檔）；專案名稱圓體字；I/O 分類（SFP／電源、Signal、Debug port）；FDD 通道配對（每一顆 Final PA 自帶一組
  *       Pre-driver／Driver／環形器：沒拆的列自動錯開、拆開的列照元件清單；各組高度不交錯 → 上下排、交錯 → 左右並排；自動錯開的只能左右拖、
  *       拖 PA 時跟著動；盲插／腔體每一路每一組、開關存 layout3d.pair）；同一個專案的元件／I/O 清單變了，側欄跟著重畫
+ *   [Q] 元件預設轉向：Final PA／Driver 預設轉 90°（長邊橫跨訊號方向）、銅塊底板固定跟著板子；⟳／R＝跟預設方向差 90°（layout3d.turn）；
+ *       舊版 layout3d.rot（絕對角度）載入時轉成 turn（PA／Driver 回到預設）、之後只寫 turn
  *   [K] 瀏覽器沒有 WebGL：工具照常可用、Tab3 顯示原因、沒有未攔截的錯誤
  *
  * 執行：
@@ -916,6 +918,54 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     ok('非 FDD（只有一種 Final PA）但環形器 8 顆 → 也分到每一路（2 顆並排、各自一格腔體），盲插仍每一路一個', f4.avail && !f4.fdd && f4.G === 0 && f4.cr.every(([l, s, g], i) => l === Math.floor(i / 2) && s === i % 2 && g === -1)
       && f4.conns === 4 && f4.cells === 8 && !/偵測到 FDD/.test(f4.t), f4);
     await page.evaluate(() => { components.rf = window.__rfKeep; dbSpecs3dCache = window.__specKeep; recalc(); renderTab3(true); }); await idle();
+  }
+
+  console.log('\n[Q] 元件預設轉向：Final PA／Driver 預設轉 90°（長邊橫跨訊號方向，全部專案）、銅塊底板固定跟著板子、舊資料的 rot 轉成 turn');
+  {
+    const idle = () => page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    await page.evaluate(() => { layout3d = null; renderTab3(true); }); await idle();
+    const rowOf = (name) => page.evaluate(n => { const L = RRU3D.dbg.LAY(); return L.inst.filter(o => o.row.name === n).map(o => ({ rot: o.rot, turn: o.turn, bL: o.bL, bW: o.bW, cL: o.cL, cW: o.cW, fpL: o.fpL, fpW: o.fpW, bodyL: o.body.L, bodyW: o.body.W })); }, name);
+    const q1 = await page.evaluate(() => { const L = RRU3D.dbg.LAY(), by = {}; L.inst.forEach(o => { (by[o.role] = by[o.role] || []).push(o.rot ? (o.turn ? 'T' : 'R') : (o.turn ? 't' : '0')); });
+      return Object.fromEntries(Object.entries(by).map(([k, v]) => [k, v.join('')])); });
+    ok('Final PA、Driver 預設轉 90°（沒有使用者調整）；其他元件（Pre-driver、環形器、FPGA、DDR、SFP…）照 AI-Thermal 規格的方向', /^R+$/.test(q1.pa) && /^R+$/.test(q1.drv)
+      && Object.entries(q1).filter(([k]) => k !== 'pa' && k !== 'drv').every(([, v]) => /^0+$/.test(v)), q1);
+    const pa0 = (await rowOf('Final PA'))[0];
+    const plate = await page.evaluate(() => { RRU3D.dbg.PCB().updateMatrixWorld(true); const out = [];
+      RRU3D.dbg.PCB().traverse(m => { if (m.isMesh && m.userData.sec === 'cu' && m.userData.inst && m.userData.inst.key === 'Final PA#0') { m.geometry.computeBoundingBox(); const bb = m.geometry.boundingBox.clone().applyMatrix4(m.matrixWorld), s = bb.max.clone().sub(bb.min); out.push([+s.x.toFixed(1), +s.y.toFixed(2), +s.z.toFixed(1)]); } });
+      const g = RRU3D.dbg.P().g; return { out, Coin: [g.Coin_L, g.Coin_W, g.Coin_T] }; });
+    const [CL, CW] = plate.Coin, big = plate.out.find(v => Math.abs(v[0] - CL) < 0.2 && Math.abs(v[2] - CW) < 0.2), ped = plate.out.find(v => v !== big);
+    ok('銅塊底板固定跟著板子方向（Coin_L 沿長度、Coin_W 沿寬度），只有凸台（＝PA 本體）跟著轉 → 元件佔的板面跟轉之前一樣，8T8R 窄通道也不會擠',
+      !!big && !!ped && Math.abs(ped[0] - pa0.bodyW) < 0.2 && Math.abs(ped[2] - pa0.bodyL) < 0.2 && pa0.cL === CL && pa0.cW === CW && pa0.fpL === Math.max(pa0.bL, CL) && pa0.fpW === Math.max(pa0.bW, CW), [plate, pa0]);
+    // 元件分頁：整列的 ⟳＝跟預設方向差 90°
+    await page.click('#r3d-tab-comp');
+    const btn = n => page.evaluate(n => { const b = [...document.querySelectorAll('#r3d-ctab .cr:not(.sub)')].find(r => r.dataset.row === n).querySelector('.c-rot'); return { p: b.getAttribute('aria-pressed'), t: b.title }; }, n);
+    const clickRot = n => page.evaluate(n => [...document.querySelectorAll('#r3d-ctab .cr:not(.sub)')].find(r => r.dataset.row === n).querySelector('.c-rot').click(), n);
+    const b1 = await btn('Final PA'), tip0 = await page.evaluate(() => RRU3D.dbg.tipHtml(RRU3D.dbg.LAY().inst.find(o => o.row.name === 'Final PA')));
+    ok('預設轉的不算「使用者轉過」：⟳ 沒按下、說明寫出預設已轉 90°；游標提示寫「預設轉 90°」', b1.p === 'false' && /預設已轉 90°/.test(b1.t) && /（預設轉 90°）/.test(tip0), [b1, tip0.match(/本體.{0,60}/)]);
+    await clickRot('Final PA'); await idle();
+    const q2 = { row: await rowOf('Final PA'), b: await btn('Final PA'), l3d: await page.evaluate(() => JSON.parse(JSON.stringify(layout3d))), cid: await page.evaluate(() => components.rf.find(c => c.Component === 'Final PA')._cid),
+      tip: await page.evaluate(() => RRU3D.dbg.tipHtml(RRU3D.dbg.LAY().inst.find(o => o.row.name === 'Final PA'))) };
+    ok('按 ⟳ → 整列轉回原方向（長邊沿長度）；存成 layout3d.turn[_cid] = [90,…]（不寫舊的 rot）、⟳ 按下、提示寫「轉回原方向」', q2.row.every(o => !o.rot && o.turn) && q2.b.p === 'true'
+      && q2.l3d && q2.l3d.turn && same(q2.l3d.turn[q2.cid], [90, 90, 90, 90]) && !('rot' in q2.l3d) && /（轉回原方向）/.test(q2.tip), q2);
+    await clickRot('Final PA'); await idle();
+    const q3 = { row: await rowOf('Final PA'), l3d: await page.evaluate(() => layout3d && JSON.parse(JSON.stringify(layout3d))) };
+    ok('再按一次 → 回到預設（轉 90°），layout3d 不留 turn', q3.row.every(o => o.rot && !o.turn) && !(q3.l3d && q3.l3d.turn), q3);
+    // 單顆：選取 → R
+    await page.evaluate(() => { RRU3D.dbg.select('c:Driver PA#1'); RRU3D.dbg.rotateSel(); }); await idle();
+    const q4 = await rowOf('Driver PA');
+    ok('選一顆 Driver 按 R → 只有那一顆轉回原方向，其他照預設', q4.every((o, i) => i === 1 ? !o.rot && o.turn : o.rot && !o.turn), q4.map(o => [o.rot, o.turn]));
+    await page.evaluate(() => { RRU3D.dbg.select('c:Driver PA#1'); RRU3D.dbg.rotateSel(); RRU3D.dbg.select(null); }); await idle();
+    // 舊資料：layout3d.rot（絕對角度，0＝原方向，一列裡沒動過的也補 0）
+    const mig = await page.evaluate(() => { const rf = components.rf, pa = rf.find(c => c.Component === 'Final PA'), cr = rf.find(c => c.Component === 'Circulator');
+      layout3d = { rot: { [pa._cid]: [90, 0, 0, 0], [cr._cid]: [0, 90, 0, 0] } }; renderTab3(true); return { pa: pa._cid, cr: cr._cid }; });
+    await idle();
+    const q5 = { pa: await rowOf('Final PA'), cr: await rowOf('Circulator') };
+    ok('舊資料轉換：PA 的舊 rot 一律回到新的預設（舊的 90＝現在的預設、0＝沒動過）；環形器的舊 90 照舊（變成 turn）', q5.pa.every(o => o.rot && !o.turn) && q5.cr.every((o, i) => i === 1 ? o.rot && o.turn : !o.rot && !o.turn), q5);
+    await page.evaluate(() => RRU3D.dbg.saveEdit()); await idle();
+    const q6 = await page.evaluate(ids => ({ l3d: JSON.parse(JSON.stringify(layout3d)), ids }), mig);
+    ok('轉換後一有調整就寫成新格式：layout3d.turn 只有環形器那一列、舊的 rot 不再寫', q6.l3d.turn && same(Object.keys(q6.l3d.turn), [mig.cr]) && same(q6.l3d.turn[mig.cr], [0, 90, 0, 0]) && !('rot' in q6.l3d), q6);
+    await page.evaluate(() => { layout3d = null; renderTab3(true); }); await idle();
   }
 
   ok('沒有 JS 錯誤', errors.length === 0, errors);
