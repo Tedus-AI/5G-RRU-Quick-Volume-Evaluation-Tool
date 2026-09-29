@@ -22,8 +22,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
 /* 版面與樣式：掛進 index.html 的 #tab3-3d；樣式全部限定在 .r3d、id 一律加 r3d- 前綴（不跟工具其他頁面衝突） */
-const R3D_CSS = "\n/* 單一深色工作台（刻意的單一外觀）：深色操作介面＋淺色攝影棚視窗，模擬工業 3D 軟體 */\n  .r3d{color-scheme: dark;\n    --chrome:#0f141a; --chrome2:#151c24; --chrome3:#1b2430; --line:#26323f; --line2:#334255;\n    --ink:#e6ecf2; --ink2:#a3b3c4; --ink3:#71849a;\n    --accent:#1fc6d2; --accent-soft:rgba(31,198,210,0.14); --navy:#1e3a5f; --warn:#f0b43c; --warn-soft:rgba(240,180,60,0.13);\n    --t-param:#5fd4dc; --t-data:#8fb2ff; --t-ait:#c4a8ff; --t-deco:#8796a8; --t-prov:#f0b43c;\n    --ui:\"Barlow\",\"Noto Sans TC\",\"Microsoft JhengHei\",system-ui,sans-serif;\n    --mono:\"IBM Plex Mono\",\"Noto Sans TC\",ui-monospace,Menlo,monospace;}\n.r3d [hidden]{display:none!important;}\n.r3d{margin:0;background:var(--chrome);color:var(--ink);font:14px/1.5 var(--ui);padding:10px 12px;box-sizing:border-box;border-radius:12px;container:r3d / inline-size;text-align:left;}\n.r3d *,.r3d *::before,.r3d *::after{box-sizing:border-box;}\n.r3d h2,.r3d h3,.r3d p,.r3d ul,.r3d ol,.r3d dl{margin-top:0;}\n.r3d button,.r3d input,.r3d select{margin:0;box-shadow:none;text-transform:none;letter-spacing:normal;}\n.r3d input[type=text],.r3d input[type=number]{width:100%;height:auto;}\n.r3d label{display:inline;margin:0;font-weight:inherit;}\n\n.r3d .app{display:grid;grid-template-rows:minmax(0,1fr) auto;gap:10px;height:max(580px,calc(100vh - 340px));}\n.r3d .bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}\n.r3d .brand{display:flex;align-items:center;gap:10px;min-width:0;}\n.r3d .mark{width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,#27d4de,#1e3a5f);display:grid;place-items:center;flex-shrink:0;}\n.r3d .mark i{display:block;width:14px;height:14px;border:2px solid #e9fbfc;border-top-width:5px;border-radius:2px;}\n.r3d .brand .t{font-weight:700;font-size:1.02rem;letter-spacing:0.02em;line-height:1.2;}\n.r3d .brand .s{font-size:0.76rem;color:var(--ink3);}\n.r3d .proto{font-family:var(--mono);font-size:0.68rem;letter-spacing:0.08em;color:var(--warn);border:1px solid rgba(240,180,60,0.45);border-radius:4px;padding:0 6px;margin-left:4px;}\n.r3d .spacer{flex:1;}\n.r3d .seg{display:inline-flex;background:var(--chrome2);border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px;flex-wrap:wrap;}\n.r3d .seg button{appearance:none;border:0;background:transparent;color:var(--ink2);font:600 0.8rem var(--ui);padding:5px 11px;border-radius:6px;cursor:pointer;white-space:nowrap;}\n.r3d .seg button:hover{color:var(--ink);}\n.r3d .seg button[aria-pressed=\"true\"]{background:var(--chrome3);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line2);}\n.r3d .seg button:focus-visible,.r3d .tbtn:focus-visible,.r3d .tree input:focus-visible,.r3d .asm input:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}\n.r3d .work{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:10px;min-height:0;}\n.r3d .stage{position:relative;min-height:440px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#e9edf1;}\n.r3d #r3d-cv{display:block;width:100%;height:100%;touch-action:none;}\n.r3d #r3d-labels{position:absolute;inset:0;pointer-events:none;}\n.r3d .dim{font:600 12px var(--mono);color:#172230;background:rgba(255,255,255,0.88);border:1px solid rgba(23,34,48,0.18);border-radius:4px;padding:1px 6px;white-space:nowrap;}\n.r3d .dim small{font-weight:500;color:#4b5b6e;margin-left:3px;}\n.r3d .dim.src{border-color:rgba(20,120,130,0.45);}\n.r3d .dim.src em{font-style:normal;font-weight:500;color:#0d6b73;margin-left:5px;font-size:11px;}\n.r3d .dim.src.prov{border-color:rgba(214,138,0,0.7);background:rgba(255,248,230,0.94);}\n.r3d .dim.src.prov em{color:#9a5b00;}\n.r3d .ptitle{font:700 13px var(--ui);color:#10202e;background:rgba(255,255,255,0.9);border:1px solid rgba(23,34,48,0.16);border-radius:6px;padding:3px 9px;white-space:nowrap;box-shadow:0 1px 3px rgba(15,25,40,0.12);}\n.r3d .ptitle small{display:block;font:500 11px var(--ui);color:#4b5b6e;}\n.r3d .tools{position:absolute;left:10px;top:10px;right:132px;display:flex;flex-wrap:wrap;gap:8px;pointer-events:none;}\n.r3d .tgrp{pointer-events:auto;display:inline-flex;align-items:center;gap:2px;background:rgba(15,20,26,0.86);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.08);border-radius:9px;padding:3px;}\n.r3d .tgrp .cap{font:600 0.66rem var(--ui);letter-spacing:0.1em;color:var(--ink3);padding:0 6px 0 7px;text-transform:uppercase;}\n.r3d .tbtn{appearance:none;border:0;background:transparent;color:var(--ink2);font:600 0.78rem var(--ui);padding:5px 9px;border-radius:6px;cursor:pointer;white-space:nowrap;}\n.r3d .tbtn:hover{color:var(--ink);background:rgba(255,255,255,0.06);}\n.r3d .tbtn[aria-pressed=\"true\"]{color:#04262a;background:var(--accent);}\n.r3d .tbtn:disabled{opacity:0.35;cursor:not-allowed;}\n.r3d .legend{position:absolute;right:12px;bottom:40px;width:214px;background:rgba(15,20,26,0.9);border:1px solid rgba(255,255,255,0.08);border-radius:9px;padding:10px 12px;color:var(--ink);}\n.r3d .legend h3{margin:0 0 6px;font:700 0.78rem var(--ui);letter-spacing:0.04em;}\n.r3d .lg-bar{position:relative;height:12px;border-radius:3px;}\n.r3d .lg-ticks{position:relative;height:16px;font:500 0.66rem var(--mono);color:var(--ink2);}\n.r3d .lg-ticks span{position:absolute;top:2px;transform:translateX(-50%);white-space:nowrap;}\n.r3d .lg-ticks span.l{transform:none;}\n.r3d .lg-ticks span.r{transform:translateX(-100%);}\n.r3d .lg-mk{position:absolute;top:-3px;width:2px;height:18px;background:#fff;border-radius:1px;}\n.r3d .legend dl{margin:8px 0 0;display:grid;grid-template-columns:auto 1fr;gap:1px 10px;font-size:0.74rem;}\n.r3d .legend dt{color:var(--ink3);}\n.r3d .legend dd{margin:0;text-align:right;font-family:var(--mono);}\n.r3d .legend p{margin:7px 0 0;font-size:0.68rem;color:var(--ink3);line-height:1.45;}\n.r3d .lg-lv{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-top:6px;}\n.r3d .lg-lv span{font-size:0.66rem;text-align:center;border-radius:3px;padding:1px 0;color:#0f141a;font-weight:700;}\n.r3d .hint{position:absolute;left:12px;bottom:10px;font-size:0.72rem;color:#3b4a5c;background:rgba(255,255,255,0.72);border-radius:5px;padding:2px 8px;}\n.r3d .loading{position:absolute;inset:0;display:grid;place-items:center;font:600 0.9rem var(--ui);color:#3b4a5c;background:#e9edf1;}\n.r3d .secbar{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:4;display:flex;align-items:center;gap:10px;background:rgba(15,20,26,0.9);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:6px 10px;color:var(--ink);max-width:calc(100% - 24px);flex-wrap:wrap;}\n.r3d .secbar .cap{font:600 0.66rem var(--ui);letter-spacing:0.1em;color:var(--ink3);text-transform:uppercase;}\n.r3d .secbar .seg button{font-size:0.74rem;padding:3px 9px;}\n.r3d .secbar input{width:220px;accent-color:var(--accent);}\n.r3d .secbar .val{font:0.74rem var(--mono);color:var(--ink2);min-width:120px;}\n.r3d #r3d-labels{z-index:1;}\n.r3d .tools,.r3d .legend,.r3d .hint{z-index:3;}\n.r3d .stackup{position:absolute;right:136px;top:62px;z-index:3;width:210px;background:rgba(15,20,26,0.92);border:1px solid rgba(255,255,255,0.08);border-radius:9px;padding:9px 11px;color:var(--ink);font-size:0.76rem;}\n.r3d .stackup h3{margin:0 0 6px;font:700 0.76rem var(--ui);letter-spacing:0.04em;}\n.r3d .su-row{display:grid;grid-template-columns:16px 1fr auto;gap:0 8px;align-items:center;padding:3px 0;border-top:1px solid var(--line);}\n.r3d .su-row i{width:14px;height:14px;border-radius:3px;display:block;box-sizing:border-box;}\n.r3d .su-row b{font:500 0.8rem var(--mono);text-align:right;}\n.r3d .su-row em{grid-column:2 / 4;font-style:normal;font-size:0.66rem;line-height:1.2;margin-top:-1px;}\n.r3d .su-row em.param{color:var(--t-param);}\n.r3d .su-row em.prov{color:var(--t-prov);}\n.r3d .su-sum{margin-top:5px;font-size:0.7rem;color:var(--ink2);}\n.r3d .tip{position:absolute;z-index:6;pointer-events:none;width:268px;background:rgba(15,20,26,0.95);border:1px solid rgba(255,255,255,0.1);border-radius:9px;padding:9px 11px;color:var(--ink);font-size:0.76rem;line-height:1.5;box-shadow:0 8px 24px rgba(0,0,0,0.28);}\n.r3d .tip b{font-size:0.84rem;}\n.r3d .tip .row{display:flex;justify-content:space-between;gap:10px;}\n.r3d .tip .row span:first-child{color:var(--ink3);}\n.r3d .tip .row span:last-child{font-family:var(--mono);text-align:right;}\n.r3d .tip .lv{display:inline-block;border-radius:4px;padding:0 6px;font-weight:700;color:#0f141a;margin-left:6px;}\n.r3d .tip .warn{color:var(--warn);margin-top:4px;}\n.r3d .tip hr{border:0;border-top:1px solid var(--line);margin:6px 0;}\n.r3d .side{display:flex;flex-direction:column;gap:10px;min-height:0;overflow:auto;padding-right:2px;}\n.r3d .card{background:var(--chrome2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;}\n.r3d .card h2{margin:0 0 8px;font:700 0.72rem var(--ui);letter-spacing:0.12em;color:var(--ink3);text-transform:uppercase;display:flex;align-items:center;gap:8px;}\n.r3d .card h2 .cnt{font-family:var(--mono);letter-spacing:0;color:var(--warn);text-transform:none;}\n.r3d .tree{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px;}\n.r3d .tree li{display:grid;grid-template-columns:auto 1fr auto;gap:0 8px;align-items:start;padding:5px 6px;border-radius:7px;cursor:pointer;}\n.r3d .tree li:hover,.r3d .tree li.sel{background:var(--accent-soft);}\n.r3d .tree input{margin:3px 0 0;accent-color:var(--accent);}\n.r3d .tree .nm{font-weight:600;font-size:0.82rem;line-height:1.35;}\n.r3d .tree .sp{grid-column:2 / 4;font:0.7rem var(--mono);color:var(--ink2);line-height:1.4;}\n.r3d .tag{font:700 0.62rem var(--ui);letter-spacing:0.04em;border-radius:4px;padding:0 5px;border:1px solid currentColor;white-space:nowrap;align-self:center;}\n.r3d .tag.param{color:var(--t-param);}\n.r3d .tag.data{color:var(--t-data);}\n.r3d .tag.ait{color:var(--t-ait);}\n.r3d .tag.deco{color:var(--t-deco);}\n.r3d .tag.prov{color:var(--t-prov);}\n.r3d .srcl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:5px 10px;font-size:0.76rem;}\n.r3d .srcl dt{color:var(--ink2);}\n.r3d .srcl dd{margin:0;text-align:right;}\n.r3d .srcl dd b{font-family:var(--mono);font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums;}\n.r3d .srcl dd span{display:block;font-size:0.68rem;color:var(--ink3);}\n.r3d .asm{display:flex;flex-direction:column;gap:10px;font-size:0.78rem;}\n.r3d .asm .q{border-left:2px solid var(--warn);padding-left:9px;}\n.r3d .asm .q > div:first-child{font-weight:600;color:var(--ink);}\n.r3d .asm .q p{margin:2px 0 0;color:var(--ink2);font-size:0.72rem;line-height:1.5;}\n.r3d .asm .q p b{color:var(--ink);font-weight:600;}\n.r3d .asm .q p.bad{color:var(--warn);}\n.r3d .asm input[type=range]{width:100%;accent-color:var(--warn);margin:6px 0 0;}\n.r3d .asm .rng{display:flex;justify-content:space-between;font:0.66rem var(--mono);color:var(--ink3);}\n.r3d .asm .seg{margin-top:5px;}\n.r3d .asm .seg button{font-size:0.74rem;padding:3px 9px;}\n.r3d .kv{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:0.8rem;}\n.r3d .kv dt{color:var(--ink3);}\n.r3d .kv dd{margin:0;text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;}\n.r3d .status{display:flex;flex-wrap:wrap;gap:4px 18px;font:0.76rem var(--mono);color:var(--ink2);padding:2px 2px;}\n.r3d .status b{color:var(--ink);font-weight:500;}\n.r3d .stabs{display:grid;grid-template-columns:repeat(6,auto);gap:2px;background:var(--chrome2);border:1px solid var(--line);border-radius:9px;padding:3px;position:sticky;top:0;z-index:2;}\n.r3d .stabs button{appearance:none;border:0;background:transparent;color:var(--ink2);font:600 0.76rem var(--ui);padding:6px 4px;border-radius:6px;cursor:pointer;white-space:nowrap;}\n.r3d .stabs button:hover{color:var(--ink);}\n.r3d .stabs button[aria-selected=\"true\"]{background:var(--chrome3);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line2);}\n.r3d .stabs button:focus-visible,.r3d .fld:focus-visible,.r3d .ibtn:focus-visible,.r3d .pbtn:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}\n.r3d .stabs .cnt{color:var(--warn);font-family:var(--mono);font-size:0.7rem;margin-left:2px;}\n.r3d .pstack{display:flex;flex-direction:column;gap:10px;}\n.r3d .card h2 .cnt2{font-family:var(--mono);letter-spacing:0;color:var(--ink2);text-transform:none;font-weight:500;}\n.r3d .note{margin:0 0 8px;font-size:0.72rem;color:var(--ink2);line-height:1.5;}\n.r3d .note b{color:var(--ink);font-weight:600;}\n.r3d .note.warn{color:var(--warn);margin:8px 0 0;}\n.r3d .ch,.r3d .cr{display:grid;grid-template-columns:minmax(0,1fr) 54px minmax(0,1fr) 22px 22px;gap:5px;align-items:center;}\n.r3d .ibtn[aria-pressed=\"true\"]{background:var(--accent);color:#04262a;border-color:var(--accent);}\n.r3d .ibtn[aria-pressed=\"mixed\"]{color:var(--accent);border-color:var(--accent);box-shadow:inset 0 -3px 0 var(--accent);}\n.r3d .ch{font-size:0.66rem;color:var(--ink3);letter-spacing:0.04em;padding:0 0 4px;border-bottom:1px solid var(--line);}\n.r3d .cr{padding:5px 2px;border-bottom:1px solid var(--line);border-radius:6px;cursor:pointer;}\n.r3d .cr.sel{background:var(--accent-soft);}\n.r3d .cn{min-width:0;}\n.r3d .cn b{display:block;font-size:0.78rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}\n.r3d .cn small{display:block;font-size:0.66rem;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}\n.r3d .fld{width:100%;min-width:0;box-sizing:border-box;background:var(--chrome);border:1px solid var(--line2);border-radius:5px;color:var(--ink);font:0.76rem var(--mono);padding:4px 5px;}\n.r3d select.fld{font-family:var(--ui);padding:4px 3px;}\n.r3d .fld::placeholder{color:var(--ink3);}\n.r3d .fld.chg{border-color:var(--warn);}\n.r3d .fld.bad{border-color:#e05252;}\n.r3d .ibtn{appearance:none;border:1px solid var(--line2);background:var(--chrome3);color:var(--ink2);border-radius:5px;width:22px;height:22px;display:grid;place-items:center;font:600 0.7rem var(--ui);cursor:pointer;padding:0;}\n.r3d .ibtn:hover:not(:disabled){color:var(--ink);border-color:var(--ink3);}\n.r3d .ibtn:disabled{opacity:0.3;cursor:default;}\n.r3d .plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;}\n.r3d .plist li{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:4px 5px;align-items:center;padding:4px;border-radius:7px;border:1px solid transparent;cursor:pointer;}\n.r3d .plist .pl2{grid-column:1 / 4;display:grid;grid-template-columns:auto 50px 22px 22px 6px auto 50px 22px 22px;gap:3px;align-items:center;font-size:0.66rem;color:var(--ink3);}\n.r3d .plist .pl2 .fld{padding:3px 4px;}\n.r3d .plist li.sel{border-color:var(--accent);background:var(--accent-soft);}\n.r3d .plist .pn{font:600 0.7rem var(--mono);color:var(--ink2);white-space:nowrap;}\n/* 步進器：◀ 數字 ▶（數字直接顯示目前位置；按住連續、越按越快） */\n  .r3d .stp{display:grid;grid-template-columns:20px minmax(0,1fr) 20px;gap:2px;align-items:center;min-width:0;}\n.r3d .stp .ibtn{width:20px;height:24px;}\n.r3d .stp .fld{text-align:center;padding:4px 2px;}\n.r3d .ibtn[data-hold],.r3d .plist .ibtn[data-a=\"l\"],.r3d .plist .ibtn[data-a=\"r\"],.r3d .plist .ibtn[data-a=\"up\"],.r3d .plist .ibtn[data-a=\"dn\"]{touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}\n.r3d .ibtn.holding{background:var(--accent);color:#04262a;border-color:var(--accent);}\n.r3d .stp .cx{appearance:none;border:1px dashed var(--line2);background:transparent;color:var(--ink2);border-radius:5px;height:24px;min-width:0;padding:0 3px;font:600 0.7rem var(--mono);cursor:pointer;white-space:nowrap;overflow:hidden;}\n.r3d .stp .cx:hover{color:var(--ink);border-color:var(--ink3);}\n.r3d .stp .cx[aria-expanded=\"true\"]{border-style:solid;color:var(--ink);background:var(--chrome3);}\n.r3d .stp .cx.chg{border-color:var(--warn);}\n.r3d .stp .cx:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}\n.r3d .cr.sub{padding:3px 2px 3px 12px;border-bottom:1px dashed var(--line);}\n.r3d .cr.sub .cn b{font:600 0.7rem var(--mono);color:var(--ink2);}\n.r3d .fld.ref{border-color:transparent;background:transparent;color:var(--ink);padding-left:0;cursor:default;}\n.r3d .selbar{position:absolute;left:12px;bottom:10px;z-index:4;display:flex;align-items:center;gap:10px;max-width:calc(100% - 24px);box-sizing:border-box;background:rgba(15,20,26,0.93);border:1px solid var(--accent);border-radius:8px;padding:4px 5px 4px 10px;color:var(--ink);font-size:0.74rem;line-height:1.4;box-shadow:0 6px 18px rgba(0,0,0,0.22);}\n.r3d .selbar span{min-width:0;}\n.r3d .selbar b{color:var(--accent);font-weight:700;}\n.r3d .selbar .pbtn{background:var(--accent);color:#04262a;border-color:var(--accent);padding:3px 12px;flex:none;}\n.r3d .status .saved{color:var(--ink3);}\n.r3d .status .saved.err{color:var(--warn);}\n.r3d .pbx{display:flex;gap:2px;}\n.r3d .padd{display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap;}\n.r3d .padd select{width:auto;flex:1 1 90px;}\n.r3d .pbtn{appearance:none;border:1px solid var(--line2);background:var(--chrome3);color:var(--ink);border-radius:6px;font:600 0.76rem var(--ui);padding:4px 10px;cursor:pointer;white-space:nowrap;}\n.r3d .pbtn.ghost{background:transparent;color:var(--ink2);}\n.r3d .pbtn:hover{border-color:var(--ink3);}\n/* 輸出 PDF：兩頁預覽＋存檔 */\n  .r3d .pdfdlg{position:fixed;inset:0;z-index:50;background:rgba(8,12,16,0.62);display:grid;place-items:center;padding:16px;}\n.r3d .pdf-card{width:min(1000px,100%);max-height:100%;display:flex;flex-direction:column;background:var(--chrome2);border:1px solid var(--line2);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,0.4);overflow:hidden;}\n.r3d .pdf-top,.r3d .pdf-bot{display:flex;align-items:center;gap:12px;padding:10px 12px;}\n.r3d .pdf-top{border-bottom:1px solid var(--line);}\n.r3d .pdf-bot{border-top:1px solid var(--line);}\n.r3d .pdf-top h3{margin:0;font:700 0.9rem var(--ui);color:var(--ink);white-space:nowrap;}\n.r3d .pdf-st{flex:1;min-width:0;font:0.74rem var(--mono);color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}\n.r3d .pdf-pages{flex:1;min-height:180px;overflow:auto;display:flex;flex-wrap:wrap;gap:14px;justify-content:center;align-content:flex-start;padding:14px;background:#56616d;}\n.r3d .pdf-pages img{width:min(450px,100%);height:auto;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,0.35);}\n.r3d .pdf-note{flex:1;min-width:0;margin:0;font-size:0.74rem;color:var(--ink2);}\n.r3d .pdf-bot .pbtn{background:var(--accent);color:#04262a;border-color:var(--accent);padding:5px 16px;}\n.r3d .pdf-bot .pbtn:disabled{opacity:0.45;cursor:default;}\n.r3d .ptag{font:600 11px var(--mono);color:#10202e;background:rgba(255,255,255,0.92);border:1px solid rgba(23,34,48,0.22);border-radius:4px;padding:0 5px;white-space:nowrap;}\n.r3d .ptag.sel{background:#1fc6d2;color:#04262a;border-color:#0d6b73;}\n.r3d .tag.edit{color:var(--accent);}\n.r3d .su-row em.auto{color:var(--t-data);}\n.r3d .hint.dark{color:#e6ecf2;background:rgba(15,20,26,0.7);}\n.r3d .hint.edit{color:#04262a;background:rgba(31,198,210,0.9);}\n/* 視角方塊（ViewCube）：跟著相機轉；點一面＝那個方向的正視圖（正交投影） */\n  .r3d .vcube{position:absolute;right:12px;top:12px;z-index:4;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;}\n.r3d .vc-box{--vh:25px;width:calc(var(--vh) * 2);height:calc(var(--vh) * 2);position:relative;margin:8px 8px 12px;}\n.r3d .vc-cube{position:absolute;inset:0;transform-style:preserve-3d;}\n.r3d .vc-f{position:absolute;inset:0;appearance:none;margin:0;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid rgba(23,34,48,0.4);border-radius:4px;background:rgba(247,249,251,0.96);color:#142130;font:700 12px var(--ui);line-height:1.05;cursor:pointer;backface-visibility:hidden;-webkit-backface-visibility:hidden;pointer-events:auto;}\n.r3d .vc-f small{font:600 9px var(--ui);color:#4b5b6e;letter-spacing:0.02em;min-height:9px;}\n.r3d .vc-f:hover,.r3d .vc-f:focus-visible,.r3d .vc-f.on{background:#1fc6d2;color:#04262a;outline:none;}\n.r3d .vc-f:hover small,.r3d .vc-f:focus-visible small,.r3d .vc-f.on small{color:#04262a;}\n.r3d .vc-front{transform:translateZ(var(--vh));}\n.r3d .vc-back{transform:rotateY(180deg) translateZ(var(--vh));}\n.r3d .vc-right{transform:rotateY(90deg) translateZ(var(--vh));}\n.r3d .vc-left{transform:rotateY(-90deg) translateZ(var(--vh));}\n.r3d .vc-top{transform:rotateX(90deg) translateZ(var(--vh));}\n.r3d .vc-bottom{transform:rotateX(-90deg) translateZ(var(--vh));}\n.r3d .vc-ctl{display:flex;gap:2px;pointer-events:auto;background:rgba(15,20,26,0.86);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:2px;}\n.r3d .vc-ctl .tbtn{font-size:0.72rem;padding:3px 7px;}\n.r3d .vc-cross,.r3d .vc-pan{display:grid;gap:2px;pointer-events:auto;background:rgba(15,20,26,0.86);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:3px;}\n.r3d .vc-cross{grid-template-areas:\". t . .\" \"l f r b\" \". d . .\";grid-template-columns:repeat(4,26px);grid-auto-rows:21px;}\n.r3d .vc-pan{grid-template-areas:\". u .\" \"l c r\" \". d .\";grid-template-columns:repeat(3,26px);grid-auto-rows:22px;}\n.r3d .vbtn{appearance:none;border:0;border-radius:4px;background:rgba(255,255,255,0.07);color:var(--ink2);font:600 0.72rem var(--ui);cursor:pointer;padding:0;display:grid;place-items:center;}\n.r3d .vbtn:hover{color:var(--ink);background:rgba(255,255,255,0.16);}\n.r3d .vbtn[aria-pressed=\"true\"]{background:var(--accent);color:#04262a;}\n.r3d .vbtn:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}\n/* 屏蔽罩面板 */\n  .r3d .shd-form{display:grid;grid-template-columns:minmax(0,1fr) 78px;gap:6px 10px;align-items:center;font-size:0.76rem;margin-bottom:10px;}\n.r3d .shd-form label{color:var(--ink2);}\n.r3d .shd-form .sub{grid-column:1 / 3;margin:-2px 0 0;font-size:0.68rem;color:var(--ink3);line-height:1.45;}\n.r3d .shd-form .seg{justify-self:end;}\n.r3d .shd-form .seg button{font-size:0.72rem;padding:3px 8px;}\n.r3d .rules{margin:0 0 10px;padding-left:18px;font-size:0.72rem;color:var(--ink2);line-height:1.5;display:flex;flex-direction:column;gap:3px;}\n.r3d .rules b{color:var(--ink);font-weight:600;}\n.r3d .cav-h{font-size:0.66rem;color:var(--ink3);letter-spacing:0.04em;padding:0 2px 4px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;}\n.r3d .cav{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:2px 8px;font-size:0.74rem;padding:4px 2px;border-bottom:1px solid var(--line);align-items:center;cursor:pointer;border-radius:5px;}\n.r3d .cav:hover,.r3d .cav.sel{background:var(--accent-soft);}\n.r3d .cav b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}\n.r3d .cav span{font-family:var(--mono);font-size:0.7rem;color:var(--ink2);white-space:nowrap;}\n.r3d .cav .ok{color:#7fd79a;}\n.r3d .cav .ng{color:var(--warn);}\n.r3d .note.est{color:var(--t-data);margin:6px 0 0;}\n@container r3d (max-width:1280px){.r3d .work{grid-template-columns:minmax(0,1fr);}\n.r3d .stage{min-height:64vh;}\n.r3d .app{height:auto;}\n\n  }\n@container r3d (max-width:600px){.r3d .tgrp .cap{display:none;}\n.r3d .tbtn{padding:4px 7px;font-size:0.74rem;}\n.r3d .tools{gap:5px;left:6px;right:74px;top:6px;}\n.r3d .vc-cross,.r3d .vc-pan{display:none;}\n.r3d .stackup{right:12px;top:auto;bottom:60px;}\n.r3d .vc-box{--vh:20px;margin:9px 8px 10px;}\n.r3d .vcube{right:6px;top:6px;}\n.r3d .vc-f{font-size:11px;}\n.r3d .vc-f small{display:none;}\n.r3d .stabs button{font-size:0.72rem;padding:6px 2px;}\n\n  }\n@media (prefers-reduced-motion:reduce){.r3d .tbtn,.r3d .seg button{transition:none;}\n }\n\n\n.r3d .gate{position:absolute;inset:0;z-index:7;display:grid;place-items:center;padding:24px;background:rgba(15,20,26,0.9);color:var(--ink);font-size:0.9rem;text-align:center;}\n.r3d .gate b{color:var(--warn);}\n\n.r3d .ticon{display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;}\n.r3d .ticon svg{width:16px;height:16px;display:block;}\n.r3d .ticon .fs-out{display:none;}\n.r3d .ticon[aria-pressed=\"true\"] .fs-in{display:none;}\n.r3d .ticon[aria-pressed=\"true\"] .fs-out{display:block;}\n.r3d .ticon[aria-busy=\"true\"]{opacity:0.55;cursor:progress;}\n/* 專案名稱：右下角立體字（字面亮、下面疊幾層深色當厚度）；選取元件時左下的操作列會拉長 → 讓開 */\n.r3d .pname{position:absolute;right:16px;bottom:8px;z-index:2;max-width:42%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;pointer-events:none;\n  padding:0 2px 7px;font:800 22px/1.25 var(--ui);letter-spacing:0.03em;color:#2f5a86;\n  text-shadow:0 1px 0 #244a70,0 2px 0 #1f4063,0 3px 0 #1a3656,0 4px 0 #152d48,0 6px 7px rgba(10,20,35,0.38);}\n.r3d .selbar:not([hidden]) ~ .pname{display:none;}\n/* 全螢幕：整頁進瀏覽器全螢幕，3D 檢視器蓋滿畫面（工具的對話框 z-index 更高，照樣看得到） */\n.r3d.r3d-fs{position:fixed;inset:0;z-index:3000;border-radius:0;overflow:auto;}\n.r3d.r3d-fs .app{height:calc(100vh - 20px);}\n";
-const R3D_HTML = "\n<div class=\"app\">\n\n  <div class=\"work\">\n    <section class=\"stage\" id=\"r3d-stage\" aria-label=\"3D 視窗\">\n      <canvas id=\"r3d-cv\"></canvas>\n      <div id=\"r3d-labels\"></div>\n      <div class=\"tools\">\n        <div class=\"tgrp\" aria-label=\"狀態\"><span class=\"cap\">狀態</span>\n          <button class=\"tbtn\" data-state=\"asm\" aria-pressed=\"true\">組裝</button>\n          <button class=\"tbtn\" data-state=\"exp\" aria-pressed=\"false\">爆炸</button>\n          <button class=\"tbtn\" data-state=\"flat\" aria-pressed=\"false\">拆機攤開</button>\n        </div>\n        <div class=\"tgrp\" aria-label=\"部件\"><span class=\"cap\">部件</span>\n          <button class=\"tbtn\" data-solo=\"\" aria-pressed=\"true\" title=\"四大部件都顯示（清掉複選）\">全部</button>\n          <button class=\"tbtn\" data-solo=\"fil\" aria-pressed=\"false\" title=\"顯示腔體濾波器；可複選，再按一次取消\">濾波器</button>\n          <button class=\"tbtn\" data-solo=\"shd\" aria-pressed=\"false\" title=\"顯示屏蔽罩；可複選，再按一次取消\">屏蔽罩</button>\n          <button class=\"tbtn\" data-solo=\"pcb\" aria-pressed=\"false\" title=\"顯示 PCB（含元件、銅塊）；可複選，再按一次取消\">PCB</button>\n          <button class=\"tbtn\" data-solo=\"hsk\" aria-pressed=\"false\" title=\"顯示散熱器（含 I/O）；可複選，再按一次取消\">HSK</button>\n          <button class=\"tbtn\" id=\"r3d-t-pflip\" aria-pressed=\"false\" title=\"把畫面上顯示的部件沿長邊方向的中心軸翻轉 180°（組裝／爆炸：整組一起翻、相對位置不變；拆機攤開：各自原地翻面）；再按一次翻回\">⇅ 翻轉</button>\n        </div>\n        <div class=\"tgrp\" aria-label=\"顯示\"><span class=\"cap\">顯示</span>\n          <button class=\"tbtn\" data-mode=\"real\" aria-pressed=\"true\">寫實</button>\n          <button class=\"tbtn\" data-mode=\"therm\" aria-pressed=\"false\">熱分佈</button>\n          <button class=\"tbtn\" data-mode=\"xray\" aria-pressed=\"false\">透視</button>\n        </div>\n        <div class=\"tgrp\" aria-label=\"工具\"><span class=\"cap\">工具</span>\n          <button class=\"tbtn\" id=\"r3d-t-dim\" aria-pressed=\"true\">尺寸標註</button>\n          <button class=\"tbtn\" id=\"r3d-t-sec\" aria-pressed=\"false\" title=\"剖開看疊層：濾波器／屏蔽罩／PCB／基板／鰭片\">剖面</button>\n          <button class=\"tbtn\" id=\"r3d-t-flip\" aria-pressed=\"false\" title=\"攤開時把 PCB 翻到濾波器側\">PCB 翻面</button>\n          <button class=\"tbtn\" id=\"r3d-t-up\" aria-pressed=\"false\">直立安裝</button>\n          <button class=\"tbtn\" id=\"r3d-t-shot\" title=\"把 3D 視窗目前的畫面（含尺寸標註）存成 PNG\">📷 下載目前畫面</button>\n          <button class=\"tbtn\" id=\"r3d-t-pdf\" title=\"把 3D 模型整理成兩頁 A4 的 PDF：外觀與三視圖、內部結構與佈局\">輸出 PDF</button>\n        </div>\n        <div class=\"tgrp\" aria-label=\"視窗\">\n          <button class=\"tbtn ticon\" id=\"r3d-t-fs\" aria-pressed=\"false\" aria-label=\"全螢幕\" title=\"全螢幕（只顯示 3D 檢視器；再按一次或 Esc 退出）\"><svg class=\"fs-in\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\"><path d=\"M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4\"/></svg><svg class=\"fs-out\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\"><path d=\"M6 2v4H2M14 6h-4V2M10 14v-4h4M2 10h4v4\"/></svg></button>\n          <button class=\"tbtn ticon\" id=\"r3d-t-save\" aria-label=\"儲存專案\" title=\"儲存專案（還沒解除資料庫保護會先請你輸入密碼）\"><svg viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linejoin=\"round\"><path d=\"M2.5 2.5h9l2 2v9h-11z\"/><path d=\"M5 2.5v3.5h5V2.5M4.5 13.5V9.5h7v4\"/></svg></button>\n        </div>\n        <div class=\"tgrp\" aria-label=\"編輯\"><span class=\"cap\">編輯</span>\n          <button class=\"tbtn\" id=\"r3d-t-edit\" aria-pressed=\"false\" title=\"拖曳元件（長度＋橫向）、I/O、天線座；方向鍵微調\">移動</button>\n        </div>\n      </div>\n      <div class=\"vcube\" id=\"r3d-vcube\">\n        <div class=\"vc-box\"><div class=\"vc-cube\" id=\"r3d-vc-cube\">\n          <button type=\"button\" class=\"vc-f vc-front\" data-std=\"front\">前<small></small></button>\n          <button type=\"button\" class=\"vc-f vc-back\" data-std=\"back\">後<small></small></button>\n          <button type=\"button\" class=\"vc-f vc-right\" data-std=\"right\">右<small></small></button>\n          <button type=\"button\" class=\"vc-f vc-left\" data-std=\"left\">左<small></small></button>\n          <button type=\"button\" class=\"vc-f vc-top\" data-std=\"top\">上<small></small></button>\n          <button type=\"button\" class=\"vc-f vc-bottom\" data-std=\"bottom\">下<small></small></button>\n        </div></div>\n        <div class=\"vc-ctl\"><button type=\"button\" class=\"tbtn\" id=\"r3d-vc-home\" data-view=\"iso\" title=\"3D 等角視圖（透視，回到預設角度）\">等角</button><button type=\"button\" class=\"tbtn\" data-view=\"io\" title=\"從 I/O 端斜看（透視）\">I/O</button><button type=\"button\" class=\"tbtn\" id=\"r3d-t-ortho\" aria-pressed=\"false\" title=\"正交投影：沒有透視變形，看尺寸與對齊用。點方塊的面會自動切成正交\">正交</button></div>\n        <div class=\"vc-cross\" role=\"group\" aria-label=\"六個正視圖\">\n          <button type=\"button\" class=\"vbtn\" data-std=\"top\" style=\"grid-area:t\">上</button>\n          <button type=\"button\" class=\"vbtn\" data-std=\"left\" style=\"grid-area:l\">左</button>\n          <button type=\"button\" class=\"vbtn\" data-std=\"front\" style=\"grid-area:f\">前</button>\n          <button type=\"button\" class=\"vbtn\" data-std=\"right\" style=\"grid-area:r\">右</button>\n          <button type=\"button\" class=\"vbtn\" data-std=\"back\" style=\"grid-area:b\">後</button>\n          <button type=\"button\" class=\"vbtn\" data-std=\"bottom\" style=\"grid-area:d\">下</button>\n        </div>\n        <div class=\"vc-pan\" role=\"group\" aria-label=\"平移畫面\">\n          <button type=\"button\" class=\"vbtn\" data-pan=\"0,1\" style=\"grid-area:u\" title=\"畫面往上（也可以 Shift＋左鍵拖曳、右鍵拖曳）\" aria-label=\"畫面往上\">▲</button>\n          <button type=\"button\" class=\"vbtn\" data-pan=\"-1,0\" style=\"grid-area:l\" title=\"畫面往左\" aria-label=\"畫面往左\">◀</button>\n          <button type=\"button\" class=\"vbtn\" data-pan=\"c\" style=\"grid-area:c\" title=\"回到中心（不改角度與遠近）\" aria-label=\"畫面置中\">◎</button>\n          <button type=\"button\" class=\"vbtn\" data-pan=\"1,0\" style=\"grid-area:r\" title=\"畫面往右\" aria-label=\"畫面往右\">▶</button>\n          <button type=\"button\" class=\"vbtn\" data-pan=\"0,-1\" style=\"grid-area:d\" title=\"畫面往下\" aria-label=\"畫面往下\">▼</button>\n        </div>\n      </div>\n      <div class=\"legend\" id=\"r3d-legend\" hidden>\n        <h3 title=\"基板溫度沿長度方向依 0.03 °C/mm 上升（與工具「元件相對高度」同一條公式）；鰭片沿高度依 1D 鰭片方程式（cosh）遞減。\">溫度 °C <span style=\"font-weight:500;color:var(--ink3)\">· 散熱器與鰭片</span></h3>\n        <div class=\"lg-bar\" id=\"r3d-lg-bar\"></div>\n        <div class=\"lg-ticks\" id=\"r3d-lg-ticks\"></div>\n        <dl id=\"r3d-lg-kv\"></dl>\n        <h3 style=\"margin-top:8px\">元件 · 裕度分級</h3>\n        <div class=\"lg-lv\" id=\"r3d-lg-lv\"></div>\n        <p>灰色＝不在計算模型內（PCB、屏蔽罩、濾波器）</p>\n      </div>\n      <div class=\"tip\" id=\"r3d-tip\" hidden></div>\n      <div class=\"stackup\" id=\"r3d-stackup\" hidden></div>\n      <div class=\"secbar\" id=\"r3d-secbar\" hidden>\n        <span class=\"cap\">剖面</span>\n        <div class=\"seg\" role=\"group\" aria-label=\"剖切方向\"><button type=\"button\" data-sax=\"x\" aria-pressed=\"true\">橫剖（看鰭片截面）</button><button type=\"button\" data-sax=\"z\" aria-pressed=\"false\">縱剖（沿長度）</button></div>\n        <input type=\"range\" id=\"r3d-sec-pos\" min=\"0\" max=\"100\" step=\"0.5\" aria-label=\"剖切位置\">\n        <span class=\"val\" id=\"r3d-sec-val\"></span>\n        <button type=\"button\" class=\"tbtn\" id=\"r3d-sec-bn\" title=\"剖面移到瓶頸元件的位置\">到瓶頸元件</button>\n      </div>\n      <div class=\"selbar\" id=\"r3d-selbar\" hidden><span id=\"r3d-selbar-t\"></span><button type=\"button\" class=\"pbtn\" id=\"r3d-selbar-done\" title=\"取消選取（Esc 或點 3D 空白處也可以）\">完成</button></div>\n      <div class=\"hint\" id=\"r3d-hint\">左鍵旋轉 · 右鍵或 Shift＋左鍵平移 · 滾輪縮放 · 右上方塊／十字鈕切正視 · 游標停在元件上看數據</div>\n      <div class=\"pname\" id=\"r3d-pname\" aria-hidden=\"true\"></div>\n      <div class=\"loading\" id=\"r3d-loading\">載入 3D 引擎…</div>\n      <div class=\"gate\" id=\"r3d-gate\" hidden></div>\n    </section>\n\n    <aside class=\"side\">\n      <div class=\"stabs\" role=\"tablist\" aria-label=\"側欄分頁\">\n        <button type=\"button\" role=\"tab\" id=\"r3d-tab-comp\" data-tab=\"comp\" aria-selected=\"true\" aria-controls=\"r3d-pn-comp\">元件</button>\n        <button type=\"button\" role=\"tab\" id=\"r3d-tab-io\" data-tab=\"io\" aria-selected=\"false\" aria-controls=\"r3d-pn-io\">I/O</button>\n        <button type=\"button\" role=\"tab\" id=\"r3d-tab-ant\" data-tab=\"ant\" aria-selected=\"false\" aria-controls=\"r3d-pn-ant\">天線座</button>\n        <button type=\"button\" role=\"tab\" id=\"r3d-tab-shd\" data-tab=\"shd\" aria-selected=\"false\" aria-controls=\"r3d-pn-shd\">屏蔽罩<span class=\"cnt\" id=\"r3d-shd-tcnt\"></span></button>\n        <button type=\"button\" role=\"tab\" id=\"r3d-tab-asm\" data-tab=\"asm\" aria-selected=\"false\" aria-controls=\"r3d-pn-asm\">假設<span class=\"cnt\" id=\"r3d-asm-cnt\"></span></button>\n        <button type=\"button\" role=\"tab\" id=\"r3d-tab-model\" data-tab=\"model\" aria-selected=\"false\" aria-controls=\"r3d-pn-model\">模型</button>\n      </div>\n      <section class=\"card\" id=\"r3d-pn-comp\" role=\"tabpanel\" aria-labelledby=\"r3d-tab-comp\">\n        <h2>元件位置 <span class=\"cnt2\" id=\"r3d-comp-cnt\"></span></h2>\n        <p class=\"note\"><b>元件相對高度</b>＝元件設定的同一格：在這裡改會寫回去、重算溫度（整列共用，多顆一起動）。<b>橫向</b>＝元件中心距 PCB 左緣，只影響 3D：◀ ▶ 按住連續移動（Shift＝10 mm），也可以直接打數字，清空＝回到自動。多顆的列點「×4」展開，每一顆各自調。<b>⟳</b>＝水平轉 90°。開「移動」可以直接在 3D 上拖。</p>\n        <div class=\"ctab\" id=\"r3d-ctab\"></div>\n        <p class=\"note warn\" id=\"r3d-comp-warn\" hidden></p>\n        <p class=\"note est\" id=\"r3d-comp-est\" hidden></p>\n      </section>\n      <section class=\"card\" id=\"r3d-pn-io\" role=\"tabpanel\" aria-labelledby=\"r3d-tab-io\" hidden>\n        <h2>數位 I/O <span class=\"cnt2\" id=\"r3d-io-cnt\"></span></h2>\n        <p class=\"note\">橫向＝接頭中心距外殼左側（從 I/O 端往內看，由左到右）；高度＝接頭中心距分模面。◀ ▶ ▼ ▲ 按住連續移動（Shift＝10 mm），也可以直接打數字，清空＝回到自動。<b>SFP 光口跟 PCB 上的 SFP 籠綁在一起</b>：左右一起動，高度固定對齊籠子。接頭框超出端牆就自動補肉。</p>\n        <ol class=\"plist\" id=\"r3d-io-list\"></ol>\n        <div class=\"padd\"><select class=\"fld\" id=\"r3d-io-add-t\" aria-label=\"要新增的 I/O 類型\"></select><button type=\"button\" class=\"pbtn\" id=\"r3d-io-add\">＋ 新增</button><button type=\"button\" class=\"pbtn ghost\" id=\"r3d-io-reset\">重設</button></div>\n        <p class=\"note warn\" id=\"r3d-io-warn\" hidden></p>\n        <p class=\"note est\" id=\"r3d-io-note\" hidden></p>\n      </section>\n      <section class=\"card\" id=\"r3d-pn-ant\" role=\"tabpanel\" aria-labelledby=\"r3d-tab-ant\" hidden>\n        <h2>天線座 <span class=\"cnt2\" id=\"r3d-ant-cnt\"></span></h2>\n        <p class=\"note\">預設數量＝Final PA 數量。位置＝天線座中心距外殼左側：◀ ▶ 按住連續移動，也可以直接打數字，清空＝依順序自動等分。</p>\n        <ol class=\"plist\" id=\"r3d-ant-list\"></ol>\n        <div class=\"padd\"><select class=\"fld\" id=\"r3d-ant-add-t\" aria-label=\"要新增的天線座類型\"></select><button type=\"button\" class=\"pbtn\" id=\"r3d-ant-add\">＋ 新增</button><button type=\"button\" class=\"pbtn ghost\" id=\"r3d-ant-reset\">依 Final PA 數量重設</button></div>\n        <p class=\"note warn\" id=\"r3d-ant-warn\" hidden></p>\n      </section>\n      <section class=\"card\" id=\"r3d-pn-shd\" role=\"tabpanel\" aria-labelledby=\"r3d-tab-shd\" hidden>\n        <h2>屏蔽罩 <span class=\"cnt2\" id=\"r3d-shd-cnt\"></span></h2>\n        <p class=\"note\">只在 3D 顯示、不影響溫度計算。罩住 PCB 的濾波器側：長寬＝PCB，高＝分模面到 PCB（H_shield − 板厚），不會把整機撐大。腔體依下面的 RF 隔離規則自動排，元件移動就跟著變。</p>\n        <div class=\"shd-form\" id=\"r3d-shd-form\"></div>\n        <ol class=\"rules\" id=\"r3d-shd-rules\"></ol>\n        <div id=\"r3d-shd-list\"></div>\n        <p class=\"note warn\" id=\"r3d-shd-warn\" hidden></p>\n        <p class=\"note\" id=\"r3d-shd-kg\"></p>\n      </section>\n      <section class=\"card\" id=\"r3d-pn-asm\" role=\"tabpanel\" aria-labelledby=\"r3d-tab-asm\" hidden><h2>構圖規則與假設</h2><div class=\"asm\" id=\"r3d-asm\"></div></section>\n      <div class=\"pstack\" id=\"r3d-pn-model\" role=\"tabpanel\" aria-labelledby=\"r3d-tab-model\" hidden>\n        <section class=\"card\"><h2>模型樹</h2><ul class=\"tree\" id=\"r3d-tree\"></ul></section>\n        <section class=\"card\"><h2>構圖依據</h2><dl class=\"srcl\" id=\"r3d-src\"></dl></section>\n        <section class=\"card\"><h2>設計數據</h2><dl class=\"kv\" id=\"r3d-kv\"></dl></section>\n      </div>\n    </aside>\n  </div>\n\n  <footer class=\"status\" id=\"r3d-status\"></footer>\n  <div class=\"pdfdlg\" id=\"r3d-pdfdlg\" hidden role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"r3d-pdf-h\">\n    <div class=\"pdf-card\">\n      <div class=\"pdf-top\"><h3 id=\"r3d-pdf-h\">輸出 PDF</h3><span class=\"pdf-st\" id=\"r3d-pdf-st\" role=\"status\"></span><button type=\"button\" class=\"ibtn\" id=\"r3d-pdf-x\" aria-label=\"關閉\">✕</button></div>\n      <div class=\"pdf-pages\" id=\"r3d-pdf-pages\"></div>\n      <div class=\"pdf-bot\"><p class=\"pdf-note\" id=\"r3d-pdf-note\"></p><button type=\"button\" class=\"pbtn\" id=\"r3d-pdf-save\" disabled>存成 PDF</button></div>\n    </div>\n  </div>\n</div>\n\n\n";
+const R3D_CSS = "\n/* 單一深色工作台（刻意的單一外觀）：深色操作介面＋淺色攝影棚視窗，模擬工業 3D 軟體 */\n  .r3d{color-scheme: dark;\n    --chrome:#0f141a; --chrome2:#151c24; --chrome3:#1b2430; --line:#26323f; --line2:#334255;\n    --ink:#e6ecf2; --ink2:#a3b3c4; --ink3:#71849a;\n    --accent:#1fc6d2; --accent-soft:rgba(31,198,210,0.14); --navy:#1e3a5f; --warn:#f0b43c; --warn-soft:rgba(240,180,60,0.13);\n    --t-param:#5fd4dc; --t-data:#8fb2ff; --t-ait:#c4a8ff; --t-deco:#8796a8; --t-prov:#f0b43c;\n    --ui:\"Barlow\",\"Noto Sans TC\",\"Microsoft JhengHei\",system-ui,sans-serif;\n    --mono:\"IBM Plex Mono\",\"Noto Sans TC\",ui-monospace,Menlo,monospace;}\n.r3d [hidden]{display:none!important;}\n.r3d{margin:0;background:var(--chrome);color:var(--ink);font:14px/1.5 var(--ui);padding:10px 12px;box-sizing:border-box;border-radius:12px;container:r3d / inline-size;text-align:left;}\n.r3d *,.r3d *::before,.r3d *::after{box-sizing:border-box;}\n.r3d h2,.r3d h3,.r3d p,.r3d ul,.r3d ol,.r3d dl{margin-top:0;}\n.r3d button,.r3d input,.r3d select{margin:0;box-shadow:none;text-transform:none;letter-spacing:normal;}\n.r3d input[type=text],.r3d input[type=number]{width:100%;height:auto;}\n.r3d label{display:inline;margin:0;font-weight:inherit;}\n\n.r3d .app{display:grid;grid-template-rows:minmax(0,1fr) auto;gap:10px;height:max(580px,calc(100vh - 340px));}\n.r3d .bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}\n.r3d .brand{display:flex;align-items:center;gap:10px;min-width:0;}\n.r3d .mark{width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,#27d4de,#1e3a5f);display:grid;place-items:center;flex-shrink:0;}\n.r3d .mark i{display:block;width:14px;height:14px;border:2px solid #e9fbfc;border-top-width:5px;border-radius:2px;}\n.r3d .brand .t{font-weight:700;font-size:1.02rem;letter-spacing:0.02em;line-height:1.2;}\n.r3d .brand .s{font-size:0.76rem;color:var(--ink3);}\n.r3d .proto{font-family:var(--mono);font-size:0.68rem;letter-spacing:0.08em;color:var(--warn);border:1px solid rgba(240,180,60,0.45);border-radius:4px;padding:0 6px;margin-left:4px;}\n.r3d .spacer{flex:1;}\n.r3d .seg{display:inline-flex;background:var(--chrome2);border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px;flex-wrap:wrap;}\n.r3d .seg button{appearance:none;border:0;background:transparent;color:var(--ink2);font:600 0.8rem var(--ui);padding:5px 11px;border-radius:6px;cursor:pointer;white-space:nowrap;}\n.r3d .seg button:hover{color:var(--ink);}\n.r3d .seg button[aria-pressed=\"true\"]{background:var(--chrome3);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line2);}\n.r3d .seg button:focus-visible,.r3d .tbtn:focus-visible,.r3d .tree input:focus-visible,.r3d .asm input:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}\n.r3d .work{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:10px;min-height:0;}\n.r3d .stage{position:relative;min-height:440px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#e9edf1;}\n.r3d #r3d-cv{display:block;width:100%;height:100%;touch-action:none;}\n.r3d #r3d-labels{position:absolute;inset:0;pointer-events:none;}\n.r3d .dim{font:600 12px var(--mono);color:#172230;background:rgba(255,255,255,0.88);border:1px solid rgba(23,34,48,0.18);border-radius:4px;padding:1px 6px;white-space:nowrap;}\n.r3d .dim small{font-weight:500;color:#4b5b6e;margin-left:3px;}\n.r3d .dim.src{border-color:rgba(20,120,130,0.45);}\n.r3d .dim.src em{font-style:normal;font-weight:500;color:#0d6b73;margin-left:5px;font-size:11px;}\n.r3d .dim.src.prov{border-color:rgba(214,138,0,0.7);background:rgba(255,248,230,0.94);}\n.r3d .dim.src.prov em{color:#9a5b00;}\n.r3d .ptitle{font:700 13px var(--ui);color:#10202e;background:rgba(255,255,255,0.9);border:1px solid rgba(23,34,48,0.16);border-radius:6px;padding:3px 9px;white-space:nowrap;box-shadow:0 1px 3px rgba(15,25,40,0.12);}\n.r3d .ptitle small{display:block;font:500 11px var(--ui);color:#4b5b6e;}\n.r3d .tools{position:absolute;left:10px;top:10px;right:132px;display:flex;flex-wrap:wrap;gap:8px;pointer-events:none;}\n.r3d .tgrp{pointer-events:auto;display:inline-flex;align-items:center;gap:2px;background:rgba(15,20,26,0.86);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.08);border-radius:9px;padding:3px;}\n.r3d .tgrp .cap{font:600 0.66rem var(--ui);letter-spacing:0.1em;color:var(--ink3);padding:0 6px 0 7px;text-transform:uppercase;}\n.r3d .tbtn{appearance:none;border:0;background:transparent;color:var(--ink2);font:600 0.78rem var(--ui);padding:5px 9px;border-radius:6px;cursor:pointer;white-space:nowrap;}\n.r3d .tbtn:hover{color:var(--ink);background:rgba(255,255,255,0.06);}\n.r3d .tbtn[aria-pressed=\"true\"]{color:#04262a;background:var(--accent);}\n.r3d .tbtn:disabled{opacity:0.35;cursor:not-allowed;}\n.r3d .legend{position:absolute;right:12px;bottom:40px;width:214px;background:rgba(15,20,26,0.9);border:1px solid rgba(255,255,255,0.08);border-radius:9px;padding:10px 12px;color:var(--ink);}\n.r3d .legend h3{margin:0 0 6px;font:700 0.78rem var(--ui);letter-spacing:0.04em;}\n.r3d .lg-bar{position:relative;height:12px;border-radius:3px;}\n.r3d .lg-ticks{position:relative;height:16px;font:500 0.66rem var(--mono);color:var(--ink2);}\n.r3d .lg-ticks span{position:absolute;top:2px;transform:translateX(-50%);white-space:nowrap;}\n.r3d .lg-ticks span.l{transform:none;}\n.r3d .lg-ticks span.r{transform:translateX(-100%);}\n.r3d .lg-mk{position:absolute;top:-3px;width:2px;height:18px;background:#fff;border-radius:1px;}\n.r3d .legend dl{margin:8px 0 0;display:grid;grid-template-columns:auto 1fr;gap:1px 10px;font-size:0.74rem;}\n.r3d .legend dt{color:var(--ink3);}\n.r3d .legend dd{margin:0;text-align:right;font-family:var(--mono);}\n.r3d .legend p{margin:7px 0 0;font-size:0.68rem;color:var(--ink3);line-height:1.45;}\n.r3d .lg-lv{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-top:6px;}\n.r3d .lg-lv span{font-size:0.66rem;text-align:center;border-radius:3px;padding:1px 0;color:#0f141a;font-weight:700;}\n.r3d .hint{position:absolute;left:12px;bottom:10px;font-size:0.72rem;color:#3b4a5c;background:rgba(255,255,255,0.72);border-radius:5px;padding:2px 8px;}\n.r3d .loading{position:absolute;inset:0;display:grid;place-items:center;font:600 0.9rem var(--ui);color:#3b4a5c;background:#e9edf1;}\n.r3d .secbar{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:4;display:flex;align-items:center;gap:10px;background:rgba(15,20,26,0.9);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:6px 10px;color:var(--ink);max-width:calc(100% - 24px);flex-wrap:wrap;}\n.r3d .secbar .cap{font:600 0.66rem var(--ui);letter-spacing:0.1em;color:var(--ink3);text-transform:uppercase;}\n.r3d .secbar .seg button{font-size:0.74rem;padding:3px 9px;}\n.r3d .secbar input{width:220px;accent-color:var(--accent);}\n.r3d .secbar .val{font:0.74rem var(--mono);color:var(--ink2);min-width:120px;}\n.r3d #r3d-labels{z-index:1;}\n.r3d .tools,.r3d .legend,.r3d .hint{z-index:3;}\n.r3d .stackup{position:absolute;right:136px;top:62px;z-index:3;width:210px;background:rgba(15,20,26,0.92);border:1px solid rgba(255,255,255,0.08);border-radius:9px;padding:9px 11px;color:var(--ink);font-size:0.76rem;}\n.r3d .stackup h3{margin:0 0 6px;font:700 0.76rem var(--ui);letter-spacing:0.04em;}\n.r3d .su-row{display:grid;grid-template-columns:16px 1fr auto;gap:0 8px;align-items:center;padding:3px 0;border-top:1px solid var(--line);}\n.r3d .su-row i{width:14px;height:14px;border-radius:3px;display:block;box-sizing:border-box;}\n.r3d .su-row b{font:500 0.8rem var(--mono);text-align:right;}\n.r3d .su-row em{grid-column:2 / 4;font-style:normal;font-size:0.66rem;line-height:1.2;margin-top:-1px;}\n.r3d .su-row em.param{color:var(--t-param);}\n.r3d .su-row em.prov{color:var(--t-prov);}\n.r3d .su-sum{margin-top:5px;font-size:0.7rem;color:var(--ink2);}\n.r3d .tip{position:absolute;z-index:6;pointer-events:none;width:268px;background:rgba(15,20,26,0.95);border:1px solid rgba(255,255,255,0.1);border-radius:9px;padding:9px 11px;color:var(--ink);font-size:0.76rem;line-height:1.5;box-shadow:0 8px 24px rgba(0,0,0,0.28);}\n.r3d .tip b{font-size:0.84rem;}\n.r3d .tip .row{display:flex;justify-content:space-between;gap:10px;}\n.r3d .tip .row span:first-child{color:var(--ink3);}\n.r3d .tip .row span:last-child{font-family:var(--mono);text-align:right;}\n.r3d .tip .lv{display:inline-block;border-radius:4px;padding:0 6px;font-weight:700;color:#0f141a;margin-left:6px;}\n.r3d .tip .warn{color:var(--warn);margin-top:4px;}\n.r3d .tip hr{border:0;border-top:1px solid var(--line);margin:6px 0;}\n.r3d .side{display:flex;flex-direction:column;gap:10px;min-height:0;overflow:auto;padding-right:2px;}\n.r3d .card{background:var(--chrome2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;}\n.r3d .card h2{margin:0 0 8px;font:700 0.72rem var(--ui);letter-spacing:0.12em;color:var(--ink3);text-transform:uppercase;display:flex;align-items:center;gap:8px;}\n.r3d .card h2 .cnt{font-family:var(--mono);letter-spacing:0;color:var(--warn);text-transform:none;}\n.r3d .tree{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px;}\n.r3d .tree li{display:grid;grid-template-columns:auto 1fr auto;gap:0 8px;align-items:start;padding:5px 6px;border-radius:7px;cursor:pointer;}\n.r3d .tree li:hover,.r3d .tree li.sel{background:var(--accent-soft);}\n.r3d .tree input{margin:3px 0 0;accent-color:var(--accent);}\n.r3d .tree .nm{font-weight:600;font-size:0.82rem;line-height:1.35;}\n.r3d .tree .sp{grid-column:2 / 4;font:0.7rem var(--mono);color:var(--ink2);line-height:1.4;}\n.r3d .tag{font:700 0.62rem var(--ui);letter-spacing:0.04em;border-radius:4px;padding:0 5px;border:1px solid currentColor;white-space:nowrap;align-self:center;}\n.r3d .tag.param{color:var(--t-param);}\n.r3d .tag.data{color:var(--t-data);}\n.r3d .tag.ait{color:var(--t-ait);}\n.r3d .tag.deco{color:var(--t-deco);}\n.r3d .tag.prov{color:var(--t-prov);}\n.r3d .srcl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:5px 10px;font-size:0.76rem;}\n.r3d .srcl dt{color:var(--ink2);}\n.r3d .srcl dd{margin:0;text-align:right;}\n.r3d .srcl dd b{font-family:var(--mono);font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums;}\n.r3d .srcl dd span{display:block;font-size:0.68rem;color:var(--ink3);}\n.r3d .asm{display:flex;flex-direction:column;gap:10px;font-size:0.78rem;}\n.r3d .asm .q{border-left:2px solid var(--warn);padding-left:9px;}\n.r3d .asm .q > div:first-child{font-weight:600;color:var(--ink);}\n.r3d .asm .q p{margin:2px 0 0;color:var(--ink2);font-size:0.72rem;line-height:1.5;}\n.r3d .asm .q p b{color:var(--ink);font-weight:600;}\n.r3d .asm .q p.bad{color:var(--warn);}\n.r3d .asm input[type=range]{width:100%;accent-color:var(--warn);margin:6px 0 0;}\n.r3d .asm .rng{display:flex;justify-content:space-between;font:0.66rem var(--mono);color:var(--ink3);}\n.r3d .asm .seg{margin-top:5px;}\n.r3d .asm .seg button{font-size:0.74rem;padding:3px 9px;}\n.r3d .kv{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:0.8rem;}\n.r3d .kv dt{color:var(--ink3);}\n.r3d .kv dd{margin:0;text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;}\n.r3d .status{display:flex;flex-wrap:wrap;gap:4px 18px;font:0.76rem var(--mono);color:var(--ink2);padding:2px 2px;}\n.r3d .status b{color:var(--ink);font-weight:500;}\n.r3d .stabs{display:grid;grid-template-columns:repeat(6,auto);gap:2px;background:var(--chrome2);border:1px solid var(--line);border-radius:9px;padding:3px;position:sticky;top:0;z-index:2;}\n.r3d .stabs button{appearance:none;border:0;background:transparent;color:var(--ink2);font:600 0.76rem var(--ui);padding:6px 4px;border-radius:6px;cursor:pointer;white-space:nowrap;}\n.r3d .stabs button:hover{color:var(--ink);}\n.r3d .stabs button[aria-selected=\"true\"]{background:var(--chrome3);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line2);}\n.r3d .stabs button:focus-visible,.r3d .fld:focus-visible,.r3d .ibtn:focus-visible,.r3d .pbtn:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}\n.r3d .stabs .cnt{color:var(--warn);font-family:var(--mono);font-size:0.7rem;margin-left:2px;}\n.r3d .pstack{display:flex;flex-direction:column;gap:10px;}\n.r3d .card h2 .cnt2{font-family:var(--mono);letter-spacing:0;color:var(--ink2);text-transform:none;font-weight:500;}\n.r3d .note{margin:0 0 8px;font-size:0.72rem;color:var(--ink2);line-height:1.5;}\n.r3d .note b{color:var(--ink);font-weight:600;}\n.r3d .note.warn{color:var(--warn);margin:8px 0 0;}\n.r3d .ch,.r3d .cr{display:grid;grid-template-columns:minmax(0,1fr) 54px minmax(0,1fr) 22px 22px;gap:5px;align-items:center;}\n.r3d .ibtn[aria-pressed=\"true\"]{background:var(--accent);color:#04262a;border-color:var(--accent);}\n.r3d .ibtn[aria-pressed=\"mixed\"]{color:var(--accent);border-color:var(--accent);box-shadow:inset 0 -3px 0 var(--accent);}\n.r3d .ch{font-size:0.66rem;color:var(--ink3);letter-spacing:0.04em;padding:0 0 4px;border-bottom:1px solid var(--line);}\n.r3d .cr{padding:5px 2px;border-bottom:1px solid var(--line);border-radius:6px;cursor:pointer;}\n.r3d .cr.sel{background:var(--accent-soft);}\n.r3d .cn{min-width:0;display:grid;grid-template-columns:18px minmax(0,1fr);column-gap:5px;align-items:center;}\n.r3d .cn .eye{grid-row:1 / span 2;width:18px;height:18px;}\n.r3d .cn b,.r3d .cn small{grid-column:2;}\n.r3d .cn b{display:block;font-size:0.78rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}\n.r3d .cn small{display:block;font-size:0.66rem;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}\n.r3d .fld{width:100%;min-width:0;box-sizing:border-box;background:var(--chrome);border:1px solid var(--line2);border-radius:5px;color:var(--ink);font:0.76rem var(--mono);padding:4px 5px;}\n.r3d select.fld{font-family:var(--ui);padding:4px 3px;}\n.r3d .fld::placeholder{color:var(--ink3);}\n.r3d .fld.chg{border-color:var(--warn);}\n.r3d .fld.bad{border-color:#e05252;}\n.r3d .ibtn{appearance:none;border:1px solid var(--line2);background:var(--chrome3);color:var(--ink2);border-radius:5px;width:22px;height:22px;display:grid;place-items:center;font:600 0.7rem var(--ui);cursor:pointer;padding:0;}\n.r3d .ibtn:hover:not(:disabled){color:var(--ink);border-color:var(--ink3);}\n.r3d .ibtn:disabled{opacity:0.3;cursor:default;}\n.r3d .plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;}\n.r3d .plist li{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:4px 5px;align-items:center;padding:4px;border-radius:7px;border:1px solid transparent;cursor:pointer;}\n.r3d .plist .pl2{grid-column:1 / 4;display:grid;grid-template-columns:auto 50px 22px 22px 6px auto 50px 22px 22px;gap:3px;align-items:center;font-size:0.66rem;color:var(--ink3);}\n.r3d .plist .pl2 .fld{padding:3px 4px;}\n.r3d .plist li.sel{border-color:var(--accent);background:var(--accent-soft);}\n.r3d .plist .pn{font:600 0.7rem var(--mono);color:var(--ink2);white-space:nowrap;}\n/* 步進器：◀ 數字 ▶（數字直接顯示目前位置；按住連續、越按越快） */\n  .r3d .stp{display:grid;grid-template-columns:20px minmax(0,1fr) 20px;gap:2px;align-items:center;min-width:0;}\n.r3d .stp .ibtn{width:20px;height:24px;}\n.r3d .stp .fld{text-align:center;padding:4px 2px;}\n.r3d .ibtn[data-hold],.r3d .plist .ibtn[data-a=\"l\"],.r3d .plist .ibtn[data-a=\"r\"],.r3d .plist .ibtn[data-a=\"up\"],.r3d .plist .ibtn[data-a=\"dn\"]{touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}\n.r3d .ibtn.holding{background:var(--accent);color:#04262a;border-color:var(--accent);}\n.r3d .stp .cx{appearance:none;border:1px dashed var(--line2);background:transparent;color:var(--ink2);border-radius:5px;height:24px;min-width:0;padding:0 3px;font:600 0.7rem var(--mono);cursor:pointer;white-space:nowrap;overflow:hidden;}\n.r3d .stp .cx:hover{color:var(--ink);border-color:var(--ink3);}\n.r3d .stp .cx[aria-expanded=\"true\"]{border-style:solid;color:var(--ink);background:var(--chrome3);}\n.r3d .stp .cx.chg{border-color:var(--warn);}\n.r3d .stp .cx:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}\n.r3d .cr.sub{padding:3px 2px 3px 12px;border-bottom:1px dashed var(--line);}\n.r3d .cr.sub .cn b{font:600 0.7rem var(--mono);color:var(--ink2);}\n.r3d .fld.ref{border-color:transparent;background:transparent;color:var(--ink);padding-left:0;cursor:default;}\n.r3d .selbar{position:absolute;left:12px;bottom:10px;z-index:4;display:flex;align-items:center;gap:10px;max-width:calc(100% - 24px);box-sizing:border-box;background:rgba(15,20,26,0.93);border:1px solid var(--accent);border-radius:8px;padding:4px 5px 4px 10px;color:var(--ink);font-size:0.74rem;line-height:1.4;box-shadow:0 6px 18px rgba(0,0,0,0.22);}\n.r3d .selbar span{min-width:0;}\n.r3d .selbar b{color:var(--accent);font-weight:700;}\n.r3d .selbar .pbtn{background:var(--accent);color:#04262a;border-color:var(--accent);padding:3px 12px;flex:none;}\n.r3d .selbar .pbtn.ghost{background:transparent;color:var(--ink);border-color:var(--line2);margin-right:-4px;}\n/* 在 3D 隱藏（👁）：清單上的小眼睛（按下＝藏起來，名稱變淡）；左下提示「已隱藏 N 個 · 全部顯示」 */\n.r3d .eye svg{width:12px;height:12px;display:block;}\n.r3d .eye .e-off{display:none;}\n.r3d .eye[aria-pressed=\"true\"] .e-on{display:none;}\n.r3d .eye[aria-pressed=\"true\"] .e-off{display:block;}\n.r3d .cr.hid .cn b,.r3d .cr.hid .cn small,.r3d .plist li.hid .pn,.r3d .plist li.hid .p-t{opacity:0.5;}\n.r3d .hidebar{position:absolute;left:12px;bottom:44px;z-index:4;display:flex;align-items:center;gap:8px;background:rgba(15,20,26,0.9);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:3px 4px 3px 9px;color:var(--ink2);font-size:0.72rem;line-height:1.4;max-width:calc(100% - 24px);box-sizing:border-box;}\n.r3d .hidebar b{color:var(--ink);font-weight:700;}\n.r3d .hidebar .pbtn{padding:2px 10px;font-size:0.72rem;flex:none;}\n/* 通道配對（FDD）：元件分頁上方的開關＋說明 */\n.r3d .pairbox{background:var(--chrome);border:1px solid var(--line2);border-radius:8px;padding:6px 8px 7px;margin:0 0 8px;}\n.r3d .pairbox .pb-h{display:flex;align-items:center;justify-content:space-between;gap:8px;font:700 0.76rem var(--ui);color:var(--ink);}\n.r3d .pairbox .seg button{padding:2px 12px;font-size:0.72rem;}\n.r3d .pairbox p{margin:5px 0 0;font-size:0.7rem;color:var(--ink2);line-height:1.55;}\n.r3d .pairbox p b{color:var(--ink);font-weight:600;}\n.r3d .pairbox p .pw{color:var(--warn);}\n.r3d .status .saved{color:var(--ink3);}\n.r3d .status .saved.err{color:var(--warn);}\n.r3d .pbx{display:flex;gap:2px;}\n.r3d .padd{display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap;}\n.r3d .padd select{width:auto;flex:1 1 90px;}\n.r3d .pbtn{appearance:none;border:1px solid var(--line2);background:var(--chrome3);color:var(--ink);border-radius:6px;font:600 0.76rem var(--ui);padding:4px 10px;cursor:pointer;white-space:nowrap;}\n.r3d .pbtn.ghost{background:transparent;color:var(--ink2);}\n.r3d .pbtn:hover{border-color:var(--ink3);}\n/* 輸出 PDF：兩頁預覽＋存檔 */\n  .r3d .pdfdlg{position:fixed;inset:0;z-index:50;background:rgba(8,12,16,0.62);display:grid;place-items:center;padding:16px;}\n.r3d .pdf-card{width:min(1000px,100%);max-height:100%;display:flex;flex-direction:column;background:var(--chrome2);border:1px solid var(--line2);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,0.4);overflow:hidden;}\n.r3d .pdf-top,.r3d .pdf-bot{display:flex;align-items:center;gap:12px;padding:10px 12px;}\n.r3d .pdf-top{border-bottom:1px solid var(--line);}\n.r3d .pdf-bot{border-top:1px solid var(--line);}\n.r3d .pdf-top h3{margin:0;font:700 0.9rem var(--ui);color:var(--ink);white-space:nowrap;}\n.r3d .pdf-st{flex:1;min-width:0;font:0.74rem var(--mono);color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}\n.r3d .pdf-pages{flex:1;min-height:180px;overflow:auto;display:flex;flex-wrap:wrap;gap:14px;justify-content:center;align-content:flex-start;padding:14px;background:#56616d;}\n.r3d .pdf-pages img{width:min(450px,100%);height:auto;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,0.35);}\n.r3d .pdf-note{flex:1;min-width:0;margin:0;font-size:0.74rem;color:var(--ink2);}\n.r3d .pdf-bot .pbtn{background:var(--accent);color:#04262a;border-color:var(--accent);padding:5px 16px;}\n.r3d .pdf-bot .pbtn:disabled{opacity:0.45;cursor:default;}\n.r3d .ptag{font:600 11px var(--mono);color:#10202e;background:rgba(255,255,255,0.92);border:1px solid rgba(23,34,48,0.22);border-radius:4px;padding:0 5px;white-space:nowrap;}\n.r3d .ptag.sel{background:#1fc6d2;color:#04262a;border-color:#0d6b73;}\n.r3d .tag.edit{color:var(--accent);}\n.r3d .su-row em.auto{color:var(--t-data);}\n.r3d .hint.dark{color:#e6ecf2;background:rgba(15,20,26,0.7);}\n.r3d .hint.edit{color:#04262a;background:rgba(31,198,210,0.9);}\n/* 視角方塊（ViewCube）：跟著相機轉；點一面＝那個方向的正視圖（正交投影） */\n  .r3d .vcube{position:absolute;right:12px;top:12px;z-index:4;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;}\n.r3d .vc-box{--vh:25px;width:calc(var(--vh) * 2);height:calc(var(--vh) * 2);position:relative;margin:8px 8px 12px;}\n.r3d .vc-cube{position:absolute;inset:0;transform-style:preserve-3d;}\n.r3d .vc-f{position:absolute;inset:0;appearance:none;margin:0;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid rgba(23,34,48,0.4);border-radius:4px;background:rgba(247,249,251,0.96);color:#142130;font:700 12px var(--ui);line-height:1.05;cursor:pointer;backface-visibility:hidden;-webkit-backface-visibility:hidden;pointer-events:auto;}\n.r3d .vc-f small{font:600 9px var(--ui);color:#4b5b6e;letter-spacing:0.02em;min-height:9px;}\n.r3d .vc-f:hover,.r3d .vc-f:focus-visible,.r3d .vc-f.on{background:#1fc6d2;color:#04262a;outline:none;}\n.r3d .vc-f:hover small,.r3d .vc-f:focus-visible small,.r3d .vc-f.on small{color:#04262a;}\n.r3d .vc-front{transform:translateZ(var(--vh));}\n.r3d .vc-back{transform:rotateY(180deg) translateZ(var(--vh));}\n.r3d .vc-right{transform:rotateY(90deg) translateZ(var(--vh));}\n.r3d .vc-left{transform:rotateY(-90deg) translateZ(var(--vh));}\n.r3d .vc-top{transform:rotateX(90deg) translateZ(var(--vh));}\n.r3d .vc-bottom{transform:rotateX(-90deg) translateZ(var(--vh));}\n.r3d .vc-ctl{display:flex;gap:2px;pointer-events:auto;background:rgba(15,20,26,0.86);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:2px;}\n.r3d .vc-ctl .tbtn{font-size:0.72rem;padding:3px 7px;}\n.r3d .vc-cross,.r3d .vc-pan{display:grid;gap:2px;pointer-events:auto;background:rgba(15,20,26,0.86);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:3px;}\n.r3d .vc-cross{grid-template-areas:\"rl t rr .\" \"l f r b\" \". d . .\";grid-template-columns:repeat(4,26px);grid-auto-rows:21px;}\n.r3d .vc-pan{grid-template-areas:\". u .\" \"l c r\" \". d .\";grid-template-columns:repeat(3,26px);grid-auto-rows:22px;}\n.r3d .vbtn{appearance:none;border:0;border-radius:4px;background:rgba(255,255,255,0.07);color:var(--ink2);font:600 0.72rem var(--ui);cursor:pointer;padding:0;display:grid;place-items:center;}\n.r3d .vbtn:hover{color:var(--ink);background:rgba(255,255,255,0.16);}\n.r3d .vbtn[aria-pressed=\"true\"]{background:var(--accent);color:#04262a;}\n.r3d .vbtn:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}\n.r3d .vbtn svg{width:13px;height:13px;display:block;}\n/* 屏蔽罩面板 */\n  .r3d .shd-form{display:grid;grid-template-columns:minmax(0,1fr) 78px;gap:6px 10px;align-items:center;font-size:0.76rem;margin-bottom:10px;}\n.r3d .shd-form label{color:var(--ink2);}\n.r3d .shd-form .sub{grid-column:1 / 3;margin:-2px 0 0;font-size:0.68rem;color:var(--ink3);line-height:1.45;}\n.r3d .shd-form .seg{justify-self:end;}\n.r3d .shd-form .seg button{font-size:0.72rem;padding:3px 8px;}\n.r3d .rules{margin:0 0 10px;padding-left:18px;font-size:0.72rem;color:var(--ink2);line-height:1.5;display:flex;flex-direction:column;gap:3px;}\n.r3d .rules b{color:var(--ink);font-weight:600;}\n.r3d .cav-h{font-size:0.66rem;color:var(--ink3);letter-spacing:0.04em;padding:0 2px 4px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;}\n.r3d .cav{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:2px 8px;font-size:0.74rem;padding:4px 2px;border-bottom:1px solid var(--line);align-items:center;cursor:pointer;border-radius:5px;}\n.r3d .cav:hover,.r3d .cav.sel{background:var(--accent-soft);}\n.r3d .cav b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}\n.r3d .cav span{font-family:var(--mono);font-size:0.7rem;color:var(--ink2);white-space:nowrap;}\n.r3d .cav .ok{color:#7fd79a;}\n.r3d .cav .ng{color:var(--warn);}\n.r3d .note.est{color:var(--t-data);margin:6px 0 0;}\n@container r3d (max-width:1280px){.r3d .work{grid-template-columns:minmax(0,1fr);}\n.r3d .stage{min-height:64vh;}\n.r3d .app{height:auto;}\n\n  }\n@container r3d (max-width:600px){.r3d .tgrp .cap{display:none;}\n.r3d .tbtn{padding:4px 7px;font-size:0.74rem;}\n.r3d .tools{gap:5px;left:6px;right:74px;top:6px;}\n.r3d .vc-cross,.r3d .vc-pan{display:none;}\n.r3d .stackup{right:12px;top:auto;bottom:60px;}\n.r3d .vc-box{--vh:20px;margin:9px 8px 10px;}\n.r3d .vcube{right:6px;top:6px;}\n.r3d .vc-f{font-size:11px;}\n.r3d .vc-f small{display:none;}\n.r3d .stabs button{font-size:0.72rem;padding:6px 2px;}\n\n  }\n@media (prefers-reduced-motion:reduce){.r3d .tbtn,.r3d .seg button{transition:none;}\n }\n\n\n.r3d .gate{position:absolute;inset:0;z-index:7;display:grid;place-items:center;padding:24px;background:rgba(15,20,26,0.9);color:var(--ink);font-size:0.9rem;text-align:center;}\n.r3d .gate b{color:var(--warn);}\n\n.r3d .ticon{display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;}\n.r3d .ticon svg{width:16px;height:16px;display:block;}\n.r3d .ticon .fs-out{display:none;}\n.r3d .ticon[aria-pressed=\"true\"] .fs-in{display:none;}\n.r3d .ticon[aria-pressed=\"true\"] .fs-out{display:block;}\n.r3d .ticon[aria-busy=\"true\"]{opacity:0.55;cursor:progress;}\n/* 專案名稱：右下角立體字（使用者要求：顏色清楚、字形圓潤，參考 Arial Rounded MT Bold）。字面亮藍、下面疊三層深藍當厚度、上緣一條白色高光；\n   Arial Rounded MT Bold（Windows 有 Office／macOS 內建）→ 沒有就用 Nunito（Google Fonts，工具已載入）；font-synthesis:none 避免在已經是粗體的字上再加粗。\n   選取元件時左下的操作列會拉長 → 讓開 */\n.r3d .pname{position:absolute;right:16px;bottom:8px;z-index:2;max-width:42%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;pointer-events:none;\n  padding:0 2px 7px;font:800 23px/1.25 \"Arial Rounded MT Bold\",\"Arial Rounded MT\",\"Nunito\",\"Noto Sans TC\",\"Microsoft JhengHei\",sans-serif;font-synthesis:none;letter-spacing:0.02em;color:#1f6fd6;\n  text-shadow:0 -1px 0 rgba(255,255,255,0.65),0 1px 0 #0f4a96,0 2px 0 #0d3f82,0 3px 0 #0b356e,0 5px 6px rgba(10,20,35,0.32);}\n.r3d .selbar:not([hidden]) ~ .pname{display:none;}\n/* 全螢幕：整頁進瀏覽器全螢幕，3D 檢視器蓋滿畫面（工具的對話框 z-index 更高，照樣看得到） */\n.r3d.r3d-fs{position:fixed;inset:0;z-index:3000;border-radius:0;overflow:auto;}\n.r3d.r3d-fs .app{height:calc(100vh - 20px);}\n";
+const R3D_HTML = "\n<div class=\"app\">\n\n  <div class=\"work\">\n    <section class=\"stage\" id=\"r3d-stage\" aria-label=\"3D 視窗\">\n      <canvas id=\"r3d-cv\"></canvas>\n      <div id=\"r3d-labels\"></div>\n      <div class=\"tools\">\n        <div class=\"tgrp\" aria-label=\"狀態\"><span class=\"cap\">狀態</span>\n          <button class=\"tbtn\" data-state=\"asm\" aria-pressed=\"true\">組裝</button>\n          <button class=\"tbtn\" data-state=\"exp\" aria-pressed=\"false\">爆炸</button>\n          <button class=\"tbtn\" data-state=\"flat\" aria-pressed=\"false\">拆機攤開</button>\n        </div>\n        <div class=\"tgrp\" aria-label=\"部件\"><span class=\"cap\">部件</span>\n          <button class=\"tbtn\" data-solo=\"\" aria-pressed=\"true\" title=\"四大部件都顯示（清掉複選）\">全部</button>\n          <button class=\"tbtn\" data-solo=\"fil\" aria-pressed=\"false\" title=\"顯示腔體濾波器；可複選，再按一次取消\">濾波器</button>\n          <button class=\"tbtn\" data-solo=\"shd\" aria-pressed=\"false\" title=\"顯示屏蔽罩；可複選，再按一次取消\">屏蔽罩</button>\n          <button class=\"tbtn\" data-solo=\"pcb\" aria-pressed=\"false\" title=\"顯示 PCB（含元件、銅塊）；可複選，再按一次取消\">PCB</button>\n          <button class=\"tbtn\" data-solo=\"hsk\" aria-pressed=\"false\" title=\"顯示散熱器（含 I/O）；可複選，再按一次取消\">HSK</button>\n          <button class=\"tbtn\" id=\"r3d-t-pflip\" aria-pressed=\"false\" title=\"把畫面上顯示的部件沿長邊方向的中心軸翻轉 180°（組裝／爆炸：整組一起翻、相對位置不變；拆機攤開：各自原地翻面）；再按一次翻回\">⇅ 翻轉</button>\n        </div>\n        <div class=\"tgrp\" aria-label=\"顯示\"><span class=\"cap\">顯示</span>\n          <button class=\"tbtn\" data-mode=\"real\" aria-pressed=\"true\">寫實</button>\n          <button class=\"tbtn\" data-mode=\"therm\" aria-pressed=\"false\">熱分佈</button>\n          <button class=\"tbtn\" data-mode=\"xray\" aria-pressed=\"false\">透視</button>\n        </div>\n        <div class=\"tgrp\" aria-label=\"工具\"><span class=\"cap\">工具</span>\n          <button class=\"tbtn\" id=\"r3d-t-dim\" aria-pressed=\"true\">尺寸標註</button>\n          <button class=\"tbtn\" id=\"r3d-t-sec\" aria-pressed=\"false\" title=\"剖開看疊層：濾波器／屏蔽罩／PCB／基板／鰭片\">剖面</button>\n          <button class=\"tbtn\" id=\"r3d-t-flip\" aria-pressed=\"false\" title=\"攤開時把 PCB 翻到濾波器側\">PCB 翻面</button>\n          <button class=\"tbtn\" id=\"r3d-t-up\" aria-pressed=\"false\">直立安裝</button>\n          <button class=\"tbtn\" id=\"r3d-t-shot\" title=\"把 3D 視窗目前的畫面（含尺寸標註）存成 PNG\">📷 下載目前畫面</button>\n          <button class=\"tbtn\" id=\"r3d-t-pdf\" title=\"把 3D 模型整理成兩頁 A4 的 PDF：外觀與三視圖、內部結構與佈局\">輸出 PDF</button>\n        </div>\n        <div class=\"tgrp\" aria-label=\"視窗\">\n          <button class=\"tbtn ticon\" id=\"r3d-t-fs\" aria-pressed=\"false\" aria-label=\"全螢幕\" title=\"全螢幕（只顯示 3D 檢視器；再按一次或 Esc 退出）\"><svg class=\"fs-in\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\"><path d=\"M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4\"/></svg><svg class=\"fs-out\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\"><path d=\"M6 2v4H2M14 6h-4V2M10 14v-4h4M2 10h4v4\"/></svg></button>\n          <button class=\"tbtn ticon\" id=\"r3d-t-save\" aria-label=\"儲存專案\" title=\"儲存專案（還沒解除資料庫保護會先請你輸入密碼）\"><svg viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linejoin=\"round\"><path d=\"M2.5 2.5h9l2 2v9h-11z\"/><path d=\"M5 2.5v3.5h5V2.5M4.5 13.5V9.5h7v4\"/></svg></button>\n        </div>\n        <div class=\"tgrp\" aria-label=\"編輯\"><span class=\"cap\">編輯</span>\n          <button class=\"tbtn\" id=\"r3d-t-edit\" aria-pressed=\"false\" title=\"拖曳元件（長度＋橫向）、I/O、天線座；方向鍵微調\">移動</button>\n        </div>\n      </div>\n      <div class=\"vcube\" id=\"r3d-vcube\">\n        <div class=\"vc-box\"><div class=\"vc-cube\" id=\"r3d-vc-cube\">\n          <button type=\"button\" class=\"vc-f vc-front\" data-std=\"front\">前<small></small></button>\n          <button type=\"button\" class=\"vc-f vc-back\" data-std=\"back\">後<small></small></button>\n          <button type=\"button\" class=\"vc-f vc-right\" data-std=\"right\">右<small></small></button>\n          <button type=\"button\" class=\"vc-f vc-left\" data-std=\"left\">左<small></small></button>\n          <button type=\"button\" class=\"vc-f vc-top\" data-std=\"top\">上<small></small></button>\n          <button type=\"button\" class=\"vc-f vc-bottom\" data-std=\"bottom\">下<small></small></button>\n        </div></div>\n        <div class=\"vc-ctl\"><button type=\"button\" class=\"tbtn\" id=\"r3d-vc-home\" data-view=\"iso\" title=\"3D 等角視圖（透視，回到預設角度）\">等角</button><button type=\"button\" class=\"tbtn\" data-view=\"io\" title=\"從 I/O 端斜看（透視）\">I/O</button><button type=\"button\" class=\"tbtn\" id=\"r3d-t-ortho\" aria-pressed=\"false\" title=\"正交投影：沒有透視變形，看尺寸與對齊用。點方塊的面會自動切成正交\">正交</button></div>\n        <div class=\"vc-cross\" role=\"group\" aria-label=\"六個正視圖、左旋／右旋 90°\">\n          <button type=\"button\" class=\"vbtn\" data-roll=\"-1\" style=\"grid-area:rl\" title=\"左旋 90°：畫面逆時針轉（正視圖再按一次＝回到原本方向）\" aria-label=\"左旋 90°\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><polyline points=\"1 4 1 10 7 10\"/><path d=\"M3.51 15a9 9 0 1 0 2.13-9.36L1 10\"/></svg></button>\n          <button type=\"button\" class=\"vbtn\" data-roll=\"1\" style=\"grid-area:rr\" title=\"右旋 90°：畫面順時針轉（正視圖再按一次＝回到原本方向）\" aria-label=\"右旋 90°\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><polyline points=\"23 4 23 10 17 10\"/><path d=\"M20.49 15a9 9 0 1 1-2.12-9.36L23 10\"/></svg></button>\n          <button type=\"button\" class=\"vbtn\" data-std=\"top\" style=\"grid-area:t\">上</button>\n          <button type=\"button\" class=\"vbtn\" data-std=\"left\" style=\"grid-area:l\">左</button>\n          <button type=\"button\" class=\"vbtn\" data-std=\"front\" style=\"grid-area:f\">前</button>\n          <button type=\"button\" class=\"vbtn\" data-std=\"right\" style=\"grid-area:r\">右</button>\n          <button type=\"button\" class=\"vbtn\" data-std=\"back\" style=\"grid-area:b\">後</button>\n          <button type=\"button\" class=\"vbtn\" data-std=\"bottom\" style=\"grid-area:d\">下</button>\n        </div>\n        <div class=\"vc-pan\" role=\"group\" aria-label=\"平移畫面\">\n          <button type=\"button\" class=\"vbtn\" data-pan=\"0,1\" style=\"grid-area:u\" title=\"畫面往上（也可以 Shift＋左鍵拖曳、右鍵拖曳）\" aria-label=\"畫面往上\">▲</button>\n          <button type=\"button\" class=\"vbtn\" data-pan=\"-1,0\" style=\"grid-area:l\" title=\"畫面往左\" aria-label=\"畫面往左\">◀</button>\n          <button type=\"button\" class=\"vbtn\" data-pan=\"c\" style=\"grid-area:c\" title=\"回到中心（不改角度與遠近）\" aria-label=\"畫面置中\">◎</button>\n          <button type=\"button\" class=\"vbtn\" data-pan=\"1,0\" style=\"grid-area:r\" title=\"畫面往右\" aria-label=\"畫面往右\">▶</button>\n          <button type=\"button\" class=\"vbtn\" data-pan=\"0,-1\" style=\"grid-area:d\" title=\"畫面往下\" aria-label=\"畫面往下\">▼</button>\n        </div>\n      </div>\n      <div class=\"legend\" id=\"r3d-legend\" hidden>\n        <h3 title=\"基板溫度沿長度方向依 0.03 °C/mm 上升（與工具「元件相對高度」同一條公式）；鰭片沿高度依 1D 鰭片方程式（cosh）遞減。\">溫度 °C <span style=\"font-weight:500;color:var(--ink3)\">· 散熱器與鰭片</span></h3>\n        <div class=\"lg-bar\" id=\"r3d-lg-bar\"></div>\n        <div class=\"lg-ticks\" id=\"r3d-lg-ticks\"></div>\n        <dl id=\"r3d-lg-kv\"></dl>\n        <h3 style=\"margin-top:8px\">元件 · 裕度分級</h3>\n        <div class=\"lg-lv\" id=\"r3d-lg-lv\"></div>\n        <p>灰色＝不在計算模型內（PCB、屏蔽罩、濾波器）</p>\n      </div>\n      <div class=\"tip\" id=\"r3d-tip\" hidden></div>\n      <div class=\"stackup\" id=\"r3d-stackup\" hidden></div>\n      <div class=\"secbar\" id=\"r3d-secbar\" hidden>\n        <span class=\"cap\">剖面</span>\n        <div class=\"seg\" role=\"group\" aria-label=\"剖切方向\"><button type=\"button\" data-sax=\"x\" aria-pressed=\"true\">橫剖（看鰭片截面）</button><button type=\"button\" data-sax=\"z\" aria-pressed=\"false\">縱剖（沿長度）</button></div>\n        <input type=\"range\" id=\"r3d-sec-pos\" min=\"0\" max=\"100\" step=\"0.5\" aria-label=\"剖切位置\">\n        <span class=\"val\" id=\"r3d-sec-val\"></span>\n        <button type=\"button\" class=\"tbtn\" id=\"r3d-sec-bn\" title=\"剖面移到瓶頸元件的位置\">到瓶頸元件</button>\n      </div>\n      <div class=\"hidebar\" id=\"r3d-hidebar\" hidden><span id=\"r3d-hidebar-t\"></span><button type=\"button\" class=\"pbtn\" id=\"r3d-hidebar-all\" title=\"個別隱藏的元件、I/O、天線座全部顯示回來\">全部顯示</button></div>\n      <div class=\"selbar\" id=\"r3d-selbar\" hidden><span id=\"r3d-selbar-t\"></span><button type=\"button\" class=\"pbtn ghost\" id=\"r3d-selbar-hide\" title=\"在 3D 隱藏選取的這一個（H）；清單上的 👁 或左下「全部顯示」可以再顯示\">隱藏</button><button type=\"button\" class=\"pbtn\" id=\"r3d-selbar-done\" title=\"取消選取（Esc 或點 3D 空白處也可以）\">完成</button></div>\n      <div class=\"hint\" id=\"r3d-hint\">左鍵旋轉 · 右鍵或 Shift＋左鍵平移 · 滾輪縮放 · 右上方塊／十字鈕切正視（⟲⟳ 轉 90°）· 游標停在元件上看數據</div>\n      <div class=\"pname\" id=\"r3d-pname\" aria-hidden=\"true\"></div>\n      <div class=\"loading\" id=\"r3d-loading\">載入 3D 引擎…</div>\n      <div class=\"gate\" id=\"r3d-gate\" hidden></div>\n    </section>\n\n    <aside class=\"side\">\n      <div class=\"stabs\" role=\"tablist\" aria-label=\"側欄分頁\">\n        <button type=\"button\" role=\"tab\" id=\"r3d-tab-comp\" data-tab=\"comp\" aria-selected=\"true\" aria-controls=\"r3d-pn-comp\">元件</button>\n        <button type=\"button\" role=\"tab\" id=\"r3d-tab-io\" data-tab=\"io\" aria-selected=\"false\" aria-controls=\"r3d-pn-io\">I/O</button>\n        <button type=\"button\" role=\"tab\" id=\"r3d-tab-ant\" data-tab=\"ant\" aria-selected=\"false\" aria-controls=\"r3d-pn-ant\">天線座</button>\n        <button type=\"button\" role=\"tab\" id=\"r3d-tab-shd\" data-tab=\"shd\" aria-selected=\"false\" aria-controls=\"r3d-pn-shd\">屏蔽罩<span class=\"cnt\" id=\"r3d-shd-tcnt\"></span></button>\n        <button type=\"button\" role=\"tab\" id=\"r3d-tab-asm\" data-tab=\"asm\" aria-selected=\"false\" aria-controls=\"r3d-pn-asm\">假設<span class=\"cnt\" id=\"r3d-asm-cnt\"></span></button>\n        <button type=\"button\" role=\"tab\" id=\"r3d-tab-model\" data-tab=\"model\" aria-selected=\"false\" aria-controls=\"r3d-pn-model\">模型</button>\n      </div>\n      <section class=\"card\" id=\"r3d-pn-comp\" role=\"tabpanel\" aria-labelledby=\"r3d-tab-comp\">\n        <h2>元件位置 <span class=\"cnt2\" id=\"r3d-comp-cnt\"></span></h2>\n        <p class=\"note\"><b>元件相對高度</b>＝元件設定的同一格：在這裡改會寫回去、重算溫度（整列共用，多顆一起動）。<b>橫向</b>＝元件中心距 PCB 左緣，只影響 3D：◀ ▶ 按住連續移動（Shift＝10 mm），也可以直接打數字，清空＝回到自動。多顆的列點「×4」展開，每一顆各自調。<b>⟳</b>＝水平轉 90°。開「移動」可以直接在 3D 上拖。<b>👁</b>＝只在 3D 隱藏（不影響計算、不存檔）。</p>\n        <div class=\"pairbox\" id=\"r3d-pair\" hidden>\n          <div class=\"pb-h\"><span>通道配對（FDD）</span><div class=\"seg\" role=\"group\" aria-label=\"通道配對（FDD）\"><button type=\"button\" data-pair=\"1\" aria-pressed=\"true\">開</button><button type=\"button\" data-pair=\"0\" aria-pressed=\"false\">關</button></div></div>\n          <p id=\"r3d-pair-t\"></p>\n        </div>\n        <div class=\"ctab\" id=\"r3d-ctab\"></div>\n        <p class=\"note warn\" id=\"r3d-comp-warn\" hidden></p>\n        <p class=\"note est\" id=\"r3d-comp-est\" hidden></p>\n      </section>\n      <section class=\"card\" id=\"r3d-pn-io\" role=\"tabpanel\" aria-labelledby=\"r3d-tab-io\" hidden>\n        <h2>數位 I/O <span class=\"cnt2\" id=\"r3d-io-cnt\"></span></h2>\n        <p class=\"note\">橫向＝接頭中心距外殼左側（從 I/O 端往內看，由左到右）；高度＝接頭中心距分模面。◀ ▶ ▼ ▲ 按住連續移動（Shift＝10 mm），也可以直接打數字，清空＝回到自動。<b>SFP 光口跟 PCB 上的 SFP 籠綁在一起</b>：左右一起動，高度固定對齊籠子。接頭框超出端牆就自動補肉。</p>\n        <ol class=\"plist\" id=\"r3d-io-list\"></ol>\n        <div class=\"padd\"><select class=\"fld\" id=\"r3d-io-add-t\" aria-label=\"要新增的 I/O 類型\"></select><button type=\"button\" class=\"pbtn\" id=\"r3d-io-add\">＋ 新增</button><button type=\"button\" class=\"pbtn ghost\" id=\"r3d-io-reset\">重設</button></div>\n        <p class=\"note warn\" id=\"r3d-io-warn\" hidden></p>\n        <p class=\"note est\" id=\"r3d-io-note\" hidden></p>\n      </section>\n      <section class=\"card\" id=\"r3d-pn-ant\" role=\"tabpanel\" aria-labelledby=\"r3d-tab-ant\" hidden>\n        <h2>天線座 <span class=\"cnt2\" id=\"r3d-ant-cnt\"></span></h2>\n        <p class=\"note\">預設數量＝Final PA 數量。位置＝天線座中心距外殼左側：◀ ▶ 按住連續移動，也可以直接打數字，清空＝依順序自動等分。</p>\n        <ol class=\"plist\" id=\"r3d-ant-list\"></ol>\n        <div class=\"padd\"><select class=\"fld\" id=\"r3d-ant-add-t\" aria-label=\"要新增的天線座類型\"></select><button type=\"button\" class=\"pbtn\" id=\"r3d-ant-add\">＋ 新增</button><button type=\"button\" class=\"pbtn ghost\" id=\"r3d-ant-reset\">依 Final PA 數量重設</button></div>\n        <p class=\"note warn\" id=\"r3d-ant-warn\" hidden></p>\n      </section>\n      <section class=\"card\" id=\"r3d-pn-shd\" role=\"tabpanel\" aria-labelledby=\"r3d-tab-shd\" hidden>\n        <h2>屏蔽罩 <span class=\"cnt2\" id=\"r3d-shd-cnt\"></span></h2>\n        <p class=\"note\">只在 3D 顯示、不影響溫度計算。罩住 PCB 的濾波器側：長寬＝PCB，高＝分模面到 PCB（H_shield − 板厚），不會把整機撐大。腔體依下面的 RF 隔離規則自動排，元件移動就跟著變。</p>\n        <div class=\"shd-form\" id=\"r3d-shd-form\"></div>\n        <ol class=\"rules\" id=\"r3d-shd-rules\"></ol>\n        <div id=\"r3d-shd-list\"></div>\n        <p class=\"note warn\" id=\"r3d-shd-warn\" hidden></p>\n        <p class=\"note\" id=\"r3d-shd-kg\"></p>\n      </section>\n      <section class=\"card\" id=\"r3d-pn-asm\" role=\"tabpanel\" aria-labelledby=\"r3d-tab-asm\" hidden><h2>構圖規則與假設</h2><div class=\"asm\" id=\"r3d-asm\"></div></section>\n      <div class=\"pstack\" id=\"r3d-pn-model\" role=\"tabpanel\" aria-labelledby=\"r3d-tab-model\" hidden>\n        <section class=\"card\"><h2>模型樹</h2><ul class=\"tree\" id=\"r3d-tree\"></ul></section>\n        <section class=\"card\"><h2>構圖依據</h2><dl class=\"srcl\" id=\"r3d-src\"></dl></section>\n        <section class=\"card\"><h2>設計數據</h2><dl class=\"kv\" id=\"r3d-kv\"></dl></section>\n      </div>\n    </aside>\n  </div>\n\n  <footer class=\"status\" id=\"r3d-status\"></footer>\n  <div class=\"pdfdlg\" id=\"r3d-pdfdlg\" hidden role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"r3d-pdf-h\">\n    <div class=\"pdf-card\">\n      <div class=\"pdf-top\"><h3 id=\"r3d-pdf-h\">輸出 PDF</h3><span class=\"pdf-st\" id=\"r3d-pdf-st\" role=\"status\"></span><button type=\"button\" class=\"ibtn\" id=\"r3d-pdf-x\" aria-label=\"關閉\">✕</button></div>\n      <div class=\"pdf-pages\" id=\"r3d-pdf-pages\"></div>\n      <div class=\"pdf-bot\"><p class=\"pdf-note\" id=\"r3d-pdf-note\"></p><button type=\"button\" class=\"pbtn\" id=\"r3d-pdf-save\" disabled>存成 PDF</button></div>\n    </div>\n  </div>\n</div>\n\n\n";
 const MOUNT = document.getElementById('tab3-3d');
 const ROOT = document.createElement('div');
 ROOT.className = 'r3d'; ROOT.innerHTML = R3D_HTML; MOUNT.appendChild(ROOT);
@@ -312,14 +312,112 @@ function riskHtml(r, h) {
 }
 let UID = 1;
 const uid = p => p + (UID++) + Math.random().toString(36).slice(2, 6);
-const IO_TYPES = { sfp: { n: 'SFP 光口', s: 'SFP', w: 19 }, rj45: { n: 'RJ45 網路', s: 'RJ45', w: 21 }, pwr: { n: '電源', s: '電源', w: 28 },
-                   aisg: { n: 'AISG', s: 'AISG', w: 22 }, dbg: { n: 'Debug', s: 'DBG', w: 7 }, gnd: { n: '接地', s: '接地', w: 14 } };
+/* 數位 I/O 分三大類（使用者定義）：SFP／電源（白色凸台＋黑色開口，電源跟 SFP 光口同一種外觀）、Signal（圓形防水座：RJ45 等，AISG 也算訊號）、
+   Debug port（金屬框＋黑色開口）；接地歸「其他」。key 不變（舊專案存的 layout3d.io 照樣讀得懂）：rj45＝Signal、dbg＝Debug port */
+const IO_CLASS = [['sfp', 'SFP／電源'], ['sig', 'Signal'], ['dbg', 'Debug port'], ['etc', '其他']];
+const IO_TYPES = { sfp: { n: 'SFP 光口', s: 'SFP', w: 19, c: 'sfp' }, pwr: { n: '電源', s: '電源', w: 19, c: 'sfp' },
+                   rj45: { n: 'Signal 訊號口', s: 'SIG', w: 21, c: 'sig' }, aisg: { n: 'AISG', s: 'AISG', w: 22, c: 'sig' },
+                   dbg: { n: 'Debug port', s: 'DBG', w: 28, c: 'dbg' }, gnd: { n: '接地', s: '接地', w: 14, c: 'etc' } };
+const ioClassOf = t => (IO_CLASS.find(c => c[0] === ((IO_TYPES[t] || {}).c || 'etc')) || IO_CLASS[3])[1];
 const ANT_TYPES = { '4310': { n: '4.3-10', w: 22 }, n: { n: 'N 型', w: 26 } };
 const PORT_MARGIN = 16;
 function sfpQty() { return P.rows.filter(r => roleOf(r) === 'sfp').reduce((s, r) => s + (r.qty || 0), 0); }
 function laneCount() {
   const rf = P.rows.filter(r => r.cat === 'RF' && r.qty >= 2 && roleOf(r) !== 'filter').sort((a, b) => b.W - a.W);
   return rf.length ? rf[0].qty : 0;
+}
+/* 通道配對：
+   - 數量是通道數整數倍（k × N，k ≥ 2）的 RF 元件 → 平均分到 N 路（第 i 顆 → 第 ⌊i/k⌋ 路）。
+   - 兩種以上的 Final PA 各 N 顆＝FDD：每一顆 PA 自帶一組 Pre-driver／Driver／環形器（fddPlan／fddPlace）；
+     屏蔽罩腔體、盲插接頭、走線缺口都照「每一路每一組一條發射鏈」排。
+   - 只有一種 Final PA（TDD）時，k × N 的列＝同一條鏈上並聯的元件 → 那一路在寬度上再等分成 k 格並排，高度照元件清單。
+   預設開；關掉（E.pair = false → 專案的 layout3d.pair = false）＝舊排法：這些元件由板子中線往兩側排、每一路共用一組腔體與盲插接頭 */
+function pairPlan(N) {
+  const rf = P.rows.filter(r => r.qty > 0 && r.cat === 'RF');
+  const multi = N >= 2 ? rf.filter(r => r.qty > N && r.qty % N === 0 && !['filter', 'sfp'].includes(roleOf(r))) : [];
+  const pas = N >= 2 ? rf.filter(r => roleOf(r) === 'pa' && r.qty === N) : [];
+  const avail = multi.length > 0 || pas.length >= 2;
+  return { N, multi, pas, avail, on: avail && ed().pair !== false, fdd: pas.length >= 2 };
+}
+/* 頻段代號：元件名稱結尾的 B8、B20B28、B1…；組名＝那一種 Final PA 的頻段（沒有就 G1、G2…） */
+const bandOf = n => { const m = String(n || '').match(/(?:^|[^A-Za-z0-9])(B\d+(?:[\/+&]?B\d+)*)\s*\)?\s*$/i); return m ? m[1].toUpperCase() : ''; };
+function grpLabel(g) { const pa = LAY && LAY.pair && LAY.pair.pas[g]; return (pa && bandOf(pa.name)) || 'G' + (g + 1); }
+/* FDD：N 路 × G 組發射鏈，每一顆 Final PA 自帶一組 Pre-driver／Driver／環形器（使用者定義，照他畫的圖）
+   - 照元件清單的高度（＝溫度計算的位置）：各種 Final PA，以及「拆開的列」（每一路一顆）—— 名稱帶頻段（Driver-B8）→ 那一組；
+     沒帶頻段 → 同一級依高度順序對到各組（最低的對到 PA 最低的那一組），對不起來就對到最近的那一顆 PA。
+   - 自動錯開（沒拆的列：數量＝G × N，每一路每一組一顆）：緊跟在自己那一顆 PA 旁邊（腔體相鄰、共用一道牆），
+     順序照元件清單的高度（Pre-driver／Driver 在 PA 前面＝下面、環形器在後面＝上面）。3D 只是示意、不能上下拖；溫度計算照元件清單的高度。
+   - 各組照清單的元件高度範圍不交錯 → 上下排（每一路一欄，PA 低的那一組在下）；交錯（例：Driver-B1 250、Driver-B3 270）
+     或兩種 PA 靠太近、連元件本體都疊不下 → 每一路左右並排（由左到右＝第 1、2…組）。
+   - 上下排擠不下完整的屏蔽罩腔體 → 縮小腔體留邊（s：1＝完整、0＝只留元件本體），說明框提醒 */
+function fddPlan(PR, N) {
+  const pas = PR.pas, G = pas.length, ph = pas.map(r => hgtOf(r)), mean = ph.reduce((s, v) => s + v, 0) / G;
+  const ord = [...Array(G).keys()].sort((a, b) => ph[a] - ph[b] || a - b);
+  const sideOf = r => { const ro = roleOf(r); return ro === 'pre' || ro === 'drv' ? -1 : ro === 'circ' ? 1 : hgtOf(r) >= mean ? 1 : -1; };
+  const nearest = (h, sd) => {                   // Pre-driver／Driver 找上面最近的 PA、環形器找下面最近的；那一側沒有 → 最近的
+    const c = ord.filter(g => sd < 0 ? ph[g] >= h : ph[g] <= h);
+    return c.length ? (sd < 0 ? c[0] : c[c.length - 1]) : ord.reduce((b, g) => Math.abs(ph[g] - h) < Math.abs(ph[b] - h) ? g : b, ord[0]);
+  };
+  const rf = P.rows.filter(r => r.qty > 0 && r.cat === 'RF' && !pas.includes(r) && !['filter', 'sfp'].includes(roleOf(r)));
+  const grpOf = new Map(pas.map((r, g) => [r, g])), split = rf.filter(r => r.qty === N);
+  split.forEach(r => { const b = bandOf(r.name), g = b ? pas.findIndex(p => bandOf(p.name) === b) : -1; if (g >= 0) grpOf.set(r, g); });
+  ['pre', 'drv', 'circ'].forEach(role => {
+    const all = split.filter(r => roleOf(r) === role), rs = all.filter(r => !grpOf.has(r)).sort((a, b) => hgtOf(a) - hgtOf(b)); if (!rs.length) return;
+    const taken = new Set(all.filter(r => grpOf.has(r)).map(r => grpOf.get(r))), free = ord.filter(g => !taken.has(g));
+    rs.forEach((r, i) => grpOf.set(r, rs.length === free.length ? free[i] : nearest(hgtOf(r), sideOf(r))));
+  });
+  const shared = rf.filter(r => r.qty === G * N);
+  return { G, pas, grpOf, fixed: [...grpOf.keys()].filter(r => !pas.includes(r)), shared, side: new Map(shared.map(r => [r, sideOf(r)])) };
+}
+/* 上下排擠不下時縮小的屏蔽罩留邊（s：1＝SHD_MARGIN 完整，0＝只留 0.5 mm）；盲插接頭的腔體半徑 6 → 4 mm（接頭柱半徑 3.1） */
+const fddMargin = (mx, s) => 0.5 + s * (mx - 0.5), fddConnR = s => 4 + 2 * s;
+/* 算每一組發射鏈的位置（高度，距 PCB 底部）。over＝{ row, h }：拖曳中那一列暫時用 h（即時預覽） */
+function fddPlace(F, inst, over) {
+  const Sh = shdCfg(), w = Sh.on ? Sh.wall : 0, H = r => over && over.row === r ? over.h : hgtOf(r);
+  const G = F.G, ph = F.pas.map(H), ord = [...Array(G).keys()].sort((a, b) => ph[a] - ph[b] || a - b);
+  // 每一列沿長度的半長：fp＝元件佔的板面＋0.5（濾波器側只算本體：銅塊底板、導熱孔接觸面都在 PCB 背面，見 hit()），kp＝屏蔽罩腔體（本體＋留邊＋半道牆）
+  const ext = new Map();
+  inst.forEach(o => {
+    if (!F.grpOf.has(o.row) && !F.shared.includes(o.row)) return;
+    const [mx] = SHD_MARGIN[o.role] || SHD_MARGIN_DEF, fl = o.side === 'filter', b2 = (fl ? o.bL : o.fpL) / 2;
+    const fp = b2 + (fl ? w / 2 : 0) + 0.5, kp = Math.max(fp, fl && Sh.on ? b2 + mx + w / 2 : b2 + 1.25);   // 最緊：兩顆之間只留一道牆＋0.5 mm；完整：屏蔽罩留邊（shieldLayout 用同一個 s）
+    const e = ext.get(o.row); ext.set(o.row, e ? { fp: Math.max(e.fp, fp), kp: Math.max(e.kp, kp), half: Math.max(e.half, o.fpL / 2) } : { fp, kp, half: o.fpL / 2 });
+  });
+  const eAt = (r, s) => { const e = ext.get(r); return e.fp + s * (e.kp - e.fp); };
+  const connUp = (r, s) => ext.get(r).half + 8 + fddConnR(s) + w / 2;   // 盲插接頭在環形器（沒有就 PA）上方 8 mm，腔體包到接頭外（connsNow、shieldLayout）
+  const connOf = g => P.rows.find(r => roleOf(r) === 'circ' && ext.has(r) && (F.grpOf.get(r) === g || F.shared.includes(r))) || F.pas[g];
+  const chain = (g, s) => {
+    const P0 = ph[g], pa = F.pas[g], cr = connOf(g), pos = new Map([[pa, P0]]);
+    let lo = P0, hi = P0;
+    [-1, 1].forEach(sd => {
+      const its = [];
+      F.fixed.forEach(r => { if (F.grpOf.get(r) === g && ext.has(r)) { const h = H(r); if (sd < 0 ? h < P0 : h >= P0) its.push({ r, fix: true, k: h }); } });
+      F.shared.forEach(r => { if (ext.has(r) && F.side.get(r) === sd) its.push({ r, fix: false, k: sd < 0 ? Math.min(H(r), P0 - 1e-3) : Math.max(H(r), P0 + 1e-3) }); });
+      its.sort((a, b) => sd * (a.k - b.k));        // 由 PA 往外
+      let edge = P0 + sd * (sd > 0 && cr === pa ? Math.max(eAt(pa, s), connUp(pa, s)) : eAt(pa, s));
+      its.forEach(it => {
+        const e = eAt(it.r, s), p = it.fix ? it.k : edge + sd * e, eo = sd > 0 && it.r === cr ? Math.max(e, connUp(it.r, s)) : e;
+        pos.set(it.r, p); edge = sd > 0 ? Math.max(edge, p + eo) : Math.min(edge, p - eo);
+      });
+      if (sd < 0) lo = edge; else hi = edge;
+    });
+    return { g, pos, lo, hi };
+  };
+  const fixedRange = g => {                      // 照清單的元件（PA＋拆開的列）的範圍，只算元件本體
+    let lo = Infinity, hi = -Infinity;
+    [F.pas[g], ...F.fixed.filter(r => F.grpOf.get(r) === g && ext.has(r))].forEach(r => { const h = H(r), e = ext.get(r).fp; lo = Math.min(lo, h - e); hi = Math.max(hi, h + e); });
+    return [lo, hi];
+  };
+  const inter = ord.some((g, k) => k > 0 && fixedRange(ord[k - 1])[1] > fixedRange(g)[0] + 0.01);
+  let res = null;
+  if (!inter) for (let i = 20; i >= 0 && !res; i--) {
+    const s = i / 20, cs = ord.map(g => chain(g, s));
+    if (cs.every((c, k) => k === 0 || cs[k - 1].hi <= c.lo + 0.01)) res = { mode: 'stack', s, cs };
+  }
+  if (!res) res = { mode: 'side', s: 1, cs: ord.map(g => chain(g, 1)), why: inter ? 'inter' : 'tight' };
+  const pos = new Map(F.shared.map(r => [r, Array(G).fill(null)]));
+  res.cs.forEach(c => F.shared.forEach(r => { if (c.pos.has(r)) pos.get(r)[c.g] = c.pos.get(r); }));
+  return { mode: res.mode, s: res.s, why: res.why || '', pos, ph, ord };
 }
 function defaultIO() {
   const n = Math.max(1, sfpQty());
@@ -343,25 +441,31 @@ function portWarnings(lay, label) {
   for (let k = 1; k < s.length; k++) if (s[k].z - s[k - 1].z < (s[k].w + s[k - 1].w) / 2 + 2) out.push(label(s[k - 1].i) + ' 與 ' + label(s[k].i) + ' 重疊');
   return out;
 }
-const ioLabel = i => { const it = ioList()[i]; if (!it) return ''; const t = IO_TYPES[it.type]; const k = ioList().slice(0, i + 1).filter(x => x.type === it.type).length;
+const ioLabel = i => { const it = ioList()[i]; if (!it) return ''; const t = IO_TYPES[it.type] || { s: String(it.type) }; const k = ioList().slice(0, i + 1).filter(x => x.type === it.type).length;   // 不認得的類型照原字顯示（不當掉）
   return t.s + (ioList().filter(x => x.type === it.type).length > 1 ? k : ''); };
 const antLabel = i => 'ANT' + (i + 1);
 
 function layout() {
   const g = P.g, x0 = g.Btm, z0 = g.Left, Lp = g.L_pcb, Wp = g.W_pcb, tP = g.t_PCB || 2, E = ed();
   const rows = P.rows.filter(r => r.qty > 0);
-  const N = laneCount(), laneW = N ? Wp / N : 0;
+  const N = laneCount(), laneW = N ? Wp / N : 0, PR = pairPlan(N);
+  const G = PR.on && PR.fdd ? PR.pas.length : 0;                 // FDD：幾組（幾種 Final PA）
+  const F = G ? fddPlan(PR, N) : null;                            // 每一列屬於哪一組、哪些列由 3D 自動錯開
   const inst = [];
   rows.forEach(r => {
     const role = roleOf(r); if (role === 'filter') return;
     const body = bodyOf(r, role), ct = contactOf(r);
     const side = (r.bt === 'Copper Coin' || r.bt === 'Thermal Via') ? 'filter' : 'hsk';
     const mz = E.posW[r.name] || [], mr = (E.rot && E.rot[r.name]) || [];
+    const auto = !!F && F.shared.includes(r), gRow = F && F.grpOf.has(r) ? F.grpOf.get(r) : -1;   // FDD：沒拆的列（每一路每一組一顆）／照清單的列屬於哪一組
+    const k = auto ? G : PR.on && PR.multi.includes(r) ? r.qty / N : 0;   // 通道配對：這一列每一路 k 顆（TDD 並聯的 → 那一路再等分成 k 格並排）
     for (let i = 0; i < r.qty; i++) {
       const rot = role !== 'sfp' && mr[i] === 90;         // SFP 插口一定朝 I/O 端，不能轉
       const bL = rot ? body.W : body.L, bW = rot ? body.L : body.W, cL = rot ? ct.W : ct.L, cW = rot ? ct.L : ct.W;
       inst.push({ row: r, role, body, ct, side, rot, bL, bW, cL, cW, fpL: Math.max(bL, cL), fpW: Math.max(bW, cW), i, key: r.name + '#' + i,
-        lane: (N && r.cat === 'RF' && r.qty === N) ? i : -1, manualZ: typeof mz[i] === 'number' ? mz[i] : null });
+        lane: (N && r.cat === 'RF' && r.qty === N) ? i : k ? Math.floor(i / k) : -1, sub: k && !auto ? i % k : -1, subN: k && !auto ? k : 1,
+        grp: auto ? i % G : gRow, fdd: auto ? 'auto' : gRow >= 0 ? 'fixed' : '',
+        manualZ: typeof mz[i] === 'number' ? mz[i] : null });
     }
   });
   // SFP 籠跟 I/O 清單的 SFP 光口綁在一起（第 k 顆對第 k 個光口），橫向只存在光口上。舊資料存在籠子上的橫向 → 搬到光口
@@ -375,24 +479,33 @@ function layout() {
     }
   });
   if (sfpMig) saveEdit();
-  // 長度方向：元件相對高度（距 PCB 底部；3D 上改＝寫回元件設定）；超出板邊的夾回板內
+  // 長度方向：元件相對高度（距 PCB 底部；3D 上改＝寫回元件設定）；超出板邊的夾回板內。
+  // FDD 沒拆的列＝3D 自動錯開的位置（o.h3；溫度計算仍用元件清單的 o.hgt）；左右並排時各組在那一路的第幾格
+  const FD = F ? fddPlace(F, inst) : null;
   inst.forEach(o => {
     const h = hgtOf(o.row); o.hgt = h;
-    const xc = x0 + (A.ref === 'bottom' ? h + o.fpL / 2 : h);
+    if (FD && FD.mode === 'side' && o.grp >= 0 && o.fdd) { o.sub = o.grp; o.subN = G; }
+    const h3 = FD && o.fdd === 'auto' ? FD.pos.get(o.row)[o.grp] : null, hc = h3 != null ? h3 : h;
+    if (h3 != null) o.h3 = h3;
+    const xc = x0 + (A.ref === 'bottom' ? hc + o.fpL / 2 : hc);
     const lo = x0 + o.fpL / 2 + 1, hi = x0 + Lp - o.fpL / 2 - 1, x = Math.min(Math.max(xc, lo), hi);
     o.x = x; o.clampD = Math.abs(x - xc) > 0.5 ? x - xc : 0; o.shift = o.clampD;
   });
   const placed = [], CLR = 2.5, RIB = 2;
   const zClamp = (o, z) => Math.min(Math.max(z, z0 + o.fpW / 2 + 0.5), z0 + Wp - o.fpW / 2 - 0.5);
-  const hit = (o, x, z) => placed.some(q => q !== o && Math.abs(q.x - x) < (q.fpL + o.fpL) / 2 + CLR && Math.abs(q.z - z) < (q.fpW + o.fpW) / 2 + CLR);
+  // 重疊判斷用「元件佔的板面」＝本體與接觸面取大。FDD 發射鏈（兩顆都是濾波器側）只比本體：銅塊底板、導熱孔接觸面都在 PCB 背面，
+  // 不佔濾波器側的板面 —— 否則 55 mm 長的銅塊會把緊跟在 PA 旁邊的 Driver／環形器擠到那一路的側邊
+  const bodyOnly = (a, b) => !!(a.fdd && b.fdd && a.side === 'filter' && b.side === 'filter');
+  const hit = (o, x, z) => placed.some(q => { if (q === o) return false; const bo = bodyOnly(o, q);
+    return Math.abs(q.x - x) < (bo ? q.bL + o.bL : q.fpL + o.fpL) / 2 + CLR && Math.abs(q.z - z) < (bo ? q.bW + o.bW : q.fpW + o.fpW) / 2 + CLR; });
   // ① 手動橫向位置（元件表的「橫向位置」或 3D 拖曳）
   inst.filter(o => o.manualZ != null).forEach(o => { o.z = zClamp(o, z0 + o.manualZ); o.src = 'manual'; o.overlap = hit(o, o.x, o.z); placed.push(o); });
   // ② SFP 籠對齊它的 SFP 光口（兩邊綁在一起：元件表、I/O 清單、3D 拖曳改哪一邊都會一起動）
   const sfpZ = new Map(portsLayout(ioList(), IO_TYPES).filter(p => p.it.type === 'sfp').map(p => [p.it, p.z]));
   sfpI.filter(o => o.port && sfpZ.has(o.port)).forEach(o => { o.z = zClamp(o, sfpZ.get(o.port)); o.src = 'io'; o.overlap = hit(o, o.x, o.z); placed.push(o); });
-  // ③ 多通道（數量＝Final PA）：每一路一個通道，沿寬度等分
+  // ③ 多通道（數量＝Final PA）：每一路一個通道，沿寬度等分；通道配對的列（k × 通道數）在那一路裡再等分成 k 格
   inst.filter(o => o.lane >= 0 && !placed.includes(o)).sort((a, b) => b.fpL * b.fpW - a.fpL * a.fpW).forEach(o => {
-    const zc = z0 + laneW * (o.lane + 0.5), half = Math.max(0, laneW / 2 - RIB / 2 - 1.5 - o.fpW / 2);
+    const sw = laneW / o.subN, zc = z0 + laneW * o.lane + sw * (Math.max(0, o.sub) + 0.5), half = Math.max(0, sw / 2 - RIB / 2 - 1.5 - o.fpW / 2);
     let z = null;
     const scan = x => { for (let d = 0; d <= half + 1e-6 && z === null; d += 0.5) for (const s of [1, -1]) { const zz = zc + s * d; if (!hit(o, x, zz)) { z = zz; break; } } };
     scan(o.x);
@@ -442,7 +555,7 @@ function layout() {
     if (o.pocket) o.pocket.boss = Math.max(0, depth - (tb - T_MIN));        // 凹槽底到鰭片側不到 T_MIN → 補肉的高度
   });
   const byK = k => inst.filter(o => o.body.hK === k).length;
-  LAY = { inst, N, laneW, holes, D, df, yTop, tb, cavD, maxDown, maxUp,
+  LAY = { inst, N, laneW, pair: PR, G, fdd: FD ? Object.assign({ F }, FD) : null, holes, D, df, yTop, tb, cavD, maxDown, maxUp,
           clash: inst.filter(o => o.clash).length,
           clamped: inst.filter(o => Math.abs(o.clampD) > 0.5), moved: inst.filter(o => Math.abs(o.shift - o.clampD) > 0.5),
           overlaps: inst.filter(o => o.overlap).length, src: { ait: byK('ait'), data: byK('data'), prov: byK('prov') } };
@@ -453,19 +566,29 @@ function layout() {
   LAY.loops = loopsNow();                // 膠條、螺絲柱、PCB／屏蔽罩外形
   return LAY;
 }
-/* 盲插接頭（濾波器 → PCB）：每一路一個，跟著環形器（沒有環形器就跟 PA） */
+/* 發射鏈：每一路一條；FDD（通道配對開著）每一路每一組（每一種 Final PA）一條。
+   chainPick＝那一條鏈上某一級的元件（那一組沒有這一級 → 用那一路共用的） */
+function chainsOf() {
+  const out = [];
+  for (let i = 0; i < (LAY.N || 0); i++) (LAY.G ? Array.from({ length: LAY.G }, (_, g) => g) : [-1]).forEach(g => out.push({ lane: i, grp: g }));
+  return out;
+}
+function chainPick(lane, grp, role) {
+  return LAY.inst.find(o => o.lane === lane && o.role === role && o.grp === grp) || (grp >= 0 && LAY.inst.find(o => o.lane === lane && o.role === role && o.grp < 0)) || null;
+}
+/* 盲插接頭（濾波器 → PCB）：每一條發射鏈一個，跟著環形器（沒有環形器就跟 PA） */
 function connsNow() {
-  const g = P.g, out = [];
-  for (let i = 0; i < (LAY.N || 0); i++) {
-    const ref = LAY.inst.find(o => o.lane === i && o.role === 'circ') || LAY.inst.find(o => o.lane === i && o.role === 'pa'); if (!ref) continue;
-    out.push({ x: Math.min(ref.x + ref.fpL / 2 + 8, g.Btm + g.L_pcb - 8), z: ref.z, ref, lane: i });
-  }
+  const g = P.g, out = [], seen = new Set();
+  chainsOf().forEach(({ lane, grp }) => {
+    const ref = chainPick(lane, grp, 'circ') || chainPick(lane, grp, 'pa'); if (!ref || seen.has(ref)) return; seen.add(ref);
+    out.push({ x: Math.min(ref.x + ref.fpL / 2 + 8, g.Btm + g.L_pcb - 8), z: ref.z, ref, lane, grp });
+  });
   return out;
 }
 /* SFP 光口：橫向＝I/O 清單的位置，高度＝對應 SFP 籠在 PCB 上的高度（HSK 側：從 PCB 板面往上） */
 /* 數位 I/O：橫向 z（清單位置或自動等分）、高度 y（接頭中心距分模面）、端面上接頭框的高 fh／寬 fw。
    SFP 的高度固定對齊 PCB 上的 SFP 籠；其他接頭可以上下調（留白＝端牆中間） */
-const IO_FH = { rj45: 21, pwr: 14, aisg: 21, dbg: 7, gnd: 12 };
+const IO_FH = { rj45: 21, pwr: 14, aisg: 21, dbg: 14, gnd: 12 };
 function ioLayout() {
   const list = ioList(), sfpInst = LAY.inst.filter(o => o.role === 'sfp'), yT = LAY.yTop;
   const yDef = Math.min(Math.max(yT / 2, 10.5), Math.max(yT - 10.5, yT / 2));
@@ -511,17 +634,19 @@ function shieldLayout() {
   const Rf = { x0: x0 + S.rim - w / 2, x1: x0 + Lp - S.rim + w / 2, z0: z0 + S.rim - w / 2, z1: z0 + Wp - S.rim + w / 2 };   // 牆中線可以壓在外框上（共用外框）
   const groups = new Map();
   LAY.inst.filter(o => o.side === 'filter').forEach(o => {
-    const k = o.lane >= 0 ? 'L' + o.lane + ':' + o.role : 'I:' + o.key;
+    const k = o.lane >= 0 ? 'L' + o.lane + (o.grp >= 0 ? 'g' + o.grp : o.sub >= 0 ? 's' + o.sub : '') + ':' + o.role : 'I:' + o.key;   // 同一路同一級一格（FDD：每一組各一格）
     if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o);
   });
   let keeps = [];
+  const sc = LAY.fdd && LAY.fdd.mode === 'stack' ? LAY.fdd.s : 1;   // FDD 上下排擠不下 → 發射鏈的腔體留邊跟著縮（跟 fddPlace 同一個 s，腔體才不會整路合成一格）
   groups.forEach(list => {
-    const o0 = list[0], [mx, mz] = SHD_MARGIN[o0.role] || SHD_MARGIN_DEF;
-    const k = { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity, insts: list, roles: [o0.role], lane: o0.lane };
+    const o0 = list[0], [mx0, mz] = SHD_MARGIN[o0.role] || SHD_MARGIN_DEF, mx = o0.fdd && sc < 1 ? fddMargin(mx0, sc) : mx0;
+    const k = { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity, insts: list, roles: [o0.role], lane: o0.lane, grp: o0.grp };
     list.forEach(o => { k.x0 = Math.min(k.x0, o.x - o.bL / 2 - mx - w / 2); k.x1 = Math.max(k.x1, o.x + o.bL / 2 + mx + w / 2);
                         k.z0 = Math.min(k.z0, o.z - o.bW / 2 - mz - w / 2); k.z1 = Math.max(k.z1, o.z + o.bW / 2 + mz + w / 2); });
     LAY.conns.filter(c => list.includes(c.ref)).forEach(c => {          // 盲插接頭（天線輸出）包在它那一格裡
-      k.x0 = Math.min(k.x0, c.x - 6 - w / 2); k.x1 = Math.max(k.x1, c.x + 6 + w / 2); k.z0 = Math.min(k.z0, c.z - 6 - w / 2); k.z1 = Math.max(k.z1, c.z + 6 + w / 2); k.conn = true; });
+      const cr = o0.fdd ? fddConnR(sc) : 6;
+      k.x0 = Math.min(k.x0, c.x - cr - w / 2); k.x1 = Math.max(k.x1, c.x + cr + w / 2); k.z0 = Math.min(k.z0, c.z - cr - w / 2); k.z1 = Math.max(k.z1, c.z + cr + w / 2); k.conn = true; });
     keeps.push(k);
   });
   const clampK = () => keeps.forEach(k => { k.x0 = Math.max(k.x0, Rf.x0); k.x1 = Math.min(k.x1, Rf.x1); k.z0 = Math.max(k.z0, Rf.z0); k.z1 = Math.min(k.z1, Rf.z1); });
@@ -533,10 +658,13 @@ function shieldLayout() {
     } } };
   clampK(); mergeK();
   const ov = (a0, a1, b0, b1) => a0 < b1 - 0.01 && b0 < a1 - 0.01;
+  // 中間還隔著別的格子就不對齊（否則兩格都伸進中間那一格 → 三格合併；發射鏈排得緊時會發生）
+  const midX = (a, b) => keeps.some(c => c !== a && c !== b && c.x1 > a.x1 - 0.01 && c.x0 < b.x0 + 0.01 && (ov(c.z0, c.z1, a.z0, a.z1) || ov(c.z0, c.z1, b.z0, b.z1)));
+  const midZ = (a, b) => keeps.some(c => c !== a && c !== b && c.z1 > a.z1 - 0.01 && c.z0 < b.z0 + 0.01 && (ov(c.x0, c.x1, a.x0, a.x1) || ov(c.x0, c.x1, b.x0, b.x1)));
   for (let it = 0; it < 3; it++) keeps.forEach(a => keeps.forEach(b => {    // 很近的兩格共用一道牆
     if (a === b) return;
-    if (ov(a.z0, a.z1, b.z0, b.z1)) { const gx = b.x0 - a.x1; if (gx > 0.01 && gx < SHD_SNAP) { const m = (a.x1 + b.x0) / 2; a.x1 = m; b.x0 = m; } }
-    if (ov(a.x0, a.x1, b.x0, b.x1)) { const gz = b.z0 - a.z1; if (gz > 0.01 && gz < SHD_SNAP) { const m = (a.z1 + b.z0) / 2; a.z1 = m; b.z0 = m; } }
+    if (ov(a.z0, a.z1, b.z0, b.z1)) { const gx = b.x0 - a.x1; if (gx > 0.01 && gx < SHD_SNAP && !midX(a, b)) { const m = (a.x1 + b.x0) / 2; a.x1 = m; b.x0 = m; } }
+    if (ov(a.x0, a.x1, b.x0, b.x1)) { const gz = b.z0 - a.z1; if (gz > 0.01 && gz < SHD_SNAP && !midZ(a, b)) { const m = (a.z1 + b.z0) / 2; a.z1 = m; b.z0 = m; } }
   }));
   keeps.forEach(k => { if (k.x0 - Rf.x0 < SHD_SNAP) k.x0 = Rf.x0; if (Rf.x1 - k.x1 < SHD_SNAP) k.x1 = Rf.x1; if (k.z0 - Rf.z0 < SHD_SNAP) k.z0 = Rf.z0; if (Rf.z1 - k.z1 < SHD_SNAP) k.z1 = Rf.z1; });
   mergeK();
@@ -557,21 +685,21 @@ function shieldLayout() {
   });
   // 走線缺口：同一路相鄰兩級之間，訊號線穿過的每一道牆開一個小缺口
   const notches = [];
-  for (let i = 0; i < (LAY.N || 0); i++) {
-    const chain = ['pre', 'drv', 'pa', 'circ'].map(r => LAY.inst.find(o => o.lane === i && o.role === r)).filter(Boolean).sort((a, b) => a.x - b.x);
+  chainsOf().forEach(({ lane, grp }) => {
+    const chain = ['pre', 'drv', 'pa', 'circ'].map(r => chainPick(lane, grp, r)).filter(Boolean).sort((a, b) => a.x - b.x);
     for (let k = 1; k < chain.length; k++) {
       const a = chain[k - 1], b = chain[k], zs = b.z;
       walls.filter(q => q.axis === 'x' && q.pos > a.x && q.pos < b.x && zs > q.a && zs < q.b).forEach(q => notches.push({ x: q.pos, z: zs }));
     }
-  }
+  });
   LAY.shd = { S, cells, walls, depth, Rf, notches, keeps };
 }
 function keepMerge(a, b) {
   return { x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), z0: Math.min(a.z0, b.z0), z1: Math.max(a.z1, b.z1),
-           insts: a.insts.concat(b.insts), roles: [...new Set(a.roles.concat(b.roles))], lane: a.lane === b.lane ? a.lane : -1, conn: a.conn || b.conn, merged: true };
+           insts: a.insts.concat(b.insts), roles: [...new Set(a.roles.concat(b.roles))], lane: a.lane === b.lane ? a.lane : -1, grp: a.grp === b.grp ? a.grp : -1, conn: a.conn || b.conn, merged: true };
 }
 function keepLabel(k) {
-  const ch = k.lane >= 0 ? 'CH' + (k.lane + 1) + ' · ' : '';
+  const ch = k.lane >= 0 ? 'CH' + (k.lane + 1) + (LAY.G && k.grp >= 0 ? ' ' + grpLabel(k.grp) : '') + ' · ' : '';
   if (k.insts.every(o => o.lane >= 0)) return ch + k.roles.map(r => ROLE_NAME[r] || r).join('＋');
   return ch + [...new Set(k.insts.map(o => o.row.name))].join('＋');
 }
@@ -651,19 +779,19 @@ function buildSFPPort(group, yc, zc, ch = 9.8) {  // SFP 光口：白色凸台�
   const a = mesh(new RoundedBoxGeometry(5, ch + 4, 19, 3, 1.6), MAT.powder, 'deco'); a.position.set(-2.4, yc, zc);
   group.add(a, box(0.6, ch + 1.6, 15, MAT.steel, 'deco', -5.05, yc, zc), box(0.4, ch - 0.2, 13, MAT.hole, 'deco', -5.3, yc, zc));
 }
-function buildRJ45(group, yc, zc) {            // 防水 RJ45：圓形螺紋座＋方形插孔
+function buildRJ45(group, yc, zc) {            // Signal 訊號口（RJ45 等）：圓形防水螺紋座＋方形插孔
   group.add(cylX(9.5, 10.5, 5, 48, MAT.powder, -2.5, yc, zc), cylX(7.8, 7.8, 4, 48, MAT.plastic, -6.5, yc, zc), box(0.5, 7, 8.5, MAT.hole, 'deco', -8.6, yc, zc));
 }
-function buildPower(group, yc, zc) {           // 電源口：金屬框＋黑色開口
-  const fr = mesh(new RoundedBoxGeometry(2, 14, 28, 2, 1.2), MAT.steel, 'deco'); fr.position.set(-1, yc, zc);
-  group.add(fr, box(0.4, 9.5, 23, MAT.hole, 'deco', -2.1, yc, zc));
+function buildPower(group, yc, zc) {           // 電源口：跟 SFP 光口同一類外觀（白色凸台＋金屬框＋黑色開口）
+  buildSFPPort(group, yc, zc, IO_FH.pwr - 4);
 }
 function buildAISG(group, yc, zc) {            // AISG（圓形 8 pin）：座＋六角螺帽＋本體＋黑色插面
   group.add(cylX(10, 10.5, 3, 48, MAT.powder, -1.5, yc, zc), cylX(9, 9, 4.5, 6, MAT.metal, -5.2, yc, zc), cylX(6.6, 6.6, 8, 40, MAT.metal, -10.5, yc, zc),
             cylX(5, 5, 0.4, 32, MAT.plastic, -14.6, yc, zc));
 }
-function buildDebug(group, yc, zc) {           // Debug：小圓孔＋金屬圈
-  group.add(cylX(2.4, 2.4, 0.5, 24, MAT.hole, -0.25, yc, zc), cylX(3.4, 3.4, 0.8, 24, MAT.steel, -0.1, yc, zc));
+function buildDebug(group, yc, zc) {           // Debug port：金屬框＋黑色開口
+  const fr = mesh(new RoundedBoxGeometry(2, 14, 28, 2, 1.2), MAT.steel, 'deco'); fr.position.set(-1, yc, zc);
+  group.add(fr, box(0.4, 9.5, 23, MAT.hole, 'deco', -2.1, yc, zc));
 }
 function buildGnd(group, yc, zc) {             // 接地：墊片＋螺柱＋螺帽
   const pad = mesh(new RoundedBoxGeometry(2, 12, 12, 2, 1), MAT.metal, 'deco'); pad.position.set(-1, yc, zc);
@@ -1319,6 +1447,7 @@ let rru = null, HSK = null, PCB = null, SHD = null, FIL = null, dimsA = null, di
 let bbox = new THREE.Box3(), center = new THREE.Vector3(), radius = 300;
 const state = { mode: 'real', dims: true, st: 'asm', flip: false, upright: false, edit: false, solo: null, pflip: false };   // solo：null＝全部，否則是要顯示的部件陣列（可複選）；pflip：顯示中的部件沿長邊中心軸翻 180°（見 withFlips）
 const HIDE = {};                                   // 模型樹取消勾選的零件（重建後照樣藏）
+const HIDEI = new Set();                           // 個別隱藏的零件（選取鍵：c:元件#i、io:id、ant:id）；只在這次檢視、不存檔，換專案清掉
 
 function disposeTree(o) { o.traverse(x => { if (x.geometry) x.geometry.dispose(); if (x.element) x.element.remove(); }); }
 function rebuild(projKey, keepView) {
@@ -1327,7 +1456,7 @@ function rebuild(projKey, keepView) {
   if (!projKey && SKIP_REBUILD) { SKIP_REBUILD = false; return; }   // 工具剛在 saveEdit 裡重算並更新過（元件相對高度寫回）→ 不重做一次
   if (rru) { holder.remove(rru); disposeTree(rru); }
   if (dimsA) { holder.remove(dimsA); disposeTree(dimsA); }
-  parts = {}; PBOX = {}; if (newProj) state.pflip = false;
+  parts = {}; PBOX = {}; if (newProj) { state.pflip = false; HIDEI.clear(); }
   T_LO = P.g.T_amb; T_HI = P.r.T_base + P.g.L_pcb * P.g.Slope;
   layout();
   rru = new THREE.Group();
@@ -1507,6 +1636,7 @@ function updateVis() {
   if (titles[2]) titles[2].element.innerHTML = '③ PCB<small>' + (state.pflip ? '翻面 · ' : '') + (state.flip !== !!state.pflip ? '濾波器側朝上 · 射頻元件（銅塊凸台）' : 'HSK 側朝上 · 貼在基板內側的那一面') + '</small>';
   vcLabels();
   updateTags();
+  hidebarPlace();
 }
 
 const VIEWS = {
@@ -1522,6 +1652,7 @@ const VIEWS = {
   top:   { d: V(0, 1, 0), up: V(0, 0, -1), std: 1 }, bottom: { d: V(0, -1, 0), up: V(0, 0, 1), std: 1 },
 };
 let curView = 'iso', frameSize = null;               // frameSize＝上次對焦時的畫面大小（畫面變大／變小時據此重新對焦）
+let viewRoll = 0;                                    // 正視圖轉了幾個 90°（順時針，畫面上看）：只在正視圖有意義；換視角、自己轉過／平移／縮放就歸零
 function fitDist(dir, tgt, box, fill = 0.8) {       // 依視窗長寬比，把外框的 8 個角都放進畫面（fill＝佔畫面比例）
   const cam = camera.clone(); cam.aspect = camera.aspect; cam.up.set(0, 1, 0); cam.updateProjectionMatrix();
   const pts = []; for (let i = 0; i < 8; i++) pts.push(V(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z));
@@ -1538,7 +1669,7 @@ function safeInsets() {
   const sr = stage.getBoundingClientRect(), o = { t: 0, r: 0, b: 0, W: sr.width, H: sr.height };
   ROOT.querySelectorAll('.tools .tgrp').forEach(e => { const q = e.getBoundingClientRect(); if (q.height) o.t = Math.max(o.t, q.bottom - sr.top + 6); });
   const v = $('vcube').getBoundingClientRect(); if (v.width) o.r = Math.max(0, sr.right - v.left + 6);
-  ['hint', 'selbar', 'pname'].forEach(id => { const h = $(id); if (!h.hidden) { const q = h.getBoundingClientRect(); if (q.height) o.b = Math.max(o.b, sr.bottom - q.top + 4); } });
+  ['hint', 'selbar', 'pname', 'hidebar'].forEach(id => { const h = $(id); if (!h.hidden) { const q = h.getBoundingClientRect(); if (q.height) o.b = Math.max(o.b, sr.bottom - q.top + 4); } });
   if (o.W - o.r < o.W * 0.6) o.r = 0;
   if (o.H - o.t - o.b < o.H * 0.6) o.t = o.b = 0;
   return o;
@@ -1570,9 +1701,10 @@ function fitOrtho(dir, up, box, ctr, fill = 0.9) {
   const wpp = Math.max(2 * ey / (fill * (s.H - s.t - s.b)), 2 * ex / (fill * (s.W - s.r)));
   return { d: wpp * s.H / (2 * tn), tgt: ctr.clone().addScaledVector(r, s.r / 2 * wpp).addScaledVector(u, (s.t - s.b) / 2 * wpp) };
 }
-function frame(view, instant) {
+function frame(view, instant, dur) {
   const v = VIEWS[view] || VIEWS.iso, std = !!v.std;
   const dir = (!std && state.upright ? (VIEWS_UP[view] || VIEWS_UP.iso) : v.d).clone().normalize(), up = (v.up || V(0, 1, 0)).clone();
+  if (!std) viewRoll = 0; else if (viewRoll) up.applyAxisAngle(dir, viewRoll * Math.PI / 2);   // 右旋一次＝上方向繞視線（朝向相機）轉 +90° → 畫面順時針轉
   if (std && !ORTHO) setProjection(true);                                  // 正視＝正交
   else if ((view === 'iso' || view === 'io') && ORTHO) setProjection(false);  // 回到透視的預設視角
   const box = soloBox() || ((std || portrait()) && dimsBox(dir)) || bbox, ctr = box.getCenter(new THREE.Vector3());   // 只看一個部件 → 對焦那一件；正視或直式畫面 → 連尺寸標註一起放進畫面
@@ -1580,7 +1712,19 @@ function frame(view, instant) {
   const toPos = fo.tgt.clone().addScaledVector(dir, fo.d), toTgt = fo.tgt.clone();
   curView = view; markViews(); frameSize = [stage.clientWidth, stage.clientHeight];
   if (instant || reduceMotion) { camera.position.copy(toPos); camera.up.copy(up); controls.target.copy(toTgt); controls.update(); return; }
-  camTween = { t0: performance.now(), dur: 900, p0: camera.position.clone(), t0v: controls.target.clone(), p1: toPos, t1: toTgt, u0: camera.up.clone(), u1: up };
+  camTween = { t0: performance.now(), dur: dur || 900, p0: camera.position.clone(), t0v: controls.target.clone(), p1: toPos, t1: toTgt, u0: camera.up.clone(), u1: up };
+}
+/* 左旋／右旋 90°（q＝−1 逆時針、＋1 順時針，畫面上看）：
+   正視圖＝記住轉向（viewRoll）、依轉過去的方向重新對焦（畫面大小變了照樣保持）；再按一次同一個正視圖按鈕＝回到原本方向。
+   其他視角（等角、自己轉過／平移過）＝原地繞視線轉，不重新對焦；轉過就不是那個預設視角了（跟平移一樣，按鈕不再亮） */
+function rollView(q) {
+  if (!rru) return;
+  if (curView && VIEWS[curView] && VIEWS[curView].std) { viewRoll = (viewRoll + q + 4) % 4; frame(curView, false, 450); return; }
+  const tw = camTween, p = tw ? tw.p1 : camera.position, t = tw ? tw.t1 : controls.target, u = tw ? tw.u1 : camera.up;
+  const u1 = u.clone().applyAxisAngle(p.clone().sub(t).normalize(), q * Math.PI / 2);
+  if (curView) { curView = null; viewRoll = 0; markViews(); }
+  if (reduceMotion) { camTween = null; camera.position.copy(p); controls.target.copy(t); camera.up.copy(u1); controls.update(); return; }
+  camTween = { t0: performance.now(), dur: 450, p0: camera.position.clone(), t0v: controls.target.clone(), p1: p.clone(), t1: t.clone(), u0: camera.up.clone(), u1 };
 }
 /* 組裝狀態顯示尺寸時：機體外框＋這個方向看得到的尺寸線（跟視線平行的會縮成一個點，不算、也不顯示） */
 const DIM_EDGE = 0.85;
@@ -1605,7 +1749,7 @@ function panView(dx, dy) {
   const t = controls.target, d = camera.position.distanceTo(t), h = 2 * d * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   const mv = V(1, 0, 0).applyQuaternion(camera.quaternion).multiplyScalar(-dx * 0.12 * h).add(V(0, 1, 0).applyQuaternion(camera.quaternion).multiplyScalar(-dy * 0.12 * h));
   camTween = null; camera.position.add(mv); t.add(mv); controls.update();
-  if (curView) { curView = null; markViews(); }        // 平移過就不是預設視角了
+  if (curView) { curView = null; viewRoll = 0; markViews(); }        // 平移過就不是預設視角了
 }
 function recenter() {
   const dir = camera.position.clone().sub(controls.target).normalize(), box = soloBox() || (ORTHO && dimsBox(dir)) || bbox;   // 跟對焦同一套：正交才把尺寸標註算進去
@@ -1768,12 +1912,27 @@ function setTab(t) {
   updateTags();
 }
 function renderPanels() { renderComp(); renderPorts('io'); renderPorts('ant'); renderShd(); renderAsm(); refreshPanels(); }
-function refreshPanels() { refreshComp(); refreshPorts('io'); refreshPorts('ant'); refreshShd(); refreshAsm(); buildTree(); fillPanels(); }
+function refreshPanels() {
+  if (compSig() !== COMP_SIG) renderComp();
+  ['io', 'ant'].forEach(k => { if (portSig(k) !== PORT_SIG[k]) renderPorts(k); });
+  refreshComp(); refreshPorts('io'); refreshPorts('ant'); refreshShd(); refreshAsm(); buildTree(); fillPanels();
+}
+/* 清單的列不一樣才重畫（只改數值不重畫，輸入中不跳）：
+   元件（名稱×數量）—— 同一個專案在工具裡新增／刪除／改名／改數量後回到 3D 頁；
+   I/O、天線座（id＋類型、順序）—— 例：資料庫的專案被別人改過、重新載入同一個專案 */
+let COMP_SIG = '';
+const PORT_SIG = { io: '', ant: '' };
+const compSig = () => LAY ? [...new Set(LAY.inst.map(o => o.row))].map(r => r.name + '×' + r.qty).join('|') : '';
+const portSig = kind => (kind === 'io' ? ioList() : antList()).map(it => it.id + ':' + it.type).join('|');
 
 /* 元件位置表：元件相對高度＝元件設定的同一格（寫回、會重算；整列共用）；橫向＝元件中心距 PCB 左緣（只影響 3D）。
    橫向用 ◀ ▶ 調（按住連續、越按越快；Shift＝一步 10 mm），數字直接填目前位置（自動排的也填好），也可以直接打字、清空＝回到自動。
    多顆的列：◀ ▶ 整列一起平移；點「×4」展開，每一顆各自調、各自轉 */
 const CEXP = new Set();
+/* 👁：只在 3D 隱藏（不影響計算、不存檔）。按下（aria-pressed）＝藏起來 */
+const EYE = '<svg class="e-on" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 8s2.4-4.3 6.5-4.3S14.5 8 14.5 8s-2.4 4.3-6.5 4.3S1.5 8 1.5 8z"/><circle cx="8" cy="8" r="1.9"/></svg>' +
+  '<svg class="e-off" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.8 5.6C2 6.6 1.5 8 1.5 8s2.4 4.3 6.5 4.3c1.1 0 2.1-.3 2.9-.8M6.2 3.9c.6-.1 1.2-.2 1.8-.2 4.1 0 6.5 4.3 6.5 4.3s-.5 1-1.4 2"/><path d="M2 2l12 12"/></svg>';
+const eyeBtn = (cls, lab) => '<button type="button" class="ibtn eye ' + cls + '" aria-pressed="false" aria-label="在 3D 隱藏 ' + lab + '">' + EYE + '</button>';
 function stepHtml(key, lab) {
   return '<div class="stp" data-key="' + esc(key) + '">' +
     '<button type="button" class="ibtn" data-hold="-1" title="往左（按住連續，Shift＝10 mm）" aria-label="' + lab + ' 往左">◀</button>' +
@@ -1781,10 +1940,10 @@ function stepHtml(key, lab) {
     '<button type="button" class="ibtn" data-hold="1" title="往右（按住連續，Shift＝10 mm）" aria-label="' + lab + ' 往右">▶</button></div>';
 }
 function renderComp() {
-  const rows = [...new Set(LAY.inst.map(o => o.row))];
+  const rows = [...new Set(LAY.inst.map(o => o.row))]; COMP_SIG = compSig();
   $('ctab').innerHTML = '<div class="ch"><span>元件</span><span title="＝元件設定的「元件相對高度」">相對高度</span><span>橫向（距左緣）</span><span></span><span></span></div>' + rows.map(r => {
     const n = esc(r.name), multi = r.qty > 1;
-    return '<div class="cr" data-row="' + n + '"><span class="cn"><b title="' + n + '">' + n + '</b><small></small></span>' +
+    return '<div class="cr" data-row="' + n + '"><span class="cn">' + eyeBtn('c-eye', n) + '<b title="' + n + '">' + n + '</b><small></small></span>' +
       '<input class="fld c-h" type="number" step="1" inputmode="decimal" aria-label="' + n + ' 元件相對高度 (mm)，寫回元件設定">' +
       (multi ? '<div class="stp" data-row-all="' + n + '">' +
           '<button type="button" class="ibtn" data-hold="-1" title="' + r.qty + ' 顆一起往左（按住連續，Shift＝10 mm）" aria-label="' + n + ' 整列往左">◀</button>' +
@@ -1793,7 +1952,7 @@ function renderComp() {
         : stepHtml(r.name + '#0', n)) +
       '<button type="button" class="ibtn c-rot" aria-pressed="false" aria-label="' + n + ' 水平轉 90°">⟳</button>' +
       '<button type="button" class="ibtn c-r" title="橫向回到自動、元件相對高度回到原值、取消旋轉" aria-label="重設 ' + n + '">↺</button></div>' +
-      (multi ? Array.from({ length: r.qty }, (_, i) => '<div class="cr sub" data-row="' + n + '" data-i="' + i + '" hidden><span class="cn"><b>#' + (i + 1) + '</b></span><span></span>' +
+      (multi ? Array.from({ length: r.qty }, (_, i) => '<div class="cr sub" data-row="' + n + '" data-i="' + i + '" hidden><span class="cn">' + eyeBtn('c-eye1', n + ' 第 ' + (i + 1) + ' 顆') + '<b>#' + (i + 1) + '</b><small class="c-ch"></small></span><span></span>' +
         stepHtml(r.name + '#' + i, n + ' 第 ' + (i + 1) + ' 顆') +
         '<button type="button" class="ibtn c-rot1" aria-pressed="false" aria-label="' + n + ' 第 ' + (i + 1) + ' 顆水平轉 90°">⟳</button>' +
         '<button type="button" class="ibtn c-r1" title="這一顆：橫向回到自動、取消旋轉" aria-label="重設 ' + n + ' 第 ' + (i + 1) + ' 顆">↺</button></div>').join('') : '');
@@ -1803,19 +1962,26 @@ function compRowInsts(name) { return LAY.inst.filter(o => o.row.name === name); 
 function refreshComp() {
   const E = ed(), z0 = P.g.Left, warn = [];
   $('comp-cnt').textContent = LAY.inst.length + ' 顆';
+  refreshPair();
   $('ctab').querySelectorAll('.cr:not(.sub)').forEach(row => {
     const name = row.dataset.row, list = compRowInsts(name); if (!list.length) return;
     const r = list[0].row, ih = row.querySelector('.c-h');
     const hChg = typeof E.hgt[name] === 'number', side = list[0].side, dt = dTemp(r), risk = bnRisk(r);
     if (document.activeElement !== ih) ih.value = hChg ? E.hgt[name] : r.hgt;
     ih.classList.toggle('chg', hChg);
-    ih.title = (hChg ? '已改（原值 ' + r.hgt + ' mm）。' : '') + '＝元件設定的「元件相對高度」：改這格會寫回去並重算溫度' + (r.qty > 1 ? '（' + r.qty + ' 顆一起動）' : '');
-    row.querySelector('.cn small').textContent = r.cat + ' ×' + r.qty + ' · ' + (side === 'hsk' ? 'HSK 側' : '濾波器側') +
+    const au = list.filter(o => o.fdd === 'auto'), auG = [...new Set(au.map(o => o.grp))].sort((a, b) => a - b);
+    ih.title = (hChg ? '已改（原值 ' + r.hgt + ' mm）。' : '') + '＝元件設定的「元件相對高度」：改這格會寫回去並重算溫度' + (r.qty > 1 ? '（' + r.qty + ' 顆一起動）' : '') +
+      (au.length ? '。3D 上由通道配對自動錯開（' + auG.map(g => grpLabel(g) + ' ' + f1(au.find(o => o.grp === g).x - P.g.Btm)).join('／') + ' mm），這格只影響溫度計算' : '');
+    row.querySelector('.cn small').textContent = r.cat + ' ×' + r.qty + ' · ' + (side === 'hsk' ? 'HSK 側' : '濾波器側') + (au.length ? ' · 3D 自動錯開' : '') +
       (hChg && r.W > 0 ? ' · 估 ' + (dt >= 0 ? '+' : '') + f1(dt) + ' °C' + (risk === 'new' ? ' · 會變瓶頸' : '') : '');
     const manN = list.filter(isManualZ).length, rotN = list.filter(o => o.rot).length, rb = row.querySelector('.c-rot'), isSfp = list[0].role === 'sfp';
     rb.disabled = isSfp; rb.setAttribute('aria-pressed', rotN && rotN === list.length ? 'true' : rotN ? 'mixed' : 'false');
     rb.title = isSfp ? 'SFP 插口一定朝 I/O 端，不能轉' : rotN === list.length ? '已轉 90°（再按一下轉回）' : rotN ? rotN + '/' + list.length + ' 顆已轉 · 按一下整列轉 90°' : '水平轉 90°（整列一起；展開後可以一顆一顆轉，或選一顆按 R）';
     row.querySelector('.c-r').disabled = !hChg && !manN && !rotN;
+    const hidN = list.filter(o => HIDEI.has('c:' + o.key)).length, eye = row.querySelector('.c-eye');
+    eye.setAttribute('aria-pressed', hidN && hidN === list.length ? 'true' : hidN ? 'mixed' : 'false'); row.classList.toggle('hid', hidN > 0 && hidN === list.length);
+    eye.title = hidN === list.length ? '已在 3D 隱藏（再按一下顯示）' : hidN ? hidN + '/' + list.length + ' 顆已隱藏 · 按一下整列隱藏'
+      : '在 3D 隱藏' + (list.length > 1 ? '（整列 ' + list.length + ' 顆；展開後可以一顆一顆藏）' : '') + '，不影響計算；選取後按 H 也可以';
     const multi = r.qty > 1, open = multi && CEXP.has(name);
     if (multi) {
       const cx = row.querySelector('.cx'); cx.setAttribute('aria-expanded', String(open)); cx.classList.toggle('chg', manN > 0);
@@ -1828,6 +1994,10 @@ function refreshComp() {
       r1.title = isSfp ? 'SFP 插口一定朝 I/O 端，不能轉' : o.rot ? '已轉 90°（再按一下轉回）' : '只轉這一顆 90°';
       sr.querySelector('.c-r1').disabled = !isManualZ(o) && !o.rot;
       sr.classList.toggle('sel', SELK === 'c:' + o.key);
+      const hid1 = HIDEI.has('c:' + o.key), e1 = sr.querySelector('.c-eye1');
+      e1.setAttribute('aria-pressed', String(hid1)); e1.title = hid1 ? '已在 3D 隱藏（再按一下顯示）' : '在 3D 隱藏這一顆'; sr.classList.toggle('hid', hid1);
+      sr.querySelector('.c-ch').textContent = o.lane >= 0 ? 'CH' + (o.lane + 1) + (LAY.G && o.grp >= 0 ? ' ' + grpLabel(o.grp) : o.subN > 1 ? ' · ' + (o.sub + 1) + '/' + o.subN : '') +
+        (o.fdd === 'auto' ? ' · 3D ' + f1(o.x - P.g.Btm) : '') : '';
     });
     if (list.some(o => o.src === 'manual' && o.overlap)) warn.push(name + ' 跟其他元件重疊');
   });
@@ -1877,6 +2047,10 @@ function wireComp() {
   $('ctab').addEventListener('click', e => {
     const row = e.target.closest('.cr'); if (!row || !row.dataset.row) return;
     const name = row.dataset.row, E = ed(), list = compRowInsts(name); if (!list.length) return;
+    if (e.target.closest('.eye')) {                           // 👁 在 3D 隱藏／顯示（整列或這一顆）
+      const one = row.classList.contains('sub') ? list[+row.dataset.i] : null, ks = (one ? [one] : list).map(o => 'c:' + o.key);
+      hideSet(ks, !ks.every(k => HIDEI.has(k))); return;
+    }
     const hb = e.target.closest('[data-hold]');
     if (hb) {                                                 // 滑鼠／觸控由上面的「按住」處理；鍵盤（Enter、空白鍵）在這裡走一步
       if (e.detail === 0) { const sp = hb.closest('.stp'), sign = +hb.dataset.hold, j = sp.dataset.key ? selJob('c:' + sp.dataset.key, 'z', sign) : rowJob(sp.dataset.rowAll, sign); if (j) { j.step(e.shiftKey ? 10 : 1); j.done(); } }
@@ -1899,21 +2073,76 @@ function wireComp() {
     if (e.target.closest('button') || e.target.tagName === 'INPUT') return;
     select('c:' + (sub ? sub.key : list[0].key));
   });
+  ROOT.querySelectorAll('[data-pair]').forEach(b => b.addEventListener('click', () => {   // 通道配對開／關（關＝跟著專案存 layout3d.pair = false）
+    const E = ed(), on = b.dataset.pair === '1'; if (on === (E.pair !== false)) return;
+    if (on) delete E.pair; else E.pair = false;
+    saveEdit(); rebuild(null, true);
+  }));
 }
+/* 通道配對（FDD）的開關與說明：數量是通道數整數倍的 RF 元件、兩種以上的 Final PA 才出現 */
+function refreshPair() {
+  const PR = LAY.pair, box = $('pair'); box.hidden = !PR.avail; if (!PR.avail) return;
+  ROOT.querySelectorAll('[data-pair]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.pair === '1') === PR.on)));
+  const N = LAY.N, out = [], nm = rs => rs.map(r => '<b>' + esc(r.name) + '</b> ×' + r.qty).join('、');
+  if (!PR.fdd) {
+    out.push('通道數 ' + N + '（Final PA 數量）。');
+    if (PR.multi.length) out.push(nm(PR.multi) + ' 是 ' + N + ' 路的整數倍 → ' + (PR.on ? '平均分到每一路，每一路 ' + [...new Set(PR.multi.map(r => r.qty / N))].join('／') +
+      ' 顆並排；高度照元件清單（跟溫度計算同一個位置）。' : '由板子中線往兩側排（通道配對已關閉）。'));
+  } else {
+    const G = PR.pas.length, FD = LAY.fdd, lab = g => '<b>' + esc(grpLabel(g)) + '</b>';
+    out.push('偵測到 FDD：' + G + ' 種 Final PA（' + PR.pas.map((r, g) => lab(g)).join('、') + '）各 ' + N + ' 顆 → ' + N + ' 路 × ' + G + ' 組。');
+    if (!PR.on || !FD) out.push('通道配對已關閉：' + (PR.multi.length ? nm(PR.multi) + ' 由板子中線往兩側排，' : '') + '屏蔽罩腔體、盲插接頭每一路一組。');
+    else {
+      out.push('每一顆 PA 自帶一組 Pre-driver／Driver／環形器，' + (FD.mode === 'stack'
+        ? '上下排：' + (G === 2 ? lab(FD.ord[0]) + ' 在下、' + lab(FD.ord[1]) + ' 在上' : '由下往上＝' + FD.ord.map(lab).join('、')) + '（每一路一欄）。'
+        : '每一路左右並排（由左到右＝' + PR.pas.map((r, g) => lab(g)).join('、') + '）：' + (FD.why === 'inter' ? '拆開的列高度交錯' + fddInterEx(FD.F) + '，上下疊不起來。' : '兩種 PA 太近，連元件本體都疊不下。')));
+      if (FD.F.shared.length) out.push('沒拆開的列（' + nm(FD.F.shared) + '）由 3D 自動錯開：緊跟在自己那一顆 PA 旁邊，只是示意、不能上下拖；溫度計算照元件清單的高度。' +
+        '要每一組分開指定高度 → 在元件清單拆成 ' + G + ' 列（例：' + esc(fddSplitEx(FD.F.shared[0])) + '），3D 就照清單排。');
+      if (FD.F.fixed.length) out.push('已拆開的列（' + FD.F.fixed.map(r => '<b>' + esc(r.name) + '</b>').join('、') + '）照元件清單的高度。');
+      if (FD.mode === 'stack' && FD.s < 1) {
+        const ph = FD.ord.map(g => FD.ph[g]), gap = Math.min(...ph.slice(1).map((v, k) => v - ph[k]));
+        out.push('<span class="pw">⚠ ' + (G === 2 ? '兩種 PA 只差 ' : '相鄰兩種 PA 最近只差 ') + f1(gap) + ' mm，上下疊不下完整的屏蔽罩腔體 → 已縮小腔體留邊（相鄰腔體可能合併）；把 PA 的高度拉開一點就會寬鬆。</span>');
+      }
+      const other = PR.multi.filter(r => !FD.F.shared.includes(r));
+      if (other.length) out.push(nm(other) + ' 是 ' + N + ' 路的整數倍、但不是 ' + G + ' 組 → 平均分到每一路並排，高度照元件清單。');
+    }
+  }
+  $('pair-t').innerHTML = out.join('<br>');
+}
+/* 拆成各組的列名範例：「PreDriver」→「PreDriver-B8、PreDriver-B20B28」（名稱結尾原本的頻段拿掉） */
+function fddSplitEx(r) {
+  const base = String(r.name).replace(/[-_\s]*\(?B\d+(?:[\/+&]?B\d+)*\)?\s*$/i, '') || r.name;
+  return LAY.pair.pas.map((p, g) => base + '-' + grpLabel(g)).join('、');
+}
+/* 高度交錯的例子：同一級拆開的列（例：Driver-B1 250、Driver-B3 270） */
+function fddInterEx(F) {
+  const byRole = {}; F.fixed.forEach(r => { (byRole[roleOf(r)] = byRole[roleOf(r)] || []).push(r); });
+  const rs = Object.values(byRole).find(a => a.length >= 2);
+  return rs ? '（' + rs.slice().sort((a, b) => hgtOf(a) - hgtOf(b)).map(r => esc(r.name) + ' ' + f1(hgtOf(r))).join('、') + '）' : '';
+}
+const fddLockMsg = r => esc(r.name) + ' ' + r.qty + ' 顆共用一個元件相對高度（溫度計算用）；3D 依通道配對緊跟在各自那一顆 PA 旁邊 → 只能左右拖。要每一組分開指定高度，請在元件清單拆成 ' +
+  LAY.G + ' 列（例：' + esc(fddSplitEx(r)) + '）';
 
 /* 數位 I/O／天線座清單：類型、位置（距外殼左側）、◀▶ 微調、↑↓ 排序、✕ 刪除、＋新增 */
+/* 類型下拉：I/O 依大類分組（SFP／電源、Signal、Debug port、其他）；存的類型不認得 → 補一個「（未知）」選項，不靜默改掉 */
+function typeOpts(kind, sel) {
+  const io = kind === 'io', types = io ? IO_TYPES : ANT_TYPES, opt = ([k, t]) => '<option value="' + k + '"' + (k === sel ? ' selected' : '') + '>' + t.n + '</option>';
+  const unk = sel && !types[sel] ? '<option value="' + esc(sel) + '" selected>' + esc(sel) + '（未知）</option>' : '';
+  return unk + (io ? IO_CLASS.map(([c, cn]) => '<optgroup label="' + cn + '">' + Object.entries(types).filter(([, t]) => t.c === c).map(opt).join('') + '</optgroup>').join('')
+    : Object.entries(types).map(opt).join(''));
+}
 function renderPorts(kind) {
-  const io = kind === 'io', list = io ? ioList() : antList(), types = io ? IO_TYPES : ANT_TYPES;
+  const io = kind === 'io', list = io ? ioList() : antList(); PORT_SIG[kind] = portSig(kind);
   $(kind + '-list').innerHTML = list.map((it, i) => '<li data-i="' + i + '"><span class="pn"></span>' +
-    '<select class="fld p-t" aria-label="第 ' + (i + 1) + ' 個的類型">' + Object.entries(types).map(([k, t]) => '<option value="' + k + '"' + (k === it.type ? ' selected' : '') + '>' + (t.s || t.n) + '</option>').join('') + '</select>' +
-    '<span class="pbx"><button type="button" class="ibtn" data-a="u" title="順序往前" aria-label="順序往前"' + (i ? '' : ' disabled') + '>↑</button><button type="button" class="ibtn" data-a="d" title="順序往後" aria-label="順序往後"' + (i < list.length - 1 ? '' : ' disabled') + '>↓</button>' +
+    '<select class="fld p-t" aria-label="第 ' + (i + 1) + ' 個的類型">' + typeOpts(kind, it.type) + '</select>' +
+    '<span class="pbx"><button type="button" class="ibtn eye" data-a="h" aria-pressed="false" aria-label="在 3D 隱藏第 ' + (i + 1) + ' 個">' + EYE + '</button><button type="button" class="ibtn" data-a="u" title="順序往前" aria-label="順序往前"' + (i ? '' : ' disabled') + '>↑</button><button type="button" class="ibtn" data-a="d" title="順序往後" aria-label="順序往後"' + (i < list.length - 1 ? '' : ' disabled') + '>↓</button>' +
     '<button type="button" class="ibtn" data-a="x" title="刪除" aria-label="刪除">✕</button></span>' +
     '<div class="pl2"><span>橫向</span><input class="fld p-z" type="text" inputmode="decimal" autocomplete="off" aria-label="第 ' + (i + 1) + ' 個的橫向位置 (mm)">' +
     '<button type="button" class="ibtn" data-a="l" title="往左（按住連續，Shift＝10 mm）" aria-label="往左">◀</button><button type="button" class="ibtn" data-a="r" title="往右（按住連續，Shift＝10 mm）" aria-label="往右">▶</button>' +
     (io ? '<span></span><span>高度</span><input class="fld p-y" type="text" inputmode="decimal" autocomplete="off" aria-label="第 ' + (i + 1) + ' 個的高度 (mm)">' +
       '<button type="button" class="ibtn" data-a="dn" title="往下（按住連續，Shift＝10 mm）" aria-label="往下">▼</button><button type="button" class="ibtn" data-a="up" title="往上（按住連續，Shift＝10 mm）" aria-label="往上">▲</button>' : '') +
     '</div></li>').join('');
-  $(kind + '-add-t').innerHTML = Object.entries(types).map(([k, t]) => '<option value="' + k + '">' + t.n + '</option>').join('');
+  $(kind + '-add-t').innerHTML = typeOpts(kind, null);
 }
 function refreshPorts(kind) {
   const io = kind === 'io', list = io ? ioList() : antList(), types = io ? IO_TYPES : ANT_TYPES, lab = io ? ioLabel : antLabel, lay = io ? ioLayout() : portsLayout(list, types);
@@ -1934,6 +2163,8 @@ function refreshPorts(kind) {
       li.querySelectorAll('[data-a="dn"],[data-a="up"]').forEach(b => { b.hidden = p.lock; });
     }
     li.classList.toggle('sel', SELK === kind + ':' + p.it.id);
+    const hid = HIDEI.has(kind + ':' + p.it.id), eb = li.querySelector('.eye');
+    eb.setAttribute('aria-pressed', String(hid)); eb.title = hid ? '已在 3D 隱藏（再按一下顯示）' : '在 3D 隱藏這一個（不影響計算）'; li.classList.toggle('hid', hid);
   });
   const w = portWarnings(lay, lab), el = $(kind + '-warn');
   el.hidden = !w.length; el.textContent = w.length ? '⚠ ' + w.join('；') : '';
@@ -1949,7 +2180,7 @@ function wirePorts(kind) {
   const fillBack = (inp, i, ax) => { const q = (kind === 'io' ? ioLayout() : portsLayout(L(), types))[i]; if (q) { inp.value = f1(ax === 'z' ? q.z : q.y); inp.classList.remove('bad'); } };   // 送出後填回目前的值
   $(kind + '-list').addEventListener('change', e => {
     const li = e.target.closest('li'); if (!li) return; const i = +li.dataset.i, it = L()[i];
-    if (e.target.classList.contains('p-t')) { it.type = e.target.value; done(false); }
+    if (e.target.classList.contains('p-t')) { it.type = e.target.value; PORT_SIG[kind] = portSig(kind); done(false); }   // 下拉本身已經是新值 → 不重畫（鍵盤選的焦點不跳）
     else if (e.target.classList.contains('p-z')) {             // 直接打數字；清空＝回到自動
       const s = e.target.value.trim(), v = parseFloat(s), t = selTarget(kind + ':' + it.id);
       if (s === '' || /^(自動|auto)$/i.test(s)) it.pos = null; else if (isFinite(v)) it.pos = Math.round((t ? t.clamp(v) : v) * 2) / 2; else { e.target.classList.add('bad'); return; }
@@ -1968,6 +2199,7 @@ function wirePorts(kind) {
       if (e.detail === 0) { const k = kind + ':' + it.id, j = selJob(k, a === 'l' || a === 'r' ? 'z' : 'v', a === 'r' || a === 'up' ? 1 : -1); if (j) { select(k, true); j.step(e.shiftKey ? 10 : 1); j.done(); } }
       return;
     }
+    if (a === 'h') { const k = kind + ':' + it.id; hideSet([k], !HIDEI.has(k)); return; }
     if (a === 'u' && i > 0) { [list[i - 1], list[i]] = [list[i], list[i - 1]]; done(true); }
     else if (a === 'd' && i < list.length - 1) { [list[i + 1], list[i]] = [list[i], list[i + 1]]; done(true); }
     else if (a === 'x') { list.splice(i, 1); if (SELK === kind + ':' + it.id) SELK = null; done(true); }
@@ -2077,19 +2309,52 @@ function treeItems() {
     { key: 'boss', tag: 'data', name: '補肉 × ' + L.bosses.length, spec: '凹槽底不到 ' + T_MIN + ' mm 或 SFP 光口超出端牆 → 鰭片側加高' },
     { key: 'rib', tag: 'deco', name: '螺絲 · 鎖附孔', spec: '分模面螺絲 M3 × ' + (L.screws || []).length + '（牆往內凸成螺絲柱、膠條繞孔、PCB 在那裡缺口；從濾波器背面鎖進 HSK 牙孔，外殼不凸出）· PCB 鎖 HSK 的螺絲孔' },
     { key: 'pcb', tag: 'param', name: 'PCB', spec: g.L_pcb + ' × ' + g.W_pcb + ' × ' + (g.t_PCB || 2) + ' mm' + (coin ? ' · 銅塊開孔 × ' + coin : '') },
-    { key: 'comp', tag: 'data', name: '元件 × ' + L.inst.length, spec: 'AI-Thermal ' + L.src.ait + ' · 元件表 ' + L.src.data + ' · 暫定高度 ' + L.src.prov },
+    { key: 'comp', tag: 'data', name: '元件 × ' + L.inst.length + hidTxt('c'), spec: 'AI-Thermal ' + L.src.ait + ' · 元件表 ' + L.src.data + ' · 暫定高度 ' + L.src.prov + (L.G ? ' · FDD ' + L.N + ' 路 × ' + L.G + ' 組' : '') },
     { key: 'shield', tag: 'edit', name: '屏蔽罩 · ' + (SH.S.on ? SH.cells.length + ' 個腔體' : '隱藏'), spec: SH.S.on ? f1(L.df) + ' 高 · 頂板 ' + SH.S.roof + ' · 隔牆 ' + SH.S.wall + ' · RF 腔體 ' + SH.cells.filter(c => c.keep).length : '在「屏蔽罩」分頁打開' },
     { key: 'filter', tag: 'param', name: '腔體濾波器', spec: r.L + ' × ' + r.W + ' × ' + g.H_filter + ' mm · 上蓋凹入，調諧螺絲在 H_filter 內' },
     { key: 'tune', tag: 'deco', name: '調諧螺絲・蓋板螺絲', spec: '每路一條濾波器（排列示意）' },
-    { key: 'rfc', tag: 'edit', name: '天線座 × ' + antList().length + ' · 盲插 × ' + (L.conns ? L.conns.length : 0), spec: '天線座在「天線座」分頁編輯；盲插跟著環形器、穿過屏蔽罩頂板' },
-    { key: 'io', tag: 'edit', name: '數位 I/O × ' + ioList().length, spec: '在「I/O」分頁編輯；SFP 元件與光口對齊（橫向＋高度）' },
+    { key: 'rfc', tag: 'edit', name: '天線座 × ' + antList().length + hidTxt('ant') + ' · 盲插 × ' + (L.conns ? L.conns.length : 0), spec: '天線座在「天線座」分頁編輯；盲插跟著環形器（每一條發射鏈一個）、穿過屏蔽罩頂板' },
+    { key: 'io', tag: 'edit', name: '數位 I/O × ' + ioList().length + hidTxt('io'), spec: IO_CLASS.map(([c, n]) => [n, ioList().filter(it => ((IO_TYPES[it.type] || {}).c || 'etc') === c).length]).filter(q => q[1]).map(q => q[0] + ' ' + q[1]).join(' · ') + '；在「I/O」分頁編輯，SFP 元件與光口對齊' },
   ];
 }
 function buildTree() {
   $('tree').innerHTML = treeItems().map(t => '<li data-part="' + t.key + '"><input type="checkbox" id="r3d-vis-' + t.key + '"' + (HIDE[t.key] ? '' : ' checked') + ' aria-label="顯示' + esc(t.name) + '">' +
     '<span class="nm">' + esc(t.name) + '</span>' + tg(t.tag) + '<span class="sp">' + esc(t.spec) + '</span></li>').join('');
 }
-function applyHide() { Object.keys(parts).forEach(k => (parts[k] || []).forEach(o => { o.visible = !HIDE[k]; })); }
+/* 顯示／隱藏：模型樹的整類（HIDE）＋個別隱藏（HIDEI：元件一顆一顆、每一個 I/O、每一個天線座；元件的 TIM 跟著元件） */
+function applyHide() {
+  Object.keys(parts).forEach(k => (parts[k] || []).forEach(o => { const u = o.userData || {};
+    o.visible = !HIDE[k] && !(u.selKey && HIDEI.has(u.selKey)) && !(u.kind === 'tim' && u.inst && HIDEI.has('c:' + u.inst.key)); }));
+  [HSK && HSK.userData.io, FIL && FIL.userData.ant].forEach(g => g && g.children.forEach(pg => { if (pg.userData.selKey) pg.visible = !HIDEI.has(pg.userData.selKey); }));
+  hidePaint();
+}
+/* 個別隱藏的數量（只算還在的：元件刪掉、數量變少、接頭刪掉的不算） */
+function hidKeys() {
+  const n = { c: 0, io: 0, ant: 0 }; if (!LAY || !P) return n;
+  const has = { c: new Set(LAY.inst.map(o => 'c:' + o.key)), io: new Set(ioList().map(it => 'io:' + it.id)), ant: new Set(antList().map(it => 'ant:' + it.id)) };
+  HIDEI.forEach(k => { const t = k.startsWith('c:') ? 'c' : k.startsWith('io:') ? 'io' : 'ant'; if (has[t].has(k)) n[t]++; });
+  return n;
+}
+const hidTxt = t => { const n = hidKeys()[t]; return n ? '（個別隱藏 ' + n + '）' : ''; };
+/* 隱藏（on＝true）／顯示：選取中的那一個被藏起來就取消選取；清單的 👁、模型樹、畫面左下的提示一起更新 */
+function hideSet(keys, on) {
+  keys.forEach(k => { if (on) HIDEI.add(k); else HIDEI.delete(k); });
+  if (on && SELK && keys.includes(SELK)) select(null);
+  applyHide(); refreshComp(); refreshPorts('io'); refreshPorts('ant'); buildTree(); selbarPaint();
+}
+function hidePaint() {
+  const bar = $('hidebar'); if (!bar) return;
+  const n = hidKeys(), tot = n.c + n.io + n.ant;
+  bar.hidden = !tot; if (!tot) return;
+  $('hidebar-t').innerHTML = '已隱藏 ' + [['元件', n.c], ['I/O', n.io], ['天線座', n.ant]].filter(q => q[1]).map(q => q[0] + ' <b>' + q[1] + '</b>').join(' · ');
+  hidebarPlace();
+}
+function hidebarPlace() {       // 疊在左下的操作提示／選取列（剖面時是剖面工具列）上面
+  const bar = $('hidebar'); if (!bar || bar.hidden) return;
+  const sr = stage.getBoundingClientRect(); let b = 10;
+  ['hint', 'selbar', 'secbar'].forEach(id => { const el = $(id); if (!el || el.hidden) return; const q = el.getBoundingClientRect(); if (q.height) b = Math.max(b, sr.bottom - q.top + 6); });
+  bar.style.bottom = Math.round(b) + 'px';
+}
 let flashBack = [];
 function flash(k) {
   flashBack.forEach(([o, m]) => { o.material = m; }); flashBack = [];
@@ -2109,7 +2374,8 @@ function fillPanels() {
     ['銅塊', g.Coin_L + '×' + g.Coin_W + '×' + g.Coin_T, '底板厚從 PCB 背面起算；凸台≈PA 穿過 PCB'],
     ['元件位置', '高度＋橫向', '長度＝元件相對高度（寫回元件設定）；橫向＝距 PCB 左緣'],
     ['凹槽底面積', 'R_TIM 面積', '銅塊 Coin_L×W／Via (E-Pad＋板厚)²／IC top E-Pad'],
-    ['通道數', (LAY.N || '—') + '', 'Final PA 數量 → 預設天線座數、盲插'],
+    ['通道數', (LAY.N || '—') + (LAY.G ? ' 路 × ' + LAY.G + ' 組' + (LAY.fdd ? (LAY.fdd.mode === 'stack' ? '（上下排）' : '（左右並排）') : '') : ''),
+      'Final PA 數量 → 預設天線座數' + (LAY.G ? '；FDD：' + LAY.G + ' 種 Final PA，每一顆 PA 自帶一組 Pre-driver／Driver／環形器、每一組一個盲插' : '、盲插')],
   ].map(([k, v, s]) => '<dt>' + k + '</dt><dd><b>' + esc(v) + '</b><span>' + esc(s) + '</span></dd>').join('');
   $('kv').innerHTML = [['外觀 L × W × H', r.L + ' × ' + r.W + ' × ' + f1(H) + ' mm'], ['整機體積', r.V.toFixed(2) + ' L'], ['整機重量', r.kg.toFixed(1) + ' kg'],
     ['熱負載（實際）', r.Q.toFixed(1) + ' W'], ['瓶頸元件', r.bn], ['基板溫度（PCB 底部）', r.T_base.toFixed(1) + ' °C'], ['鰭片製程', g.tech]]
@@ -2143,7 +2409,7 @@ function select(k, keepTab) {
 /* 選取中：左下的操作提示換成「已選取 X · 可以怎麼調」＋「完成」鈕（Esc、點 3D 空白處、切換分頁也會取消） */
 function selbarPaint() {
   const on = !!SELK; $('selbar').hidden = !on; $('hint').hidden = on;
-  if (!on) return;
+  if (!on) { hidebarPlace(); return; }
   let h = '';
   if (SELK.startsWith('c:')) {
     const o = LAY.inst.find(q => 'c:' + q.key === SELK);
@@ -2154,7 +2420,10 @@ function selbarPaint() {
     if (it) h = '已選取 <b>' + (kind === 'io' ? ioLabel(i) : antLabel(i)) + '</b> · ←→ 橫向' + (kind === 'io' && it.type !== 'sfp' ? ' · ↑↓ 高度' : '') +
       (kind === 'io' && it.type === 'sfp' && LAY.inst.some(o => o.port === it) ? ' · PCB 上的 SFP 籠一起動' : '');
   }
-  $('selbar-t').innerHTML = h + ' · 按住連續';
+  $('selbar-t').innerHTML = h + ' · 按住連續 · H 隱藏';
+  const hb = $('selbar-hide'), hid = HIDEI.has(SELK); hb.textContent = hid ? '顯示' : '隱藏';
+  hb.title = hid ? '這一個已在 3D 隱藏：按一下顯示回來（H）' : '在 3D 隱藏選取的這一個（H）；清單上的 👁 或左下「全部顯示」可以再顯示';
+  hidebarPlace();
 }
 function updateTags() {    // 接頭上的小標籤（SFP1、ANT2…）：編輯模式或打開對應分頁時顯示
   if (!rru) return;
@@ -2169,7 +2438,9 @@ function placeLive(list) {
 }
 function portsLive(kind) {
   const io = kind === 'io', host = io ? HSK : FIL, key2 = io ? 'io' : 'ant', old = host.userData[key2];
-  host.remove(old); disposeTree(old); const nw = io ? buildIO() : buildAnt(); host.add(nw); host.userData[key2] = nw; applyModeTo(nw); updateTags();
+  host.remove(old); disposeTree(old); const nw = io ? buildIO() : buildAnt(); host.add(nw); host.userData[key2] = nw;
+  const pk = io ? 'io' : 'rfc'; parts[pk] = (parts[pk] || []).map(x => x === old ? nw : x);   // 模型樹的顯示／隱藏跟著新的那一組
+  applyModeTo(nw); applyHide(); updateTags();
   if (io) liveBoss();
   selBoxSync();
 }
@@ -2184,7 +2455,7 @@ function selTarget(k) {
     const hLo = A.ref === 'bottom' ? 1 : fp / 2 + 1, hHi = Math.max(hLo, A.ref === 'bottom' ? g.L_pcb - fp - 1 : g.L_pcb - fp / 2 - 1);
     const xOf = (q, h) => x0 + (A.ref === 'bottom' ? h + q.fpL / 2 : h);
     const port = o.port || null;             // SFP 籠：橫向存在它的 I/O 光口上（兩邊一起動）；籠子要貼齊 I/O 端 → 不沿長度拖
-    return { kind: 'c', grp: PCB, o, rowI, port, lockH: !!port,
+    return { kind: 'c', grp: PCB, o, rowI, port, lockH: !!port || o.fdd === 'auto',     // FDD 自動錯開的：上下由通道配對排，只能左右
       snap: () => ({ pos: port ? port.pos : null }), restore: sn => { if (port) port.pos = sn.pos; },   // 即時更新會先改光口位置；沒寫回就還原
       get: () => o.z, clamp: z => Math.min(Math.max(z, lo), hi),
       getH: () => hgtOf(o.row), clampH: h => Math.min(Math.max(h, hLo), hHi),
@@ -2198,8 +2469,20 @@ function selTarget(k) {
       },
       live: (z, h) => {
         if (z != null) o.z = z;
-        if (h != null) rowI.forEach(q => { q.x = xOf(q, h); q.hgt = h; });
-        placeLive(rowI);
+        let moved = rowI;
+        if (h != null) {
+          rowI.forEach(q => { q.x = xOf(q, h); q.hgt = h; });
+          const FD = LAY.fdd;
+          if (FD && o.fdd === 'fixed') {         // FDD：拖 PA／拆開的列 → 自動錯開的元件跟著重排（即時預覽；放開後完整重排）
+            const R = fddPlace(FD.F, LAY.inst, { row: o.row, h });
+            if (R.mode === FD.mode) {
+              const au = LAY.inst.filter(q => q.fdd === 'auto');
+              au.forEach(q => { const v = R.pos.get(q.row)[q.grp]; if (v != null) { q.h3 = v; q.x = Math.min(Math.max(xOf(q, v), x0 + q.fpL / 2 + 1), x0 + g.L_pcb - q.fpL / 2 - 1); } });
+              moved = rowI.concat(au);
+            }
+          }
+        }
+        placeLive(moved);
         if (port && z != null) { port.pos = z; portsLive('io'); }
         liveGeom();
       } };
@@ -2358,13 +2641,15 @@ canvas.addEventListener('pointermove', e => {
   if (selBox) selBox.update();
   const tip = $('tip'), sr = stage.getBoundingClientRect();
   if (isC) {
-    const r = t.o.row, hh = nh != null ? nh : t.getH(), dh = hh - r.hgt, dT = r.W > 0 ? dh * P.g.Slope : 0;
+    const r = t.o.row, hh = nh != null ? nh : t.getH(), dh = hh - r.hgt, dT = r.W > 0 ? dh * P.g.Slope : 0, au = t.o.fdd === 'auto';
     tip.innerHTML = '<b>' + esc(r.name) + '</b>' + (r.qty > 1 ? ' <span style="color:var(--ink3)">第 ' + (t.o.i + 1) + '/' + r.qty + ' 顆</span>' : '') +
-      trow('元件相對高度', f1(hh) + ' mm' + (Math.abs(dh) > 0.01 ? '（原 ' + f1(r.hgt) + '）' : '')) + trow('橫向（距 PCB 左緣）', f1(nz - P.g.Left) + ' mm') +
+      trow('元件相對高度', f1(hh) + ' mm' + (au ? '（溫度計算用）' : '') + (Math.abs(dh) > 0.01 ? '（原 ' + f1(r.hgt) + '）' : '')) +
+      (au ? trow('3D 位置', f1(t.o.x - P.g.Btm) + ' mm（自動錯開）') : '') + trow('橫向（距 PCB 左緣）', f1(nz - P.g.Left) + ' mm') +
       (r.W > 0 && Math.abs(dh) > 0.01 ? trow('估計溫度', (dT >= 0 ? '+' : '') + f2(dT) + ' °C → ' + r.ref + ' ' + f1(r.Tref + dT)) : '') +
       riskHtml(r, hh) +
-      '<div style="color:var(--ink3);font-size:0.7rem;margin-top:3px">' + (t.lockH ? 'SFP 籠跟 ' + ioLabel(ioList().indexOf(t.port)) + ' 光口綁在一起：左右一起動（籠子貼齊 I/O 端）' :
-        (r.qty > 1 ? '元件相對高度整列共用：' + r.qty + ' 顆一起上下移 · ' : '') + '放開＝寫回元件設定 · Shift 只動一個方向') + '</div>';
+      '<div style="color:var(--ink3);font-size:0.7rem;margin-top:3px">' + (t.port ? 'SFP 籠跟 ' + ioLabel(ioList().indexOf(t.port)) + ' 光口綁在一起：左右一起動（籠子貼齊 I/O 端）' :
+        au ? fddLockMsg(r) :
+        (r.qty > 1 ? '元件相對高度整列共用：' + r.qty + ' 顆一起上下移 · ' : '') + (t.o.fdd === 'fixed' && LAY.fdd && LAY.fdd.F.shared.length ? '自動錯開的元件跟著一起動 · ' : '') + '放開＝寫回元件設定 · Shift 只動一個方向') + '</div>';
   } else {
     const q = t.kind === 'io' ? ioLayout().find(x => x.it === t.it) : null, over = q ? q.y + q.fh / 2 + BOSS_WALL - LAY.yTop : 0;
     tip.innerHTML = '<b>' + (t.kind === 'io' ? ioLabel : antLabel)((t.kind === 'io' ? ioList() : antList()).indexOf(t.it)) + '</b>' + trow('距外殼左側', f1(nz) + ' mm') +
@@ -2396,6 +2681,7 @@ window.addEventListener('keydown', e => {
   }
   if (!SELK || /INPUT|SELECT|TEXTAREA/.test((document.activeElement || {}).tagName || '')) return;
   if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey && !e.altKey && SELK.startsWith('c:')) { e.preventDefault(); if (!e.repeat) rotateSel(); return; }
+  if ((e.key === 'h' || e.key === 'H') && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); if (!e.repeat) hideSet([SELK], !HIDEI.has(SELK)); return; }
   const ax = { ArrowLeft: ['z', -1], ArrowRight: ['z', 1], ArrowUp: ['v', 1], ArrowDown: ['v', -1] }[e.key]; if (!ax) return;
   e.preventDefault();
   if (!KJOB || KJOB.key !== e.key) { keyStop(); const job = selJob(SELK, ax[0], ax[1]); if (!job) return; KJOB = { key: e.key, job }; }
@@ -2455,14 +2741,19 @@ function tipHtml(o, what) {
   else if (o.side === 'filter') h += trow('HSK 接觸', 'PCB 背面貼基板');
   if (o.ct.kind === 'coin') h += trow('銅塊', '底板 ' + f2(o.ct.L) + '×' + f2(o.ct.W) + '×' + P.g.Coin_T + '＋凸台 ' + f2(o.body.L) + '×' + f2(o.body.W));
   if (pk && pk.boss > 0) h += '<div class="warn">穿出基板 → 鰭片側補肉 ' + f2(pk.boss) + ' mm</div>';
-  h += '<hr>' + trow('元件相對高度', f1(o.hgt) + ' mm' + (est ? '（原 ' + f1(r.hgt) + '）' : '') + (Math.abs(o.shift) > 0.5 ? '（' + (Math.abs(o.clampD) > 0.5 ? '夾回板內' : '避讓') + ' ' + (o.shift > 0 ? '+' : '') + f1(o.shift) + '）' : ''));
+  const shTxt = Math.abs(o.shift) > 0.5 ? '（' + (Math.abs(o.clampD) > 0.5 ? '夾回板內' : '避讓') + ' ' + (o.shift > 0 ? '+' : '') + f1(o.shift) + '）' : '';
+  if (o.fdd === 'auto') h += '<hr>' + trow('元件相對高度', f1(o.hgt) + ' mm（溫度計算用）' + (est ? '（原 ' + f1(r.hgt) + '）' : '')) +      // FDD 沒拆的列：3D 位置由通道配對自動錯開
+    trow('3D 位置', f1(o.x - P.g.Btm) + ' mm' + shTxt + '<br><span style="color:var(--ink3)">通道配對自動錯開：緊跟 ' + esc(grpLabel(o.grp)) + ' 那一顆 PA</span>');
+  else h += '<hr>' + trow('元件相對高度', f1(o.hgt) + ' mm' + (est ? '（原 ' + f1(r.hgt) + '）' : '') + shTxt);
   h += trow('橫向', '距左緣 ' + f1(o.z - P.g.Left) + ' mm（' + ({ manual: '手動', io: '對齊 SFP 光口', auto: '自動' }[o.src] || '自動') + '）');
+  if (o.lane >= 0) h += trow('通道', 'CH' + (o.lane + 1) + (LAY.G && o.grp >= 0 ? ' · ' + esc(grpLabel(o.grp)) + ' 那一組' : o.subN > 1 ? ' · 第 ' + (o.sub + 1) + '/' + o.subN + ' 格' : ''));
   h += trow('本體', f2(o.body.L) + '×' + f2(o.body.W) + '×' + (o.body.h != null ? f2(o.body.h) : '?') + (o.rot ? '（轉 90°）' : ''));
   h += '<div style="color:var(--ink3);font-size:0.7rem">尺寸：' + esc(o.body.sizeSrc) + '<br>高度：' + esc(o.body.hSrc) + '</div>';
   if (o.clash) h += '<div class="warn">⚠ 比屏蔽罩腔深高 ' + f2(o.clash) + ' mm，會頂到頂板</div>';
   if (est) h += riskHtml(r, hgtOf(r));
   if (o.overlap) h += '<div class="warn">⚠ 與其他元件重疊</div>';
-  if (state.edit) h += '<div style="color:var(--ink3);font-size:0.7rem;margin-top:3px">拖曳＝長度＋橫向（Shift 只動一個方向）· ←→ 橫向 · ↑↓ 元件相對高度（Shift ×10）' + (o.role === 'sfp' ? '' : ' · R 轉 90°') + '</div>';
+  if (state.edit) h += '<div style="color:var(--ink3);font-size:0.7rem;margin-top:3px">' + (o.fdd === 'auto' ? '拖曳＝橫向（上下由通道配對自動排）· ←→ 橫向'
+    : '拖曳＝長度＋橫向（Shift 只動一個方向）· ←→ 橫向 · ↑↓ 元件相對高度（Shift ×10）') + (o.role === 'sfp' ? '' : ' · R 轉 90°') + '</div>';
   return h;
 }
 const ISO_WHY = { pa: '末級 PA：輸出功率最大，跟前級隔開避免自激', drv: 'Driver：增益高，最怕輸出漏回來', pre: 'Pre-driver：最前級小訊號，要跟後級隔開',
@@ -2504,7 +2795,8 @@ function bossTipHtml(b) {
 }
 function portTipHtml(p, kind) {
   const list = kind === 'io' ? ioList() : antList(), t = (kind === 'io' ? IO_TYPES : ANT_TYPES)[p.it.type] || { n: p.it.type };
-  let h = '<b>' + (kind === 'io' ? ioLabel(p.i) : antLabel(p.i)) + '</b> <span style="color:var(--ink3)">' + t.n + '</span>';
+  const cls = kind === 'io' ? ioClassOf(p.it.type) : '', ctx = cls && t.n.indexOf(cls) < 0 ? '（' + cls + '）' : '';
+  let h = '<b>' + (kind === 'io' ? ioLabel(p.i) : antLabel(p.i)) + '</b> <span style="color:var(--ink3)">' + esc(t.n) + ctx + '</span>';
   const io = kind === 'io', vert = io && !p.lock;
   h += trow('位置', '距外殼左側 ' + f1(p.z) + ' mm' + (p.auto ? '（自動等分）' : '')) + (io ? trow('高度', '距分模面 ' + f1(p.y) + ' mm' + (p.lock ? '（對齊 SFP 籠）' : p.yAuto ? '（自動）' : '')) : '') + trow('順序', (p.i + 1) + ' / ' + list.length);
   if (io && p.y + p.fh / 2 + BOSS_WALL > LAY.yTop + 0.01) h += trow('補肉', '框超出端牆 → 加高 ' + f1(p.y + p.fh / 2 + BOSS_WALL - LAY.yTop) + ' mm');
@@ -2569,14 +2861,15 @@ new ResizeObserver(() => {
 }).observe(stage);
 
 /* 工具列與側欄 */
-const HINTS = { view: '左鍵旋轉 · 右鍵或 Shift＋左鍵平移 · 滾輪縮放 · 右上方塊／十字鈕切正視 · 游標停在元件上看數據', edit: '移動模式：拖曳元件＝長度＋橫向（放開寫回元件設定；Shift 只動一個方向）· R 轉 90° · I/O 接頭可上下左右 · 方向鍵微調（按住連續）· 點空白處或 Esc 取消選取' };
+const HINTS = { view: '左鍵旋轉 · 右鍵或 Shift＋左鍵平移 · 滾輪縮放 · 右上方塊／十字鈕切正視（⟲⟳ 轉 90°）· 游標停在元件上看數據', edit: '移動模式：拖曳元件＝長度＋橫向（放開寫回元件設定；Shift 只動一個方向）· R 轉 90° · I/O 接頭可上下左右 · 方向鍵微調（按住連續）· 點空白處或 Esc 取消選取' };
 ROOT.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => frame(b.dataset.view)));
 /* 自己轉／平移過 → 畫面已經不是那個預設視角：按鈕不再亮（再按一次就回正）；轉場還在跑就中斷，不跟使用者搶鏡頭 */
 controls.addEventListener('start', () => { camTween = null; });
-canvas.addEventListener('pointerdown', e => { if (!drag && (e.button === 0 || e.button === 2)) { curView = null; markViews(); } });
-canvas.addEventListener('wheel', () => { if (curView) { curView = null; markViews(); } }, { passive: true });   // 縮放過也算自己調過（畫面大小變了不再自動重新對焦）
-ROOT.querySelectorAll('.vc-f').forEach(b => b.addEventListener('click', () => frame(b.dataset.std)));
-ROOT.querySelectorAll('.vc-cross [data-std]').forEach(b => b.addEventListener('click', () => frame(b.dataset.std)));
+canvas.addEventListener('pointerdown', e => { if (!drag && (e.button === 0 || e.button === 2)) { curView = null; viewRoll = 0; markViews(); } });
+canvas.addEventListener('wheel', () => { if (curView) { curView = null; viewRoll = 0; markViews(); } }, { passive: true });   // 縮放過也算自己調過（畫面大小變了不再自動重新對焦）
+ROOT.querySelectorAll('.vc-f').forEach(b => b.addEventListener('click', () => { viewRoll = 0; frame(b.dataset.std); }));   // 點正視圖＝原本的方向（轉過的也轉回來）
+ROOT.querySelectorAll('.vc-cross [data-std]').forEach(b => b.addEventListener('click', () => { viewRoll = 0; frame(b.dataset.std); }));
+ROOT.querySelectorAll('[data-roll]').forEach(b => b.addEventListener('click', () => rollView(+b.dataset.roll)));
 ROOT.querySelectorAll('[data-pan]').forEach(b => b.addEventListener('click', e => { const v = b.dataset.pan; if (v === 'c') { recenter(); return; } const [x, y] = v.split(',').map(Number), k = e.shiftKey ? 3 : 1; panView(x * k, y * k); }));
 ROOT.querySelectorAll('[data-solo]').forEach(b => b.addEventListener('click', () => {
   const k = b.dataset.solo, all = Object.keys(PARTS());   // 可複選：按一下加入、再按一下拿掉；全部拿掉或四件都選 → 回到「全部」
@@ -2643,6 +2936,8 @@ function setEdit(on) {
 $('t-edit').addEventListener('click', () => setEdit(!state.edit));
 ROOT.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => { setTab(b.dataset.tab); if (SELK) select(null); }));
 $('selbar-done').addEventListener('click', () => select(null));
+$('selbar-hide').addEventListener('click', () => { if (SELK) hideSet([SELK], !HIDEI.has(SELK)); });
+$('hidebar-all').addEventListener('click', () => hideSet([...HIDEI], false));
 $('tree').addEventListener('change', e => { const li = e.target.closest('li'); if (!li) return; HIDE[li.dataset.part] = !e.target.checked; applyHide(); });
 $('tree').addEventListener('click', e => { const li = e.target.closest('li'); if (li && e.target.tagName !== 'INPUT') flash(li.dataset.part); });
 wireComp(); wirePorts('io'); wirePorts('ant');
@@ -2820,14 +3115,14 @@ function pScale(sx, sy, sz, availW, availH) {
 
 /* 拍全部需要的圖：組裝（等角＋三視圖）、爆炸。標準姿勢、寫實、四大部件與所有零件都顯示；拍完全部還原 */
 function pdfShots() {
-  const st0 = state.st, up0 = state.upright, mode0 = state.mode, solo0 = state.solo, hide0 = Object.assign({}, HIDE), pf0 = state.pflip;
+  const st0 = state.st, up0 = state.upright, mode0 = state.mode, solo0 = state.solo, hide0 = Object.assign({}, HIDE), hideI0 = new Set(HIDEI), pf0 = state.pflip;
   state.pflip = false;
   tween = null;                                   // 零件移動的動畫直接到位（拍完會照原本的狀態放回去）
   const out = {};
   try {
     if (mode0 !== 'real') { state.mode = 'real'; applyMode(); }
     state.solo = null; Object.values(PARTS()).forEach(o => { if (o) o.visible = true; });
-    Object.keys(HIDE).forEach(k => { HIDE[k] = false; }); applyHide();
+    Object.keys(HIDE).forEach(k => { HIDE[k] = false; }); HIDEI.clear(); applyHide();
     state.upright = false; applyState('asm', true); if (dimsA) dimsA.visible = false; holder.updateMatrixWorld(true);
     const g = P.g, r = P.r, box = bbox.clone(), sz3 = box.getSize(new THREE.Vector3());
     const L = r.L, W = r.W, Ht = g.H_filter + g.H_shield + g.t_base + r.FH, env = (x, y, z) => holder.localToWorld(V(x, y, z));
@@ -2856,7 +3151,7 @@ function pdfShots() {
     }).filter(Boolean);
   } finally {
     state.upright = up0; state.pflip = pf0; state.solo = solo0; applyState(st0, true);   // 先還原部件組合：整組翻的中心跟著顯示中的部件
-    Object.assign(HIDE, hide0); applyHide();
+    Object.assign(HIDE, hide0); hideI0.forEach(k => HIDEI.add(k)); applyHide();
     applySolo();
     if (state.mode !== mode0) { state.mode = mode0; applyMode(); }
     updateVis();
@@ -3257,19 +3552,19 @@ function update(data, hooks) {
 function gate(html) { const el = $('gate'); el.hidden = !html; el.innerHTML = html || ''; }
 function snapshot(w = 1600, h = 1000) {
   if (!P || !rru) return null;
-  const st0 = state.st, up0 = state.upright, mode0 = state.mode, solo0 = state.solo, hide0 = Object.assign({}, HIDE), pf0 = state.pflip;
+  const st0 = state.st, up0 = state.upright, mode0 = state.mode, solo0 = state.solo, hide0 = Object.assign({}, HIDE), hideI0 = new Set(HIDEI), pf0 = state.pflip;
   state.pflip = false;
   tween = null;
   try {
     if (mode0 !== 'real') { state.mode = 'real'; applyMode(); }
     state.solo = null; Object.values(PARTS()).forEach(o => { if (o) o.visible = true; });
-    Object.keys(HIDE).forEach(k => { HIDE[k] = false; }); applyHide();
+    Object.keys(HIDE).forEach(k => { HIDE[k] = false; }); HIDEI.clear(); applyHide();
     state.upright = false; applyState('asm', true); if (dimsA) dimsA.visible = false; holder.updateMatrixWorld(true);
     return pShoot(w, h, pPersp(w, h, VIEWS.iso.d.clone().normalize(), bbox.clone(), 0.9), true).toDataURL('image/jpeg', 0.92);
   } catch (e) { console.warn('[3D] snapshot failed:', e); return null; }
   finally {
     state.upright = up0; state.pflip = pf0; state.solo = solo0; applyState(st0, true);
-    Object.assign(HIDE, hide0); applyHide();
+    Object.assign(HIDE, hide0); hideI0.forEach(k => HIDEI.add(k)); applyHide();
     applySolo();
     if (state.mode !== mode0) { state.mode = mode0; applyMode(); }
     updateVis();
@@ -3284,7 +3579,7 @@ window.RRU3D = {
   dbg: { LAY: () => LAY, P: () => P, ed, scene, camera, controls, A, state, select, setEdit, setTab, rebuild, ioList, antList, saveEdit, sel: () => SELK,
     frame, setProjection, ortho: () => ORTHO, acam, panView, recenter, soloBox, ioLayout, rotateSel, applySolo, SHD: () => SHD, HSK: () => HSK, PCB: () => PCB, FIL: () => FIL, partCenter, partBox, targets, targets0, flipPivot, shownParts, fsOn, frames: () => FRAMES, tween: () => tween, tweenApply,
     settle: () => { if (tween) { tweenApply(tween, 1); tween = null; } if (camTween) { camera.position.copy(camTween.p1); controls.target.copy(camTween.t1); camera.up.copy(camTween.u1); controls.update(); camTween = null; } },
-    busy: () => !!(camTween || tween), frameSize: () => frameSize, curView: () => curView, pdf: () => PDF_OUT, pdfBusy: () => pdfBusy, screws: () => LAY.screws, loops: () => LAY.loops, shotCanvas,
+    busy: () => !!(camTween || tween), frameSize: () => frameSize, curView: () => curView, viewRoll: () => viewRoll, rollView, hideSet, HIDEI, hidKeys, pairPlan: () => LAY && LAY.pair, fdd: () => LAY && LAY.fdd, fddPlace, selTarget, selJob, tipHtml, grpLabel, bandOf, pdf: () => PDF_OUT, pdfBusy: () => pdfBusy, screws: () => LAY.screws, loops: () => LAY.loops, shotCanvas,
     screenOf: k => { const o = findSel(k); if (!o) return null; holder.updateMatrixWorld(true); const c = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()).project(acam()), r = canvas.getBoundingClientRect();
       return { x: r.left + (c.x + 1) / 2 * r.width, y: r.top + (1 - c.y) / 2 * r.height }; } },
 };
