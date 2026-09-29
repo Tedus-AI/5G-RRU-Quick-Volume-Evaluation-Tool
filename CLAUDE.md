@@ -516,8 +516,25 @@ fg 對 bg ≥ 5.9:1），畫面用 `marginVars(lv)` 塞進 CSS 變數 `--st-*`�
   內部結構與佈局；每頁 200 dpi 圖片、自己組成 PDF，不需要字型檔）—— 在工具裡都是一般下載。
   PDF 報告第 6 節的 3D 圖＝`RRU3D.snapshot()` 在畫面外渲染（白底、組裝、寫實），**不改使用者目前的視角與顯示方式**。
 - 切到別的分頁 → `RRU3D.left()` 取消選取；3D 頁不在畫面上時不處理按鍵、不重畫。
+- **工具列「視窗」組（「工具」組右邊，兩顆圖示鈕）**：
+  - **全螢幕** `#r3d-t-fs`：`documentElement.requestFullscreen()`（整頁進瀏覽器全螢幕）＋ `.r3d.r3d-fs`（`position:fixed; inset:0; z-index:3000`）
+    蓋滿畫面 → 只看得到 3D 檢視器；工具的對話框（z-index 3100／9999）照樣疊在上面。再按一次、Esc、瀏覽器自己退出
+    （`fullscreenchange`）都還原；瀏覽器不給全螢幕時仍蓋滿視窗（Esc 退出）。⚠ `onScreen()` 用 `getClientRects()`，
+    **不可用 `offsetParent`**：fixed 元素的 `offsetParent` 永遠是 null → 全螢幕時整個停止重畫。
+  - **儲存** `#r3d-t-save` → `HOST.onSave` ＝ 工具的 `r3dSave()`：資料庫保護沒解除 → **頁內密碼小視窗**（`#r3dUnlockModal`，
+    與「🔒 資料庫保護」同一組密碼，錯了不關視窗、就地提示）→ `toggleCloudLock(pwd)`（同一個解鎖流程，含取 SharePoint 編輯鎖）→
+    `cloudSaveProject()`。⚠ 全螢幕時原生 `alert`／`prompt` 會讓瀏覽器先退出全螢幕 → 存檔過程的 `alert` 暫時收集起來、
+    改在畫面下方提示（`#r3dToast`，❌／⚠️ 開頭用深紅底）。存檔中再按不重複送出（`aria-busy`）。
+- **右下角專案名稱**（`#r3d-pname`，立體字、`pointer-events:none`）：`update()` 帶進來的 `data.name`；選取元件時讓位給操作列。
+  對焦時 `safeInsets()` 也避開它。
+- **部件可複選**：`state.solo` ＝ `null`（全部）或部件陣列；再按一次取消那一件，全部取消或四件都選 → 回到 `null`。
+  `soloBox()` ＝ 選到的部件合起來的外框。
+- **部件翻轉 180°**（部件組的「⇅ 翻轉」）：對亮起的部件（「全部」＝四件）沿**長邊（x）方向、穿過部件中心**的軸翻面；
+  `state.pflip[k]`，`targets(st) = withFlips(targets0(st))`：`q' = q·Rx(180°)`、`p' = p + q·(0, 2c.y, 2c.z)`（c＝`partCenter(k)`，
+  部件自己的外框中心、不含尺寸標註，換模型時清掉）；轉場內插部件中心 → 看起來繞自己的中心轉。只是檢視用，不存檔；
+  PDF 報告的 3D 圖與 3D PDF 一律不翻（渲染時暫時清掉、渲染完還原）。
 - 契約測試：`tests/viewer3d.test.js`（需要 WebGL＋three.js：`THREE_DIR=<three@0.170.0 的本機副本>`，沒給就連 CDN；
-  [J] 兩種螢幕寬的版面與標註遮擋、[K] 沒有 WebGL 的瀏覽器）；`tests/dimensions.test.js` [C] 驗 3D 吃同一組 L／W／鰭片數。
+  [J] 兩種螢幕寬的版面與標註遮擋、[K] 沒有 WebGL 的瀏覽器、[N] 全螢幕／儲存解鎖／專案名稱／部件複選與翻轉）；`tests/dimensions.test.js` [C] 驗 3D 吃同一組 L／W／鰭片數。
 
 ### 限溫對象（`Limit_Ref`：Tj／Tc）與允許溫升基準 ⚠️ 兩個工具共用
 

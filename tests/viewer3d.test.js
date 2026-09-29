@@ -19,6 +19,8 @@
  *       畫面大小變了、還沒動過視角 → 自動重新對焦（自己縮放過就不動）
  *   [L] Die-casting 鰭片：梯形斷面（根部 T_root、鰭尖 Fin_t）、節距＝Fin_t＋Gap、整排在散熱器寬度內
  *   [M] 補肉疊在鰭片上：鰭片一律從基板長到鰭尖（跨在補肉邊緣的也不截短），只有穿過凹槽的那段從凹槽頂往上長
+ *   [N] 工具列「視窗」組：全螢幕（整頁進瀏覽器全螢幕、只剩 3D 檢視器，照樣重畫）、儲存（沒解除資料庫保護 → 頁內密碼小視窗，
+ *       解除後接著存；訊息在畫面內提示，不跳原生對話框）；右下角專案名稱；部件可複選；部件沿長邊中心軸翻轉 180°
  *   [K] 瀏覽器沒有 WebGL：工具照常可用、Tab3 顯示原因、沒有未攔截的錯誤
  *
  * 執行：
@@ -283,7 +285,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     const R = el => el.getBoundingClientRect(), stEl = document.getElementById('r3d-stage');
     const vis = el => { const r = R(el); if (!r.width || !r.height) return false; for (let e = el; e; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden') return false; } return true; };
     const root = document.querySelector('#tab3 .r3d'), st = R(stEl), side = R(root.querySelector('.side'));
-    const overlays = [...root.querySelectorAll('.tools .tgrp, #r3d-vcube > *, #r3d-hint, #r3d-selbar')].filter(vis).map(R);
+    const overlays = [...root.querySelectorAll('.tools .tgrp, #r3d-vcube > *, #r3d-hint, #r3d-selbar, #r3d-pname')].filter(vis).map(R);
     const labels = [...root.querySelectorAll('#r3d-labels .dim')].filter(vis);
     const hit = [];
     labels.forEach(el => { const a = R(el); overlays.forEach(o => { if (Math.min(a.right, o.right) - Math.max(a.left, o.left) > 0 && Math.min(a.bottom, o.bottom) - Math.max(a.top, o.top) > 0) hit.push(el.innerText.replace(/\s+/g, ' ')); }); });
@@ -392,6 +394,121 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   ok('有一片鰭片跨在補肉邊緣 → 它照樣從基板完整長到鰭尖（不被挖空）', M.edge != null && M.edgeFull, M);
   ok('不是從基板長起的鰭片段只出現在凹槽範圍內（其他地方一律完整）', M.cut.length === 0, M.cut);
   ok('鰭片不會穿進凹槽（穿過凹槽的那段從凹槽頂往上長）', M.holes > 0 && M.intrude.length === 0, M);
+
+  console.log('\n[N] 全螢幕、儲存鈕、專案名稱、部件複選、部件翻轉');
+  await show3d();
+  await page.evaluate(() => { projectNameSet('N 測試專案 8T8R'); tab3Stale = true; renderTab3(); });
+  await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
+  const n1 = await page.evaluate(() => { const e = document.getElementById('r3d-pname'), st = document.getElementById('r3d-stage').getBoundingClientRect(), r = e.getBoundingClientRect();
+    return { t: e.textContent, name: projectNameGet(), vis: getComputedStyle(e).display !== 'none', inStage: r.right <= st.right + 0.5 && r.bottom <= st.bottom + 0.5 && r.left >= st.left + st.width / 2,
+      icons: ['r3d-t-fs', 'r3d-t-save'].map(id => { const b = document.getElementById(id); return !!b.querySelector('svg') && !b.textContent.trim() && !!b.getAttribute('aria-label'); }),
+      sameGrp: document.getElementById('r3d-t-fs').parentElement === document.getElementById('r3d-t-save').parentElement,
+      saveRight: document.getElementById('r3d-t-save').getBoundingClientRect().left > document.getElementById('r3d-t-fs').getBoundingClientRect().left,
+      afterTools: document.getElementById('r3d-t-fs').parentElement.previousElementSibling.contains(document.getElementById('r3d-t-pdf')) }; });
+  ok('右下角顯示專案名稱（跟工具的專案名稱同一個）', n1.t === n1.name && n1.vis && n1.inStage, n1);
+  ok('全螢幕、儲存兩顆是圖示鈕（有 aria-label），並排放在「工具」組後面、儲存在右', n1.icons.every(Boolean) && n1.sameGrp && n1.saveRight && n1.afterTools, n1);
+
+  // 全螢幕
+  const f0 = await page.evaluate(() => [document.getElementById('r3d-stage').clientWidth, RRU3D.dbg.frames()]);
+  await page.click('#r3d-t-fs');
+  await page.waitForFunction(() => document.fullscreenElement && document.getElementById('r3d-stage').clientWidth > 0, null, { timeout: 10000 });
+  await page.waitForFunction(f => RRU3D.dbg.frames() > f + 2, f0[1] + 0, { timeout: 60000 });
+  const n2 = await page.evaluate(() => { const el = document.querySelector('.r3d'), b = el.getBoundingClientRect(), hdr = document.querySelector('.header');
+    return { cls: el.classList.contains('r3d-fs'), pressed: document.getElementById('r3d-t-fs').getAttribute('aria-pressed'), native: document.fullscreenElement === document.documentElement,
+      full: b.left <= 0 && b.top <= 0 && b.right >= innerWidth - 0.5 && b.bottom >= innerHeight - 0.5,
+      covers: [[5, 5], [innerWidth - 5, innerHeight - 5], [innerWidth / 2, 3]].every(([x, y]) => el.contains(document.elementFromPoint(x, y))),
+      hdrCovered: !hdr || !hdr.contains(document.elementFromPoint(innerWidth / 2, 10)), stageW: document.getElementById('r3d-stage').clientWidth }; });
+  ok('按全螢幕 → 整頁進瀏覽器全螢幕，只剩 3D 檢視器（蓋滿畫面、工具的標題列被蓋住）', n2.cls && n2.pressed === 'true' && n2.native && n2.full && n2.covers && n2.hdrCovered, n2);
+  ok('全螢幕時 3D 畫面變大、照樣在重畫（position:fixed 不可讓 onScreen 誤判）', n2.stageW > f0[0], [f0, n2.stageW]);
+
+  // 儲存：保護啟用中 → 頁內密碼小視窗
+  await page.evaluate(() => { window.__prompts = 0; window.prompt = () => { window.__prompts++; return null; }; window.__alerts = [];
+    dbAdapter.isSharePointMode = () => false; cloudLocked = true; _applyCloudLockUI(); window.__w0 = window.__writes.length; });
+  await page.click('#r3d-t-save');
+  await page.waitForSelector('#r3dUnlockModal.active', { timeout: 5000 });
+  const n3 = await page.evaluate(() => { const f = document.getElementById('r3dUnlockForm').getBoundingClientRect();
+    return { top: document.getElementById('r3dUnlockForm').contains(document.elementFromPoint(f.left + f.width / 2, f.top + 30)), focus: document.activeElement.id,
+      stillFs: !!document.fullscreenElement && document.querySelector('.r3d').classList.contains('r3d-fs') }; });
+  ok('沒解除資料庫保護就按儲存 → 跳出頁內密碼小視窗（疊在全螢幕的 3D 上、游標在密碼欄）', n3.top && n3.focus === 'r3dUnlockPwd' && n3.stillFs, n3);
+  await page.fill('#r3dUnlockPwd', '9999'); await page.press('#r3dUnlockPwd', 'Enter');
+  const n4 = await page.evaluate(() => ({ err: document.getElementById('r3dUnlockErr').textContent, open: document.getElementById('r3dUnlockModal').classList.contains('active'), locked: cloudLocked, w: window.__writes.length - window.__w0 }));
+  ok('密碼錯 → 小視窗不關、顯示「密碼錯誤」，不解鎖也不寫入', /密碼錯誤/.test(n4.err) && n4.open && n4.locked && n4.w === 0, n4);
+  await page.click('#r3dUnlockCancel');
+  await page.waitForTimeout(300);
+  const n5 = await page.evaluate(() => ({ open: document.getElementById('r3dUnlockModal').classList.contains('active'), locked: cloudLocked, w: window.__writes.length - window.__w0, busy: document.getElementById('r3d-t-save').getAttribute('aria-busy') }));
+  ok('取消 → 不解鎖、不寫入', !n5.open && n5.locked && n5.w === 0 && n5.busy === null, n5);
+  await page.click('#r3d-t-save');
+  await page.waitForSelector('#r3dUnlockModal.active', { timeout: 5000 });
+  await page.fill('#r3dUnlockPwd', '0000'); await page.press('#r3dUnlockPwd', 'Enter');
+  await page.waitForFunction(() => !document.getElementById('r3dToast').hidden, null, { timeout: 15000 });
+  const n6 = await page.evaluate(() => ({ locked: cloudLocked, w: window.__writes.length - window.__w0, toast: document.getElementById('r3dToast').textContent, alerts: window.__alerts.length, prompts: window.__prompts,
+    stillFs: !!document.fullscreenElement && document.querySelector('.r3d').classList.contains('r3d-fs'), lockBtn: document.getElementById('cloudLockBtn').textContent, alertBack: String(window.alert).includes('__alerts') }));
+  ok('密碼對 → 解除保護（工具列的保護鈕同步）並接著儲存專案（寫入一次）', !n6.locked && n6.w === 1 && /關閉/.test(n6.lockBtn), n6);
+  ok('存檔訊息在畫面內提示、不跳原生 alert／prompt（全螢幕不會被瀏覽器退出），之後 alert 還原', /已儲存/.test(n6.toast) && n6.alerts === 0 && n6.prompts === 0 && n6.stillFs && n6.alertBack, n6);
+  await page.evaluate(() => { window.__w0 = window.__writes.length; document.getElementById('r3dToast').hidden = true; });
+  await page.click('#r3d-t-save');
+  await page.waitForFunction(() => !document.getElementById('r3dToast').hidden, null, { timeout: 15000 });
+  const n7 = await page.evaluate(() => ({ modal: document.getElementById('r3dUnlockModal').classList.contains('active'), w: window.__writes.length - window.__w0 }));
+  ok('已解除保護 → 直接儲存，不再問密碼', !n7.modal && n7.w === 1, n7);
+  // 退出全螢幕：再按一次；瀏覽器自己退出（Esc）時檢視器也跟著還原
+  await page.click('#r3d-t-fs');
+  await page.waitForFunction(() => !document.fullscreenElement, null, { timeout: 10000 });
+  const n8 = await page.evaluate(() => ({ cls: document.querySelector('.r3d').classList.contains('r3d-fs'), pressed: document.getElementById('r3d-t-fs').getAttribute('aria-pressed') }));
+  await page.click('#r3d-t-fs');
+  await page.waitForFunction(() => !!document.fullscreenElement, null, { timeout: 10000 });
+  await page.evaluate(() => document.exitFullscreen());
+  await page.waitForFunction(() => !document.fullscreenElement, null, { timeout: 10000 });
+  await page.waitForTimeout(200);
+  const n9 = await page.evaluate(() => document.querySelector('.r3d').classList.contains('r3d-fs'));
+  ok('再按一次 → 退出全螢幕；瀏覽器自己退出全螢幕（Esc）→ 檢視器也還原', !n8.cls && n8.pressed === 'false' && !n9, [n8, n9]);
+  await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
+
+  // 部件複選
+  const soloClick = k => page.click('#tab3 [data-solo="' + k + '"]');
+  const soloState = () => page.evaluate(() => { const D = RRU3D.dbg; return { solo: D.state.solo, vis: { fil: D.FIL().visible, shd: D.SHD().visible, pcb: D.PCB().visible, hsk: D.HSK().visible },
+    pressed: Object.fromEntries([...document.querySelectorAll('#tab3 [data-solo]')].map(b => [b.dataset.solo || 'all', b.getAttribute('aria-pressed')])) }; });
+  await soloClick('fil'); await soloClick('shd');
+  await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
+  const s1 = await soloState();
+  const sb = await page.evaluate(() => { const D = RRU3D.dbg, u = D.soloBox(), one = k => { D.state.solo = [k]; const b = D.soloBox(); return b; }, keep = D.state.solo.slice();
+    const bf = one('fil'), bs = one('shd'); D.state.solo = keep; const e = bf.clone().union(bs); const d = Math.max(...u.min.clone().sub(e.min).toArray().concat(u.max.clone().sub(e.max).toArray()).map(Math.abs)); return d; });
+  ok('點「濾波器」再點「屏蔽罩」→ 兩件都顯示（複選），按鈕都亮、「全部」不亮', JSON.stringify(s1.solo) === '["fil","shd"]' && s1.vis.fil && s1.vis.shd && !s1.vis.pcb && !s1.vis.hsk
+    && s1.pressed.fil === 'true' && s1.pressed.shd === 'true' && s1.pressed.pcb === 'false' && s1.pressed.all === 'false', s1);
+  ok('複選時對焦框＝選到的部件合起來的外框', sb < 0.01, sb);
+  await soloClick('shd'); const s2 = await soloState();
+  await soloClick('fil'); const s3 = await soloState();
+  ok('再按一次取消那一件；全部取消 → 回到「全部」', JSON.stringify(s2.solo) === '["fil"]' && !s2.vis.shd && s3.solo === null && s3.pressed.all === 'true' && Object.values(s3.vis).every(Boolean), [s2, s3]);
+  for (const k of ['fil', 'shd', 'pcb', 'hsk']) await soloClick(k);
+  const s4 = await soloState();
+  ok('四件都選 → 等於「全部」', s4.solo === null && s4.pressed.all === 'true', s4);
+
+  // 部件翻轉 180°（爆炸、只看濾波器）
+  await page.click('#tab3 [data-state="exp"]'); await soloClick('fil');
+  await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
+  const pose = () => page.evaluate(() => { const D = RRU3D.dbg, o = D.FIL(), s = D.SHD(); o.updateWorldMatrix(true, true);
+    const c = D.partCenter('fil').clone().applyMatrix4(o.matrixWorld), q = o.getWorldQuaternion(new D.camera.quaternion.constructor()), V = D.camera.position.constructor;
+    return { c: c.toArray(), x: new V(1, 0, 0).applyQuaternion(q).toArray(), y: new V(0, 1, 0).applyQuaternion(q).toArray(), shd: s.position.toArray().concat(s.quaternion.toArray()),
+      pflip: JSON.stringify(D.state.pflip), pressed: document.getElementById('r3d-t-pflip').getAttribute('aria-pressed') }; });
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  const p0 = await pose();
+  await page.click('#r3d-t-pflip'); await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
+  const p1 = await pose();
+  ok('只看濾波器按「翻轉」→ 濾波器沿長邊（x）中心軸轉 180°：中心不動、長邊方向不變、上下顛倒', dist(p0.c, p1.c) < 0.01 && dot(p0.x, p1.x) > 0.9999 && dot(p0.y, p1.y) < -0.9999 && p1.pflip === '{"fil":true}' && p1.pressed === 'true', [p0, p1]);
+  ok('沒選到的部件不動', JSON.stringify(p0.shd) === JSON.stringify(p1.shd), [p0.shd, p1.shd]);
+  const snap = await page.evaluate(() => { const u = RRU3D.snapshot(400, 250); return !!u && u.startsWith('data:image/jpeg'); });
+  const pS = await pose();
+  ok("翻轉後產生報告用的 3D 圖（組裝、不翻）→ 不動到畫面上的翻轉", snap && pS.pflip === '{"fil":true}' && dist(p1.c, pS.c) < 0.01 && dot(p1.y, pS.y) > 0.9999, pS);
+  await soloClick('fil');   // 全部 → 翻轉對四件：濾波器已翻 → 其他三件也翻；再按全部翻回
+  await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
+  const pa = await page.evaluate(() => [RRU3D.dbg.state.solo, document.getElementById('r3d-t-pflip').getAttribute('aria-pressed')]);
+  await page.click('#r3d-t-pflip'); await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
+  const pb = await page.evaluate(() => JSON.stringify(RRU3D.dbg.state.pflip));
+  await page.click('#r3d-t-pflip'); await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
+  const p3 = await pose();
+  ok('「全部」時翻轉＝四件一起翻；再按一次全部翻回原位', pa[0] === null && pa[1] === 'false' && pb === '{"fil":true,"shd":true,"pcb":true,"hsk":true}' && p3.pflip === '{}'
+    && dist(p0.c, p3.c) < 0.01 && dot(p0.y, p3.y) > 0.9999, [pa, pb, p3]);
+  await page.click('#tab3 [data-state="asm"]');
+  await page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
 
   ok('沒有 JS 錯誤', errors.length === 0, errors);
   await browser.close();

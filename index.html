@@ -132,6 +132,10 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .header .proj-name:hover .pn-value{text-decoration:underline;text-underline-offset:3px;}
 .cloud-modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;}
 .cloud-modal-overlay.active{display:flex;}
+/* 3D 頁「儲存」鈕的訊息（全螢幕時不能用 alert：瀏覽器會先退出全螢幕）；點一下關閉 */
+#r3dToast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:10000;max-width:min(560px,calc(100vw - 32px));padding:10px 16px;border-radius:10px;
+  background:#1e293b;color:#f1f5f9;font-size:0.88rem;line-height:1.55;white-space:pre-line;box-shadow:0 10px 30px rgba(0,0,0,0.35);cursor:pointer;}
+#r3dToast.is-err{background:#7f1d1d;}
 .cloud-modal{background:#fff;border-radius:16px;padding:30px;width:420px;max-width:90vw;max-height:70vh;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
 .cloud-modal h3{margin:0 0 16px;color:#1e3a5f;font-size:1.2rem;}
 .cloud-modal .cloud-list{max-height:40vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:10px;}
@@ -887,6 +891,21 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
         </div>
       </div>
     </div>
+    <!-- 3D 頁「儲存」鈕：資料庫保護還沒解除 → 先問密碼（頁內小視窗；原生 prompt 在全螢幕時會讓瀏覽器先退出全螢幕） -->
+    <div class="cloud-modal-overlay" id="r3dUnlockModal" role="dialog" aria-modal="true" aria-labelledby="r3dUnlockTitle">
+      <form class="cloud-modal" id="r3dUnlockForm" style="width:380px;" autocomplete="off">
+        <h3 id="r3dUnlockTitle">🔒 解除資料庫保護後儲存</h3>
+        <p style="margin:0 0 14px;color:#475569;font-size:0.88rem;line-height:1.5;">資料庫寫入保護啟用中。輸入密碼解除（與工具列「🔒 資料庫保護」同一組），解除後接著儲存專案。</p>
+        <label for="r3dUnlockPwd" style="display:block;margin-bottom:6px;color:#1e3a5f;font-weight:700;font-size:0.85rem;">密碼</label>
+        <input type="password" id="r3dUnlockPwd" style="width:100%;padding:9px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:0.95rem;box-sizing:border-box;">
+        <div id="r3dUnlockErr" role="alert" style="min-height:1.3em;margin-top:6px;color:#b91c1c;font-size:0.82rem;"></div>
+        <div style="display:flex;gap:10px;margin-top:10px;justify-content:flex-end;">
+          <button type="button" class="cloud-close" id="r3dUnlockCancel">取消</button>
+          <button type="submit" class="cloud-close" style="background:#1e3a5f;color:#fff;">解鎖並儲存</button>
+        </div>
+      </form>
+    </div>
+    <div id="r3dToast" role="status" aria-live="polite" hidden></div>
   </div>
 
   <!-- 資料庫佔用橫幅：他人持有編輯鎖時置頂顯示誰在用，無人時隱藏 -->
@@ -1101,9 +1120,9 @@ function _applyCloudLockUI(){
   btn.className='cloud-lock '+(cloudLocked?'locked':'unlocked');
   btn.innerHTML=cloudLocked?'🔒 資料庫保護：啟用':'🔓 資料庫保護：關閉';
 }
-async function toggleCloudLock(){
+async function toggleCloudLock(pwdIn){   // pwdIn：3D 頁密碼小視窗已經問過（沒給就跳 prompt）
   if(cloudLocked){
-    let pwd=prompt('請輸入密碼以解除資料庫寫入保護：');
+    let pwd=typeof pwdIn==='string'?pwdIn:prompt('請輸入密碼以解除資料庫寫入保護：');
     if(pwd===null)return;
     if(pwd!==CLOUD_LOCK_PWD){alert('❌ 密碼錯誤');return;}
     if(dbAdapter.isSharePointMode && dbAdapter.isSharePointMode()){
@@ -3534,8 +3553,55 @@ function renderTab3(force){
       :f?'<div class="alert alert-danger">⚠️ 3D 引擎載入失敗（需要網路連到 cdn.jsdelivr.net 載入 three.js）；其他分頁不受影響。</div>'
       :'<div class="alert alert-info">⏳ 載入 3D 引擎…</div>');return;}
   show('');
-  try{RRU3D.update(build3dData(),{onEdit:r3dOnEdit});}
+  try{RRU3D.update(build3dData(),{onEdit:r3dOnEdit,onSave:r3dSave});}
   catch(e){console.error('[3D] update failed:',e);show('<div class="alert alert-danger">⚠️ 3D 模型建立失敗：'+_vEsc(e.message||String(e))+'</div>');}
+}
+// 3D 頁的「儲存」鈕（全螢幕時也在）：資料庫保護沒解除 → 先跳密碼小視窗（同一組密碼、同一個解鎖流程 toggleCloudLock），
+// 解除後接著走「💾 儲存專案」（cloudSaveProject）。全螢幕時原生 alert／prompt 會讓瀏覽器先退出全螢幕
+// → 密碼用頁內小視窗，存檔過程的訊息收集起來改在畫面下方提示（r3dToast）。
+let r3dSaving=false,r3dToastT=0;
+async function r3dSave(){
+  if(r3dSaving)return;
+  r3dSaving=true;
+  const msgs=[],alert0=window.alert;
+  window.alert=m=>{msgs.push(String(m));};
+  try{
+    if(cloudLocked&&!(await r3dAskUnlock()))return;
+    await cloudSaveProject();
+  }finally{
+    window.alert=alert0;r3dSaving=false;
+    if(msgs.length)r3dToast(msgs.join('\n'));
+  }
+}
+function r3dAskUnlock(){
+  return new Promise(resolve=>{
+    const ov=document.getElementById('r3dUnlockModal'),form=document.getElementById('r3dUnlockForm'),
+      inp=document.getElementById('r3dUnlockPwd'),err=document.getElementById('r3dUnlockErr'),
+      cancel=document.getElementById('r3dUnlockCancel'),back=document.activeElement;
+    inp.value='';err.textContent='';ov.classList.add('active');
+    inp.focus();
+    const done=async pwd=>{
+      form.onsubmit=null;cancel.onclick=null;ov.onkeydown=null;ov.onclick=null;
+      inp.value='';ov.classList.remove('active');
+      if(pwd!=null)await toggleCloudLock(pwd);
+      if(back&&back.focus)back.focus();
+      resolve(pwd!=null&&!cloudLocked);
+    };
+    form.onsubmit=e=>{
+      e.preventDefault();
+      if(inp.value!==CLOUD_LOCK_PWD){err.textContent='密碼錯誤，請再輸入一次';inp.select();return;}
+      done(inp.value);
+    };
+    cancel.onclick=()=>done(null);
+    ov.onclick=e=>{if(e.target===ov)done(null);};
+    ov.onkeydown=e=>{if(e.key==='Escape'){e.stopPropagation();done(null);}};
+  });
+}
+function r3dToast(msg){
+  const el=document.getElementById('r3dToast');if(!el)return;
+  el.textContent=msg;el.classList.toggle('is-err',/^\s*(❌|⚠️)/.test(msg));el.hidden=false;
+  el.onclick=()=>{el.hidden=true;};
+  clearTimeout(r3dToastT);r3dToastT=setTimeout(()=>{el.hidden=true;},/^\s*(❌|⚠️)/.test(msg)?12000:6000);
 }
 window.addEventListener('rru3d-ready',()=>{tab3Stale=true;if(tab3Active())renderTab3();});
 window.addEventListener('rru3d-fail',()=>{if(tab3Active())renderTab3(true);});
