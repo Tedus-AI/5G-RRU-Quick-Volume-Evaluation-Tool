@@ -495,12 +495,22 @@ fg 對 bg ≥ 5.9:1），畫面用 `marginVars(lv)` 塞進 CSS 變數 `--st-*`�
   - 3D 頁不在畫面上時 `renderTab3` 只標 `tab3Stale`，切過去才重建（3D 重建要花時間）；同一個專案重算後保留視角與選取。
   - 擋下計算／DRC 不通過：`#tab3-msg` 顯示跟其他頁同一份 `calcGateHtml`，3D 收起來。
 - **3D 頁的調整＝專案欄位 `layout3d`**（專案層級，只有本工具寫；AI-Thermal 原樣保留、不讀）：
-  `{ posW: {_cid: [每顆橫向 mm（元件中心距 PCB 左緣）或 null＝自動]}, rot: {_cid: [每顆 0／90]}, io: [{id, type, pos, y?}], ant: [{id, type, pos}], shd: {on, roof, wall, rim, fmax}, pair: false }`
+  `{ posW: {_cid: [每顆橫向 mm（元件中心距 PCB 左緣）或 null＝自動]}, turn: {_cid: [每顆 0／90]}, io: [{id, type, pos, y?}], ant: [{id, type, pos}], shd: {on, roof, wall, rim, fmax}, pair: false }`
   （`pair` 只有「通道配對」關掉時才寫 `false`，開著＝沒有這個 key；`l3dHas` 把 `pair:false` 算成有調整）
+  - `turn`＝**跟預設方向差 90°**（見下方「元件預設轉向」）。舊版存的是 `rot`（絕對角度，0＝原方向、一列裡沒動過的也補 0）：
+    `l3dToEdit` 照樣讀進來，檢視器 `update()` 時 `migrateRot` 轉成 `turn` —— Final PA／Driver 的舊 `rot` 一律回到新預設（舊的 90＝現在的預設、
+    舊的 0＝沒動過），其他元件的 90 照舊；`l3dFromEdit` 只寫 `turn`，舊的 `rot` 在下一次 3D 調整＋存檔時消失。
   - **以 `_cid` 為 key**（元件改名不會掉）；檢視器內部用元件名稱，`l3dToEdit`／`l3dFromEdit` 轉換，刪掉的元件的調整不留。
   - 跟著「💾 儲存專案」寫（`_buildProjectFields`：有調整才寫；全部回到自動而資料庫原本有 → 寫 `{}` 清掉）。
     載入、匯入／匯出本機檔、複製專案都帶著；換專案不沿用上一個專案的調整。
   - 未存修改：`projScreenDigest` 含 layout3d → `projectIsDirty`；有未存修改（任何修改）離開頁面會提醒（`beforeunload`）。
+- **元件預設轉向**（使用者定義「全部轉」，`defRot`）：**Final PA、Driver 預設轉 90°** —— 長邊橫跨訊號方向（沿寬度；法蘭封裝的 RF 進出腳在長邊），
+  全部專案都一樣（TDD、FDD）；其他元件照 AI-Thermal 規格的方向（長邊沿長度）。元件分頁的 ⟳、選取後的 R 鍵＝**跟預設方向**轉 90°（`o.turn`；
+  `o.rot`＝實際有沒有轉），⟳ 按下＝跟預設不一樣；游標提示寫「預設轉 90°」／「轉 90°」／「轉回原方向」，3D PDF 元件表寫「預設 90°」。
+  - ⚠ **銅塊底板固定跟著板子方向**（`Coin_L` 沿長度、`Coin_W` 沿寬度），不跟 PA 轉；只有凸台（＝PA 本體）跟著轉。底板是 PCB 背面的
+    參數化外形（計算只用面積），跟著轉的話 55 mm 會橫在 8T8R 每一路約 48 mm 的寬度上、擠到隔壁通道。所以 PA 轉了以後元件佔的板面（`fpL×fpW`）
+    跟轉之前一樣，TDD 專案的排法不會亂掉。`buildBody` 在元件群組轉 90° 時把底板的長寬對調（群組座標）。
+  - FDD 上下排因此變寬鬆（PA 沿長度只剩 9.78 mm）：備份的「FDD B8B20B28 4T4R 480W」腔體留邊比例由 0.15 變 0.9。
 - **元件相對高度在 3D 改＝寫回元件設定的 `Height(mm)` 並 `recalc()`**（`r3dOnEdit` 處理檢視器暫存的 `E.hgt` 後清空；
   layout3d 不存高度）。按住／拖曳的過程只估這一顆的溫度，放開才重算；工具在 `saveEdit()` 裡已經重算並更新畫面時，
   檢視器接下來那次重建會跳過（`SKIP_REBUILD`）。高度量到**元件中心**（跟元件設定同一個意思）。
@@ -584,7 +594,8 @@ fg 對 bg ≥ 5.9:1），畫面用 `marginVars(lv)` 塞進 CSS 變數 `--st-*`�
   - 只是檢視用、不存檔；PDF 報告的 3D 圖與 3D PDF 一律不翻（渲染時暫時關掉、渲染完**先還原部件組合再**套回狀態 —— 整組中心跟著顯示中的部件）。
 - 契約測試：`tests/viewer3d.test.js`（需要 WebGL＋three.js：`THREE_DIR=<three@0.170.0 的本機副本>`，沒給就連 CDN；
   [J] 兩種螢幕寬的版面與標註遮擋、[K] 沒有 WebGL 的瀏覽器、[N] 全螢幕／儲存解鎖／專案名稱／部件複選與翻轉、[O] 翻轉交叉測試：3 狀態（含直立）× 15 種部件組合、動畫途中剛體、隨機切換 200 步、標註／剖面／報告／拖曳、
-  [P] 左旋／右旋、個別隱藏、專案名稱字型、I/O 分類、FDD 通道配對（仿備份裡三種真實 FDD 資料形狀：只拆 PA／拆開但高度交錯／全部拆開）與側欄清單重畫）；`tests/dimensions.test.js` [C] 驗 3D 吃同一組 L／W／鰭片數。
+  [P] 左旋／右旋、個別隱藏、專案名稱字型、I/O 分類、FDD 通道配對（仿備份裡三種真實 FDD 資料形狀：只拆 PA／拆開但高度交錯／全部拆開）與側欄清單重畫、
+  [Q] 元件預設轉向（PA／Driver 預設轉 90°、銅塊底板固定、⟳／R、舊資料 rot → turn））；`tests/dimensions.test.js` [C] 驗 3D 吃同一組 L／W／鰭片數。
 
 ### 限溫對象（`Limit_Ref`：Tj／Tc）與允許溫升基準 ⚠️ 兩個工具共用
 
