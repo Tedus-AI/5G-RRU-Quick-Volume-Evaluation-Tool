@@ -24,8 +24,9 @@
  *   [O] 翻轉交叉測試：組裝／爆炸（含直立）× 15 種部件組合＝整組剛體翻、攤開＝各自原地翻；翻轉途中剛體；隨機切換序列不留殘值；
  *       鰭片尺寸標註、剖面疊層、攤開標題、報告截圖、拖曳都跟著翻轉正確
  *   [P] 正交視圖左旋／右旋 90°（正視圖記住轉向、其他視角原地轉）；元件／I/O／天線座個別隱藏（👁、選取後隱藏、H 鍵、全部顯示、
- *       換專案清掉、不存檔）；專案名稱圓體字；I/O 分類（SFP／電源、Signal、Debug port）；FDD 通道配對（兩種 Final PA → 共用的元件
- *       分到每一路、盲插／腔體每一路每一組、開關存 layout3d.pair）；同一個專案的元件／I/O 清單變了，側欄跟著重畫
+ *       換專案清掉、不存檔）；專案名稱圓體字；I/O 分類（SFP／電源、Signal、Debug port）；FDD 通道配對（每一顆 Final PA 自帶一組
+ *       Pre-driver／Driver／環形器：沒拆的列自動錯開、拆開的列照元件清單；各組高度不交錯 → 上下排、交錯 → 左右並排；自動錯開的只能左右拖、
+ *       拖 PA 時跟著動；盲插／腔體每一路每一組、開關存 layout3d.pair）；同一個專案的元件／I/O 清單變了，側欄跟著重畫
  *   [K] 瀏覽器沒有 WebGL：工具照常可用、Tab3 顯示原因、沒有未攔截的錯誤
  *
  * 執行：
@@ -806,55 +807,107 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     ok('Debug port＝金屬框＋黑色開口（寬 28、高 14）；Signal＝圓形防水座', io2.g.dbg && io2.g.dbg.length === 2 && io2.g.dbg[0][1] === 14 && io2.g.dbg[0][2] === 28 && io2.g.rj45 && io2.g.rj45.length === 3, [io2.g.dbg, io2.g.rj45]);
     ok('I/O 清單在程式改了之後（同一個專案）跟著重畫：列數、類型一致；不認得的類型標「（未知）」不靜默改掉', io2.rows === io2.list && same(io2.sel, [...Array(io2.list - 6).fill('sfp'), 'pwr', 'rj45', 'aisg', 'dbg', 'gnd', 'xyz']) && /未知/.test(io2.unk), io2);
 
-    // ── FDD 通道配對 ──
+    // ── FDD 通道配對：每一顆 Final PA 自帶一組 Pre-driver／Driver／環形器（使用者畫的圖：2 排 × 4 路） ──
     await page.click('#r3d-tab-comp');
     const tdd = await page.evaluate(() => ({ avail: RRU3D.dbg.pairPlan().avail, hidden: document.getElementById('r3d-pair').hidden }));
     ok('TDD（每種 RF 元件都是通道數 4 顆）→ 不出現通道配對', !tdd.avail && tdd.hidden, tdd);
     const V0 = await page.evaluate(() => calcResults.Volume_L);
-    await page.evaluate(() => {
-      const rf = components.rf, base = n => JSON.parse(JSON.stringify(rf.find(x => x.Component === n)));
-      const mk = (src, name, qty, h, type) => { const c = base(src); c.Component = name; c.Qty = qty; c['Height(mm)'] = h; c.Type = type; delete c._cid; return c; };
-      window.__rfKeep = JSON.parse(JSON.stringify(rf));
-      components.rf = [mk('Driver PA', 'Driver-B8B20B28', 8, 250, 'Driver'), mk('Final PA', 'Final-B8', 4, 320, 'Final PA'), mk('Final PA', 'Final-B20B28', 4, 400, 'Final PA'),
-        mk('Pre Driver', 'PreDriver', 8, 210, 'Pre-driver'), mk('Circulator', 'Circulators', 8, 450, 'CR'), Object.assign(base('Cavity Filter'), { Qty: 8 })];
-      CompMerge.ensureCids(components.rf);
+    // 三種資料形狀（仿備份裡的真實 FDD 專案）：A＝只有 PA 分頻段、Driver／Pre／環形器各 8 顆沒拆；B＝Pre／Driver 拆開但高度交錯、環形器 8 顆沒拆；C＝全部拆開、各組高度不重疊
+    const fddLoad = (kind, pa1) => page.evaluate(([kind, pa1]) => {
+      if (!window.__rfKeep) { window.__rfKeep = JSON.parse(JSON.stringify(components.rf)); window.__specKeep = dbSpecs3dCache; }
+      const rf = window.__rfKeep, base = n => JSON.parse(JSON.stringify(rf.find(x => x.Component === n))), specs = {};
+      const mk = (src, name, qty, h, type, sz) => { const c = base(src); c.Component = name; c.Qty = qty; c['Height(mm)'] = h; c.Type = type; delete c._cid; specs[name] = { size: sz, h: 2, proj: 'demo' }; return c; };
+      const pa = (n, h) => mk('Final PA', n, 4, h, 'Final PA', '25.4*9.78'), dv = (n, q, h) => mk('Driver PA', n, q, h, 'Driver', '12*7');
+      const pr = (n, q, h) => mk('Pre Driver', n, q, h, 'Pre-driver', '3*3'), cr = (n, q, h) => mk('Circulator', n, q, h, 'CR', '10*10');
+      const fil = Object.assign(base('Cavity Filter'), { Qty: 8 }); delete fil._cid;
+      components.rf = kind === 'A' ? [dv('Driver-B8B20B28', 8, 250), pa('Final-B8', pa1 || 320), pa('Final-B20B28', 400), pr('PreDriver', 8, 210), cr('Circulators', 8, 450), fil]
+        : kind === 'B' ? [pa('Final-B3', 400), pa('Final-B1', 320), dv('Driver-B3', 4, 270), dv('Driver-B1', 4, 250), pr('PreDriver-B3', 4, 230), pr('PreDriver-B1', 4, 210), fil, cr('Circulators', 8, 450)]
+        : [pa('Final-B8', 200), pa('Final-B20B28', 400), dv('Driver-B8', 4, 150), dv('Driver-B20B28', 4, 350), pr('Pre-B8', 4, 110), pr('Pre-B20B28', 4, 310), cr('CR-B8', 4, 250), cr('CR-B20B28', 4, 450), fil];
+      dbSpecs3dCache = specs; CompMerge.ensureCids(components.rf);
       document.getElementById('L_pcb').value = 510; document.getElementById('W_pcb').value = 385;   // 真實 FDD 專案的 PCB 大小
       recalc(); renderTab3(true);
+    }, [kind, pa1 || 0]);
+    // 每一路每一組的發射鏈：[名稱, 高度（3D）, 元件清單的高度, fdd, 橫向偏離那一格中心]
+    const fddState = () => page.evaluate(() => {
+      const D = RRU3D.dbg, L = D.LAY(), g = D.P().g, z0 = g.Left, lw = L.laneW, FD = L.fdd;
+      const chains = [];
+      for (let lane = 0; lane < L.N; lane++) for (let gi = 0; gi < L.G; gi++) chains.push({ lane, grp: gi, m: L.inst.filter(o => o.lane === lane && o.grp === gi).sort((a, b) => a.x - b.x)
+        .map(o => ({ n: o.row.name, role: o.role, x: +(o.x - g.Btm).toFixed(2), h: o.hgt, fdd: o.fdd, bL: o.bL, sub: o.sub, subN: o.subN,
+          dz: +Math.abs(o.z - (z0 + lw * o.lane + lw / o.subN * (Math.max(0, o.sub) + 0.5))).toFixed(2) })) });
+      return { N: L.N, G: L.G, on: L.pair.on, mode: FD && FD.mode, s: FD && FD.s, why: FD && FD.why, shared: FD ? FD.F.shared.map(r => r.name) : [], fixed: FD ? FD.F.fixed.map(r => r.name) : [],
+        ord: FD ? FD.ord.map(D.grpLabel) : [], chains, overlap: L.inst.filter(o => o.overlap).length, merged: L.shd.cells.filter(c => c.keep.merged).map(c => c.keep.label),
+        conns: L.conns.map(c => [c.lane, c.grp, c.ref.role, c.ref.grp]), circCells: L.shd.cells.filter(c => c.keep.roles.includes('circ')).map(c => c.keep.label),
+        t: document.getElementById('r3d-pair-t').textContent, box: document.getElementById('r3d-pair').hidden, pressed: document.querySelector('#r3d-pair [data-pair="1"]').getAttribute('aria-pressed') };
     });
-    await idle();
-    const f1 = await page.evaluate(() => {
-      const D = RRU3D.dbg, L = D.LAY(), g = D.P().g, z0 = g.Left, lw = L.laneW;
-      const rows = ['Driver-B8B20B28', 'PreDriver', 'Circulators'].map(n => L.inst.filter(o => o.row.name === n).map(o => ({ lane: o.lane, sub: o.sub, grp: o.grp, x: o.x - g.Btm, h: o.row.hgt,
-        dz: Math.abs(o.z - (z0 + lw * o.lane + lw / 2 * (o.sub + 0.5))) })));
-      const pas = ['Final-B8', 'Final-B20B28'].map(n => L.inst.filter(o => o.row.name === n).map(o => ({ lane: o.lane, grp: o.grp, dz: Math.abs(o.z - (z0 + lw * (o.lane + 0.5))), x: o.x - g.Btm })));
-      return { N: L.N, G: L.G, on: L.pair.on, fdd: L.pair.fdd, multi: L.pair.multi.map(r => r.name), rows, pas,
-        conns: L.conns.map(c => [c.lane, c.grp, c.ref.row.name, c.ref.grp]), circCells: L.shd.cells.filter(c => c.keep.roles.includes('circ')).map(c => c.keep.label),
-        box: document.getElementById('r3d-pair').hidden, boxT: document.getElementById('r3d-pair-t').textContent, pressed: document.querySelector('#r3d-pair [data-pair="1"]').getAttribute('aria-pressed'),
-        ctab: [...document.querySelectorAll('#r3d-ctab .cr:not(.sub)')].map(r => r.dataset.row),
-        ch: [...document.querySelectorAll('#r3d-ctab .cr.sub[data-row="Circulators"] .c-ch')].map(e => e.textContent), overlap: L.inst.filter(o => o.overlap).length };
+    const ORD = ['pre', 'drv', 'pa', 'circ'];
+    const chainOk = c => c.m.length === 4 && same(c.m.map(o => o.role), ORD);                       // 一條鏈＝Pre → Driver → PA → 環形器（由下往上）
+    const noGap = (lo, hi) => Math.max(...lo.m.map(o => o.x + o.bL / 2)) < Math.min(...hi.m.map(o => o.x - o.bL / 2));   // 下面那一組整條都在上面那一組下方
+    await fddLoad('A'); await idle();
+    const fa1 = await fddState();
+    ok('FDD：2 種 Final PA 各 4 顆 → 4 路 × 2 組；Driver／Pre-driver／環形器（各 8 顆、沒拆）自動偵測、預設開', fa1.N === 4 && fa1.G === 2 && fa1.on && !fa1.box && fa1.pressed === 'true'
+      && same(fa1.shared, ['Driver-B8B20B28', 'PreDriver', 'Circulators']) && !fa1.fixed.length, fa1);
+    ok('每一顆 PA 自帶一組：8 條完整的發射鏈（Pre-driver → Driver → PA → 環形器），上下排（B8 在下、B20B28 在上），每一路一欄、都在那一路正中間',
+      fa1.mode === 'stack' && fa1.chains.length === 8 && fa1.chains.every(chainOk) && same(fa1.ord, ['B8', 'B20B28'])
+      && [0, 1, 2, 3].every(l => noGap(fa1.chains[l * 2], fa1.chains[l * 2 + 1])) && fa1.chains.every(c => c.m.every(o => o.dz < 0.01 && o.sub === -1)) && fa1.overlap === 0, fa1.chains.slice(0, 2));
+    ok('Final PA 照元件清單的高度（320、400＝溫度計算的位置）；沒拆的列由 3D 自動錯開、緊跟在自己那一顆 PA 旁邊（元件清單的高度照舊＝溫度計算用）',
+      fa1.chains.every(c => c.m.every(o => o.fdd === (o.role === 'pa' ? 'fixed' : 'auto'))) && fa1.chains.every(c => { const p = c.m.find(o => o.role === 'pa'); return p.x === p.h; })
+      && fa1.chains.every(c => { const p = c.m.find(o => o.role === 'pa'), d = c.m.find(o => o.role === 'drv'); return d.h === 250 && d.x !== 250 && p.x - d.x < 30; }), fa1.chains.slice(0, 2).map(c => c.m.map(o => [o.role, o.x, o.h])));
+    ok('每一路每一組的腔體各自一格（沒有合併）、盲插接頭 8 個（跟著那一組的環形器）', !fa1.merged.length && fa1.conns.length === 8 && fa1.conns.every(([l, gi, role, g2]) => role === 'circ' && g2 === gi)
+      && fa1.circCells.length === 8 && fa1.circCells.includes('CH1 B8 · 環形器') && fa1.circCells.includes('CH4 B20B28 · 環形器'), [fa1.merged, fa1.conns, fa1.circCells]);
+    ok('兩種 PA 只差 80 mm → 疊不下完整的屏蔽罩腔體：縮小留邊（s < 1）並在說明寫出來；說明也寫出怎麼排、溫度計算照清單、要分開指定就拆成兩列',
+      fa1.s < 1 && /上下排/.test(fa1.t) && /B8 在下、B20B28 在上/.test(fa1.t) && /自動錯開/.test(fa1.t) && /溫度計算照元件清單的高度/.test(fa1.t) && /拆成 2 列（例：Driver-B8、Driver-B20B28）/.test(fa1.t)
+      && /兩種 PA 只差 80 mm/.test(fa1.t), [fa1.s, fa1.t]);
+    const fa2 = await page.evaluate(() => {
+      const D = RRU3D.dbg, L = D.LAY(), g = D.P().g, au = L.inst.find(o => o.row.name === 'Driver-B8B20B28' && o.lane === 0 && o.grp === 1), pa = L.inst.find(o => o.row.name === 'Final-B20B28' && o.lane === 0);
+      const tip = D.tipHtml(au), tAu = D.selTarget('c:' + au.key), jAu = D.selJob('c:' + au.key, 'v', 1), jAuZ = D.selJob('c:' + au.key, 'z', 1);
+      const row = [...document.querySelectorAll('#r3d-ctab .cr:not(.sub)')].find(r => r.dataset.row === 'Driver-B8B20B28');
+      const sub = [...document.querySelectorAll('#r3d-ctab .cr.sub[data-row="Driver-B8B20B28"] .c-ch')].map(e => e.textContent);
+      // 拖 B20B28 的 PA 往上 30 mm（即時預覽）：它那一組自動錯開的元件跟著上移，B8 那一組不動
+      const before = L.inst.filter(o => o.fdd === 'auto').map(o => [o.key, o.grp, o.x]);
+      const tPa = D.selTarget('c:' + pa.key); tPa.live(null, 430);
+      const moved = L.inst.filter(o => o.fdd === 'auto').map(o => { const b = before.find(q => q[0] === o.key); return [o.grp, +(o.x - b[2]).toFixed(2)]; });
+      D.rebuild(null, true);
+      return { tip, lockAu: tAu.lockH, lockPa: tPa.lockH, jAu, jAuZ: !!jAuZ, small: row.querySelector('.cn small').textContent, title: row.querySelector('.c-h').title, sub, moved,
+        backPa: +(D.LAY().inst.find(o => o.row.name === 'Final-B20B28' && o.lane === 0).x - g.Btm).toFixed(2), hgt: components.rf.find(c => c.Component === 'Final-B20B28')['Height(mm)'] };
     });
-    const i8 = Array.from({ length: 8 }, (_, i) => i);
-    ok('FDD：2 種 Final PA 各 4 顆 → 4 路 × 2 組；共用的 Driver／Pre-driver／環形器（各 8 顆）自動偵測、預設開', f1.N === 4 && f1.G === 2 && f1.on && f1.fdd && same(f1.multi, ['Driver-B8B20B28', 'PreDriver', 'Circulators']) && !f1.box && f1.pressed === 'true', f1);
-    ok('共用的元件平均分到每一路：第 i 顆 → 第 ⌊i/2⌋ 路、第 i mod 2 格（＝第 i mod 2 種 PA 那一組），落在那一格的正中間、沒有重疊', f1.rows.every(r => r.length === 8 && i8.every(i => r[i].lane === Math.floor(i / 2) && r[i].sub === i % 2 && r[i].grp === i % 2 && r[i].dz < 0.01)) && f1.overlap === 0, f1.rows);
-    ok('元件都在自己的「元件相對高度」上（跟溫度計算同一個位置，不另外捏造高度）', f1.rows.every(r => r.every(o => Math.abs(o.x - o.h) < 0.01)), f1.rows.map(r => r.map(o => [o.x, o.h])));
-    ok('兩種 Final PA 照舊：每一路一顆、在那一路正中間，B8、B20B28 各一組', f1.pas.every((r, gi) => r.length === 4 && r.every((o, i) => o.lane === i && o.grp === gi && o.dz < 0.01)), f1.pas);
-    ok('盲插接頭每一條發射鏈一個（4 路 × 2 組＝8 個），跟著那一組的環形器', f1.conns.length === 8 && f1.conns.every(([lane, grp, n, g2]) => n === 'Circulators' && g2 === grp), f1.conns);
-    ok('屏蔽罩：每一路每一組的環形器各一格，標「CH1 B8」「CH1 B20B28」…', f1.circCells.length === 8 && f1.circCells.includes('CH1 B8 · 環形器') && f1.circCells.includes('CH4 B20B28 · 環形器'), f1.circCells);
-    ok('元件分頁的列跟著新的元件清單重畫（同一個專案）；展開後每一顆標出通道與組', same(f1.ctab.slice(0, 5), ['Driver-B8B20B28', 'Final-B8', 'Final-B20B28', 'PreDriver', 'Circulators']) && !f1.ctab.includes('Final PA') && same(f1.ch.slice(0, 3), ['CH1 B8', 'CH1 B20B28', 'CH2 B8']), [f1.ctab, f1.ch]);
-    ok('說明寫出偵測到什麼、怎麼排', /偵測到 FDD/.test(f1.boxT) && /B8、B20B28/.test(f1.boxT) && /每一路 2 顆並排/.test(f1.boxT), f1.boxT);
+    ok('自動錯開的元件只能左右拖（上下鎖住，↑↓ 也不動）；PA 照常可以上下拖', fa2.lockAu && fa2.jAu === null && fa2.jAuZ && !fa2.lockPa, fa2);
+    ok('游標提示寫出兩個高度：元件相對高度（溫度計算用）＋3D 位置（自動錯開，緊跟哪一組的 PA）', /溫度計算用/.test(fa2.tip) && /3D 位置/.test(fa2.tip) && /緊跟 B20B28 那一顆 PA/.test(fa2.tip)
+      && (!/拖曳/.test(fa2.tip) || /上下由通道配對自動排/.test(fa2.tip)), fa2.tip);
+    ok('元件分頁：那一列標「3D 自動錯開」、高度欄說明寫出各組的 3D 位置、展開後每一顆寫出 CH／組／3D 位置', /3D 自動錯開/.test(fa2.small) && /B8 \d+(\.\d)?／B20B28 \d+(\.\d)? mm/.test(fa2.title)
+      && /這格只影響溫度計算/.test(fa2.title) && /^CH1 B8 · 3D \d/.test(fa2.sub[0]) && /^CH1 B20B28 · 3D \d/.test(fa2.sub[1]), [fa2.small, fa2.title, fa2.sub.slice(0, 2)]);
+    ok('拖 PA 上下（即時預覽）→ 它那一組自動錯開的元件跟著往上移（另一組照舊緊跟自己的 PA：兩排之間空間變大 → 縮小的腔體留邊跟著放寬，只微調）；沒放開就不寫回（元件清單不變）',
+      fa2.moved.every(([gi, d]) => gi === 1 ? d > 10 : Math.abs(d) < 15) && fa2.backPa === 400 && fa2.hgt === 400, fa2.moved);
+    await fddLoad('A', 200); await idle();
+    const fa3 = await fddState();
+    ok('把 B8 的 PA 拉到 200 mm（空間夠）→ 腔體完整（s = 1）、不再提醒；發射鏈照舊緊跟各自的 PA', fa3.mode === 'stack' && fa3.s === 1 && !/只差/.test(fa3.t) && fa3.chains.every(chainOk)
+      && [0, 1, 2, 3].every(l => noGap(fa3.chains[l * 2], fa3.chains[l * 2 + 1])) && !fa3.merged.length && fa3.overlap === 0, [fa3.s, fa3.chains[0].m.map(o => [o.role, o.x])]);
+    await fddLoad('B'); await idle();
+    const fb1 = await fddState();
+    ok('拆開的列（Driver-B1 250／B3 270、Pre 210／230）高度交錯 → 每一路左右並排（每一組一格），拆開的列照元件清單的高度；說明寫出原因',
+      fb1.mode === 'side' && fb1.why === 'inter' && same(fb1.fixed.slice().sort(), ['Driver-B1', 'Driver-B3', 'PreDriver-B1', 'PreDriver-B3']) && same(fb1.shared, ['Circulators'])
+      && fb1.chains.every(c => chainOk(c) && c.m.every(o => o.sub === c.grp && o.subN === 2 && o.dz < 0.01)) && fb1.chains.every(c => c.m.every(o => o.fdd === 'auto' || o.x === o.h))
+      && /左右並排/.test(fb1.t) && /高度交錯（Driver-B1 250、Driver-B3 270）/.test(fb1.t) && /已拆開的列/.test(fb1.t) && fb1.overlap === 0, [fb1.mode, fb1.chains.slice(0, 2), fb1.t]);
+    ok('沒拆的環形器（8 顆）照樣自動錯開：緊跟在各自那一顆 PA 上方（B1 的在 320 上方、B3 的在 400 上方）', fb1.chains.every(c => { const p = c.m.find(o => o.role === 'pa'), r = c.m.find(o => o.role === 'circ');
+      return r.fdd === 'auto' && r.x > p.x && r.x - p.x < 35; }) && fb1.conns.length === 8 && !fb1.merged.length, fb1.chains.slice(0, 2).map(c => c.m.map(o => [o.role, o.x])));
+    await fddLoad('C'); await idle();
+    const fc1 = await fddState();
+    ok('全部拆開、各組高度不重疊 → 上下排，每一顆都在元件清單的高度（照拆後的方式排，沒有自動錯開）', fc1.mode === 'stack' && fc1.s === 1 && !fc1.shared.length && fc1.fixed.length === 6
+      && fc1.chains.every(c => chainOk(c) && c.m.every(o => o.fdd === 'fixed' && o.x === o.h && o.dz < 0.01)) && /已拆開的列/.test(fc1.t) && !/自動錯開/.test(fc1.t) && fc1.overlap === 0, [fc1.chains[0].m, fc1.t]);
+    // 開關：關掉＝舊排法；存進 layout3d.pair、重新載入照樣是關的
+    await fddLoad('A'); await idle();
     const Von = await page.evaluate(() => calcResults.Volume_L);
     await page.click('#r3d-pair [data-pair="0"]'); await idle();
-    const f2 = await page.evaluate(() => { const L = RRU3D.dbg.LAY(); return { on: L.pair.on, G: L.G, lanes: L.inst.filter(o => o.row.name === 'Circulators').map(o => o.lane), conns: L.conns.length, l3d: layout3d && layout3d.pair,
-      dirty: projectIsDirty(), V: calcResults.Volume_L, pressed: document.querySelector('#r3d-pair [data-pair="0"]').getAttribute('aria-pressed') }; });
-    ok('關掉 → 舊排法（共用的元件不分路、盲插每一路一個）；存成 layout3d.pair = false、專案標成未存；溫度計算完全不變', !f2.on && f2.G === 0 && f2.lanes.every(l => l === -1) && f2.conns === 4 && f2.l3d === false
+    const f2 = await page.evaluate(() => { const L = RRU3D.dbg.LAY(); return { on: L.pair.on, G: L.G, fdd: L.fdd, lanes: L.inst.filter(o => o.row.name === 'Circulators').map(o => o.lane), conns: L.conns.length, l3d: layout3d && layout3d.pair,
+      dirty: projectIsDirty(), V: calcResults.Volume_L, auto: L.inst.filter(o => o.fdd).length, pressed: document.querySelector('#r3d-pair [data-pair="0"]').getAttribute('aria-pressed') }; });
+    ok('關掉 → 舊排法（共用的元件不分路、盲插每一路一個、沒有自動錯開）；存成 layout3d.pair = false、專案標成未存；溫度計算完全不變', !f2.on && f2.G === 0 && !f2.fdd && !f2.auto && f2.lanes.every(l => l === -1) && f2.conns === 4 && f2.l3d === false
       && f2.dirty && f2.pressed === 'true' && f2.V === Von, f2);
     const sv = await page.evaluate(async () => { window.__writes = []; await cloudSaveProject(); const id = currentProjectId, db = (window.__db.projects[id] || {}).layout3d;
       await cloudLoadOne(id, { silent: true }); renderTab3(true); return { id, db: db && db.pair, back: RRU3D.dbg.LAY().pair.on, l3d: layout3d && layout3d.pair }; });
     await idle();
     ok('存檔寫進共用 DB（layout3d.pair = false）、重新載入照樣是關的', sv.db === false && sv.back === false && sv.l3d === false, sv);
     await page.click('#r3d-pair [data-pair="1"]'); await idle();
-    const f3 = await page.evaluate(() => ({ on: RRU3D.dbg.LAY().pair.on, l3d: layout3d ? ('pair' in layout3d) : false }));
-    ok('再打開 → 回到通道配對（開著不寫 key）', f3.on && !f3.l3d, f3);
+    const f3 = await page.evaluate(() => ({ on: RRU3D.dbg.LAY().pair.on, mode: RRU3D.dbg.LAY().fdd && RRU3D.dbg.LAY().fdd.mode, l3d: layout3d ? ('pair' in layout3d) : false }));
+    ok('再打開 → 回到通道配對（上下排；開著不寫 key）', f3.on && f3.mode === 'stack' && !f3.l3d, f3);
     // 非 FDD：TDD 但環形器 8 顆（例：環形器＋隔離器）→ 每一路 2 顆並排，腔體各自一格、盲插仍是每一路一個
     await page.evaluate(() => { components.rf = JSON.parse(JSON.stringify(window.__rfKeep)); components.rf.find(x => x.Component === 'Circulator').Qty = 8; recalc(); renderTab3(true); });
     await idle();
@@ -862,7 +915,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
       cells: L.shd.cells.filter(c => c.keep.roles.includes('circ')).length, t: document.getElementById('r3d-pair-t').textContent }; });
     ok('非 FDD（只有一種 Final PA）但環形器 8 顆 → 也分到每一路（2 顆並排、各自一格腔體），盲插仍每一路一個', f4.avail && !f4.fdd && f4.G === 0 && f4.cr.every(([l, s, g], i) => l === Math.floor(i / 2) && s === i % 2 && g === -1)
       && f4.conns === 4 && f4.cells === 8 && !/偵測到 FDD/.test(f4.t), f4);
-    await page.evaluate(() => { components.rf = window.__rfKeep; recalc(); renderTab3(true); }); await idle();
+    await page.evaluate(() => { components.rf = window.__rfKeep; dbSpecs3dCache = window.__specKeep; recalc(); renderTab3(true); }); await idle();
   }
 
   ok('沒有 JS 錯誤', errors.length === 0, errors);
