@@ -32,6 +32,10 @@
  *   [R] 殼體牆厚 3 mm（PCB 照防水邊距、跟牆之間露出基板；螺絲柱從牆長出來；膠條在牆頂）；Embedded 最外兩片 2.5 mm 壓鑄鰭片（貼齊側面、
  *       中間等距）；鰭片截斷（空氣層）：開關、長度／寬度對稱增減、位置上下、全寬、夾範圍、亂打不改、按住連續（放開才存）、記住設定、
  *       layout3d.cut 存檔與載入、尺寸標註與模型樹、計算不變
+ *   [S] 屏蔽罩標準化（照實機）：RF 每一路一欄（寬度等分）× 三列（環形器／Final PA／Driver＋Pre-driver），列牆在兩組元件中間、
+ *       最下面那道牆讓 Driver＋Pre-driver 在格子中間；RF 以外一個大空間；牆的每個垂直交點（十字、T 字、接外框）一支螺絲＋凸台，
+ *       PCB 鎖附孔＝屏蔽罩螺絲、基板同位置牙孔；大空間的鎖附孔＝螺絲柱；拖 PA 時牆與螺絲即時跟著；沒有多通道 RF → 整個一個大空間；
+ *       屏蔽罩隱藏 → PCB 鎖附孔回到預設（FDD 的上下排／左右並排在 [P] 驗）
  *   [K] 瀏覽器沒有 WebGL：工具照常可用、Tab3 顯示原因、沒有未攔截的錯誤
  *
  * 執行：
@@ -847,6 +851,9 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
       return { N: L.N, G: L.G, on: L.pair.on, mode: FD && FD.mode, s: FD && FD.s, why: FD && FD.why, shared: FD ? FD.F.shared.map(r => r.name) : [], fixed: FD ? FD.F.fixed.map(r => r.name) : [],
         ord: FD ? FD.ord.map(D.grpLabel) : [], chains, overlap: L.inst.filter(o => o.overlap).length, merged: L.shd.cells.filter(c => c.keep.merged).map(c => c.keep.label),
         conns: L.conns.map(c => [c.lane, c.grp, c.ref.role, c.ref.grp]), circCells: L.shd.cells.filter(c => c.keep.roles.includes('circ')).map(c => c.keep.label),
+        shdCols: L.shd.cols, shdRows: L.shd.rows, perLane: [...Array(L.N).keys()].map(l => L.shd.cells.filter(c => c.keep.lane === l).length),
+        cellRoles: L.shd.cells.filter(c => c.keep.lane === 0).sort((a, b) => b.x1 - a.x1 || a.z0 - b.z0).map(c => (c.keep.grp >= 0 ? D.grpLabel(c.keep.grp) + ':' : '') + c.keep.roles.join('+')),
+        inCell: L.shd.cells.every(c => c.keep.insts.every(o => o.x > c.x0 && o.x < c.x1 && o.z > c.z0 && o.z < c.z1)),
         t: document.getElementById('r3d-pair-t').textContent, box: document.getElementById('r3d-pair').hidden, pressed: document.querySelector('#r3d-pair [data-pair="1"]').getAttribute('aria-pressed') };
     });
     const ORD = ['pre', 'drv', 'pa', 'circ'];
@@ -862,9 +869,11 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     ok('Final PA 照元件清單的高度（320、400＝溫度計算的位置）；沒拆的列由 3D 自動錯開、緊跟在自己那一顆 PA 旁邊（元件清單的高度照舊＝溫度計算用）',
       fa1.chains.every(c => c.m.every(o => o.fdd === (o.role === 'pa' ? 'fixed' : 'auto'))) && fa1.chains.every(c => { const p = c.m.find(o => o.role === 'pa'); return p.x === p.h; })
       && fa1.chains.every(c => { const p = c.m.find(o => o.role === 'pa'), d = c.m.find(o => o.role === 'drv'); return d.h === 250 && d.x !== 250 && p.x - d.x < 30; }), fa1.chains.slice(0, 2).map(c => c.m.map(o => [o.role, o.x, o.h])));
-    ok('每一路每一組的腔體各自一格（沒有合併）、盲插接頭 8 個（跟著那一組的環形器）', !fa1.merged.length && fa1.conns.length === 8 && fa1.conns.every(([l, gi, role, g2]) => role === 'circ' && g2 === gi)
-      && fa1.circCells.length === 8 && fa1.circCells.includes('CH1 B8 · 環形器') && fa1.circCells.includes('CH4 B20B28 · 環形器'), [fa1.merged, fa1.conns, fa1.circCells]);
-    ok('兩種 PA 只差 80 mm → 疊不下完整的屏蔽罩腔體：縮小留邊（s < 1）並在說明寫出來；說明也寫出怎麼排、溫度計算照清單、要分開指定就拆成兩列',
+    ok('屏蔽罩：上下排 → 每一路一欄、由上往下每一組各三列（環形器／Final PA／Driver＋Pre-driver）＝6 格，沒有合併；盲插接頭 8 個（跟著那一組的環形器）',
+      !fa1.merged.length && fa1.conns.length === 8 && fa1.conns.every(([l, gi, role, g2]) => role === 'circ' && g2 === gi) && fa1.shdCols === 4 && fa1.shdRows === 6 && fa1.perLane.every(n => n === 6)
+      && same(fa1.cellRoles, ['B20B28:circ', 'B20B28:pa', 'B20B28:drv+pre', 'B8:circ', 'B8:pa', 'B8:drv+pre']) && fa1.inCell
+      && fa1.circCells.length === 8 && fa1.circCells.includes('CH1 B8 · 環形器') && fa1.circCells.includes('CH4 B20B28 · 環形器'), [fa1.merged, fa1.perLane, fa1.cellRoles, fa1.circCells]);
+    ok('兩種 PA 只差 80 mm → 疊不下完整的屏蔽罩留邊：排緊（s < 1）並在說明寫出來；說明也寫出怎麼排、溫度計算照清單、要分開指定就拆成兩列',
       fa1.s < 1 && /上下排/.test(fa1.t) && /B8 在下、B20B28 在上/.test(fa1.t) && /自動錯開/.test(fa1.t) && /溫度計算照元件清單的高度/.test(fa1.t) && /拆成 2 列（例：Driver-B8、Driver-B20B28）/.test(fa1.t)
       && /兩種 PA 只差 80 mm/.test(fa1.t), [fa1.s, fa1.t]);
     const fa2 = await page.evaluate(() => {
@@ -899,6 +908,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
       && /左右並排/.test(fb1.t) && /高度交錯（Driver-B1 250、Driver-B3 270）/.test(fb1.t) && /已拆開的列/.test(fb1.t) && fb1.overlap === 0, [fb1.mode, fb1.chains.slice(0, 2), fb1.t]);
     ok('沒拆的環形器（8 顆）照樣自動錯開：緊跟在各自那一顆 PA 上方（B1 的在 320 上方、B3 的在 400 上方）', fb1.chains.every(c => { const p = c.m.find(o => o.role === 'pa'), r = c.m.find(o => o.role === 'circ');
       return r.fdd === 'auto' && r.x > p.x && r.x - p.x < 35; }) && fb1.conns.length === 8 && !fb1.merged.length, fb1.chains.slice(0, 2).map(c => c.m.map(o => [o.role, o.x])));
+    ok('屏蔽罩：左右並排 → 每一路再分成每一組一欄（8 欄），每一欄三列；每一格包住自己那一組', fb1.shdCols === 8 && fb1.shdRows === 3 && fb1.perLane.every(n => n === 6) && fb1.inCell, [fb1.shdCols, fb1.shdRows, fb1.perLane]);
     await fddLoad('C'); await idle();
     const fc1 = await fddState();
     ok('全部拆開、各組高度不重疊 → 上下排，每一顆都在元件清單的高度（照拆後的方式排，沒有自動錯開）', fc1.mode === 'stack' && fc1.s === 1 && !fc1.shared.length && fc1.fixed.length === 6
@@ -918,13 +928,13 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     await page.click('#r3d-pair [data-pair="1"]'); await idle();
     const f3 = await page.evaluate(() => ({ on: RRU3D.dbg.LAY().pair.on, mode: RRU3D.dbg.LAY().fdd && RRU3D.dbg.LAY().fdd.mode, l3d: layout3d ? ('pair' in layout3d) : false }));
     ok('再打開 → 回到通道配對（上下排；開著不寫 key）', f3.on && f3.mode === 'stack' && !f3.l3d, f3);
-    // 非 FDD：TDD 但環形器 8 顆（例：環形器＋隔離器）→ 每一路 2 顆並排，腔體各自一格、盲插仍是每一路一個
+    // 非 FDD：TDD 但環形器 8 顆（例：環形器＋隔離器）→ 每一路 2 顆並排，共用那一路的環形器格、盲插仍是每一路一個
     await page.evaluate(() => { components.rf = JSON.parse(JSON.stringify(window.__rfKeep)); components.rf.find(x => x.Component === 'Circulator').Qty = 8; recalc(); renderTab3(true); });
     await idle();
     const f4 = await page.evaluate(() => { const L = RRU3D.dbg.LAY(); return { avail: L.pair.avail, fdd: L.pair.fdd, G: L.G, cr: L.inst.filter(o => o.role === 'circ').map(o => [o.lane, o.sub, o.grp]), conns: L.conns.length,
       cells: L.shd.cells.filter(c => c.keep.roles.includes('circ')).length, t: document.getElementById('r3d-pair-t').textContent }; });
-    ok('非 FDD（只有一種 Final PA）但環形器 8 顆 → 也分到每一路（2 顆並排、各自一格腔體），盲插仍每一路一個', f4.avail && !f4.fdd && f4.G === 0 && f4.cr.every(([l, s, g], i) => l === Math.floor(i / 2) && s === i % 2 && g === -1)
-      && f4.conns === 4 && f4.cells === 8 && !/偵測到 FDD/.test(f4.t), f4);
+    ok('非 FDD（只有一種 Final PA）但環形器 8 顆 → 也分到每一路（2 顆並排、共用那一路的環形器格），盲插仍每一路一個', f4.avail && !f4.fdd && f4.G === 0 && f4.cr.every(([l, s, g], i) => l === Math.floor(i / 2) && s === i % 2 && g === -1)
+      && f4.conns === 4 && f4.cells === 4 && !/偵測到 FDD/.test(f4.t), f4);
     await page.evaluate(() => { components.rf = window.__rfKeep; dbSpecs3dCache = window.__specKeep; recalc(); renderTab3(true); }); await idle();
   }
 
@@ -1088,6 +1098,100 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     const s10 = await segs();
     ok('載入專案的 layout3d.cut → 3D 照著截斷，分頁顯示開、長 30／寬 50／位置 100', s10.c && s10.c.x === 100 && s10.c.len === 30 && s10.c.wid === 50 && same(s10.inputs.map(Number), [30, 50, 100])
       && (await page.evaluate(() => document.querySelector('#r3d-pn-fin [data-cut="1"]').getAttribute('aria-pressed'))) === 'true', [s10.c, s10.inputs]);
+    await page.evaluate(() => { layout3d = null; renderTab3(true); }); await idle();
+    await page.click('#r3d-tab-comp');
+  }
+
+  console.log('\n[S] 屏蔽罩標準化（照實機）：RF 每一路一欄 × 三列（環形器／Final PA／Driver＋Pre-driver）、其餘一個大空間、牆交點螺絲');
+  {
+    const idle = () => page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    await page.evaluate(() => { layout3d = null; renderTab3(true); }); await idle();
+    await page.click('#r3d-tab-shd');
+    // 每一組（環形器／PA／Driver＋Pre-driver）沿長度的範圍：元件本體＋盲插接頭（跟 shieldLayout 同一個定義）
+    const grid = () => page.evaluate(() => {
+      const D = RRU3D.dbg, L = D.LAY(), SH = L.shd, g = D.P().g, w = SH.S.wall, eq = (a, b) => Math.abs(a - b) < 0.01;
+      const ext = k => { const cs = L.conns.filter(c => k.insts.includes(c.ref));
+        return [Math.min(...k.insts.map(o => o.x - o.bL / 2), ...cs.map(c => c.x - 4)), Math.max(...k.insts.map(o => o.x + o.bL / 2), ...cs.map(c => c.x + 4))]; };
+      const lanes = [...Array(L.N).keys()].map(l => SH.cells.filter(c => c.keep.lane === l).sort((a, b) => b.x1 - a.x1));
+      const lane0 = lanes[0] || [];
+      const mid = lane0.slice(1).map((c, k) => +(c.x1 - (ext(lane0[k].keep)[0] + ext(c.keep)[1]) / 2).toFixed(3));
+      const last = lane0[lane0.length - 1], le = last ? ext(last.keep) : [0, 0];
+      return { N: L.N, n: SH.cells.length, cols: SH.cols, rows: SH.rows, rowsOf: lanes.map(cs => cs.map(c => c.keep.roles.join('+'))),
+        laneOk: lanes.every((cs, l) => cs.every(c => (l === 0 ? eq(c.z0, SH.Rf.z0) : eq(c.z0, g.Left + L.laneW * l)) && (l === L.N - 1 ? eq(c.z1, SH.Rf.z1) : eq(c.z1, g.Left + L.laneW * (l + 1))))),
+        topOk: lanes.every(cs => eq(cs[0].x1, SH.Rf.x1)), aligned: lanes.every(cs => same2(cs.map(c => [c.x0, c.x1].map(v => v.toFixed(3))), lane0.map(c => [c.x0, c.x1].map(v => v.toFixed(3))))),
+        inside: SH.cells.every(c => c.keep.insts.every(o => o.x - o.bL / 2 > c.x0 + w / 2 && o.x + o.bL / 2 < c.x1 - w / 2 && o.z > c.z0 && o.z < c.z1)),
+        mid, sym: last ? +((le[0] - last.x0) - (lane0[lane0.length - 2].x1 - le[1])).toFixed(3) : null,
+        bigOk: L.inst.filter(o => o.row.cat !== 'RF').every(o => !SH.cells.some(c => o.x > c.x0 && o.x < c.x1 && o.z > c.z0 && o.z < c.z1)),
+        wallHits: SH.wallHits.map(o => o.row.name), merged: SH.keeps.filter(k => k.merged).length,
+        cnt: document.getElementById('r3d-shd-cnt').textContent, list: document.getElementById('r3d-shd-list').textContent,
+        rules: document.getElementById('r3d-shd-rules').textContent, tree: document.getElementById('r3d-tree').textContent, tcnt: document.getElementById('r3d-shd-tcnt').textContent };
+      function same2(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+    });
+    const S1 = await grid();
+    ok('4T4R：每一路一欄 × 三列＝12 格；由上往下＝環形器／Final PA／Driver＋Pre-driver（沒有合併）', S1.N === 4 && S1.n === 12 && S1.cols === 4 && S1.rows === 3 && !S1.merged
+      && S1.rowsOf.every(l => same(l, ['circ', 'pa', 'drv+pre'])), S1.rowsOf);
+    ok('欄寬＝PCB 寬度等分（外側兩欄貼外框）；最上面那一列從 PCB 頂端（外框）開始；每一路的列牆對齊', S1.laneOk && S1.topOk && S1.aligned, S1);
+    ok('列牆放在兩組元件正中間，每一格包住自己那一組（含盲插接頭）；最下面那道牆讓 Driver＋Pre-driver 在格子中間', S1.mid.length === 2 && S1.mid.every(d => Math.abs(d) < 0.01) && S1.inside && Math.abs(S1.sym) < 0.01, [S1.mid, S1.sym]);
+    ok('RF 以外（數位、電源）一個大空間、不另外分格；隔牆不穿過任何元件', S1.bigOk && !S1.wallHits.length && /RF 以外 · 大空間/.test(S1.list) && S1.cnt === 'RF 12 格＋大空間' && S1.tcnt === '', [S1.cnt, S1.wallHits]);
+    ok('分頁的規則、模型樹寫出新的標準化設計', /每一路一欄、寬度等分/.test(S1.rules) && /Driver＋Pre-driver 共用一格/.test(S1.rules) && /牆的每個垂直交點一支螺絲/.test(S1.rules) && /RF 以外（數位、電源…）一個大空間/.test(S1.rules)
+      && /屏蔽罩 · RF 12 格＋大空間/.test(S1.tree), [S1.rules, S1.tree.slice(0, 60)]);
+    // 螺絲：牆的每個垂直交點（十字、T 字）＋接到外框的地方；PCB 鎖附孔＝屏蔽罩螺絲；基板同一個位置有牙孔
+    const S2 = await page.evaluate(() => {
+      const D = RRU3D.dbg, L = D.LAY(), SH = L.shd, g = D.P().g, eps = 0.05, rim = SH.S.rim;
+      const X = SH.walls.filter(q => q.axis === 'x'), Z = SH.walls.filter(q => q.axis === 'z');
+      const has = (x, z) => SH.screws.some(p => Math.hypot(p.x - x, p.z - z) < 0.01);
+      const cross = []; X.forEach(h => Z.forEach(v => { if (v.pos >= h.a - eps && v.pos <= h.b + eps && h.pos >= v.a - eps && h.pos <= v.b + eps) cross.push([h.pos, v.pos]); }));
+      const frames = []; X.forEach(h => { if (h.a < SH.Rf.z0 + eps) frames.push([h.pos, g.Left + rim + 2]); if (h.b > SH.Rf.z1 - eps) frames.push([h.pos, g.Left + g.W_pcb - rim - 2]); });
+      Z.forEach(v => { if (v.b > SH.Rf.x1 - eps) frames.push([g.Btm + g.L_pcb - rim - 2, v.pos]); });
+      const kinds = {}; SH.screws.forEach(p => { kinds[p.kind] = (kinds[p.kind] || 0) + 1; });
+      const key = ([x, z]) => x.toFixed(2) + ',' + z.toFixed(2);
+      const body = D.SHD().userData.body.children, boss = body.find(m => m.isInstancedMesh && m.userData.what === 'shdScrew' && m.userData.kind === 'shield');
+      const bossAt = boss ? [...Array(boss.count).keys()].map(i => [boss.instanceMatrix.array[i * 16 + 12], boss.instanceMatrix.array[i * 16 + 14]]) : [];   // 每一支的平移量
+      const hsk = []; D.HSK().traverse(m => { const p = m.geometry && m.geometry.parameters; if (m.userData.kind === 'hole' && p && Math.abs(p.radiusTop - 1.6) < 0.01) hsk.push([m.position.x, m.position.z]); });
+      const pcb = []; D.PCB().traverse(m => { const p = m.geometry && m.geometry.parameters; if (m.userData.kind === 'hole' && p && Math.abs(p.radiusTop - 1.6) < 0.01) pcb.push([m.position.x, m.position.z]); });
+      return { kinds, cross: cross.length, crossOk: cross.every(([x, z]) => has(x, z)), frames: frames.length, frameOk: frames.every(([x, z]) => has(x, z)),
+        holesEq: L.holes.map(key).sort().join(';') === SH.screws.map(p => key([p.x, p.z])).sort().join(';'),
+        boss: bossAt.length === SH.screws.length && SH.screws.every(p => bossAt.some(([x, z]) => Math.hypot(x - p.x, z - p.z) < 0.01)),
+        hskOk: SH.screws.every(p => hsk.some(([x, z]) => Math.hypot(x - p.x, z - p.z) < 0.01)), pcbOk: SH.screws.every(p => pcb.some(([x, z]) => Math.hypot(x - p.x, z - p.z) < 0.01)),
+        conf: SH.screws.filter(p => p.conf.length).map(p => p.conf.join('|')),
+        postOk: SH.screws.filter(p => p.kind === 'post').every(p => !SH.cells.some(c => p.x > c.x0 && p.x < c.x1 && p.z > c.z0 && p.z < c.z1)),
+        housing: L.screws.every(e => !SH.screws.some(p => Math.hypot(p.x - e.x, p.z - e.z) < 8)),
+        tipS: D.shdScrewTip(SH.screws.find(p => p.kind === 'cross')), tipB: D.cellTipHtml(null), tipC: D.cellTipHtml(SH.cells.find(c => c.keep.roles.includes('circ'))),
+        tipP: D.cellTipHtml(SH.cells.find(c => c.keep.roles.includes('pa'))), tipD: D.cellTipHtml(SH.cells.find(c => c.keep.roles.includes('drv'))),
+        list: document.getElementById('r3d-shd-list').textContent };
+    });
+    ok('牆的每個垂直交點都有一支螺絲：十字 6、T 字 3（直牆接到 RF 區最下面那道牆）、接到外框 9', S2.crossOk && S2.cross === 9 && S2.kinds.cross === 6 && S2.kinds.T === 3 && S2.frameOk && S2.frames === 9 && S2.kinds.frame === 9, S2.kinds);
+    ok('每一支螺絲都有凸台；PCB 鎖附孔＝屏蔽罩螺絲（PCB 開孔、基板牙孔在同一個位置）', S2.boss && S2.holesEq && S2.pcbOk && S2.hskOk, S2);
+    ok('大空間的 PCB 鎖附孔變成螺絲柱（不在 RF 格子裡）；螺絲不碰元件；分模面螺絲讓開屏蔽罩螺絲', S2.postOk && S2.kinds.post > 0 && !S2.conf.length && S2.housing, [S2.kinds, S2.conf]);
+    ok('游標提示：螺絲（牆的十字交點、穿過 PCB 鎖進基板）、大空間、各列格子的用途', /屏蔽罩螺絲/.test(S2.tipS) && /牆的十字交點/.test(S2.tipS) && /基板牙孔/.test(S2.tipS)
+      && /大空間（RF 以外）/.test(S2.tipB) && /盲插接頭/.test(S2.tipC) && /Final PA 自己一格/.test(S2.tipP) && /Driver＋Pre-driver 共用一格/.test(S2.tipD), [S2.tipS, S2.tipB]);
+    ok('分頁清單寫出路數、列數、螺絲數（牆交點＋大空間螺絲柱）', new RegExp('4 路 · 每一欄 3 列 · 螺絲 ' + (18 + S2.kinds.post) + ' 支（牆交點 18、大空間螺絲柱 ' + S2.kinds.post + '）').test(S2.list), S2.list.slice(0, 120));
+    // 拖 PA 上下（即時預覽）→ 列牆、螺絲跟著移（屏蔽罩即時重排）；放開前 PCB 孔不動
+    const S3 = await page.evaluate(async () => {
+      const D = RRU3D.dbg, L = D.LAY(), pa = L.inst.find(o => o.role === 'pa' && o.lane === 0), w0 = L.shd.walls.filter(q => q.axis === 'x').map(q => q.pos);
+      const t = D.selTarget('c:' + pa.key); t.live(null, pa.hgt + 12);
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const w1 = D.LAY().shd.walls.filter(q => q.axis === 'x').map(q => q.pos), sc = D.LAY().shd.screws.filter(p => p.kind !== 'post').map(p => p.x);
+      D.rebuild(null, true);
+      return { moved: w1.map((v, i) => +(v - w0[i]).toFixed(2)), follow: sc.every(x => w1.some(v => Math.abs(v - x) < 0.01) || x > D.LAY().shd.Rf.x1 - 20) };
+    });
+    await idle();
+    ok('拖 PA 往上 12 mm（即時預覽）→ 它上下兩道列牆跟著移（環形器／PA 之間、PA／Driver 之間），螺絲跟著牆走', S3.moved.some(d => d > 1) && S3.follow, S3);
+    // 沒有多通道 RF（Final PA 只有 1 顆）→ 整個屏蔽罩一個大空間，PCB 鎖附孔全部是螺絲柱
+    await page.evaluate(() => { window.__rfS = JSON.parse(JSON.stringify(components.rf)); components.rf.forEach(c => { if (c.Qty > 1) c.Qty = 1; }); recalc(); renderTab3(true); });
+    await idle();
+    const S4b = await page.evaluate(() => { const L = RRU3D.dbg.LAY(), SH = L.shd; return { N: L.N, n: SH.cells.length, walls: SH.walls.length, kinds: [...new Set(SH.screws.map(p => p.kind))], holes: L.holes.length, h0: L.holes0.length,
+      cnt: document.getElementById('r3d-shd-cnt').textContent, list: document.getElementById('r3d-shd-list').textContent, tip: RRU3D.dbg.cellTipHtml(null) }; });
+    ok('沒有多通道 RF → 沒有格子、沒有隔牆，整個屏蔽罩一個大空間；PCB 鎖附孔（四角＋長邊中點）都是螺絲柱', S4b.N === 0 && S4b.n === 0 && S4b.walls === 0 && same(S4b.kinds, ['post']) && S4b.holes === S4b.h0
+      && S4b.cnt === '一個大空間' && /整個屏蔽罩 · 大空間/.test(S4b.list) && /沒有多通道的 RF 發射鏈/.test(S4b.tip), S4b);
+    await page.evaluate(() => { components.rf = window.__rfS; recalc(); renderTab3(true); }); await idle();
+    // 屏蔽罩隱藏 → 沒有屏蔽罩螺絲，PCB 鎖附孔回到預設（四角＋長邊中點）
+    await page.click('#r3d-pn-shd [data-shon="0"]'); await idle();
+    const S5 = await page.evaluate(() => { const L = RRU3D.dbg.LAY(); return { same: JSON.stringify(L.holes) === JSON.stringify(L.holes0), cnt: document.getElementById('r3d-shd-cnt').textContent, on: L.shd.S.on }; });
+    await page.click('#r3d-pn-shd [data-shon="1"]'); await idle();
+    ok('按「隱藏」→ 沒有屏蔽罩就沒有屏蔽罩螺絲，PCB 鎖附孔回到預設；再按「顯示」恢復', S5.same && !S5.on && S5.cnt === '已隱藏'
+      && (await page.evaluate(() => RRU3D.dbg.LAY().shd.S.on && RRU3D.dbg.LAY().holes.length === RRU3D.dbg.LAY().shd.screws.length)), S5);
     await page.evaluate(() => { layout3d = null; renderTab3(true); }); await idle();
     await page.click('#r3d-tab-comp');
   }
