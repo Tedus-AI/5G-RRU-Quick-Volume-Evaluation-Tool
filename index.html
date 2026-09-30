@@ -2385,7 +2385,7 @@ function computeAll(params,comps,Area_fixed_m2){
   }else{
     if(ar>12){drc=true;dm="⛔ 設計無效 (Choked Flow)：流阻比 "+ar.toFixed(1)+" > 12";}
     else if(h_conv<4){drc=true;dm="⛔ 設計無效：h_conv="+h_conv.toFixed(2)+" < 4.0，Gap 過小";}
-    else if(p.Gap<4){drc=true;dm="⛔ 鰭片間距 "+p.Gap+"mm < 4mm 物理極限";}
+    else if(p.Gap<4){drc=true;dm="⛔ 鰭片 Air gap "+p.Gap+"mm < 4mm 物理極限";}
     else if(p.fin_tech_selector_v2.includes("Embedded")&&FH>100){drc=true;dm="⛔ Embedded Fin 製程限制："+FH.toFixed(1)+"mm > 100mm";}
   }
   return{Total_Power:TP,Min_dT_Allowed:MDA,Bottleneck_Name:BN,Area_req:AR,Fin_Height:FH,Volume_L:VL,total_weight_kg:tw,h_value,h_conv,h_rad,Bottleneck_Tj_Margin:BTM,Fin_Count:nf,rows,L_hsk:LH,W_hsk:WH,RRU_Height:RH,aspect_ratio:ar,drc_failed:drc,drc_msg:dm,drc_warn:dw,hs_weight_kg:hw,shield_weight_kg:sw,filter_weight_kg:fw,shielding_weight_kg:shw,pcb_weight_kg:pw,eff,eta_fin,T_hsk_base:THB,T_root:T_root_calc,G_root:G_root_calc};
@@ -3289,9 +3289,9 @@ function vrSteps(R,g){
     {label:'所需散熱面積', v:(+R.Area_req).toFixed(3), u:'m²', note:'h '+hv.h_value.toFixed(2)+' W/m²K · η '+R.eff.toFixed(2),
      f:'＝ 熱負載'+(sfOn?' × '+fmtSF(sf):'')+' ÷ (h × η × 允許溫升)',
      tip:'h＝對流 '+hv.h_conv.toFixed(2)+' ＋ 輻射 '+hv.h_rad.toFixed(2)+' W/m²K；η＝鰭片效率 '+R.eta_fin.toFixed(3)+' × 製程係數 '+fe.eta_process+'（'+(fe.isDC?'Die-casting':'Embedded')+(fe.custom?'，自訂':'')+'）'},
-    {label:'鰭片高度', v:f1(R.Fin_Height), u:'mm', note:R.Fin_Count+' 片 · 節距 '+vrN(pitch)+' mm',
+    {label:'鰭片高度', v:f1(R.Fin_Height), u:'mm', note:R.Fin_Count+' 片 · fin pitch '+vrN(pitch)+' mm',
      f:R.Fin_Height>0?'面積 ＝ 底面 L×W ＋ 2 × 片數 × L × 鰭片高':'底面積已足夠，不需要鰭片',
-     tip:'片數＝寬 '+R.W_hsk.toFixed(0)+' mm 以節距（間距 '+vrN(g.Gap)+' ＋ 厚度 '+vrN(g.Fin_t)+' mm）排得下的片數；鰭片高度由所需散熱面積反推。'},
+     tip:'片數＝寬 '+R.W_hsk.toFixed(0)+' mm 以 fin pitch（中心距＝air gap '+vrN(g.Gap)+' ＋ 厚度 '+vrN(g.Fin_t)+' mm）排得下的片數；鰭片高度由所需散熱面積反推。'},
     {label:'整機高度', v:f1(R.RRU_Height), u:'mm', note:'電子艙 '+vrN(box)+' ＋ 基板 '+vrN(g.t_base)+' ＋ 鰭片 '+f1(R.Fin_Height),
      f:'體積 ＝ L × W × H',
      tip:'電子艙＝屏蔽罩 '+vrN(g.H_shield)+' ＋ 腔體濾波器 '+vrN(g.H_filter)+' mm（參數控制台）。只有鰭片高度隨散熱需求變動。'}
@@ -3344,7 +3344,7 @@ function vrStateNote(R,st){
     const bn=vrBottleneck(R);
     return {cls:'fail', text:'無法設計：瓶頸 '+bn.Component+' 的允許溫升只有 '+bn.Allowed_dT.toFixed(1)+' °C（限溫 '+vrN(bn['Limit(C)'])+' − 局部環溫 '+bn.Loc_Amb.toFixed(1)+' − 內部溫降 '+bn.Drop.toFixed(1)+'）。散熱器就算壓到環溫也不夠，算不出體積。請降低這顆的內部溫降（Rjc／TIM／基板），或確認限溫與擺放高度。'};
   }
-  if(st==='drc')return {cls:'fail', text:'DRC 不通過：'+String(R.drc_msg||'').replace(/^⛔\s*/,'')+'。體積與重量不列出；調整參數控制台的鰭片間距、厚度或製程後會重新計算。'};
+  if(st==='drc')return {cls:'fail', text:'DRC 不通過：'+String(R.drc_msg||'').replace(/^⛔\s*/,'')+'。體積與重量不列出；調整參數控制台的鰭片 Air gap、厚度或製程後會重新計算。'};
   if(st==='ok'&&R.drc_warn)return {cls:'warn', text:String(R.drc_warn).replace(/<br\s*\/?>/gi,'\n')};
   return null;
 }
@@ -3699,7 +3699,7 @@ function runTornado(){
   dh+='<tr><td style="color:#e74c3c;font-weight:600;">紅色條 (往左)</td><td>該參數 <b>減少</b> '+pct+'%，體積的變化量</td></tr>';
   dh+='<tr><td style="color:#3498db;font-weight:600;">藍色條 (往右)</td><td>該參數 <b>增加</b> '+pct+'%，體積的變化量</td></tr>';
   dh+='</tbody></table>';
-  dh+='<p><b>條越長 → 體積對這個參數越敏感</b>，代表設計容忍度低，量產公差需嚴格管控。<br>以 Gap (鰭片間距) 為例：Gap 越小 → 流阻比 AR 上升 → 需要更高的鰭片 → 體積增大 (右條)。</p>';
+  dh+='<p><b>條越長 → 體積對這個參數越敏感</b>，代表設計容忍度低，量產公差需嚴格管控。<br>以 Gap（鰭片 air gap，相鄰兩片之間的空氣間隙）為例：Gap 越小 → 流阻比 AR 上升 → 需要更高的鰭片 → 體積增大 (右條)。</p>';
   dh+='<h4 style="margin:12px 0 4px;">三、右圖：Tj_Margin 敏感度 (Fixed-Design 固定散熱器方式)</h4>';
   dh+='<p><b>重要前提：右圖固定現有散熱器面積不變，模擬「工況偏移但散熱器不重設計」的情境。</b></p>';
   dh+='<table class="detail-table" style="width:auto;margin:4px 0 8px;"><thead><tr><th>顏色</th><th>代表方向</th></tr></thead><tbody>';
@@ -3724,7 +3724,7 @@ function runTornado(){
   dh+='<p>Gap ↑ → h_total ↑ → T_hsk ↓ → Tj_Margin ↑</p>';
   dh+='<h4 style="margin:12px 0 4px;">名詞對照</h4>';
   dh+='<table class="detail-table" style="width:auto;margin:4px 0;"><thead><tr><th>符號</th><th>全名</th><th>說明</th></tr></thead><tbody>';
-  dh+='<tr><td>h_conv</td><td>自然對流換熱係數</td><td>W/m²·K，鰭片間距越大對流越強，但趨近飽和 (tanh 曲線)</td></tr>';
+  dh+='<tr><td>h_conv</td><td>自然對流換熱係數</td><td>W/m²·K，鰭片 air gap 越大對流越強，但趨近飽和 (tanh 曲線)</td></tr>';
   dh+='<tr><td>h_rad</td><td>輻射換熱係數</td><td>W/m²·K，間距越大鰭片互見輻射越多，Gap ≥ 10mm 後飽和</td></tr>';
   dh+='<tr><td>h_total</td><td>綜合換熱係數</td><td>h_conv + h_rad (W/m²·K)</td></tr>';
   dh+='<tr><td>TotalPower</td><td>整機總功耗</td><td>含安全係數 Margin，= Σ(P×Qty) × Margin (W)</td></tr>';
@@ -5085,7 +5085,8 @@ async function generatePDFReport() {
             paramRow('H_shield', '屏蔽罩高度', G.H_shield+' mm'),
             paramRow('H_filter', '腔體濾波器高度', G.H_filter+' mm'),
             paramRow('Fin Gap', '鰭片間空氣間隙 (Air Gap)', G.Gap+' mm'),
-            paramRow('Fin Thick', '鰭片厚度', G.Fin_t+' mm')
+            paramRow('Fin Thick', '鰭片厚度', G.Fin_t+' mm'),
+            paramRow('Fin Pitch', '鰭片中心距＝厚度＋Air Gap', +(G.Fin_t+G.Gap).toFixed(2)+' mm')
           ],widths:['55%','45%']},layout:{hLineWidth:()=>0.3,vLineWidth:()=>0,hLineColor:()=>'#f1f5f9',paddingTop:()=>2,paddingBottom:()=>2,paddingLeft:()=>4,paddingRight:()=>2}}
         ]}
       ],
