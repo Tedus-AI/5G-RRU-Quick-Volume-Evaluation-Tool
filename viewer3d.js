@@ -735,18 +735,24 @@ function shieldLayout() {
     if (v.pos < h.a - eps || v.pos > h.b + eps || h.pos < v.a - eps || h.pos > v.b + eps) return;
     J.push({ x: h.pos, z: v.pos, kind: v.pos > h.a + eps && v.pos < h.b - eps && h.pos > v.a + eps && h.pos < v.b - eps ? 'cross' : 'T' });
   }));
-  X.forEach(h => { if (h.a < Rf.z0 + eps) J.push({ x: h.pos, z: z0 + sIn, kind: 'frame' }); if (h.b > Rf.z1 - eps) J.push({ x: h.pos, z: z0 + Wp - sIn, kind: 'frame' }); });
-  Z.forEach(v => { if (v.b > Rf.x1 - eps) J.push({ x: x0 + Lp - sIn, z: v.pos, kind: 'frame' }); if (v.a < Rf.x0 + eps) J.push({ x: x0 + sIn, z: v.pos, kind: 'frame' }); });
+  // 接外框的：e＝[沿哪一軸、外緣、往內的方向]（孔心＝外緣 ± (rim + d)，d 預設 SJ_IN）
+  X.forEach(h => { if (h.a < Rf.z0 + eps) J.push({ x: h.pos, z: z0 + sIn, kind: 'frame', e: ['z', z0, 1] }); if (h.b > Rf.z1 - eps) J.push({ x: h.pos, z: z0 + Wp - sIn, kind: 'frame', e: ['z', z0 + Wp, -1] }); });
+  Z.forEach(v => { if (v.b > Rf.x1 - eps) J.push({ x: x0 + Lp - sIn, z: v.pos, kind: 'frame', e: ['x', x0 + Lp, -1] }); if (v.a < Rf.x0 + eps) J.push({ x: x0 + sIn, z: v.pos, kind: 'frame', e: ['x', x0, 1] }); });
   const screws = [];
   J.forEach(p => { if (!screws.some(q => Math.hypot(q.x - p.x, q.z - p.z) < 2)) screws.push(p); });
   (LAY.holes0 || []).forEach(([x, z]) => {
     if (cells.some(c => x > c.x0 - 6 && x < c.x1 + 6 && z > c.z0 - 6 && z < c.z1 + 6) || screws.some(q => Math.hypot(q.x - x, q.z - z) < 12)) return;
     screws.push({ x, z, kind: 'post' });
   });
-  screws.forEach(p => {                                                   // 碰到元件（濾波器側的本體碰到凸台；兩面的佔板面碰到過孔）或盲插接頭 → 提醒
-    const hit = LAY.inst.filter(o => (o.side === 'filter' && Math.abs(o.x - p.x) < o.bL / 2 + SJ_R && Math.abs(o.z - p.z) < o.bW / 2 + SJ_R)
-      || (Math.abs(o.x - p.x) < o.fpL / 2 + SC_HOLE + 0.5 && Math.abs(o.z - p.z) < o.fpW / 2 + SC_HOLE + 0.5));
-    p.conf = [...new Set(hit.map(o => o.row.name))].concat(LAY.conns.some(c => Math.hypot(c.x - p.x, c.z - p.z) < CONN_KEEP + SJ_R) ? ['盲插接頭'] : []);
+  // 碰到元件（濾波器側的本體碰到凸台；兩面的佔板面，含 HSK 側的銅塊底板，碰到過孔）或盲插接頭 → 提醒
+  const confAt = (x, z) => [...new Set(LAY.inst.filter(o => (o.side === 'filter' && Math.abs(o.x - x) < o.bL / 2 + SJ_R && Math.abs(o.z - z) < o.bW / 2 + SJ_R)
+      || (Math.abs(o.x - x) < o.fpL / 2 + SC_HOLE + 0.5 && Math.abs(o.z - z) < o.fpW / 2 + SC_HOLE + 0.5)).map(o => o.row.name))]
+    .concat(LAY.conns.some(c => Math.hypot(c.x - x, c.z - z) < CONN_KEEP + SJ_R) ? ['盲插接頭'] : []);
+  screws.forEach(p => {
+    p.conf = confAt(p.x, p.z);
+    if (!p.conf.length || !p.e) return;                                   // 接外框的碰到了 → 沿著那道牆往外框靠（孔心最近離外框內面 0.8 mm），讓得開就不提醒
+    const [ax, e0, sg] = p.e;
+    for (const d of [1.6, 1.2, 0.8]) { const q = { x: p.x, z: p.z }; q[ax] = e0 + sg * (S.rim + d); const c = confAt(q.x, q.z); if (!c.length) { p[ax] = q[ax]; p.conf = c; break; } }
   });
   // 牆穿過元件（濾波器側）→ 提醒（發射鏈的元件不會：牆就放在兩組中間）
   const wallHits = new Set();
@@ -2424,7 +2430,7 @@ function refreshShd() {
     '<div class="cav big" title="RF 以外的元件排列沒有固定規則：一個大空間，不另外分格"><b>' + (cells.length ? 'RF 以外 · 大空間' : '整個屏蔽罩 · 大空間') + '</b><span>' + f1(bg.x1 - bg.x0 - S.wall) + '×' + f1(bg.z1 - bg.z0 - S.wall) + '</span><span>—</span></div>' +
     (cells.length ? '' : '<p class="note">沒有偵測到多通道的 RF 發射鏈（Final PA 數量 ≥ 2），所以沒有 RF 格子。</p>');
   const w = [];
-  if (merged.length) w.push(merged.map(k => k.label).join('、') + '：兩組元件太近、中間放不下隔牆 → 合成一格');
+  if (merged.length) w.push(merged.map(k => k.label).join('、') + '：兩組元件的元件相對高度太接近（例如環形器跟 PA 同一個高度、並排），中間放不下隔牆 → 合成一格；把高度拉開就會分成兩格');
   if (SH.wallHits.length) w.push('隔牆穿過 ' + [...new Set(SH.wallHits.map(o => o.row.name))].join('、'));
   if (conf.length) w.push('螺絲碰到 ' + [...new Set(conf.flatMap(p => p.conf))].join('、') + '（' + conf.length + ' 支）');
   if (LAY.clash) w.push([...new Set(LAY.inst.filter(o => o.clash).map(o => o.row.name))].join('、') + ' 比腔深還高，會頂到屏蔽罩頂板');
@@ -3028,7 +3034,7 @@ function cellTipHtml(c) {
   let h = '<b>屏蔽罩 · RF 格子</b> <span style="color:var(--ink3)">' + esc(k.label) + '</span>';
   h += trow('內尺寸', f1(c.a) + ' × ' + f1(c.b) + ' × ' + f1(SH.depth) + ' mm') + trow('最低共振', f2(c.f) + ' GHz（' + (c.f / S.fmax).toFixed(1) + ' × f_max）');
   h += '<hr>' + trow('內含', esc(names.join('、')));
-  h += '<div style="color:var(--ink3);font-size:0.72rem">' + esc(k.merged ? '兩組元件太近、中間放不下隔牆 → 合成一格' : ISO_WHY[k.roles.includes('circ') ? 'circ' : k.roles.includes('pa') ? 'pa' : 'drv']) + '</div>';
+  h += '<div style="color:var(--ink3);font-size:0.72rem">' + esc(k.merged ? '兩組元件的元件相對高度太接近、中間放不下隔牆 → 合成一格（把高度拉開就會分成兩格）' : ISO_WHY[k.roles.includes('circ') ? 'circ' : k.roles.includes('pa') ? 'pa' : 'drv']) + '</div>';
   if (c.warn) h += '<div class="warn">共振低於 1.2 × f_max：實機會在格子裡加隔筋或貼吸波材</div>';
   return h;
 }

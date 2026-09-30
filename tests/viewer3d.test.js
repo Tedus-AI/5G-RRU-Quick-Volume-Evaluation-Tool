@@ -1106,7 +1106,14 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   {
     const idle = () => page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
     const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-    await page.evaluate(() => { layout3d = null; renderTab3(true); }); await idle();
+    // 回到內建範例（4T4R、PCB 320 × 256）：前面的區塊改過 PCB 大小（[P] 510 × 385）與元件高度
+    await page.evaluate(() => {
+      const gp = DEFAULT_CONFIG.global_params;
+      ['rf', 'digital', 'pwr'].forEach(cat => { components[cat] = DEFAULT_CONFIG[cat + '_data'].map(r => ({ ...r })); CompMerge.ensureCids(components[cat]); });
+      for (const k in gp) { const el = document.getElementById(k); if (el) el.value = gp[k]; }
+      applyFinCustomUI(); normalizeComps(); layout3d = null; recalc(); renderTab3(true);
+    });
+    await idle();
     await page.click('#r3d-tab-shd');
     // 每一組（環形器／PA／Driver＋Pre-driver）沿長度的範圍：元件本體＋盲插接頭（跟 shieldLayout 同一個定義）
     const grid = () => page.evaluate(() => {
@@ -1121,7 +1128,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
         laneOk: lanes.every((cs, l) => cs.every(c => (l === 0 ? eq(c.z0, SH.Rf.z0) : eq(c.z0, g.Left + L.laneW * l)) && (l === L.N - 1 ? eq(c.z1, SH.Rf.z1) : eq(c.z1, g.Left + L.laneW * (l + 1))))),
         topOk: lanes.every(cs => eq(cs[0].x1, SH.Rf.x1)), aligned: lanes.every(cs => same2(cs.map(c => [c.x0, c.x1].map(v => v.toFixed(3))), lane0.map(c => [c.x0, c.x1].map(v => v.toFixed(3))))),
         inside: SH.cells.every(c => c.keep.insts.every(o => o.x - o.bL / 2 > c.x0 + w / 2 && o.x + o.bL / 2 < c.x1 - w / 2 && o.z > c.z0 && o.z < c.z1)),
-        mid, sym: last ? +((le[0] - last.x0) - (lane0[lane0.length - 2].x1 - le[1])).toFixed(3) : null,
+        mid, sym: last ? +((le[0] - last.x0) - (last.x1 - le[1])).toFixed(3) : null,   // 最下面那一格：組到下牆＝上牆到組
         bigOk: L.inst.filter(o => o.row.cat !== 'RF').every(o => !SH.cells.some(c => o.x > c.x0 && o.x < c.x1 && o.z > c.z0 && o.z < c.z1)),
         wallHits: SH.wallHits.map(o => o.row.name), merged: SH.keeps.filter(k => k.merged).length,
         cnt: document.getElementById('r3d-shd-cnt').textContent, list: document.getElementById('r3d-shd-list').textContent,
@@ -1178,6 +1185,22 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     });
     await idle();
     ok('拖 PA 往上 12 mm（即時預覽）→ 它上下兩道列牆跟著移（環形器／PA 之間、PA／Driver 之間），螺絲跟著牆走', S3.moved.some(d => d > 1) && S3.follow, S3);
+    // 範例的環形器跟 PA 同一個高度（250）：PCB 寬到 385，環形器改放在 PA 旁邊（並排）→ 中間放不下隔牆 → 合成一格＋提醒
+    await page.evaluate(() => { document.getElementById('L_pcb').value = 510; document.getElementById('W_pcb').value = 385; recalc(); renderTab3(true); }); await idle();
+    const S3b = await page.evaluate(() => { const SH = RRU3D.dbg.LAY().shd; return { merged: SH.keeps.filter(k => k.merged).map(k => k.label), rows: SH.rows,
+      warn: document.getElementById('r3d-shd-warn').textContent, hidden: document.getElementById('r3d-shd-warn').hidden, tcnt: document.getElementById('r3d-shd-tcnt').textContent,
+      tip: RRU3D.dbg.cellTipHtml(SH.cells.find(c => c.keep.merged)) }; });
+    ok('環形器跟 PA 並排（同一個高度）→ 合成一格「環形器＋Final PA」、分頁 ⚠ 寫出原因與解法（把高度拉開）、游標提示也寫', S3b.merged.length === 4 && S3b.merged.every(l => /環形器＋Final PA$/.test(l))
+      && S3b.rows === 2 && !S3b.hidden && /同一個高度/.test(S3b.warn) && /把高度拉開/.test(S3b.warn) && S3b.tcnt === '⚠' && /合成一格/.test(S3b.tip), S3b);
+    await page.evaluate(() => { const gp = DEFAULT_CONFIG.global_params; ['L_pcb', 'W_pcb'].forEach(k => { document.getElementById(k).value = gp[k]; }); recalc(); renderTab3(true); }); await idle();
+    // 8 路、每一路 48 mm：外側兩路的銅塊底板（35 寬）離 PCB 邊只剩 6.6 mm → 接外框的螺絲碰到底板 → 沿牆往外框靠（讓開就不提醒）
+    await page.evaluate(() => { document.getElementById('W_pcb').value = 385; components.rf.forEach(c => { if (c.Qty === 4) c.Qty = 8; }); recalc(); renderTab3(true); }); await idle();
+    const S3c = await page.evaluate(() => { const L = RRU3D.dbg.LAY(), SH = L.shd, g = RRU3D.dbg.P().g, rim = SH.S.rim, fr = SH.screws.filter(p => p.kind === 'frame' && p.e && p.e[0] === 'z');
+      return { N: L.N, n: SH.cells.length, conf: SH.screws.filter(p => p.conf.length).length, d: [...new Set(fr.map(p => +Math.min(p.z - g.Left, g.Left + g.W_pcb - p.z).toFixed(2)))].sort((a, b) => a - b), rim,
+        warn: document.getElementById('r3d-shd-warn').hidden }; });
+    ok('8 路：接外框的螺絲碰到外側兩路的銅塊底板 → 沿牆往外框靠（離 PCB 邊 ' + '4.2 mm）讓開、不提醒；其他的照舊在 5 mm', S3c.N === 8 && S3c.n === 24 && S3c.conf === 0 && S3c.warn
+      && S3c.d.includes(+(S3c.rim + 1.2).toFixed(2)) && S3c.d.includes(+(S3c.rim + 2).toFixed(2)), S3c);
+    await page.evaluate(() => { const gp = DEFAULT_CONFIG.global_params; document.getElementById('W_pcb').value = gp.W_pcb; components.rf.forEach(c => { if (c.Qty === 8) c.Qty = 4; }); recalc(); renderTab3(true); }); await idle();
     // 沒有多通道 RF（Final PA 只有 1 顆）→ 整個屏蔽罩一個大空間，PCB 鎖附孔全部是螺絲柱
     await page.evaluate(() => { window.__rfS = JSON.parse(JSON.stringify(components.rf)); components.rf.forEach(c => { if (c.Qty > 1) c.Qty = 1; }); recalc(); renderTab3(true); });
     await idle();
