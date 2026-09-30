@@ -36,6 +36,9 @@
  *       最下面那道牆讓 Driver＋Pre-driver 在格子中間；RF 以外一個大空間；牆的每個垂直交點（十字、T 字、接外框）一支螺絲＋凸台，
  *       PCB 鎖附孔＝屏蔽罩螺絲、基板同位置牙孔；大空間的鎖附孔＝螺絲柱；拖 PA 時牆與螺絲即時跟著；沒有多通道 RF → 整個一個大空間；
  *       屏蔽罩隱藏 → PCB 鎖附孔回到預設（FDD 的上下排／左右並排在 [P] 驗）
+ *   [T] 擠出件是實心的（外形與孔兩個點列同向時孔的側面曾反過來：屏蔽罩外框從腔體裡看不到、不投影，只剩框頂膠條的影子＝一條細灰線）；
+ *       屏蔽罩缺口離 HSK 螺絲柱 ≥ 2 mm（PCB 缺口照舊 0.5 mm）、PCB 露銅接地帶跟著屏蔽罩缺口繞；鰭片分頁 Air gap／Fin pitch 分開寫
+ *       （模型樹、視覺化報告同一套說法；Die-casting 寫出根部 air gap）
  *   [K] 瀏覽器沒有 WebGL：工具照常可用、Tab3 顯示原因、沒有未攔截的錯誤
  *
  * 執行：
@@ -1216,6 +1219,101 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     ok('按「隱藏」→ 沒有屏蔽罩就沒有屏蔽罩螺絲，PCB 鎖附孔回到預設；再按「顯示」恢復', S5.same && !S5.on && S5.cnt === '已隱藏'
       && (await page.evaluate(() => RRU3D.dbg.LAY().shd.S.on && RRU3D.dbg.LAY().holes.length === RRU3D.dbg.LAY().shd.screws.length)), S5);
     await page.evaluate(() => { layout3d = null; renderTab3(true); }); await idle();
+    await page.click('#r3d-tab-comp');
+  }
+
+  console.log('\n[T] 屏蔽罩外框是實心的（擠出件的孔方向）；屏蔽罩缺口離 HSK 螺絲柱 ≥ 2 mm、接地帶跟著缺口繞；鰭片 air gap／fin pitch 分開寫');
+  {
+    const idle = () => page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
+    await page.evaluate(() => {
+      const gp = DEFAULT_CONFIG.global_params;
+      ['rf', 'digital', 'pwr'].forEach(cat => { components[cat] = DEFAULT_CONFIG[cat + '_data'].map(r => ({ ...r })); CompMerge.ensureCids(components[cat]); });
+      for (const k in gp) { const el = document.getElementById(k); if (el) el.value = gp[k]; }
+      applyFinCustomUI(); normalizeComps(); layout3d = null; recalc(); renderTab3(true);
+    });
+    await idle();
+    // ① 封閉網格、法線朝外 → 有號體積＝截面積 × 厚度。孔的側面反過來（外形與孔兩個點列同向時 ExtrudeGeometry 不會翻正）
+    //   會多出「4/3 × 孔面積 × 厚度」：外框的內側面從腔體裡看不到、也不投影，只剩框頂 FIP 膠條的影子在頂板上畫出一條細灰線（使用者回報）
+    const T1 = await page.evaluate(() => {
+      const D = RRU3D.dbg, L = D.LAY(), LP = L.loops, S = L.shd.S, body = D.SHD().userData.body;
+      const vol = geo => { const p = geo.attributes.position, ix = geo.index, n = ix ? ix.count : p.count, at = i => ix ? ix.getX(i) : i; let v = 0;
+        for (let t = 0; t < n; t += 3) { const a = at(t), b = at(t + 1), c = at(t + 2);
+          const ax = p.getX(a), ay = p.getY(a), az = p.getZ(a), bx = p.getX(b), by = p.getY(b), bz = p.getZ(b), cx = p.getX(c), cy = p.getY(c), cz = p.getZ(c);
+          v += ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx); }
+        return v / 6; };
+      const area = pts => Math.abs(pts.reduce((s, q, i) => { const r = pts[(i + 1) % pts.length]; return s + q[0] * r[1] - r[0] * q[1]; }, 0)) / 2;
+      const perim = pts => pts.reduce((s, q, i) => { const r = pts[(i + 1) % pts.length]; return s + Math.hypot(r[0] - q[0], r[1] - q[1]); }, 0);
+      const part = k => body.children.find(o => o.userData.part === k);
+      let gasket = null; D.FIL().traverse(o => { if (o.userData.part === 'gasket') gasket = o; });
+      const H = L.df - S.roof, fw = Math.min(0.9, S.wall * 0.5);
+      const r = (m, want) => +(vol(m.geometry) / want).toFixed(3);
+      return {
+        frame: r(part('frame'), (area(LP.shd.pts) - area(LP.shdIn.pts)) * H),
+        roof: r(part('roof'), (area(LP.shd.pts) - L.shd.screws.length * Math.PI * 2.9 ** 2) * S.roof),
+        fip: r(part('fip'), perim(LP.fip.pts) * fw * 0.6),
+        gasket: r(gasket, perim(LP.gasket.pts) * 1.8 * 0.6),
+      };
+    });
+    ok('擠出件是實心的：屏蔽罩外框／頂板、外框上的 FIP 膠條、防水膠條的有號體積＝截面積 × 厚度（孔的側面朝外；反過來會多出好幾倍）',
+      Object.values(T1).every(v => v > 0.9 && v < 1.1), T1);
+    // ② 屏蔽罩缺口離 HSK 螺絲柱 ≥ 2 mm（屏蔽罩頂板與外框的每一個頂點）；PCB 缺口照舊離 0.5 mm；每一支都有缺口（缺口沒繞的話直邊離孔心只有 2.5 mm）
+    const T2 = await page.evaluate(() => {
+      const D = RRU3D.dbg, L = D.LAY(), body = D.SHD().userData.body, sc = L.screws;
+      const minTo = geo => { const p = geo.attributes.position; let m = Infinity;
+        for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); for (const e of sc) { const d = Math.hypot(x - e.x, z - e.z); if (d < m) m = d; } } return m; };
+      const bossR = Math.min(...L.loops.boss.det.flatMap(d => d.pts.map(([x, z]) => Math.hypot(x - d.spot.x, z - d.spot.z))));   // 螺絲柱的圓弧（圓角、直線段都在外面）
+      let pcbMesh = null; D.PCB().traverse(o => { if (o.isMesh && o.userData.kind === 'pcb' && Array.isArray(o.material) && !pcbMesh) pcbMesh = o; });
+      return { n: sc.length, bossR: +bossR.toFixed(2), roof: +minTo(body.children.find(o => o.userData.part === 'roof').geometry).toFixed(2),
+        frame: +minTo(body.children.find(o => o.userData.part === 'frame').geometry).toFixed(2), pcb: +minTo(pcbMesh.geometry).toFixed(2),
+        rules: document.getElementById('r3d-shd-rules').textContent.includes('離螺絲柱留 2 mm 設計間隙'),
+        tree: document.getElementById('r3d-tree').textContent.includes('屏蔽罩離螺絲柱 2 mm') };
+    });
+    ok('屏蔽罩缺口離 HSK 螺絲柱 ' + (T2.roof - T2.bossR).toFixed(2) + ' mm（≥ 2）：頂板與外框的每一個頂點離孔心 ≥ 螺絲柱半徑 ' + T2.bossR + '＋2；PCB 缺口照舊 0.5 mm；屏蔽罩分頁規則、模型樹寫出來',
+      T2.n > 0 && Math.abs(T2.bossR - 7) < 0.05 && T2.roof >= T2.bossR + 2 - 0.02 && T2.frame >= T2.bossR + 2 - 0.02 && Math.abs(T2.pcb - (T2.bossR + 0.5)) < 0.05 && T2.rules && T2.tree, T2);
+    // ③ PCB 濾波器側的露銅接地帶跟著屏蔽罩的缺口繞：缺口兩側（離孔心 8.1、PCB 露出來、屏蔽罩沒蓋到的地方）是綠漆，直邊上是金色
+    const T3 = await page.evaluate(() => {
+      const D = RRU3D.dbg, L = D.LAY(), g = D.P().g, sd = D.wallSides(), rim = L.shd.S.rim;
+      let mBot = null; D.PCB().traverse(o => { if (o.isMesh && o.userData.kind === 'pcb' && Array.isArray(o.material) && !mBot) mBot = o.material[1]; });   // [HSK 側, 濾波器側, 板邊]
+      const cv = mBot.map.image, cx = cv.getContext('2d'), s = cv.width / g.L_pcb;
+      const px = (mx, mz) => [(mx - g.Btm) * s, (g.Left + g.W_pcb - mz) * s];
+      const rgb = (mx, mz) => { const [a, b] = px(mx, mz), d = cx.getImageData(Math.round(a) - 1, Math.round(b) - 1, 3, 3).data; let r = 0, gg = 0, bb = 0;
+        for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; bb += d[i + 2]; } return [r / 9, gg / 9, bb / 9]; };
+      const gold = c => c[0] > 150 && c[1] > 120 && c[2] < 130, green = c => c[0] < 90 && c[1] > 60;
+      const dirs = { 0: [[1, 0], [0, 1]], 1: [[0, 1], [-1, 0]], 2: [[1, 0], [0, -1]], 3: [[0, 1], [1, 0]] };   // 沿邊方向、往板內
+      const gap = [], edge = [];
+      L.screws.filter(e => !e.corner).forEach(e => {
+        const [u, n] = dirs[e.k], s0 = sd[e.k], dv = s0.M + 2 - s0.e, du = Math.sqrt(8.1 ** 2 - dv ** 2);
+        [-1, 1].forEach(sg => gap.push(rgb(e.x + u[0] * du * sg + n[0] * dv, e.z + u[1] * du * sg + n[1] * dv)));
+        edge.push(rgb(e.x + u[0] * 16 + n[0] * (s0.M + rim / 2 - s0.e), e.z + u[1] * 16 + n[1] * (s0.M + rim / 2 - s0.e)));   // 離孔心 16 mm、外框中線上
+      });
+      return { n: gap.length, gapGreen: gap.filter(green).length, edgeGold: edge.filter(gold).length, nEdge: edge.length, sample: [gap[0], edge[0]].map(c => c.map(v => Math.round(v))) };
+    });
+    ok('PCB 露銅接地帶跟著屏蔽罩缺口繞：缺口旁邊屏蔽罩沒蓋到的 PCB 是綠漆（' + T3.gapGreen + '／' + T3.n + '）、外框直邊上是金色（' + T3.edgeGold + '／' + T3.nEdge + '）',
+      T3.n > 0 && T3.gapGreen === T3.n && T3.edgeGold === T3.nEdge, T3);
+    // ④ 鰭片分頁：Air gap（片間空氣間隙＝參數控制台的 Gap）與 Fin pitch（中心距＝厚度＋air gap）分開寫；模型樹、視覺化報告也一樣
+    await page.click('#r3d-tab-fin');
+    const T4 = await page.evaluate(() => {
+      const kv = [...document.querySelectorAll('#r3d-fin-kv dt')].map(dt => [dt.textContent, dt.nextElementSibling.textContent]);
+      const vr = vrSteps(calcResults, G).map(s => (s.note || '') + ' ' + (s.tip || '')).join(' ');
+      return { kv, def: document.getElementById('r3d-fin-def').textContent, tree: document.getElementById('r3d-tree').textContent, Gap: G.Gap, Fin_t: G.Fin_t, vr };
+    });
+    const pitch = +(T4.Gap + T4.Fin_t).toFixed(2), kvOf = k => (T4.kv.find(q => q[0] === k) || [])[1];
+    ok('鰭片分頁：「Air gap ' + T4.Gap + ' mm」與「Fin pitch ' + pitch + ' mm」分開兩列（不再只寫「間距」），下面寫出定義（pitch＝中心距＝厚度＋air gap）',
+      kvOf('Air gap') === T4.Gap + ' mm' && kvOf('Fin pitch') === pitch + ' mm' && !T4.kv.some(q => q[0] === '間距')
+      && /Air gap.*空氣間隙/.test(T4.def) && /Fin pitch.*中心距/.test(T4.def), T4.kv);
+    ok('模型樹與視覺化報告同一套說法：「air gap ' + T4.Gap + ' · pitch ' + pitch + '」、片數以 fin pitch 排', T4.tree.includes('air gap ' + T4.Gap + ' · pitch ' + pitch)
+      && T4.vr.includes('fin pitch ' + pitch) && /fin pitch（中心距＝air gap/.test(T4.vr), { tree: T4.tree.slice(0, 160), vr: T4.vr.slice(0, 200) });
+    // Die-casting：鰭尖的 air gap＝Gap、根部變小（G_root）；pitch 不變
+    await page.evaluate(() => { const s = document.getElementById('fin_tech_selector_v2'); s.value = 'Die-casting Fin (0.90)'; s.dispatchEvent(new Event('change', { bubbles: true }));
+      ['Fin_t', 'Gap'].forEach((k, i) => { const e = document.getElementById(k); e.value = String([2, 10][i]); e.dispatchEvent(new Event('change', { bubbles: true })); }); });
+    await page.waitForFunction(() => !calcResults.drc_failed && RRU3D.dbg.P().r.isDC, null, { timeout: 30000 }); await idle();
+    const T5 = await page.evaluate(() => ({ kv: [...document.querySelectorAll('#r3d-fin-kv dt')].map(dt => [dt.textContent, dt.nextElementSibling.textContent]),
+      def: document.getElementById('r3d-fin-def').textContent, G_root: RRU3D.dbg.P().r.G_root }));
+    const g5 = (T5.kv.find(q => q[0] === 'Air gap') || [])[1] || '', p5 = (T5.kv.find(q => q[0] === 'Fin pitch') || [])[1] || '', gr = String(Math.round(T5.G_root * 100) / 100);
+    ok('Die-casting：Air gap 寫「10 mm（鰭尖；根部 ' + gr + '）」、Fin pitch 12 mm（鰭尖厚度＋air gap，拔模不改 pitch）', g5 === '10 mm（鰭尖；根部 ' + gr + '）' && p5 === '12 mm' && T5.def.includes('根部的 air gap 剩 ' + gr), T5);
+    await page.evaluate(() => { const s = document.getElementById('fin_tech_selector_v2'); s.value = DEFAULT_CONFIG.global_params.fin_tech_selector_v2 || s.options[0].value; s.dispatchEvent(new Event('change', { bubbles: true }));
+      const gp = DEFAULT_CONFIG.global_params; ['Fin_t', 'Gap'].forEach(k => { const e = document.getElementById(k); e.value = gp[k]; e.dispatchEvent(new Event('change', { bubbles: true })); }); });
+    await idle();
     await page.click('#r3d-tab-comp');
   }
 
