@@ -29,6 +29,9 @@
  *       拖 PA 時跟著動；盲插／腔體每一路每一組、開關存 layout3d.pair）；同一個專案的元件／I/O 清單變了，側欄跟著重畫
  *   [Q] 元件預設轉向：Final PA／Driver 預設轉 90°（長邊橫跨訊號方向）、銅塊底板固定跟著板子；⟳／R＝跟預設方向差 90°（layout3d.turn）；
  *       舊版 layout3d.rot（絕對角度）載入時轉成 turn（PA／Driver 回到預設）、之後只寫 turn
+ *   [R] 殼體牆厚 3 mm（PCB 照防水邊距、跟牆之間露出基板；螺絲柱從牆長出來；膠條在牆頂）；Embedded 最外兩片 2.5 mm 壓鑄鰭片（貼齊側面、
+ *       中間等距）；鰭片截斷（空氣層）：開關、長度／寬度對稱增減、位置上下、全寬、夾範圍、亂打不改、按住連續（放開才存）、記住設定、
+ *       layout3d.cut 存檔與載入、尺寸標註與模型樹、計算不變
  *   [K] 瀏覽器沒有 WebGL：工具照常可用、Tab3 顯示原因、沒有未攔截的錯誤
  *
  * 執行：
@@ -372,9 +375,9 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   // 補肉位置不動，找一個 Gap 讓某片鰭片剛好跨在補肉的邊緣（使用者回報「整片鰭片被挖空」的情況）
   const gM = await page.evaluate(() => {
     const b = (RRU3D.dbg.LAY().bosses || [])[0]; if (!b) return null;
-    const W = calcResults.W_hsk, t = G.Fin_t;
-    for (let k = 0; k < 400; k++) { const gp = +(9 + k * 0.01).toFixed(2), n = calcFinCount(W, gp, t), pitch = t + gp, zf0 = (W - ((n - 1) * pitch + t)) / 2;
-      for (let i = 0; i < n; i++) { const z = zf0 + i * pitch + t / 2; if (Math.abs(z - b.z0) < t * 0.2 || Math.abs(z - b.z1) < t * 0.2) return gp; } }
+    const W = calcResults.W_hsk, t = G.Fin_t;   // 鰭片排法跟 3D 同一支（finLayoutOf：Embedded 最外兩片是壓鑄邊片、中間等距）
+    for (let k = 0; k < 400; k++) { const gp = +(9 + k * 0.01).toFixed(2), fl = RRU3D.dbg.finLayoutOf(W, calcFinCount(W, gp, t), t, gp, 0);
+      if (fl.some(f => !f.edge && (Math.abs(f.z - b.z0) < t * 0.2 || Math.abs(f.z - b.z1) < t * 0.2))) return gp; }
     return null;
   });
   await setIn('Gap', gM);
@@ -459,10 +462,11 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   const n7 = await page.evaluate(() => ({ modal: document.getElementById('r3dUnlockModal').classList.contains('active'), w: window.__writes.length - window.__w0 }));
   ok('已解除保護 → 直接儲存，不再問密碼', !n7.modal && n7.w === 1, n7);
   // 退出全螢幕：再按一次；瀏覽器自己退出（Esc）時檢視器也跟著還原
-  await page.click('#r3d-t-fs');
+  // （軟體算圖 SwiftShader 畫一張全螢幕要好幾秒，切換全螢幕時 click 要等畫完才回來 → 放寬到 90 秒，免得機器忙時誤判）
+  await page.click('#r3d-t-fs', { timeout: 90000 });
   await page.waitForFunction(() => !document.fullscreenElement, null, { timeout: 10000 });
   const n8 = await page.evaluate(() => ({ cls: document.querySelector('.r3d').classList.contains('r3d-fs'), pressed: document.getElementById('r3d-t-fs').getAttribute('aria-pressed') }));
-  await page.click('#r3d-t-fs');
+  await page.click('#r3d-t-fs', { timeout: 90000 });
   await page.waitForFunction(() => !!document.fullscreenElement, null, { timeout: 10000 });
   await page.evaluate(() => document.exitFullscreen());
   await page.waitForFunction(() => !document.fullscreenElement, null, { timeout: 10000 });
@@ -795,19 +799,23 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     // ── I/O 分類 ──
     await page.click('#r3d-tab-io');
     const io1 = await page.evaluate(() => ({ add: [...document.querySelectorAll('#r3d-io-add-t optgroup')].map(g => g.label + '：' + [...g.children].map(o => o.value).join(',')),
-      rowSel: [...document.querySelectorAll('#r3d-io-list .p-t')].map(s => s.value), types: RRU3D.dbg.ioList().map(it => it.type) }));
-    ok('I/O 類型分三大類：SFP／電源、Signal（RJ45 等、AISG）、Debug port；接地歸其他；清單的下拉照原本的類型', JSON.stringify(io1.add) === JSON.stringify(['SFP／電源：sfp,pwr', 'Signal：rj45,aisg', 'Debug port：dbg', '其他：gnd'])
+      rowSel: [...document.querySelectorAll('#r3d-io-list .p-t')].map(s => s.value), types: RRU3D.dbg.ioList().map(it => it.type),
+      names: ['rj45', 'sig'].map(v => document.querySelector('#r3d-io-add-t option[value="' + v + '"]').textContent) }));
+    ok('I/O 類型分三大類：SFP／電源、Signal（小圓孔，像信號燈）、Debug port；RJ45、AISG、接地歸其他；清單的下拉照原本的類型', JSON.stringify(io1.add) === JSON.stringify(['SFP／電源：sfp,pwr', 'Signal：sig', 'Debug port：dbg', '其他：rj45,aisg,gnd'])
       && JSON.stringify(io1.rowSel) === JSON.stringify(io1.types), io1);
+    ok('RJ45 恢復成「RJ45 網路」（不再叫 Signal）；預設清單有 RJ45、電源、Debug port、Signal', JSON.stringify(io1.names) === JSON.stringify(['RJ45 網路', 'Signal'])
+      && JSON.stringify(io1.types.filter(t => t !== 'sfp')) === JSON.stringify(['rj45', 'pwr', 'dbg', 'sig']), io1);
     await page.evaluate(() => { const L = RRU3D.dbg.ioList(), keep = L.filter(it => it.type === 'sfp');
-      L.splice(0, L.length, ...keep, ...['pwr', 'rj45', 'aisg', 'dbg', 'gnd', 'xyz'].map((t, i) => ({ id: 'p' + i, type: t, pos: null }))); RRU3D.dbg.saveEdit(); RRU3D.dbg.rebuild(null, true); });
+      L.splice(0, L.length, ...keep, ...['pwr', 'rj45', 'aisg', 'dbg', 'sig', 'gnd', 'xyz'].map((t, i) => ({ id: 'p' + i, type: t, pos: null }))); RRU3D.dbg.saveEdit(); RRU3D.dbg.rebuild(null, true); });
     await idle();
     const io2 = await page.evaluate(() => { const D = RRU3D.dbg, g = {}; D.HSK().userData.io.children.forEach(pg => { if (!pg.userData.port) return; const ms = []; pg.traverse(o => { if (o.isMesh) { o.geometry.computeBoundingBox(); const s = o.geometry.boundingBox.getSize(o.position.clone()); ms.push([o.material.color.getHexString(), +s.y.toFixed(1), +s.z.toFixed(1)]); } }); g[pg.userData.port.it.type] = ms; });
       return { g, rows: [...document.querySelectorAll('#r3d-io-list li')].length, list: D.ioList().length, sel: [...document.querySelectorAll('#r3d-io-list .p-t')].map(s => s.value),
         unk: [...document.querySelectorAll('#r3d-io-list .p-t')].pop().selectedOptions[0].textContent, tags: [...document.querySelectorAll('#r3d-labels .ptag')].map(e => e.textContent) }; });
     const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     ok('電源口跟 SFP 光口同一種外觀（白色凸台＋金屬框＋黑色開口，寬 19）', io2.g.pwr && io2.g.sfp && same(io2.g.pwr.map(m => m[0]), io2.g.sfp.map(m => m[0])) && io2.g.pwr[0][2] === 19, [io2.g.pwr, io2.g.sfp]);
-    ok('Debug port＝金屬框＋黑色開口（寬 28、高 14）；Signal＝圓形防水座', io2.g.dbg && io2.g.dbg.length === 2 && io2.g.dbg[0][1] === 14 && io2.g.dbg[0][2] === 28 && io2.g.rj45 && io2.g.rj45.length === 3, [io2.g.dbg, io2.g.rj45]);
-    ok('I/O 清單在程式改了之後（同一個專案）跟著重畫：列數、類型一致；不認得的類型標「（未知）」不靜默改掉', io2.rows === io2.list && same(io2.sel, [...Array(io2.list - 6).fill('sfp'), 'pwr', 'rj45', 'aisg', 'dbg', 'gnd', 'xyz']) && /未知/.test(io2.unk), io2);
+    ok('Debug port＝金屬框＋黑色開口（寬 28、高 14）；Signal＝小圓孔＋金屬圈（Ø6.8，像信號燈）；RJ45＝圓形防水座', io2.g.dbg && io2.g.dbg.length === 2 && io2.g.dbg[0][1] === 14 && io2.g.dbg[0][2] === 28
+      && io2.g.sig && io2.g.sig.length === 2 && Math.max(...io2.g.sig.map(m => m[2])) === 6.8 && io2.g.rj45 && io2.g.rj45.length === 3, [io2.g.dbg, io2.g.sig, io2.g.rj45]);
+    ok('I/O 清單在程式改了之後（同一個專案）跟著重畫：列數、類型一致；不認得的類型標「（未知）」不靜默改掉', io2.rows === io2.list && same(io2.sel, [...Array(io2.list - 7).fill('sfp'), 'pwr', 'rj45', 'aisg', 'dbg', 'sig', 'gnd', 'xyz']) && /未知/.test(io2.unk), io2);
 
     // ── FDD 通道配對：每一顆 Final PA 自帶一組 Pre-driver／Driver／環形器（使用者畫的圖：2 排 × 4 路） ──
     await page.click('#r3d-tab-comp');
@@ -966,6 +974,122 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     const q6 = await page.evaluate(ids => ({ l3d: JSON.parse(JSON.stringify(layout3d)), ids }), mig);
     ok('轉換後一有調整就寫成新格式：layout3d.turn 只有環形器那一列、舊的 rot 不再寫', q6.l3d.turn && same(Object.keys(q6.l3d.turn), [mig.cr]) && same(q6.l3d.turn[mig.cr], [0, 90, 0, 0]) && !('rot' in q6.l3d), q6);
     await page.evaluate(() => { layout3d = null; renderTab3(true); }); await idle();
+  }
+
+  console.log('\n[R] 殼體牆厚 3 mm、Embedded 最外兩片壓鑄鰭片、鰭片截斷（空氣層）');
+  {
+    const idle = () => page.waitForFunction(() => !RRU3D.dbg.busy(), null, { timeout: 30000 });
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    await page.evaluate(() => { const s = document.getElementById('fin_tech_selector_v2'); s.value = 'Embedded Fin (0.95)'; s.dispatchEvent(new Event('change', { bubbles: true })); });
+    await setIn('Fin_t', 1.2); await setIn('Gap', 11.6);
+    await page.evaluate(() => { layout3d = null; renderTab3(true); }); await idle();
+    // ── 殼體牆厚 3 mm：PCB 照防水邊距擺在內腔裡、跟牆之間留空；基板底面鋪到牆；螺絲柱從牆往內凸；膠條走在牆頂 ──
+    const w = await page.evaluate(() => {
+      const D = RRU3D.dbg, P = D.P(), L = P.r.L, W = P.r.W, g = P.g, H = D.HSK(), LP = D.LAY().loops;
+      const wall = H.children.find(m => m.userData.what === 'wall'), core = H.children.find(m => m.userData.what === 'core'), pos = wall.geometry.attributes.position, nor = wall.geometry.attributes.normal, ds = new Set();
+      for (let i = 0; i < pos.count; i += 3) {       // 牆的直立面（避開四個圓角）距外緣多遠：外側面 0、內側面＝牆厚
+        if (Math.abs(nor.getY(i)) > 0.1 || Math.hypot(nor.getX(i), nor.getZ(i)) < 0.5) continue;   // 只看直立面（擠出件有幾個零面積的三角形，法向量是 0）
+        const cx = (pos.getX(i) + pos.getX(i + 1) + pos.getX(i + 2)) / 3, cz = (pos.getZ(i) + pos.getZ(i + 1) + pos.getZ(i + 2)) / 3;
+        if (cx > 12 && cx < L - 12) ds.add(+Math.min(cz, W - cz).toFixed(2)); else if (cz > 12 && cz < W - 12) ds.add(+Math.min(cx, L - cx).toFixed(2));
+      }
+      const faces = [...ds].sort((a, b) => a - b), ring = faces.length === 2 && faces[0] === 0, inner = faces[faces.length - 1];
+      core.geometry.computeBoundingBox(); const cb = core.geometry.boundingBox;
+      const dEdge = pts => Math.min(...pts.map(([x, z]) => Math.min(x, z, L - x, W - z)));
+      const bosses = []; H.traverse(m => { if (m.userData.what === 'screwBoss') { m.geometry.computeBoundingBox(); const b = m.geometry.boundingBox; bosses.push(+Math.min(b.min.x, b.min.z, L - b.max.x, W - b.max.z).toFixed(2)); } });
+      return { faces, ring, inner: +inner.toFixed(2), core: [cb.min.x, cb.min.z, cb.max.x, cb.max.z].map(v => +v.toFixed(2)), LW: [L, W], cav: D.cavRect(), M: [g.Left, g.Top, g.Right, g.Btm],
+        bossD: [...new Set(bosses)], nBoss: bosses.length, nScrew: D.LAY().screws.length, gasket: +dEdge(LP.gasket.pts).toFixed(2), boss: +dEdge(LP.boss.pts).toFixed(2), pcb: +dEdge(LP.pcb.pts).toFixed(2),
+        tree: document.getElementById('r3d-tree').textContent.includes('牆厚 3 · PCB 離外殼'), asm: document.getElementById('r3d-a-pcb-t').textContent.includes('外殼牆厚 3 mm') };
+    });
+    ok('殼體牆厚 3 mm（不是防水邊距）：牆只在外緣 3 mm 內、內腔＝[3, 3, L−3, W−3]', w.ring && Math.abs(w.inner - 3) < 0.01 && same(w.cav.slice(0, 4), [3, 3, w.LW[0] - 3, w.LW[1] - 3]), w);
+    ok('基板底面鋪滿內腔（牆跟 PCB 之間露出基板，不是空洞）', same(w.core, [3, 3, w.LW[0] - 3, w.LW[1] - 3]), w.core);
+    ok('分模面螺絲的螺絲柱都從 3 mm 牆的內面長出來（每一支都接到牆）', w.nBoss === w.nScrew && same(w.bossD, [3]), w);
+    ok('防水膠條走在 3 mm 牆頂中間（1.5 mm），濾波器外框／上蓋跟著牆內面（3 mm）；PCB 照舊在防水邊距（' + Math.min(...w.M) + ' mm）', w.gasket === 1.5 && w.boss === 3 && w.pcb === Math.min(...w.M), w);
+    ok('模型樹與「假設」寫出牆厚 3 mm、PCB 跟牆之間留空', w.tree && w.asm, w);
+    // ── Embedded：最左、最右兩片是 2.5 mm 壓鑄鰭片 ──
+    const e1 = await page.evaluate(() => { const D = RRU3D.dbg, P = D.P(), W = P.r.W, L = P.r.L, fl = D.finLayout(), edges = [];
+      D.HSK().userData.fins.children.forEach(m => { if (m.userData.edgeFin) { m.geometry.computeBoundingBox(); const b = m.geometry.boundingBox; edges.push([+(m.position.z + b.min.z).toFixed(3), +(m.position.z + b.max.z).toFixed(3), +(b.max.x - b.min.x).toFixed(2)]); } });
+      const inner = fl.filter(f => !f.edge), gaps = inner.slice(1).map((f, i) => +(f.z - f.t / 2 - (inner[i].z + inner[i].t / 2)).toFixed(4));
+      return { n: fl.length, calc: calcResults.Fin_Count, W, L, edge: fl.filter(f => f.edge).map(f => [+f.z.toFixed(3), f.t]), edges: edges.sort((a, b) => a[0] - b[0]), gaps: [...new Set(gaps)],
+        first: +(inner[0].z - inner[0].t / 2 - 2.5).toFixed(4), last: +(W - 2.5 - (inner[inner.length - 1].z + inner[inner.length - 1].t / 2)).toFixed(4), t: [...new Set(inner.map(f => f.t))],
+        spec: document.getElementById('r3d-tree').textContent.includes('最外兩片壓鑄 2.5') }; });
+    ok('Embedded：最左、最右兩片是 2.5 mm 壓鑄鰭片、外側貼齊殼體側面（整條長度）；片數＝computeAll', e1.n === e1.calc && same(e1.edge, [[1.25, 2.5], [+(e1.W - 1.25).toFixed(3), 2.5]])
+      && e1.edges.length === 2 && same(e1.edges[0].slice(0, 2), [0, 2.5]) && same(e1.edges[1].slice(0, 2), [+(e1.W - 2.5).toFixed(3), e1.W]) && e1.edges.every(q => Math.abs(q[2] - e1.L) < 0.01), e1);
+    ok('中間的 Embedded 鰭片厚 Fin_t、等距排在兩片壓鑄鰭片之間（間距處處相同）；鰭片說明寫出「最外兩片壓鑄 2.5」', same(e1.t, [1.2]) && e1.gaps.length === 1 && Math.abs(e1.gaps[0] - e1.first) < 1e-3 && Math.abs(e1.gaps[0] - e1.last) < 1e-3 && e1.spec, e1);
+    await page.evaluate(() => { const s = document.getElementById('fin_tech_selector_v2'); s.value = 'Die-casting Fin (0.90)'; s.dispatchEvent(new Event('change', { bubbles: true })); });
+    await setIn('Fin_t', 2); await setIn('Gap', 10);
+    await page.waitForFunction(() => !calcResults.drc_failed && RRU3D.dbg.P().r.isDC, null, { timeout: 30000 }); await idle();
+    const e2 = await page.evaluate(() => { let n = 0; RRU3D.dbg.HSK().userData.fins.traverse(m => { if (m.userData.edgeFin) n++; }); return { n, fl: RRU3D.dbg.finLayout().filter(f => f.edge).length }; });
+    ok('Die-casting 本來就全部是壓鑄鰭片 → 不另外加厚最外兩片', e2.n === 0 && e2.fl === 0, e2);
+    await page.evaluate(() => { const s = document.getElementById('fin_tech_selector_v2'); s.value = 'Embedded Fin (0.95)'; s.dispatchEvent(new Event('change', { bubbles: true })); });
+    await setIn('Fin_t', 1.2); await setIn('Gap', 11.6);
+    await page.waitForFunction(() => !calcResults.drc_failed && !RRU3D.dbg.P().r.isDC, null, { timeout: 30000 }); await idle();
+    // ── 鰭片截斷（空氣層）──
+    const segs = () => page.evaluate(() => { const D = RRU3D.dbg, fins = D.HSK().userData.fins, byZ = {};
+      fins.children.forEach(m => { const p = m.geometry.attributes.position; let x0 = 1e9, x1 = -1e9; for (let i = 0; i < p.count; i++) { x0 = Math.min(x0, p.getX(i)); x1 = Math.max(x1, p.getX(i)); }
+        (m.isInstancedMesh ? Array.from({ length: m.count }, (_, i) => m.instanceMatrix.array[i * 16 + 14]) : [m.position.z]).forEach(z => { (byZ[z.toFixed(3)] = byZ[z.toFixed(3)] || []).push([x0, x1]); }); });
+      const c = D.cutCfg(), L = D.P().r.L, W = D.P().r.W, cover = (sg, a, b) => sg.reduce((s, [x0, x1]) => s + Math.max(0, Math.min(x1, b) - Math.max(x0, a)), 0);
+      const rows = Object.entries(byZ).map(([z, sg]) => ({ z: +z, inCut: c ? cover(sg, c.x0 + 0.01, c.x1 - 0.01) : 0, total: cover(sg, 0, L) }));
+      return { c, L, W, n: rows.length, cut: rows.filter(r => r.inCut < 0.01 && c).length, full: rows.filter(r => Math.abs(r.total - L) < 0.02).length, rows,
+        l3d: layout3d && layout3d.cut ? JSON.parse(JSON.stringify(layout3d.cut)) : null, FH: calcResults.Fin_Height, V: calcResults.Volume_L,
+        sum: document.getElementById('r3d-cut-sum').textContent, inputs: ['len', 'wid', 'x'].map(k => document.getElementById('r3d-cut-' + k).value),
+        dim: (() => { let cd = null; D.scene.traverse(o => { if (o.userData && o.userData.cut && o.userData.cut.isObject3D) cd = o.userData.cut; }); const l = cd && cd.children.find(q => q.element); return l ? l.element.textContent : null; })(),
+        tree: document.getElementById('r3d-tree').textContent.includes('截斷') }; });
+    const s0 = await segs();
+    await page.click('#r3d-tab-fin');
+    const pn0 = await page.evaluate(() => ({ off: document.querySelector('#r3d-pn-fin [data-cut="0"]').getAttribute('aria-pressed'), form: document.getElementById('r3d-cut-form').hidden, vis: !document.getElementById('r3d-pn-fin').hidden }));
+    ok('鰭片分頁：預設沒有截斷（「關」、步進器收起來、每一片都是整條）', pn0.vis && pn0.off === 'true' && pn0.form && !s0.c && s0.full === s0.n && !s0.l3d, [pn0, s0.full, s0.n]);
+    await page.click('#r3d-pn-fin [data-cut="1"]'); await idle();
+    const s1 = await segs();
+    ok('按「開」→ 在正中間截斷 20 mm、全寬（每一片都拿掉那一段），存成 layout3d.cut＝{x, len}（沒有 wid＝全寬）', s1.c && s1.c.full && s1.c.len === 20 && Math.abs(s1.c.x - s1.L / 2) <= 0.25 && s1.cut === s1.n
+      && s1.rows.every(r => Math.abs(r.total - (s1.L - 20)) < 0.05) && same(Object.keys(s1.l3d).sort(), ['len', 'x']) && s1.l3d.len === 20, [s1.c, s1.l3d, s1.cut, s1.n]);
+    ok('截斷只影響 3D：鰭片高、體積不變；分頁寫出截斷幾片、拿掉的面積，並說明計算沒算截斷', s1.FH === s0.FH && s1.V === s0.V && /截斷 \d+／\d+ 片/.test(s1.sum) && /拿掉鰭片面積/.test(s1.sum)
+      && /只影響 3D/.test(await page.evaluate(() => document.getElementById('r3d-cut-note').textContent)), s1.sum);
+    ok('尺寸標註與模型樹寫出截斷（長度、中心距底端）', !!s1.dim && /截斷 20/.test(s1.dim) && /中心距底端/.test(s1.dim) && s1.tree, [s1.dim, s1.tree]);
+    const btn = (k, sgn) => page.evaluate(([k, sgn]) => document.querySelector('#r3d-pn-fin [data-cutk="' + k + '"] [data-hold="' + sgn + '"]').click(), [k, sgn]);
+    await btn('len', 1); await idle();
+    const s2 = await segs();
+    ok('長度「＋」一下＝兩端各加長 1 mm（對稱：中心不動）', s2.c.len === 22 && s2.c.x === s1.c.x && Math.abs(s2.c.x0 - (s1.c.x0 - 1)) < 1e-9 && Math.abs(s2.c.x1 - (s1.c.x1 + 1)) < 1e-9 && s2.l3d.len === 22, [s1.c, s2.c]);
+    await btn('x', 1); await idle();
+    const s3 = await segs();
+    ok('位置「▲」一下＝整段往上 1 mm（長度不變）', s3.c.x === s2.c.x + 1 && s3.c.len === 22 && s3.l3d.x === s3.c.x, [s2.c, s3.c]);
+    await page.fill('#r3d-cut-wid', '120'); await page.press('#r3d-cut-wid', 'Enter'); await idle();
+    const s4 = await segs(), mid = s4.rows.filter(r => Math.abs(r.z - s4.W / 2) <= 60).length;
+    ok('寬度打 120 → 以散熱器中線對稱，只截斷中間 120 mm 內的鰭片（其他照舊整條），存成 wid＝120', s4.c.wid === 120 && !s4.c.full && s4.cut === mid && s4.full === s4.n - mid && mid > 0 && s4.l3d.wid === 120
+      && Math.abs(s4.c.z0 - (s4.W / 2 - 60)) < 1e-9, [s4.c, mid, s4.cut, s4.full, s4.n]);
+    await btn('wid', -1); await idle();
+    const s5 = await segs();
+    ok('寬度「−」一下＝兩側各縮 1 mm（118）', s5.c.wid === 118 && s5.l3d.wid === 118, s5.c);
+    await page.click('#r3d-cut-full'); await idle();
+    const s6 = await segs();
+    ok('按「全寬」→ 全部鰭片都截斷，layout3d.cut 不存 wid', s6.c.full && s6.cut === s6.n && !('wid' in s6.l3d), s6.l3d);
+    await page.fill('#r3d-cut-len', '99999'); await page.press('#r3d-cut-len', 'Enter'); await idle();
+    const s7 = await segs();
+    ok('長度打太大 → 夾到 L − 20（兩端各留 10 mm 鰭片），位置跟著夾回（整段在散熱器裡）；欄位馬上顯示夾回後的值', s7.c.len === Math.floor((s7.L - 20) * 2) / 2 && s7.c.x0 >= 0 && s7.c.x1 <= s7.L && s7.l3d.len === s7.c.len
+      && parseFloat(s7.inputs[0]) === s7.c.len, [s7.c, s7.inputs]);
+    await page.fill('#r3d-cut-len', 'abc'); await page.press('#r3d-cut-len', 'Enter'); await idle();
+    const s7b = await segs();
+    ok('亂打（不是數字）→ 不改，欄位回到原本的值', s7b.c.len === s7.c.len && parseFloat(s7b.inputs[0]) === s7.c.len, [s7b.inputs, s7.c.len]);
+    await page.fill('#r3d-cut-len', '20'); await page.press('#r3d-cut-len', 'Enter'); await idle();
+    // 按住連續：只重畫鰭片，放開才存
+    const hold = await page.evaluate(async () => { const b = document.querySelector('#r3d-pn-fin [data-cutk="len"] [data-hold="1"]'), r = b.getBoundingClientRect(), o = { bubbles: true, button: 0, clientX: r.left + 5, clientY: r.top + 5, pointerId: 1 };
+      const l0 = layout3d.cut.len; b.dispatchEvent(new PointerEvent('pointerdown', o)); await new Promise(res => setTimeout(res, 1000));
+      const mid = { cfg: RRU3D.dbg.cutCfg().len, saved: layout3d.cut.len }; window.dispatchEvent(new PointerEvent('pointerup', o)); await new Promise(res => setTimeout(res, 50));
+      return { l0, mid, after: layout3d.cut.len, cfg: RRU3D.dbg.cutCfg().len }; });
+    await idle();
+    ok('按住「＋」→ 連續加長（第一下立刻動、之後連發）；按住時只重畫鰭片，放開才寫回 layout3d', hold.mid.cfg > hold.l0 + 4 && hold.mid.saved === hold.l0 && hold.after === hold.cfg && hold.after >= hold.mid.cfg, hold);
+    await page.click('#r3d-pn-fin [data-cut="0"]'); await idle();
+    const s8 = await segs();
+    ok('按「關」→ 鰭片回到整條、layout3d 不留 cut', !s8.c && s8.full === s8.n && !s8.l3d && (await page.evaluate(() => document.getElementById('r3d-cut-form').hidden)), [s8.full, s8.n, s8.l3d]);
+    await page.click('#r3d-pn-fin [data-cut="1"]'); await idle();
+    const s9 = await segs();
+    ok('再按「開」→ 回到剛才的設定（這次檢視內記得）', s9.c && s9.c.len === hold.after && s9.l3d.len === hold.after, s9.c);
+    // 存檔格式／載入：layout3d.cut 跟著專案
+    await page.evaluate(() => { layout3d = { cut: { x: 100, len: 30, wid: 50 } }; renderTab3(true); }); await idle();
+    const s10 = await segs();
+    ok('載入專案的 layout3d.cut → 3D 照著截斷，分頁顯示開、長 30／寬 50／位置 100', s10.c && s10.c.x === 100 && s10.c.len === 30 && s10.c.wid === 50 && same(s10.inputs.map(Number), [30, 50, 100])
+      && (await page.evaluate(() => document.querySelector('#r3d-pn-fin [data-cut="1"]').getAttribute('aria-pressed'))) === 'true', [s10.c, s10.inputs]);
+    await page.evaluate(() => { layout3d = null; renderTab3(true); }); await idle();
+    await page.click('#r3d-tab-comp');
   }
 
   ok('沒有 JS 錯誤', errors.length === 0, errors);

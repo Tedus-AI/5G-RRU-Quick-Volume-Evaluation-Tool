@@ -3453,7 +3453,8 @@ function renderTab2(){
 // 這裡只負責「餵資料」：build3dData() 把參數控制台、computeAll 的結果、元件設定與 AI-Thermal 的規格
 // 整理成檢視器要的格式；檢視器不自己算熱。
 // 3D 頁的調整（元件橫向位置、轉向、數位 I/O、天線座、屏蔽罩設定）是專案的一部分：
-//   layout3d＝{ posW:{_cid:[每顆橫向 mm 或 null]}, turn:{_cid:[每顆 0／90＝跟預設方向差 90°]}, io:[…], ant:[…], shd:{…}, pair:false（通道配對關掉才寫） }
+//   layout3d＝{ posW:{_cid:[每顆橫向 mm 或 null]}, turn:{_cid:[每顆 0／90＝跟預設方向差 90°]}, io:[…], ant:[…], shd:{…}, pair:false（通道配對關掉才寫）,
+//               cut:{x,len,wid?}（鰭片截斷：中心距底端、沿鰭片長度、跨鰭片寬度；沒有 wid＝全寬） }
 //   （Final PA／Driver 預設轉 90°；舊版存的 rot 是絕對角度 → 交給檢視器的 migrateRot 轉成 turn，之後只寫 turn）
 //   → 跟著「💾 儲存專案」寫進共用 DB（專案層級欄位，只有本工具寫；以 _cid 為 key，元件改名不會掉）。
 // 元件相對高度在 3D 上改＝寫回元件設定的 Height(mm) 並重算（跟在元件設定改是同一件事）。
@@ -3468,7 +3469,7 @@ function l3dHas(){return !!layout3d&&Object.keys(layout3d).some(k=>{const v=layo
 function l3dComps(){return ['rf','digital','pwr'].flatMap(cat=>(components[cat]||[]).filter(c=>c&&c.Component));}
 // layout3d（以 _cid 為 key）→ 檢視器的編輯狀態（以元件名稱為 key；同名的以第一顆為準）
 function l3dToEdit(L){
-  const E={posW:{},hgt:{},turn:{},rot:{},io:null,ant:null,shd:{}};
+  const E={posW:{},hgt:{},turn:{},rot:{},io:null,ant:null,shd:{},cut:null};
   if(!L)return E;
   l3dComps().forEach(c=>{
     const id=c._cid,n=String(c.Component);if(!id)return;
@@ -3478,6 +3479,7 @@ function l3dToEdit(L){
   });
   if(Array.isArray(L.io))E.io=CompMerge.clone(L.io);
   if(Array.isArray(L.ant))E.ant=CompMerge.clone(L.ant);
+  if(L.cut&&typeof L.cut==='object')E.cut=CompMerge.clone(L.cut);   // 鰭片截斷（空氣層）
   if(L.shd&&typeof L.shd==='object')E.shd=CompMerge.clone(L.shd);
   if(L.pair===false)E.pair=false;   // 通道配對（FDD）關掉：3D 的 RF 元件照舊排法（預設開，開著不寫）
   return E;
@@ -3493,6 +3495,7 @@ function l3dFromEdit(E){
   if(Array.isArray(E.ant))L.ant=CompMerge.clone(E.ant);
   if(E.shd&&Object.keys(E.shd).length)L.shd=CompMerge.clone(E.shd);
   if(E.pair===false)L.pair=false;
+  if(E.cut&&typeof E.cut==='object'&&typeof E.cut.len==='number')L.cut=CompMerge.clone(E.cut);
   return Object.keys(L).length?L:null;
 }
 // 檢視器每存一次調整就交過來（saveEdit）：元件相對高度寫回元件設定 → 重算；其餘轉成 layout3d
