@@ -176,14 +176,14 @@ const AIT_PROJECT = {
   ok('3D 頁顯示擋下原因', /無法計算體積/.test(e.t3), e.t3.slice(0, 40));
 
   const e2 = await page.evaluate(async () => {
-    runSweep(); runTornado();
+    renderTab4(true);
     window.__alerts = [];
     await generatePDFReport();
-    return { sweep: document.getElementById('sa-sweep-results').textContent,
-             tornado: document.getElementById('sa-tornado-results').textContent,
+    return { sa: document.getElementById('sa-body').textContent,
+             saSecs: document.querySelectorAll('#sa-body > section[id]').length,
              pdf: window.__alerts.join('\n') };
   });
-  ok('敏感度分析（掃描／Tornado）都顯示擋下原因', /無法計算體積/.test(e2.sweep) && /無法計算體積/.test(e2.tornado), e2);
+  ok('敏感度分析顯示擋下原因、不做任何分析', /無法計算體積/.test(e2.sa) && e2.saSecs === 0, e2);
   ok('PDF 報告拒絕產生並列出缺什麼', /無法產生報告/.test(e2.pdf) && /Circulators-B20B28/.test(e2.pdf), e2.pdf.slice(0, 80));
 
   console.log('\n[F] 元件表：缺值格不顯示 0、紅框「必填」、下拉顯示「請選擇」');

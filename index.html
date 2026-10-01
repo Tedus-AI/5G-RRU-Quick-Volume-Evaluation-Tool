@@ -431,9 +431,37 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 @container (max-width:760px){.vr-res{grid-template-columns:minmax(0,1fr) minmax(0,1fr);}.vr-cell:nth-child(2){grid-column:1/-1;order:3;border-right:0;border-top:1px solid #e2e8f0;}}
 @container (max-width:480px){.vr-res{grid-template-columns:minmax(0,1fr);}.vr-cell{border-right:0;border-bottom:1px solid #e2e8f0;}.vr-cell:nth-child(2){border-top:0;}}
 @container (max-width:560px){.vr-steps{grid-template-columns:minmax(0,1fr);}}
-.sa-controls{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:18px;margin-bottom:20px;display:flex;gap:15px;align-items:flex-end;flex-wrap:wrap;}
-.sa-controls>div{display:flex;flex-direction:column;}.sa-controls label{font-size:0.78rem;color:#666;margin-bottom:4px;}
-.sa-controls input,.sa-controls select{padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:0.85rem;}
+/* 敏感度分析（Tab4，renderTab4）：面板沿用視覺化報告的 .vr-panel／.vr-head；寬度判斷依這一頁本身（container query） */
+#tab4{container-type:inline-size;}
+.sa-intro{margin:0 0 12px;font-size:0.84rem;color:#475569;line-height:1.6;}
+.sa-sum .vr-res{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr);}
+.sa-sum .sa-who .vr-num{font-size:1.15rem;white-space:normal;word-break:break-word;}
+.sa-pad{padding:10px 14px 12px;}
+.sa-ans{display:flex;flex-wrap:wrap;gap:6px 22px;margin:0 0 8px;font-size:0.84rem;color:#1e293b;line-height:1.55;}
+.sa-ans b{font-family:"Nunito",sans-serif;font-weight:900;font-size:1.05rem;color:var(--th-bg);font-variant-numeric:tabular-nums;}
+.sa-good{color:#1d6b24;font-weight:700;}
+.sa-off{color:#7a5200;font-weight:700;}
+.sa-na{color:#64748b;}
+.sa-neg{color:#a61b1b;font-weight:800;}
+.sa-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;}
+@container (max-width:900px){.sa-two{grid-template-columns:minmax(0,1fr);}.sa-sum .vr-res{grid-template-columns:minmax(0,1fr);}.sa-sum .vr-cell{border-right:0;border-top:0;border-bottom:1px solid #e2e8f0;}.sa-sum .vr-cell:last-child{border-bottom:0;}}
+.sa-sum .vr-cell:nth-child(2){order:0;}   /* 視覺化報告窄版會把第 2 格移到最後（.vr-cell:nth-child(2){order:3}）；摘要照原本順序 */
+.sa-chart{min-width:0;}
+.sa-plot{min-width:0;height:330px;border:1px solid #eef2f7;border-radius:8px;}
+.sa-plot.tall{height:440px;}
+.sa-plot .sa-noplot{padding:20px;font-size:0.8rem;color:#64748b;}
+.sa-leg{display:flex;flex-wrap:wrap;gap:4px 14px;margin:6px 4px 0;font-size:0.76rem;color:#334155;}
+.sa-leg>span{display:inline-flex;align-items:center;gap:6px;}
+.sa-leg i{display:inline-block;width:20px;height:0;border-top:3px solid;}
+.sa-leg b{font-variant-numeric:tabular-nums;}
+.sa-read{margin-top:10px;padding:9px 12px;background:#f6f8fb;border:1px solid #e2e8f0;border-radius:8px;font-size:0.8rem;line-height:1.65;color:#334155;}
+.sa-read .t{font-weight:800;color:var(--th-bg);margin-right:6px;}
+.sa-read ol{margin:4px 0 0;padding-left:20px;}
+.sa-tbl{width:100%;max-width:860px;border-collapse:collapse;font-size:0.8rem;font-variant-numeric:tabular-nums;}
+.sa-tbl th{background:linear-gradient(180deg,var(--th-bg),var(--th-bg2));color:var(--th-fg);font-weight:700;padding:7px 8px;text-align:right;border-bottom:3px solid var(--th-accent);}
+.sa-tbl th:first-child,.sa-tbl td:first-child{text-align:left;}
+.sa-tbl td{padding:6px 8px;text-align:right;border-bottom:1px solid #eef2f7;}
+.sa-tbl tr.cur td{font-weight:800;background:#f0f9ff;}
 .power-summary{background:#e3f2fd;border-left:4px solid var(--info);padding:12px 16px;border-radius:8px;margin-top:10px;font-weight:600;color:#1565c0;}
 .drc-error{background:#ffebee;border:2px solid var(--danger);border-radius:10px;padding:20px;text-align:center;color:var(--danger);}
 .lib-section{background:#f8f9fa;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:12px;}
@@ -646,7 +674,7 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
         <li><strong>Tj_Margin 裕度分析</strong>：全元件 Tj / Tc 裕量色階顯示，超溫自動觸發紅色警告</li>
         <li><strong>散熱器尺寸優化</strong>：根據瓶頸元件裕度與安全係數，自動推算所需鰭片高度、數量與整機體積</li>
         <li><strong>重量預估</strong>：含散熱器、Shield、Filter、Shielding、PCB 等分項重量</li>
-        <li><strong>敏感度分析 & Tornado Chart</strong>：支援 Gap / T_amb / Power Scale 變數掃描</li>
+        <li><strong>敏感度分析</strong>：目前這顆散熱器的餘裕（環溫／熱耗上限）、鰭片 air gap 取捨（體積＋流阻比）、熱耗與環溫變動</li>
         <li><strong>3D 模擬視圖</strong>：寫實 3D 模型（外殼、濾波器、屏蔽罩、PCB、元件、基板凹槽），可調整元件橫向位置、I/O 與天線座；下載目前畫面、輸出兩頁 A4 的 3D 模型 PDF</li>
         <li><strong>專案存取</strong>：JSON 格式載入/儲存</li>
       </ul>
@@ -991,33 +1019,10 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
     <div id="tab3-3d"></div>
   </div>
 
-  <!-- Tab 4: 敏感度分析 -->
+  <!-- Tab 4: 敏感度分析（renderTab4：摘要＋① air gap ② 熱耗 ③ 環溫；切到這頁才畫） -->
   <div class="tab-content" id="tab4">
     <h3>📈 敏感度分析 (Sensitivity Analysis)</h3>
-    <div style="margin-bottom:15px;">
-      <label><input type="radio" name="sa_mode" value="sweep" checked onchange="toggleSAMode()"> 🔬 單變數掃描</label>
-      <label style="margin-left:15px;"><input type="radio" name="sa_mode" value="tornado" onchange="toggleSAMode()"> 🌪️ Tornado Chart (全局敏感度)</label>
-    </div>
-    <hr style="margin-bottom:15px;">
-    <div id="sa-sweep-panel">
-      <div class="sa-controls">
-        <div><label>1. 分析變數</label><select id="sa_var" onchange="updateSABase()"><option value="Gap">Gap (Fin Air Gap)</option><option value="T_amb">T_amb (環境溫度)</option><option value="power_scale">Power Scale (功耗縮放)</option></select></div>
-        <div><label>2. 基準值</label><input type="number" id="sa_base" disabled></div>
-        <div><label>3. 減少 (-%)</label><input type="number" id="sa_minus" value="50" min="0" max="90" step="5"></div>
-        <div><label>4. 增加 (+%)</label><input type="number" id="sa_plus" value="50" min="0" max="300" step="5"></div>
-        <div><label>5. 計算點數</label><input type="number" id="sa_steps" value="9" min="3" max="21" step="2"></div>
-        <div><button class="btn btn-primary" onclick="runSweep()" style="margin-top:18px;">🚀 執行分析</button></div>
-      </div>
-      <div id="sa-sweep-results"></div>
-    </div>
-    <div id="sa-tornado-panel" style="display:none;">
-      <div class="sa-controls">
-        <div><label>敏感度範圍 (±%)</label><input type="number" id="tornado_pct" value="20" min="5" max="50" step="5"></div>
-        <div><label>分析指標</label><select id="tornado_metric"><option value="both">兩者並排</option><option value="volume">體積 (L)</option><option value="tj">Bottleneck Tj_Margin (°C)</option></select></div>
-        <div><button class="btn btn-primary" onclick="runTornado()" style="margin-top:18px;">🌪️ 執行 Tornado 分析</button></div>
-      </div>
-      <div id="sa-tornado-results"></div>
-    </div>
+    <div id="sa-body"></div>
   </div>
 </div>
 <script>
@@ -1596,6 +1601,10 @@ const MARGIN_LEVELS = [
   {key:'watch',lt:20,       label:'留意', icon:'●', fg:'#7a5200', bg:'#fef6e0', bd:'#f3d88f', mk:'#fab219'},
   {key:'ok',   lt:Infinity, label:'充裕', icon:'✓', fg:'#1d6b24', bg:'#eaf7ea', bd:'#bfe0c1', mk:'#0ca30c'}
 ];
+/* 流阻比（鰭片高 ÷ air gap）建議值（單一事實來源）：參數控制台的流阻比顯示、PDF、敏感度分析的 air gap 圖共用。
+   > 12 是 DRC 不通過（computeAll）；參數控制台 #ar-tip 的說明文字（「建議值內，無風 AR 往低趨勢設計，反之亦然」）是使用者訂的設計原則。 */
+const AR_GOOD = [4.5, 6.5];
+function arGood(ar){return ar>=AR_GOOD[0]&&ar<=AR_GOOD[1];}
 function marginLevel(m){return (typeof m==='number'&&isFinite(m))?MARGIN_LEVELS.find(l=>m<l.lt):null;}
 function marginVars(lv){return lv?'--st-fg:'+lv.fg+';--st-bg:'+lv.bg+';--st-bd:'+lv.bd+';--st-mk:'+lv.mk+';':'';}
 function marginRange(i){const L=MARGIN_LEVELS;return i===0?'<'+L[0].lt:i===L.length-1?'≥'+L[i-1].lt:L[i-1].lt+'–'+L[i].lt;}   // '<0'、'0–10'、'10–20'、'≥20'
@@ -2059,7 +2068,6 @@ function init() {
   initSidebarLayout();
   migrateThickGlobals(gp);
   document.getElementById('loading').style.display='none';
-  updateSABase();
   recalc();
   projBase=null;markProjectClean();
   initFirebase();
@@ -2170,7 +2178,6 @@ function initSidebarLayout(){
 // SIDEBAR HELPERS
 // =====================================================
 function toggleSection(el){el.classList.toggle('collapsed');el.nextElementSibling.classList.toggle('collapsed');}
-function toggleSAMode(){let m=document.querySelector('input[name="sa_mode"]:checked').value;document.getElementById('sa-sweep-panel').style.display=m==='sweep'?'':'none';document.getElementById('sa-tornado-panel').style.display=m==='tornado'?'':'none';}
 
 function readGlobals(){
   ['T_amb','Margin','L_pcb','W_pcb','t_PCB','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Coin_T_Setting','K_Coin','Gap','Fin_t','K_Via','Via_Eff','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(id=>{let el=document.getElementById(id);if(el&&el.tagName!=='SELECT')G[id]=parseFloat(el.value)||0;});
@@ -2304,7 +2311,10 @@ function calcThermalResistance(row0,g){
 }
 
 function emptyCalcResult(){return{Total_Power:0,Min_dT_Allowed:50,Bottleneck_Name:"None",Area_req:0,Fin_Height:0,Volume_L:0,total_weight_kg:0,h_value:0,h_conv:0,h_rad:0,Bottleneck_Tj_Margin:0,Fin_Count:0,rows:[],drc_failed:false,drc_msg:"",drc_warn:"",L_hsk:0,W_hsk:0,RRU_Height:0,aspect_ratio:0,hs_weight_kg:0,shield_weight_kg:0,filter_weight_kg:0,shielding_weight_kg:0,pcb_weight_kg:0,eff:0,eta_fin:0,T_hsk_base:0,T_root:0,G_root:0};}
-function computeAll(params,comps,Area_fixed_m2){
+/* 每顆元件的溫度鏈（computeAll 與敏感度分析共用）：散熱器基座 THB → ＋高度 × 斜率 → Tc（＋P×(R_int+R_TIM)）→ Tj（＋P×R_jc）；
+   判定溫度 T_ref 依限溫對象 Temp_Label（calcThermalResistance 決定）。 */
+function rowTemps(r,THB,p){r.T_hsk_eff=THB+r['Height(mm)']*p.Slope;r.Tc=r.T_hsk_eff+r['Power(W)']*(r.R_int+r.R_TIM);r.Tj=r.Tc+r['Power(W)']*r.R_jc;r.T_ref=r.Temp_Label==='Tc'?r.Tc:r.Tj;r.Tj_Margin=r['Limit(C)']-r.T_ref;return r;}
+function computeAll(params,comps){
   let p={...params};let all=[];
   // 必填欄位沒填 → 不計算（元件欄位不套預設值：寧可擋下，也不要用猜的值算出看似合理的體積）
   const missing=listMissing(comps);
@@ -2369,11 +2379,10 @@ function computeAll(params,comps,Area_fixed_m2){
   let shw=(p.L_pcb*p.W_pcb/100)*1.2*p.shielding_density/1000;
   let pw=(p.L_pcb*p.W_pcb/100)*p.pcb_surface_density/1000;
   let tw=hw+sw+fw+shw+pw;
-  // Tc/Tj
-  // 固定散熱器模式：以「真實功耗 TWS」評估基座溫度（Margin 只用於把散熱器設計加大，不是真實工況，
-  // 用 TP=TWS*Margin 會與撐大面積時的 Margin 互相抵消，導致基準點裕度恆為 0、吃掉設計安全係數）。
-  let THB;if(Area_fixed_m2&&Area_fixed_m2>0)THB=p.T_amb+TWS/(h_value*Area_fixed_m2*eff);else THB=p.T_amb+MDA/p.Margin;
-  rows.forEach(r=>{r.T_hsk_eff=THB+r['Height(mm)']*p.Slope;r.Tc=r.T_hsk_eff+r['Power(W)']*(r.R_int+r.R_TIM);r.Tj=r.Tc+r['Power(W)']*r.R_jc;r.T_ref=r.Temp_Label==='Tc'?r.Tc:r.Tj;r.Tj_Margin=r['Limit(C)']-r.T_ref;});   // Temp_Label＝限溫對象（calcThermalResistance 決定）
+  // Tc/Tj：散熱器基座溫度以「真實功耗 TWS」評估 ＝ T_amb + TWS/(h·A·η) ＝ T_amb + MDA/Margin
+  // （Margin 只用來把散熱器放大，不是實際工況）。「固定這顆散熱器、工況變動」見敏感度分析 saFixedEval。
+  let THB=p.T_amb+MDA/p.Margin;
+  rows.forEach(r=>rowTemps(r,THB,p));
   let BTM=0;if(valid.length&&bti>=0){let br=rows.find(r=>r.Component===BN&&r.Total_W>0);if(br)BTM=Math.round(br.Tj_Margin*10)/10;}
   // DRC
   let drc=false,dm="",dw="";let ar=(p.Gap>0&&FH>0)?FH/p.Gap:0;
@@ -2394,7 +2403,7 @@ function computeAll(params,comps,Area_fixed_m2){
 // =====================================================
 // MAIN RECALC
 // =====================================================
-function recalc(){readGlobals();applyThickFromGlobals();calcResults=computeAll(G,components,null);updateHDisplay();renderDimDerive();renderTab0();renderTab1();renderTab2();renderTab3();updateSABase();}
+function recalc(){readGlobals();applyThickFromGlobals();calcResults=computeAll(G,components);updateHDisplay();renderDimDerive();renderTab0();renderTab1();renderTab2();renderTab3();scheduleTab4();}
 
 function updateHDisplay(){
   let FH_disp=(calcResults&&calcResults.Fin_Height>0)?calcResults.Fin_Height:70;let{h_value,h_conv,h_rad}=calcHValue(G.Gap,FH_disp);let el=document.getElementById('h-val');
@@ -2404,7 +2413,7 @@ function updateHDisplay(){
   let ar=calcResults?calcResults.aspect_ratio:0;let arEl=document.getElementById('ar-val');let arMsg=document.getElementById('ar-msg');
   if(ar>0){arEl.textContent=ar.toFixed(1);
     if(ar>12){arEl.style.color='#e74c3c';arMsg.textContent='⛔ 過高 (High)';arMsg.style.color='#e74c3c';}
-    else if(ar>=4.5&&ar<=6.5){arEl.style.color='#00b894';arMsg.textContent='✅ 良好 (Good)';arMsg.style.color='#00b894';}
+    else if(arGood(ar)){arEl.style.color='#00b894';arMsg.textContent='✅ 良好 (Good)';arMsg.style.color='#00b894';}
     else{arEl.style.color='#f39c12';arMsg.textContent='⚠️ 不佳 (Poor)';arMsg.style.color='#f39c12';}
   } else {arEl.textContent='--';arMsg.textContent='等待計算...';}
   let isDC=G.fin_tech_selector_v2.includes("Die-casting");
@@ -2422,7 +2431,7 @@ function updateHDisplay(){
 // =====================================================
 // TAB SWITCHING
 // =====================================================
-function switchTab(i){const was3=tab3Active();if(was3&&i!==3&&window.RRU3D)RRU3D.left();if(i===3&&!was3)sbAutoFor3d(true);else if(was3&&i!==3)sbAutoFor3d(false);document.querySelectorAll('.tab-btn').forEach((b,j)=>b.classList.toggle('active',j===i));document.querySelectorAll('.tab-content').forEach((c,j)=>c.classList.toggle('active',j===i));if(i===3)setTimeout(()=>{if(tab3Stale||!window.RRU3D)renderTab3();else RRU3D.resize();},50);setTimeout(function(){var tab=document.getElementById('tab'+i);if(tab){tab.querySelectorAll('.js-plotly-plot').forEach(function(gd){Plotly.Plots.resize(gd);});}},80);}
+function switchTab(i){const was3=tab3Active();if(was3&&i!==3&&window.RRU3D)RRU3D.left();if(i===3&&!was3)sbAutoFor3d(true);else if(was3&&i!==3)sbAutoFor3d(false);document.querySelectorAll('.tab-btn').forEach((b,j)=>b.classList.toggle('active',j===i));document.querySelectorAll('.tab-content').forEach((c,j)=>c.classList.toggle('active',j===i));if(i===3)setTimeout(()=>{if(tab3Stale||!window.RRU3D)renderTab3();else RRU3D.resize();},50);if(i===4&&tab4Stale)renderTab4(true);setTimeout(function(){var tab=document.getElementById('tab'+i);if(tab){tab.querySelectorAll('.js-plotly-plot').forEach(function(gd){Plotly.Plots.resize(gd);});}},80);}
 function switchSubTab(i){document.querySelectorAll('.sub-tab-btn').forEach((b,j)=>b.classList.toggle('active',j===i));document.querySelectorAll('.sub-content').forEach((c,j)=>c.classList.toggle('active',j===i));}
 
 // =====================================================
@@ -3246,7 +3255,6 @@ function riskFootHtml(r,i,top,R,g){
 // =====================================================
 // TAB 2: VISUAL REPORT
 // =====================================================
-var fullscreenBtn={name:'fullscreen',title:'全螢幕',icon:{width:24,height:24,path:'M5 5h5V3H3v7h2V5zm14 0h-5V3h7v7h-2V5zM5 19h5v2H3v-7h2v5zm14 0h-5v2h7v-7h-2v5z'},click:function(gd){if(!document.fullscreenElement){var el=gd.closest('.js-plotly-plot')||gd;var origData=JSON.parse(JSON.stringify(gd.data));var origLayout=JSON.parse(JSON.stringify(gd.layout));delete origLayout.width;delete origLayout.height;var origConfig={responsive:true,displaylogo:false,modeBarButtonsToAdd:['toggleSpikelines',fullscreenBtn],displayModeBar:true};var parent=el.parentNode;var elRect=el.getBoundingClientRect();var placeholder=document.createElement('div');placeholder.id='_fs_placeholder';placeholder.style.cssText='flex:1;min-width:'+elRect.width+'px;min-height:'+elRect.height+'px;';parent.insertBefore(placeholder,el);var wrapper=document.createElement('div');wrapper.id='_fs_wrapper';wrapper.style.cssText='background:#fff;width:100%;height:100%;';wrapper.appendChild(el);document.body.appendChild(wrapper);wrapper.requestFullscreen().then(function(){Plotly.relayout(gd,{width:window.screen.width,height:window.screen.height});});var onExit=function(){if(!document.fullscreenElement){document.removeEventListener('fullscreenchange',onExit);var ph=document.getElementById('_fs_placeholder');if(ph){ph.parentNode.insertBefore(el,ph);ph.remove();}var wr=document.getElementById('_fs_wrapper');if(wr)wr.remove();Plotly.purge(gd);Plotly.newPlot(gd,origData,origLayout,origConfig).then(function(){var flexParent=el.parentNode;if(flexParent){flexParent.querySelectorAll('.js-plotly-plot').forEach(function(sib){if(sib!==el)Plotly.Plots.resize(sib);});}});}};document.addEventListener('fullscreenchange',onExit);}else{document.exitFullscreen();}}};
 /* ── 視覺化報告 ─────────────────────────────────────────────
    使用者回報「溫度裕度的圖有點重複」：原本兩張圖（溫度裕度總覽＋各元件溫度裕度）畫的是同一組裕度，
    配色還不一樣（後者是紅→綠漸層，0–10 °C 就畫成紅色，違反「紅色只給超溫」）；詳細分析頁也已經有
@@ -3614,125 +3622,357 @@ window.addEventListener('rru3d-ready',()=>{tab3Stale=true;if(tab3Active())render
 window.addEventListener('rru3d-fail',()=>{if(tab3Active())renderTab3(true);});
 
 // =====================================================
-// SENSITIVITY ANALYSIS
+// TAB 4: 敏感度分析（renderTab4）
+// -----------------------------------------------------
+// 使用者定義：air gap 最有意義、環溫用處不大、熱耗要看得懂（要有讀圖說明）；Tornado 已移除。一頁由上而下：
+//   摘要 這顆散熱器還有多少餘裕（環溫上限／熱耗上限／誰先超溫）
+//   ①  鰭片 air gap 選多少：每一點重新設計，畫「體積」＋「流阻比」（建議 AR_GOOD；無風往低、有風往高）
+//   ②  熱耗比預估高（全部元件同比例 ×0.7～×1.3）：固定這顆散熱器的裕度＋重新設計要多大
+//   ③  環溫規格：+0／+5／+10 °C 與重新設計最高做得到幾度
+// 「固定這顆散熱器」＝鰭片高、片數、air gap、總面積照目前設計 → h、η 也用目前設計的值（本工具的 h 只跟 air gap 與鰭片高有關、
+//  跟溫差無關 → 環溫與裕度 1:1；熱耗倍數 s 下每顆的裕度是 s 的一次式）。
+//  ⚠ 原本用 computeAll(…, 固定面積)：照新工況重算鰭片高、拿新的 h／η 配舊面積＝評估一顆不存在的散熱器，損失被放大約一倍（已移除）。
+// 畫面與 PDF 共用 saData()（數字）、saGapFig／saPwFixFig／saPwNewFig（Plotly 圖）與 SA_READ（讀圖說明）。
 // =====================================================
-function updateSABase(){let v=document.getElementById('sa_var').value;document.getElementById('sa_base').value=v==='power_scale'?1.0:(G[v]||1.0);}
+const SA_GAP_RANGE = [4, 20, 0.5];       // air gap 掃描（mm，絕對範圍；原本用 ±% 掃）
+const SA_PW_RANGE = [0.7, 1.3, 0.05];    // 熱耗倍數（全部元件同比例）
+const SA_AMB_STEPS = [0, 5, 10];         // 環溫 +°C
+const SA_COL = {line:'#1e3a5f', bad:'#94a3b8', cur:'#0f766e', best:'#6d28d9', cap:'#b45309', zero:'#d03b3b', band:'rgba(12,163,12,0.11)', bandTxt:'#1d6b24'};   // best＝① 建議範圍內體積最小、cap＝② 熱耗上限（琥珀＝到這裡就超溫）
+const SA_DASH = ['solid', 'dash', 'dot'], SA_DASHC = ['solid', 'dashed', 'dotted'];
+const SA_FONT = 'Noto Sans TC, Microsoft JhengHei, sans-serif';
+var tab4Stale = true, tab4Timer = null;   // var：init 之前就可能被讀到（同 tab3Stale）
+function tab4Active(){const t=document.getElementById('tab4');return !!(t&&t.classList.contains('active'));}
+const saF1 = v => (Math.round(v*10)/10).toFixed(1), saF0 = v => String(Math.round(v));
+const saR1 = v => Math.round(v * 10) / 10 + 0;   // + 0：−0 → 0（不顯示「−0.0」）
+const saPct = v => (saR1(v) >= 0 ? '+' : '−') + Math.abs(saR1(v)).toFixed(1) + '%', saSgn = v => (saR1(v) >= 0 ? '+' : '−') + Math.abs(saR1(v)).toFixed(1);
+/* 答案句＝[{t, b}]（b＝粗體數字）；畫面、PDF、測試共用同一份 */
+const saB = t => ({t, b:true}), saT = t => ({t});
+const saRunsHtml = runs => runs.map(r => r.b ? '<b>' + _vEsc(r.t) + '</b>' : _vEsc(r.t)).join(''), saRunsTxt = runs => runs.map(r => r.t).join('');
+const saCat = k => (VR_CATS.find(c => c.key === k) || {label:k, color:SA_COL.line});
 
-function saCalc(p,c,vk,xv,af){let pp={...p};let cc={rf:c.rf.map(r=>({...r})),digital:c.digital.map(r=>({...r})),pwr:c.pwr.map(r=>({...r}))};
-  if(vk==='power_scale')['rf','digital','pwr'].forEach(cat=>cc[cat].forEach(r=>r['Power(W)']*=xv));else pp[vk]=xv;return computeAll(pp,cc,af);}
-
-function runSweep(){
-  let vk=document.getElementById('sa_var').value;let bv=vk==='power_scale'?1.0:G[vk];
-  let mp=parseFloat(document.getElementById('sa_minus').value),pp=parseFloat(document.getElementById('sa_plus').value),st=parseInt(document.getElementById('sa_steps').value);
-  let vn=bv*(1-mp/100),vx=bv*(1+pp/100);if(vk==='Gap')vn=Math.max(vn,0.5);if(vk==='power_scale')vn=Math.max(vn,0.1);
-  let xs=[];for(let i=0;i<st;i++)xs.push(vn+(vx-vn)*i/(st-1));let ci=0;xs.forEach((x,i)=>{if(Math.abs(x-bv)<Math.abs(xs[ci]-bv))ci=i;});xs[ci]=bv;
-  let br=saCalc(G,components,vk,bv,null);let ab=br.Area_req;
-  if(br.blocked){document.getElementById('sa-sweep-results').innerHTML=calcGateHtml(br.missing);return;}
-  let bottleneckName=br.Bottleneck_Name;
-  // 每個工況算兩種裕度：
-  //  rD（Area=null）＝重新設計：每點重算 FH/鰭片數以滿足散熱 → 幾何(體積/重量/AR)與「重新設計裕度」
-  //  rF（Area=ab）  ＝固定散熱器：沿用基準面積 ab 評估「固定散熱器裕度」（幾何與 rD 相同，僅溫度不同）
-  let res=xs.map((x,i)=>{let rD=saCalc(G,components,vk,x,null);let rF=saCalc(G,components,vk,x,ab);let gn=vk==='Gap'?x:G.Gap;let ar=gn>0?rD.Fin_Height/gn:0;
-    return{x:Math.round(x*1e4)/1e4,Volume:Math.round(rD.Volume_L*100)/100,Weight:Math.round(rD.total_weight_kg*100)/100,AR:Math.round(ar*10)/10,Fin_Count:rD.Fin_Count,Tj_Redesign:rD.Bottleneck_Tj_Margin,Tj_Fixed:rF.Bottleneck_Tj_Margin,Fin_Height:Math.round(rD.Fin_Height*10)/10};});
-
-  let ct=document.getElementById('sa-sweep-results');
-  ct.innerHTML='<div style="display:flex;gap:15px;width:100%;flex-wrap:wrap;"><div id="sa-cl" style="flex:1;min-width:400px;"></div><div id="sa-cr" style="flex:1;min-width:400px;"></div></div><div id="sa-detail"></div>';
-  let xv=res.map(r=>r.x);
-  // LEFT: Volume + Weight (GROUPED bars, not overlapping)
-  Plotly.newPlot('sa-cl',[
-    {x:xv,y:res.map(r=>r.Volume),type:'bar',name:'體積 (L)',marker:{color:'rgba(52,152,219,0.8)'},yaxis:'y1',offsetgroup:1},
-    {x:xv,y:res.map(r=>r.Weight),type:'bar',name:'重量 (kg)',marker:{color:'rgba(46,204,113,0.8)'},yaxis:'y2',offsetgroup:2}
-  ],{barmode:'group',title:'<b>散熱器規模 — 體積 & 重量</b>',xaxis:{title:vk==='power_scale'?'功耗縮放係數 (×)':vk+' (mm)'},yaxis:{title:'體積 (L)',titlefont:{color:'#3498db'},tickfont:{color:'#3498db'}},yaxis2:{title:'重量 (kg)',titlefont:{color:'#2ecc71'},tickfont:{color:'#2ecc71'},overlaying:'y',side:'right'},legend:{orientation:'h',x:0.5,y:1.08,xanchor:'center'},shapes:[{type:'line',x0:bv,x1:bv,y0:0,y1:1,yref:'paper',line:{dash:'dash',color:'gray'},name:'Current'}],height:420,margin:{l:50,r:50,t:50,b:50},hovermode:'x unified'},{responsive:true,displaylogo:false,modeBarButtonsToAdd:[fullscreenBtn],displayModeBar:true});
-  // RIGHT
-  let py,pn,pc;if(vk==='Gap'){py=res.map(r=>r.AR);pn='流阻比 (AR)';pc='#e74c3c';}else{py=res.map(r=>r.Tj_Fixed);pn='固定散熱器 Tj_Margin (°C)';pc='#e67e22';}
-  let sh2=[{type:'line',x0:bv,x1:bv,y0:0,y1:1,yref:'paper',line:{dash:'dash',color:'gray'}}];
-  if(vk!=='Gap')sh2.push({type:'line',x0:xv[0],x1:xv[xv.length-1],y0:0,y1:0,line:{dash:'dot',color:'red',width:2}});
-  Plotly.newPlot('sa-cr',[{x:xv,y:py,mode:'lines+markers',name:pn,line:{color:pc,width:3},marker:{size:8}}],{title:'<b>熱流/幾何性能 — '+pn+'</b>',xaxis:{title:vk==='power_scale'?'功耗縮放係數 (×)':vk+' (mm)'},yaxis:{title:pn,titlefont:{color:pc},tickfont:{color:pc}},shapes:sh2,height:420,margin:{l:50,r:50,t:50,b:50},hovermode:'x unified'},{responsive:true,displaylogo:false,modeBarButtonsToAdd:[fullscreenBtn],displayModeBar:true});
-  // Detail data table
-  let bn=_vEsc(bottleneckName||'—');
-  let bnSub='<br><span style="font-weight:400;color:#94a3b8;font-size:0.82em;">瓶頸: '+bn+'</span>';
-  function mCell(v){var s=(typeof v==='number'&&v<0)?' style="color:#c0392b;font-weight:600;"':'';return '<td'+s+'>'+(typeof v==='number'?v.toFixed(1):v)+'</td>';}
-  let dh='<div class="collapsible" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';">📋 查看詳細數據 ▼</div><div class="collapsible-body"><table class="detail-table"><thead><tr><th>'+vk+'</th><th>體積 (L)</th><th>重量 (kg)</th><th>流阻比</th><th>鰭片數</th><th>重新設計裕度 (°C)'+bnSub+'</th><th>固定散熱器裕度 (°C)'+bnSub+'</th><th>Fin 高度 (mm)</th></tr></thead><tbody>';
-  res.forEach(r=>dh+='<tr><td>'+r.x+'</td><td>'+r.Volume+'</td><td>'+r.Weight+'</td><td>'+r.AR+'</td><td>'+r.Fin_Count+'</td>'+mCell(r.Tj_Redesign)+mCell(r.Tj_Fixed)+'<td>'+r.Fin_Height+'</td></tr>');
-  dh+='</tbody></table>';
-  dh+='<div style="margin-top:12px;padding:12px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:0.82rem;line-height:1.6;color:#475569;">'
-    +'<b style="color:#1e3a5f;">📖 兩種 Tj_Margin 名詞說明</b>'
-    +'<div style="margin-top:6px;"><b style="color:#0f766e;">重新設計裕度</b>：每個工況都<b>重新設計散熱器</b>(重算鰭片高度/數量)以滿足散熱後，瓶頸元件距溫度上限的裕度。因此它幾乎<b>不隨此變數改變</b>，數值≈設計安全係數(Margin)帶來的餘裕：Margin=1.0 → 0；Margin=1.05 → 正值。代表「若你願意為每個工況都重新開模，能達到的裕度」。</div>'
-    +'<div style="margin-top:4px;"><b style="color:#b45309;">固定散熱器裕度</b>：沿用<b>基準點設計出來的同一顆散熱器</b>，只改變此變數後、瓶頸元件的實際裕度。<b>基準點等於重新設計裕度</b>；偏離基準時上下起伏，代表「散熱器不動、只有這個參數漂移」時的熱風險，<b style="color:#c0392b;">負值 = 超溫</b>。</div>'
-    +'<div style="margin-top:4px;color:#64748b;">範例：Margin=1.05、基準 Gap='+_vEsc(String(bv))+' → 兩欄在基準點都約 +2.2°C；Gap 偏離基準時，固定散熱器裕度會下降甚至轉負，而重新設計裕度維持不變。</div>'
-    +'<div style="margin-top:4px;color:#94a3b8;font-size:0.95em;">＊瓶頸元件 = 允許溫升最小(最先超溫)的那顆；掃描非幾何變數(如功耗)時瓶頸可能換人，欄位標題顯示的是基準工況的瓶頸。</div>'
-    +'</div>';
-  dh+='</div>';document.getElementById('sa-detail').innerHTML=dh;
+/* ── 計算 ── */
+function saScale(comps, s){
+  const m = k => (comps[k] || []).map(r => ('Power(W)' in r) ? {...r, 'Power(W)': _num(r['Power(W)']) * s} : {...r});
+  return {rf:m('rf'), digital:m('digital'), pwr:m('pwr')};
+}
+/* 固定這顆散熱器（fx＝目前設計的 {A 總面積 m², h, eff}）：環溫或熱耗變了，各發熱元件的裕度。溫度鏈與 computeAll 相同（rowTemps）。 */
+function saFixedEval(g, comps, fx){
+  const hot = [];
+  ['rf','digital','pwr'].forEach(k => (comps[k] || []).forEach(c => {
+    if (c._excluded) return;
+    const r = {...c, _src:k.toUpperCase()}; Object.assign(r, calcThermalResistance(r, g));
+    if (r.Total_W > 0) hot.push(r);
+  }));
+  const TW = hot.reduce((s, r) => s + r.Total_W, 0), THB = g.T_amb + TW / (fx.h * fx.A * fx.eff);
+  const list = hot.map((r, i) => { rowTemps(r, THB, g); return {i, name:r.Component, cat:r._src, ref:r.Temp_Label, margin:r.Tj_Margin}; });
+  return {TW, THB, list, min:list.reduce((a, b) => (!a || b.margin < a.margin ? b : a), null)};
+}
+/* 餘裕：環溫 1:1；熱耗每顆的裕度對倍數 s 是直線（散熱器溫升與 P×R 都 ∝ s）→ 兩點定直線，找各自歸零的 s（s0）與當時的總熱耗（P0） */
+function saHeadroom(g, comps, fx){
+  const b = saFixedEval(g, comps, fx), e2 = saFixedEval(g, saScale(comps, 2), fx), dTW = e2.TW - b.TW;
+  b.list.forEach(q => {
+    const d = e2.list[q.i].margin - q.margin;
+    q.s0 = d < -1e-9 ? 1 + q.margin / -d : Infinity;
+    q.P0 = isFinite(q.s0) ? b.TW + (q.s0 - 1) * dTW : Infinity;
+  });
+  const lim = b.list.reduce((a, q) => (!a || q.s0 < a.s0 ? q : a), null);
+  const e11 = saFixedEval(g, saScale(comps, 1.1), fx), m11 = e11.list[b.min.i].margin, hsk = e11.THB - b.THB;
+  return {base:b, dT:b.min.margin, sMax:lim ? lim.s0 : Infinity, Pmax:lim ? lim.P0 : Infinity, lim,
+          d10:{hsk, self:(b.min.margin - m11) - hsk, total:b.min.margin - m11}};   // 熱耗 +10%：散熱器升溫＋瓶頸自己的 P×R
+}
+const saOk = r => !r.blocked && !r.drc_failed && r.Fin_Height > 0;
+function saWhy(r){
+  if (r.drc_failed) return String(r.drc_msg || '').replace(/^⛔\s*/, '');
+  if (!(r.Min_dT_Allowed > 0)) return '允許溫升 ≤ 0：散熱器壓到環溫也不夠';
+  return r.Fin_Height > 0 ? '' : '鰭片擺不下（片數 0）';
+}
+function saWhyShort(w){
+  return /Choked/.test(w) ? '流阻比 > 12' : /h_conv/.test(w) ? 'h_conv < 4' : /物理極限/.test(w) ? 'air gap < 4 mm'
+    : /Embedded/.test(w) ? 'Embedded 鰭片高 > 100 mm' : /根部重疊/.test(w) ? '鰭片根部重疊' : /G_min/.test(w) ? '根部間隙 < G_min'
+    : /SSM 製程極限/.test(w) ? '鰭片高厚比 > 45' : /鰭片厚度/.test(w) ? '鰭片太薄' : /拔模角/.test(w) ? '拔模角太小'
+    : /允許溫升/.test(w) ? '允許溫升 ≤ 0' : /擺不下/.test(w) ? '鰭片擺不下' : String(w).slice(0, 24);
+}
+/* 連續、同一個 key 的點 → 一段（做不出來的範圍、流阻比在建議範圍內的範圍） */
+function saRuns(pts, key){
+  const out = [];
+  pts.forEach((p, i) => { const k = key(p); if (k == null) return; const last = out[out.length - 1];
+    if (last && last.k === k && last.j === i - 1) { last.x1 = p.x; last.j = i; } else out.push({k, x0:p.x, x1:p.x, j:i}); });
+  return out;
+}
+function saRunTxt(q, pts, ends){
+  const first = ends && q.x0 === pts[0].x, last = ends && q.x1 === pts[pts.length - 1].x;
+  if (first && !last) return q.x1 + ' mm 以下';
+  if (last && !first) return q.x0 + ' mm 以上';
+  return q.x0 === q.x1 ? q.x0 + ' mm' : q.x0 + '～' + q.x1 + ' mm';
+}
+/* ① air gap：每一點都照那個 air gap 重新設計（computeAll 原封不動） */
+function saGapData(g, comps){
+  const [a, b, st] = SA_GAP_RANGE, xs = [];
+  for (let x = a; x <= b + 1e-9; x += st) xs.push(+x.toFixed(2));
+  const g0 = _num(g.Gap);
+  if (isFinite(g0) && !xs.some(x => Math.abs(x - g0) < 1e-6)) xs.push(g0);
+  xs.sort((p, q) => p - q);
+  const pts = xs.map(x => { const r = computeAll({...g, Gap:x}, comps), ok = saOk(r);
+    return {x, V:r.Volume_L, W:r.total_weight_kg, FH:r.Fin_Height, n:r.Fin_Count, AR:r.aspect_ratio, ok, why:ok ? '' : saWhy(r), good:ok && arGood(r.aspect_ratio), cur:Math.abs(x - g0) < 1e-6}; });
+  const ok = pts.filter(p => p.ok), good = pts.filter(p => p.good);
+  return {pts, cur:pts.find(p => p.cur) || null,
+    best:good.reduce((m, p) => (!m || p.V < m.V ? p : m), null),      // 流阻比在建議範圍內、體積最小
+    lowAR:ok.reduce((m, p) => (!m || p.AR < m.AR ? p : m), null),     // 流阻比最低（無風往低）
+    bad:saRuns(pts, p => p.ok ? null : saWhyShort(p.why)),
+    goodRuns:saRuns(pts, p => p.good ? 1 : null)};
+}
+/* ② 熱耗：全部元件同比例。固定這顆散熱器的裕度＋重新設計的體積 */
+function saPwData(g, comps, fx, hr){
+  const [a, b, st] = SA_PW_RANGE, pts = [];
+  for (let s = a; s <= b + 1e-9; s += st) {
+    const k = +s.toFixed(2), cc = saScale(comps, k), e = saFixedEval(g, cc, fx), r = computeAll(g, cc), ok = saOk(r);
+    pts.push({s:k, TW:e.TW, m:e.list.map(q => q.margin), V:r.Volume_L, FH:r.Fin_Height, ok, why:ok ? '' : saWhy(r)});
+  }
+  // 畫最先碰到 0 的三顆（熱耗變動時瓶頸可能換人：裕度大、但自己 P×R 也大的元件掉得快）；目前的瓶頸一定畫
+  const sel = [hr.base.min].concat(hr.base.list.slice().sort((p, q) => p.s0 - q.s0)).filter((q, k, arr) => arr.indexOf(q) === k).slice(0, 3).sort((p, q) => p.s0 - q.s0);
+  return {pts, sel};
+}
+/* ③ 環溫：固定散熱器的裕度（1:1）＋重新設計的體積；重新設計最高做得到幾度 */
+function saAmbData(g, comps, fx, R){
+  const rows = SA_AMB_STEPS.map(d => { const g2 = {...g, T_amb:g.T_amb + d}, r = d ? computeAll(g2, comps) : R, ok = saOk(r);
+    return {d, T:g2.T_amb, m:saFixedEval(g2, comps, fx).min.margin, V:r.Volume_L, ok, why:ok ? '' : saWhy(r)}; });
+  let lastOk = null, fail = null;
+  for (let k = 0; k <= 40; k++) { const t = +(g.T_amb + k).toFixed(2), r = k ? computeAll({...g, T_amb:t}, comps) : R;
+    if (saOk(r)) lastOk = {t, V:r.Volume_L}; else { fail = {t, why:saWhy(r)}; break; } }
+  return {rows, lastOk, fail};
+}
+function saData(R, g, comps){
+  const st = vrState(R);
+  if (st === 'blocked' || st === 'nohot' || st === 'nosol') return {st};
+  const gap = saGapData(g, comps);
+  if (st === 'drc') return {st, gap};
+  const fx = {A:R.Area_req, h:R.h_value, eff:R.eff}, hr = saHeadroom(g, comps, fx);
+  return {st, gap, fx, hr, pw:saPwData(g, comps, fx, hr), amb:saAmbData(g, comps, fx, R), V0:R.Volume_L};
 }
 
-function runTornado(){
-  let pct=parseFloat(document.getElementById('tornado_pct').value);let met=document.getElementById('tornado_metric').value;
-  let vars=[{key:'Gap',label:'Fin Air Gap',base:G.Gap},{key:'T_amb',label:'環境溫度',base:G.T_amb},{key:'power_scale',label:'功耗縮放係數',base:1.0}];
-  let br=saCalc(G,components,'Gap',G.Gap,null);let ab=br.Area_req;
-  if(br.blocked){document.getElementById('sa-tornado-results').innerHTML=calcGateHtml(br.missing);return;}
-  let rows=vars.map(v=>{let lo=Math.max(v.base*(1-pct/100),0.1),hi=v.base*(1+pct/100);
-    let rl=saCalc(G,components,v.key,lo,ab),rb=saCalc(G,components,v.key,v.base,ab),rh=saCalc(G,components,v.key,hi,ab);
-    return{label:v.label,Vol_lo:rl.Volume_L,Vol_bs:rb.Volume_L,Vol_hi:rh.Volume_L,Tj_lo:rl.Bottleneck_Tj_Margin,Tj_bs:rb.Bottleneck_Tj_Margin,Tj_hi:rh.Bottleneck_Tj_Margin};});
-  function mkT(data,kl,kh,kb,title,cd,ci){let bm=data.reduce((s,r)=>s+r[kb],0)/data.length;let tr=[];
-    data.forEach((r,i)=>{let f=i===0;tr.push({y:[r.label],x:[r[kl]-r[kb]],base:[r[kb]],type:'bar',orientation:'h',marker:{color:cd},name:'-'+pct+'%',showlegend:f,hovertemplate:'<b>'+r.label+'</b><br>-'+pct+'%: '+r[kl].toFixed(2)+'<extra></extra>'});
-      tr.push({y:[r.label],x:[r[kh]-r[kb]],base:[r[kb]],type:'bar',orientation:'h',marker:{color:ci},name:'+'+pct+'%',showlegend:f,hovertemplate:'<b>'+r.label+'</b><br>+'+pct+'%: '+r[kh].toFixed(2)+'<extra></extra>'});});
-    return{tr,layout:{barmode:'overlay',title:{text:title,y:0.98,x:0.5,xanchor:'center'},shapes:[{type:'line',x0:bm,x1:bm,y0:-0.5,y1:data.length-0.5,line:{dash:'dash',color:'gray'}}],legend:{orientation:'h',x:0.5,y:1.15,xanchor:'center'},height:420,margin:{l:130,r:30,t:80,b:50},yaxis:{automargin:true}}};}
-  let ct=document.getElementById('sa-tornado-results');let h='';
-  if(met==='both'||met==='volume')h+='<div id="tv" style="flex:1;min-width:400px;"></div>';
-  if(met==='both'||met==='tj')h+='<div id="tt" style="flex:1;min-width:400px;"></div>';
-  ct.innerHTML='<div style="display:flex;gap:15px;flex-wrap:wrap;">'+h+'</div><div id="tornado-detail"></div>';
-  let tCfg={responsive:true,displaylogo:false,modeBarButtonsToAdd:[fullscreenBtn],displayModeBar:true};
-  if(met==='both'||met==='volume'){let t=mkT(rows,'Vol_lo','Vol_hi','Vol_bs','<b>體積敏感度 (L)</b>','rgba(231,76,60,0.7)','rgba(52,152,219,0.7)');Plotly.newPlot('tv',t.tr,t.layout,tCfg);}
-  if(met==='both'||met==='tj'){let t=mkT(rows,'Tj_lo','Tj_hi','Tj_bs','<b>Tj_Margin 敏感度 (°C)</b>','rgba(231,76,60,0.7)','rgba(46,204,113,0.7)');Plotly.newPlot('tt',t.tr,t.layout,tCfg);}
-  // Detail
-  let dh='<div class="collapsible" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';">📋 查看 Tornado 詳細數據 ▼</div><div class="collapsible-body"><table class="detail-table"><thead><tr><th>參數</th><th>體積 -'+pct+'%</th><th>體積 Base</th><th>體積 +'+pct+'%</th><th>Tj_Margin -'+pct+'%</th><th>Tj_Margin Base</th><th>Tj_Margin +'+pct+'%</th></tr></thead><tbody>';
-  rows.forEach(r=>dh+='<tr><td>'+r.label+'</td><td>'+r.Vol_lo.toFixed(2)+'</td><td>'+r.Vol_bs.toFixed(2)+'</td><td>'+r.Vol_hi.toFixed(2)+'</td><td>'+r.Tj_lo.toFixed(1)+'</td><td>'+r.Tj_bs.toFixed(1)+'</td><td>'+r.Tj_hi.toFixed(1)+'</td></tr>');
-  dh+='</tbody></table></div>';
-  // Tornado Chart interpretation guide
-  dh+='<div class="collapsible" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';" style="margin-top:10px;">📖 如何解讀 Tornado Chart？ ▼</div>';
-  dh+='<div class="collapsible-body" style="display:none;font-size:0.88rem;line-height:1.7;color:#334155;">';
-  dh+='<h4 style="margin:8px 0 4px;">一、這張圖在問什麼？</h4>';
-  dh+='<blockquote style="margin:4px 0 10px 0;padding:6px 12px;border-left:3px solid #3498db;background:#f0f9ff;color:#1e293b;font-style:italic;">「如果我把某個參數改變 ±'+pct+'%，整機的散熱器體積與熱裕度會跑多遠？」</blockquote>';
-  dh+='<p>把三個參數 (Gap / 環境溫度 / 功耗縮放係數) 各自偏移 ±'+pct+'%，<b>誰動一下、結果就跑最多 → 那就是最需要管控的風險項目。</b></p>';
-  dh+='<h4 style="margin:12px 0 4px;">二、左圖：體積敏感度</h4>';
-  dh+='<table class="detail-table" style="width:auto;margin:4px 0 8px;"><thead><tr><th>顏色</th><th>代表方向</th></tr></thead><tbody>';
-  dh+='<tr><td style="color:#e74c3c;font-weight:600;">紅色條 (往左)</td><td>該參數 <b>減少</b> '+pct+'%，體積的變化量</td></tr>';
-  dh+='<tr><td style="color:#3498db;font-weight:600;">藍色條 (往右)</td><td>該參數 <b>增加</b> '+pct+'%，體積的變化量</td></tr>';
-  dh+='</tbody></table>';
-  dh+='<p><b>條越長 → 體積對這個參數越敏感</b>，代表設計容忍度低，量產公差需嚴格管控。<br>以 Gap（鰭片 air gap，相鄰兩片之間的空氣間隙）為例：Gap 越小 → 流阻比 AR 上升 → 需要更高的鰭片 → 體積增大 (右條)。</p>';
-  dh+='<h4 style="margin:12px 0 4px;">三、右圖：Tj_Margin 敏感度 (Fixed-Design 固定散熱器方式)</h4>';
-  dh+='<p><b>重要前提：右圖固定現有散熱器面積不變，模擬「工況偏移但散熱器不重設計」的情境。</b></p>';
-  dh+='<table class="detail-table" style="width:auto;margin:4px 0 8px;"><thead><tr><th>顏色</th><th>代表方向</th></tr></thead><tbody>';
-  dh+='<tr><td style="color:#e74c3c;font-weight:600;">紅色條 (往左)</td><td>參數變化讓 Tj_Margin <b>下降</b> (熱裕度縮水、趨向超溫)</td></tr>';
-  dh+='<tr><td style="color:#2ecc71;font-weight:600;">綠色條 (往右)</td><td>參數變化讓 Tj_Margin <b>上升</b> (更有餘裕)</td></tr>';
-  dh+='</tbody></table>';
-  dh+='<ul style="margin:4px 0 8px;padding-left:20px;">';
-  dh+='<li><b>Base 線 = 目前設計工況</b> (Tj_Margin 以此為起點向左右延伸)</li>';
-  dh+='<li>條穿越 Tj_Margin = 0 (超溫紅線) = 在該工況下散熱器不夠用，需重設計</li>';
-  dh+='<li>條越長 → 熱設計對這個參數越敏感</li></ul>';
-  dh+='<h4 style="margin:12px 0 4px;">物理意義</h4>';
-  dh+='<ul style="margin:4px 0 8px;padding-left:20px;">';
-  dh+='<li><code>T_amb ↑</code> → 基板溫度 T_hsk 整體升高 → 所有元件 Tj 同步上升 → Margin 下滑</li>';
-  dh+='<li><code>功耗 ↑</code> → T_hsk 因承受更多熱量而升高 → Tj 因 P×R 也增加 → <b>雙重衝擊</b><br>';
-  dh+='&nbsp;&nbsp;P = 元件單顆功耗 (W)、R = 接面到散熱器基板的總熱阻 (R_jc + R_int + R_TIM)、P×R = 溫差 (°C)</li>';
-  dh+='<li><code>Gap ↑</code> → h (對流+輻射係數) 改善 → T_hsk 下降 → Margin 增加 (右條)</li></ul>';
-  dh+='<h4 style="margin:12px 0 4px;">Gap 的計算方式</h4>';
-  dh+='<div style="background:#f8fafc;padding:8px 12px;border-radius:4px;font-family:monospace;font-size:0.82rem;margin:4px 0 8px;">';
-  dh+='h_conv = 6.4 × tanh(Gap / 7.0) × (70/FH)^0.2 &nbsp;&nbsp;← 自然對流（另含鰭片高度 FH 動態修正）<br>';
-  dh+='h_rad &nbsp;= 2.4 × min(1, (Gap / 10)^0.5) &nbsp;← 鰭片間輻射交換（Gap ≥ 10mm 飽和）<br>';
-  dh+='T_hsk &nbsp;= T_amb + TotalPower / (h_total × Area_fixed × eff)</div>';
-  dh+='<p>Gap ↑ → h_total ↑ → T_hsk ↓ → Tj_Margin ↑</p>';
-  dh+='<h4 style="margin:12px 0 4px;">名詞對照</h4>';
-  dh+='<table class="detail-table" style="width:auto;margin:4px 0;"><thead><tr><th>符號</th><th>全名</th><th>說明</th></tr></thead><tbody>';
-  dh+='<tr><td>h_conv</td><td>自然對流換熱係數</td><td>W/m²·K，鰭片 air gap 越大對流越強，但趨近飽和 (tanh 曲線)</td></tr>';
-  dh+='<tr><td>h_rad</td><td>輻射換熱係數</td><td>W/m²·K，間距越大鰭片互見輻射越多，Gap ≥ 10mm 後飽和</td></tr>';
-  dh+='<tr><td>h_total</td><td>綜合換熱係數</td><td>h_conv + h_rad (W/m²·K)</td></tr>';
-  dh+='<tr><td>TotalPower</td><td>整機總功耗</td><td>含安全係數 Margin，= Σ(P×Qty) × Margin (W)</td></tr>';
-  dh+='<tr><td>Area_fixed</td><td>固定散熱器面積</td><td>由基準工況計算後凍結，Fixed-Design 期間不隨工況改變 (m²)</td></tr>';
-  dh+='<tr><td>eff</td><td>有效效率係數</td><td>η_fin × η_process（η_process：嵌入式 1.06 / 壓鑄 0.99）；η_fin 為鰭片效率，隨鰭片高度 FH 動態變化</td></tr>';
-  dh+='</tbody></table>';
-  dh+='</div>';
-  document.getElementById('tornado-detail').innerHTML=dh;
+/* ── 讀圖說明（畫面與 PDF 共用；PDF 會把符號轉掉） ── */
+const SA_READ = {
+  gap: ['上圖：每個 air gap 都重新設計一顆散熱器需要的體積。實心點＝流阻比在建議範圍、空心點＝不在；灰底＝做不出來{gap}。',
+        '下圖：那顆散熱器的流阻比（鰭片高 ÷ air gap），綠底＝建議 ' + AR_GOOD[0] + '～' + AR_GOOD[1] + '。參數控制台的原則：建議值內，無風往低的一邊設計、有風往高的一邊。',
+        'Gap 小 → 片數多、鰭片矮、體積小，但流阻比變高（鰭片又密又高）；Gap 大 → 片數少、鰭片要更高。曲線的小階梯是片數（整數）跳一片造成的。'],
+  pw: ['左圖（固定這顆散熱器）：熱耗變多，裕度從兩處被吃掉 —— 散熱器整體升溫（所有元件一起升）＋元件自己的 P×R。每條線一顆元件，線跟 0 的交點＝這顆散熱器能散的熱耗上限；最先碰到 0 的就是瓶頸（熱耗變動時瓶頸可能換人：裕度大、但自己 P×R 也大的元件掉得快）。',
+       '右圖（重新設計）：熱耗真的變這麼多時，重新開一顆散熱器需要多大。灰色 ×＝用目前的鰭片規格做不出來{pw}。',
+       '熱耗倍數＝所有元件的功耗同比例放大或縮小（×' + SA_PW_RANGE[0] + '～×' + SA_PW_RANGE[1] + '）：功耗預估的誤差、PA 效率或輸出功率改變。'],
+  amb: '本工具的 h 跟溫差無關，所以固定散熱器時環溫與裕度是 1:1，不需要畫圖；重新設計時，環溫越接近元件限溫，允許溫升越小，需要的面積照 1／允許溫升往上衝 —— 每多 5 °C 的代價越來越大。'
+};
+
+const SA_WHY = {gap:{s:'（滑到 × 上看原因）', p:'（原因見上面「做不出來」那一行）'}, pw:{s:'（滑過去看原因）', p:'（原因寫在圖例）'}};
+const saReadTxt = (t, pdf) => t.replace(/\{(gap|pw)\}/g, (m, k) => SA_WHY[k][pdf ? 'p' : 's']);
+
+/* ── 圖（畫面與 PDF 共用；opt.pdf：字放大、圖例畫在圖裡） ── */
+function saBaseLayout(opt){
+  const fs = opt && opt.pdf ? 15 : 12;
+  return {font:{family:SA_FONT, size:fs, color:'#334155'}, paper_bgcolor:'#fff', plot_bgcolor:'#fff', hovermode:'closest', showlegend:!!(opt && opt.pdf),
+    legend:{orientation:'h', x:0, xanchor:'left', y:1.02, yanchor:'bottom', font:{size:fs - 1}}, margin:{l:62, r:18, t:opt && opt.pdf ? 64 : 18, b:50}};
+}
+function saAnn(x, y, text, color, ax, ay, xref, yref){
+  return {x, y, xref:xref || 'x', yref:yref || 'y', text, ax, ay, showarrow:true, arrowhead:0, arrowwidth:1.2, arrowcolor:color, font:{color, size:12}, bgcolor:'rgba(255,255,255,0.9)'};
+}
+function saGapFig(d, opt){
+  const G2 = d.gap, P = G2.pts, ok = P.filter(p => p.ok), cur = G2.cur, best = G2.best, lo = G2.lowAR, L = saBaseLayout(opt);
+  const vmax = ok.length ? Math.max(...ok.map(p => p.V)) : 1, vmin = ok.length ? Math.min(...ok.map(p => p.V)) : 0, pad = Math.max((vmax - vmin) * 0.14, vmax * 0.04);
+  const yr = [vmin - pad, vmax + pad * 1.5], yBad = yr[0] + (yr[1] - yr[0]) * 0.06, xr = [P[0].x - 0.4, P[P.length - 1].x + 0.4];
+  const ars = ok.map(p => p.AR), ar = [Math.min(AR_GOOD[0] - 0.6, ...ars) - 0.3, Math.max(AR_GOOD[1] + 0.6, ...ars) + 0.3];
+  const hv = 'Air gap %{x} mm<br>體積 %{y:.1f} L<br>%{customdata[0]} 片 × %{customdata[1]:.1f} mm<br>流阻比 %{customdata[2]:.2f} · 重量 %{customdata[3]:.1f} kg<extra></extra>';
+  const cd = p => [p.n, p.FH, p.AR, p.W], good = ok.filter(p => p.good), off = ok.filter(p => !p.good), bad = P.filter(p => !p.ok);
+  const data = [
+    {x:P.map(p => p.x), y:P.map(p => p.ok ? p.V : null), mode:'lines', line:{color:SA_COL.line, width:2.5}, connectgaps:false, hoverinfo:'skip', showlegend:false},
+    {x:good.map(p => p.x), y:good.map(p => p.V), mode:'markers', name:'流阻比在建議範圍', marker:{size:7, color:SA_COL.line}, customdata:good.map(cd), hovertemplate:hv},
+    {x:off.map(p => p.x), y:off.map(p => p.V), mode:'markers', name:'流阻比不在建議範圍', marker:{size:7, color:'#fff', line:{color:SA_COL.line, width:1.6}}, customdata:off.map(cd), hovertemplate:hv},
+    {x:bad.map(p => p.x), y:bad.map(() => yBad), mode:'markers', name:'做不出來', marker:{symbol:'x-thin-open', size:9, color:SA_COL.bad, line:{width:2, color:SA_COL.bad}}, text:bad.map(p => p.why), hovertemplate:'Air gap %{x} mm<br>%{text}<extra></extra>'},
+    {x:P.map(p => p.x), y:P.map(p => p.ok ? p.AR : null), xaxis:'x2', yaxis:'y2', mode:'lines+markers', line:{color:SA_COL.line, width:2}, connectgaps:false, showlegend:false,
+     marker:{size:5, color:P.map(p => p.good ? SA_COL.line : '#fff'), line:{color:SA_COL.line, width:1.2}}, hovertemplate:'Air gap %{x} mm<br>流阻比 %{y:.2f}<extra></extra>'}
+  ];
+  if (cur) {
+    data.push({x:[cur.x], y:[cur.ok ? cur.V : yBad], mode:'markers', name:'目前', marker:{size:13, color:SA_COL.cur, line:{color:'#fff', width:2}}, hoverinfo:'skip'});
+    if (cur.ok) data.push({x:[cur.x], y:[cur.AR], xaxis:'x2', yaxis:'y2', mode:'markers', showlegend:false, marker:{size:10, color:SA_COL.cur, line:{color:'#fff', width:1.5}}, hoverinfo:'skip'});
+  }
+  if (best && best !== cur) data.push({x:[best.x], y:[best.V], mode:'markers', name:'建議範圍內體積最小', marker:{size:12, symbol:'diamond', color:SA_COL.best, line:{color:'#fff', width:2}}, hoverinfo:'skip'});
+  const ann = [{xref:'paper', x:1, yref:'y2', y:AR_GOOD[1], text:'建議 ' + AR_GOOD[0] + '～' + AR_GOOD[1], showarrow:false, xanchor:'right', yanchor:'top', font:{color:SA_COL.bandTxt, size:11}}];
+  if (cur && cur.ok) ann.push(saAnn(cur.x, cur.V, '目前 ' + saF1(cur.V) + ' L', SA_COL.cur, -46, -34));
+  if (best && best !== cur) ann.push(saAnn(best.x, best.V, '建議範圍內最小 ' + saF1(best.V) + ' L', SA_COL.best, 30, -40));
+  if (lo && !(cur && lo === cur)) ann.push(saAnn(lo.x, lo.AR, '流阻比最低 ' + lo.AR.toFixed(1), SA_COL.line, 34, 22, 'x2', 'y2'));
+  else if (lo) ann.push(saAnn(lo.x, lo.AR, '流阻比最低 ' + lo.AR.toFixed(1) + '（目前）', SA_COL.cur, 40, 22, 'x2', 'y2'));
+  const shapes = [{type:'rect', xref:'paper', x0:0, x1:1, yref:'y2', y0:AR_GOOD[0], y1:AR_GOOD[1], fillcolor:SA_COL.band, line:{width:0}, layer:'below'}]
+    .concat(saShades(P, xr).map(q => ({type:'rect', xref:'x', x0:q.x0, x1:q.x1, yref:'paper', y0:0, y1:1, fillcolor:'#e2e8f0', opacity:0.6, line:{width:0}, layer:'below'})));
+  const layout = Object.assign(L, {
+    xaxis:{domain:[0, 1], anchor:'y', matches:'x2', showticklabels:false, range:xr, gridcolor:'#eef2f7', zeroline:false},
+    yaxis:{domain:[0.36, 1], anchor:'x', range:yr, title:{text:'需要的體積（L）', standoff:6}, gridcolor:'#eef2f7', zeroline:false},
+    xaxis2:{domain:[0, 1], anchor:'y2', range:xr, dtick:2, title:{text:'鰭片 air gap（mm）', standoff:6}, gridcolor:'#eef2f7', zeroline:false},
+    yaxis2:{domain:[0, 0.27], anchor:'x2', range:ar, title:{text:'流阻比', standoff:6}, gridcolor:'#eef2f7', zeroline:false},
+    shapes, annotations:ann});
+  return {data, layout};
+}
+/* 灰底：每個做不出來的點涵蓋到前後點的中點，相鄰的接成一塊（不分原因；目前的值不在格點上時也不會留白縫） */
+function saShades(P, xr){
+  const out = [];
+  P.forEach((p, i) => { if (p.ok) return;
+    const lo = i ? (P[i - 1].x + p.x) / 2 : xr[0], hi = i < P.length - 1 ? (p.x + P[i + 1].x) / 2 : xr[1], last = out[out.length - 1];
+    if (last && Math.abs(last.x1 - lo) < 1e-9) last.x1 = hi; else out.push({x0:lo, x1:hi}); });
+  return out;
+}
+function saPwFixFig(d, opt){
+  const hr = d.hr, pw = d.pw, TW = hr.base.TW, bn = hr.base.min, L = saBaseLayout(opt), sx = pw.pts.map(p => p.TW);
+  const lines = pw.sel.map((q, k) => ({x:sx, y:pw.pts.map(p => p.m[q.i]), mode:'lines', name:q.name + ' · 歸零在 ' + (isFinite(q.P0) ? saF0(q.P0) + ' W' : '—'),
+    line:{width:k ? 2 : 3, color:saCat(q.cat).color, dash:SA_DASH[k]}, hovertemplate:_vEsc(q.name) + '<br>總熱耗 %{x:.0f} W<br>裕度 %{y:.1f} °C<extra></extra>'}));
+  const ys = [0].concat(...lines.map(l => l.y)), y0 = Math.min(...ys), y1 = Math.max(...ys), yp = (y1 - y0) * 0.08, yr = [y0 - yp, y1 + yp];
+  const top = opt && opt.pdf ? 96 : 40, ph = ((opt && opt.h || 330) - top - 50) / (yr[1] - yr[0]), mPx = bn.margin * ph;   // 每 °C 幾 px：標籤避開 0 線
+  const same = Math.abs(hr.Pmax - TW) < 0.5, ann = [], data = lines.slice();
+  data.push({x:[TW], y:[bn.margin], mode:'markers', name:'目前', marker:{size:12, color:SA_COL.cur, line:{color:'#fff', width:2}}, hoverinfo:'skip'});
+  if (same) ann.push(saAnn(TW, 0, '目前＝上限 ' + saF0(TW) + ' W（裕度 0）', SA_COL.cap, -70, 34));
+  else {
+    ann.push(saAnn(TW, bn.margin, '目前 ' + saF0(TW) + ' W · 裕度 ' + saSgn(bn.margin) + ' °C', SA_COL.cur, -104, mPx >= 26 ? 8 : mPx + 22));
+    if (isFinite(hr.Pmax)) {
+      data.push({x:[hr.Pmax], y:[0], mode:'markers', name:'熱耗上限', marker:{size:11, symbol:'diamond', color:SA_COL.cap, line:{color:'#fff', width:2}}, hoverinfo:'skip'});
+      ann.push(saAnn(hr.Pmax, 0, '上限 ' + saF0(hr.Pmax) + ' W', SA_COL.cap, -44, 46));
+    }
+  }
+  const layout = Object.assign(L, {title:{text:'固定這顆散熱器：每顆元件的裕度', font:{size:L.font.size + 1}, x:0.01, y:0.98}, margin:Object.assign(L.margin, {t:top}),
+    xaxis:{title:{text:'總熱耗（W）', standoff:6}, gridcolor:'#eef2f7', zeroline:false}, yaxis:{title:{text:'裕度（°C）', standoff:6}, gridcolor:'#eef2f7', zeroline:false, range:yr},
+    shapes:[{type:'line', x0:sx[0], x1:sx[sx.length - 1], y0:0, y1:0, line:{color:SA_COL.zero, width:1.5}}], annotations:ann});
+  if (opt && opt.pdf) layout.legend = Object.assign(layout.legend, {y:1.0, yanchor:'bottom'});
+  return {data, layout};
+}
+function saPwNewFig(d, opt){
+  const pw = d.pw, TW = d.hr.base.TW, L = saBaseLayout(opt), okP = pw.pts.filter(p => p.ok), badP = pw.pts.filter(p => !p.ok);
+  const vmax = okP.length ? Math.max(...okP.map(p => p.V)) * 1.14 : 1;
+  const data = [
+    {x:pw.pts.map(p => p.TW), y:pw.pts.map(p => p.ok ? p.V : null), mode:'lines+markers', name:'需要的體積', connectgaps:false, line:{color:SA_COL.line, width:2.5}, marker:{size:6, color:SA_COL.line},
+     customdata:pw.pts.map(p => [p.s, p.FH]), hovertemplate:'總熱耗 %{x:.0f} W（×%{customdata[0]:.2f}）<br>體積 %{y:.1f} L · 鰭片高 %{customdata[1]:.1f} mm<extra></extra>'},
+    {x:badP.map(p => p.TW), y:badP.map(() => vmax * 0.95), mode:'markers', name:'做不出來' + (badP.length ? '（' + saWhyShort(badP[0].why) + '）' : ''), marker:{symbol:'x-thin-open', size:9, color:SA_COL.bad, line:{width:2, color:SA_COL.bad}}, text:badP.map(p => p.why), hovertemplate:'總熱耗 %{x:.0f} W<br>%{text}<extra></extra>'},
+    {x:[TW], y:[d.V0], mode:'markers', name:'目前', marker:{size:12, color:SA_COL.cur, line:{color:'#fff', width:2}}, hoverinfo:'skip'}
+  ];
+  const layout = Object.assign(L, {title:{text:'重新設計：需要的散熱器體積', font:{size:L.font.size + 1}, x:0.01, y:0.98}, margin:Object.assign(L.margin, {t:opt && opt.pdf ? 72 : 40}),
+    xaxis:{title:{text:'總熱耗（W）', standoff:6}, gridcolor:'#eef2f7', zeroline:false}, yaxis:{title:{text:'需要的體積（L）', standoff:6}, gridcolor:'#eef2f7', zeroline:false, range:[0, vmax]}});
+  if (opt && opt.pdf) layout.legend = Object.assign(layout.legend, {y:1.0, yanchor:'bottom'});
+  return {data, layout};
+}
+
+/* ── 畫面 ── */
+function saCell(cls, lbl, num, unit, note, title){
+  return '<div class="vr-cell' + (cls ? ' ' + cls : '') + '"><div class="vr-lbl">' + lbl + '</div><div class="vr-num"' + (title ? ' title="' + _vEsc(title) + '"' : '') + '>' + num + (unit ? '<small>' + unit + '</small>' : '') + '</div>' + (note ? '<div class="vr-note">' + note + '</div>' : '') + '</div>';
+}
+/* 摘要的提醒（畫面與 PDF 共用文字） */
+function saSumNote(d, g){
+  const hr = d.hr, M = _num(g.Margin), bn = hr.base.min;
+  if (hr.dT < -0.05) return {cls:'fail', text:'目前就超溫 ' + saF1(-hr.dT) + ' °C（' + bn.name + '）：安全係數 ×' + fmtSF(M) + ' 小於 1，散熱器比剛好夠的還小。'};
+  if (hr.dT < 0.05) return {cls:'warn', text:'安全係數 ×' + fmtSF(M) + '：散熱器是「剛好夠」的大小，沒有任何餘裕 —— 環溫高一點或熱耗多一點就超溫。要留餘裕，調高參數控制台的「安全係數」（例如 ×1.1 ≈ 散熱面積多 10%）。'};
+  return {cls:'info', text:'這些餘裕來自安全係數 ×' + fmtSF(M) + '（散熱面積比剛好夠的設計約多 ' + saF0((M - 1) * 100) + '%）。固定這顆散熱器時：環溫每 +1 °C，裕度 −1 °C；熱耗每 +10%，'
+    + bn.name + ' 的裕度 −' + saF1(hr.d10.total) + ' °C（散熱器升溫 ' + saF1(hr.d10.hsk) + ' ＋ 自己的 P×R ' + saF1(hr.d10.self) + '）。'};
+}
+function saWhoNote(d){
+  const hr = d.hr, bn = hr.base.min, lim = hr.lim;
+  return lim && lim !== bn ? '環溫升高時是它；熱耗增加時 ' + lim.name + ' 先超溫（自己的 P×R 掉得快）' : '環溫升高或熱耗增加都是它先超溫';
+}
+function saSumHtml(d, R, g){
+  const hr = d.hr, TW = hr.base.TW, T = g.T_amb, bn = hr.base.min, note = saSumNote(d, g);
+  return '<section class="vr-panel sa-sum" id="sa-sum"><div class="vr-head"><span class="vr-title">目前這顆散熱器還有多少餘裕</span><span class="vr-hsub">固定目前的散熱器（'
+    + R.Fin_Count + ' 片 × ' + saF1(R.Fin_Height) + ' mm、air gap ' + vrN(g.Gap) + ' mm），只讓環溫或熱耗變動 · 安全係數 ×' + fmtSF(_num(g.Margin)) + '</span></div>'
+    + '<div class="vr-res">'
+    + saCell('main', '環溫上限', saF1(T + hr.dT), '°C', '目前 ' + vrN(T) + ' °C → ' + (hr.dT >= 0 ? '還能再高 ' : '已超出 ') + saF1(Math.abs(hr.dT)) + ' °C')
+    + saCell('', '熱耗上限（全部元件同比例）', isFinite(hr.Pmax) ? saF0(hr.Pmax) : '—', 'W', '目前 ' + saF0(TW) + ' W → ' + (isFinite(hr.Pmax) ? saPct((hr.Pmax / TW - 1) * 100) : '—'))
+    + saCell('sa-who', '誰先超溫', _vEsc(bn.name), '', _vEsc(saWhoNote(d)) + ' · 目前裕度 ' + saSgn(bn.margin) + ' °C（' + bn.ref + '）', bn.name)
+    + '</div><div class="vr-alert ' + note.cls + '">' + _vEsc(note.text) + '</div></section>';
+}
+/* ① 的答案（畫面與 PDF 共用） */
+function saGapAns(d){
+  const G2 = d.gap, c = G2.cur, b = G2.best, lo = G2.lowAR, P = G2.pts, out = [];
+  const arTxt = p => '流阻比 ' + p.AR.toFixed(1) + (p.good ? '（建議範圍內）' : '（不在建議 ' + AR_GOOD[0] + '～' + AR_GOOD[1] + '）');
+  if (c) out.push({k:'cur', runs:c.ok ? [saT('目前 '), saB(c.x + ' mm'), saT(' → '), saB(saF1(c.V) + ' L'), saT('（' + c.n + ' 片 × ' + saF1(c.FH) + ' mm）· ' + arTxt(c))]
+                                      : [saT('目前 '), saB(c.x + ' mm'), saT(' 做不出來：' + c.why)]});
+  if (G2.goodRuns.length) out.push({k:'good', runs:[saT('流阻比在建議範圍（' + AR_GOOD[0] + '～' + AR_GOOD[1] + '）：'), saB(G2.goodRuns.map(q => saRunTxt(q, P, false)).join('、'))]
+    .concat(!b ? [] : b === c ? [saT('；體積最小的就是目前這個')]
+      : [saT('；其中體積最小 '), saB(b.x + ' mm'), saT(' → '), saB(saF1(b.V) + ' L'), saT((c && c.ok ? '（' + saPct((b.V / c.V - 1) * 100) + '）' : '') + '、流阻比 ' + b.AR.toFixed(1))])
+    .concat(lo ? [saT('；流阻比最低 ' + lo.x + ' mm（' + lo.AR.toFixed(1) + '）')] : [])});
+  else out.push({k:'nogood', runs:[saT('沒有任何 air gap 能讓流阻比落在建議範圍（' + AR_GOOD[0] + '～' + AR_GOOD[1] + '）' + (lo ? '；最低 ' + lo.AR.toFixed(1) + '（' + lo.x + ' mm）' : ''))]});
+  if (G2.bad.length) out.push({k:'bad', runs:[saT('做不出來：' + G2.bad.map(q => saRunTxt(q, P, true) + ' ' + q.k).join('；'))]});
+  return out;
+}
+function saGapHtml(d){
+  const cls = {cur:'', good:'', nogood:'sa-off', bad:'sa-na'};
+  return '<section class="vr-panel" id="sa-gap-sec"><div class="vr-head"><span class="vr-title">① 鰭片 air gap：選多少？</span><span class="vr-hsub">每一點都照那個 air gap 重新設計散熱器（片數、鰭片高跟著變）· '
+    + SA_GAP_RANGE[0] + '～' + SA_GAP_RANGE[1] + ' mm、每 ' + SA_GAP_RANGE[2] + ' mm</span></div><div class="sa-pad">'
+    + '<div class="sa-ans">' + saGapAns(d).map(a => '<span class="' + (cls[a.k] || '') + '">' + saRunsHtml(a.runs) + '</span>').join('') + '</div>'
+    + '<div id="sa-gap" class="sa-plot tall"></div>'
+    + '<div class="sa-leg"><span><i style="border-color:' + SA_COL.line + '"></i>需要的體積</span>'
+    + '<span><span style="color:' + SA_COL.line + '">●</span>流阻比在建議範圍</span><span><span style="color:' + SA_COL.line + '">○</span>不在建議範圍</span>'
+    + '<span><span style="color:' + SA_COL.cur + ';font-size:1rem">●</span>目前</span>' + (d.gap.best && d.gap.best !== d.gap.cur ? '<span><span style="color:' + SA_COL.best + '">◆</span>建議範圍內體積最小</span>' : '')
+    + '<span><span style="display:inline-block;width:14px;height:10px;background:' + SA_COL.band + ';border:1px solid #bfe0c1"></span>流阻比建議 ' + AR_GOOD[0] + '～' + AR_GOOD[1] + '</span>'
+    + (d.gap.bad.length ? '<span><span style="display:inline-block;width:14px;height:10px;background:#e2e8f0"></span><span style="color:' + SA_COL.bad + ';font-weight:800">×</span>做不出來</span>' : '') + '</div>'
+    + '<div class="sa-read"><span class="t">怎麼看</span><ol>' + SA_READ.gap.map(t => '<li>' + _vEsc(saReadTxt(t)) + '</li>').join('') + '</ol></div>'
+    + '</div></section>';
+}
+/* ② 的答案 */
+function saPwAns(d){
+  const hr = d.hr, TW = hr.base.TW, bn = hr.base.min, lim = hr.lim, fin = isFinite(hr.Pmax);
+  return [
+    {k:'cap', runs:[saT('這顆散熱器的熱耗上限 '), saB(fin ? saF0(hr.Pmax) + ' W' : '—'), saT((fin ? '（目前 ' + saF0(TW) + ' W，' + saPct((hr.Pmax / TW - 1) * 100) + '）' : '') + (lim ? '，' + lim.name + ' 先碰到 0' : ''))]},
+    {k:'d10', runs:[saT('熱耗 +10%：散熱器升溫 +' + saF1(hr.d10.hsk) + ' °C、' + bn.name + ' 自己的 P×R +' + saF1(hr.d10.self) + ' °C → 裕度 '), saB('−' + saF1(hr.d10.total) + ' °C')]}
+  ];
+}
+function saPwHtml(d){
+  const pw = d.pw, badP = pw.pts.filter(p => !p.ok);
+  return '<section class="vr-panel" id="sa-pw-sec"><div class="vr-head"><span class="vr-title">② 熱耗比預估高的時候</span><span class="vr-hsub">全部元件同比例 ×'
+    + SA_PW_RANGE[0] + '～×' + SA_PW_RANGE[1] + '</span></div><div class="sa-pad">'
+    + '<div class="sa-ans">' + saPwAns(d).map(a => '<span>' + saRunsHtml(a.runs) + '</span>').join('') + '</div>'
+    + '<div class="sa-two"><div class="sa-chart"><div id="sa-pw-fix" class="sa-plot"></div><div class="sa-leg">'
+    + pw.sel.map((q, k) => '<span><i style="border-color:' + saCat(q.cat).color + ';border-top-style:' + SA_DASHC[k] + ';border-top-width:' + (k ? 2 : 3) + 'px"></i>' + _vEsc(q.name)
+      + '（' + saCat(q.cat).label + '）· 歸零在 <b>' + (isFinite(q.P0) ? saF0(q.P0) + ' W' : '—') + '</b></span>').join('')
+    + '</div></div><div class="sa-chart"><div id="sa-pw-new" class="sa-plot"></div><div class="sa-leg"><span><i style="border-color:' + SA_COL.line + '"></i>需要的體積</span>'
+    + '<span><span style="color:' + SA_COL.cur + ';font-size:1rem">●</span>目前</span>'
+    + (badP.length ? '<span><span style="color:' + SA_COL.bad + ';font-weight:800">×</span>做不出來（' + _vEsc(saWhyShort(badP[0].why)) + '）</span>' : '') + '</div></div></div>'
+    + '<div class="sa-read"><span class="t">怎麼看</span><ol>' + SA_READ.pw.map(t => '<li>' + _vEsc(saReadTxt(t)) + '</li>').join('') + '</ol></div>'
+    + '</div></section>';
+}
+/* ③ 的答案 */
+function saAmbAns(d, g){
+  const a = d.amb, out = [{k:'fix', runs:[saT('這顆散熱器最高用到 '), saB(saF1(g.T_amb + d.hr.dT) + ' °C')]}];
+  if (a.lastOk && a.fail) out.push({k:'re', runs:[saT('重新設計的話最高做得到 '), saB(vrN(a.lastOk.t) + ' °C'), saT('（' + saF1(a.lastOk.V) + ' L）；' + vrN(a.fail.t) + ' °C 起做不出來：' + a.fail.why)]});
+  else if (a.lastOk) out.push({k:'re', runs:[saT('重新設計的話到 '), saB(vrN(a.lastOk.t) + ' °C'), saT('（+40 °C，' + saF1(a.lastOk.V) + ' L）都還做得出來')]});
+  return out;
+}
+function saAmbHtml(d, g){
+  const a = d.amb, V0 = d.V0;
+  return '<section class="vr-panel" id="sa-amb-sec"><div class="vr-head"><span class="vr-title">③ 環溫規格：提高幾度要付出多少？</span><span class="vr-hsub">固定散熱器時環溫與裕度 1:1 —— 每 +1 °C，裕度 −1 °C</span></div><div class="sa-pad">'
+    + '<div class="sa-ans">' + saAmbAns(d, g).map(x => '<span>' + saRunsHtml(x.runs) + '</span>').join('') + '</div>'
+    + '<table class="sa-tbl" id="sa-amb-tbl"><thead><tr><th>環溫</th><th>固定這顆散熱器：瓶頸裕度</th><th>重新設計：需要的體積</th></tr></thead><tbody>'
+    + a.rows.map(r => '<tr' + (r.d === 0 ? ' class="cur"' : '') + '><td>' + vrN(r.T) + ' °C' + (r.d === 0 ? '（目前）' : '（+' + r.d + '）') + '</td>'
+      + '<td' + (r.m < 0 ? ' class="sa-neg"' : '') + '>' + saSgn(r.m) + ' °C' + (r.m < 0 ? '（超溫）' : '') + '</td>'
+      + '<td' + (r.ok ? '' : ' class="sa-na"') + '>' + (r.ok ? saF1(r.V) + ' L' + (r.d ? '（' + saPct((r.V / V0 - 1) * 100) + '）' : '') : '做不出來：' + _vEsc(r.why)) + '</td></tr>').join('')
+    + '</tbody></table>'
+    + '<div class="sa-read"><span class="t">怎麼看</span>' + _vEsc(SA_READ.amb) + '</div>'
+    + '</div></section>';
+}
+const SA_INTRO = '這頁回答三個問題：鰭片 air gap 選多少、功耗比預估高時這顆散熱器撐不撐得住、環溫規格提高的代價。全部用參數控制台與元件設定的目前值計算，改了參數這頁會跟著更新。';
+function saHtml(d, R, g){
+  let h = '<p class="sa-intro">' + SA_INTRO + '</p>';
+  if (d.st === 'blocked') return h + calcGateHtml(R.missing);
+  if (d.st === 'nohot' || d.st === 'nosol') { const n = vrStateNote(R, d.st); return h + '<section class="vr-panel"><div class="vr-alert ' + n.cls + '" style="border-top:0">' + _vEsc(n.text) + (d.st === 'nosol' ? ' 先處理瓶頸元件，敏感度分析才有意義。' : '') + '</div></section>'; }
+  if (d.st === 'drc') return h + '<section class="vr-panel"><div class="vr-alert fail" style="border-top:0">目前的設計 DRC 不通過：' + _vEsc(String(R.drc_msg || '').replace(/^⛔\s*/, ''))
+    + '。這顆散熱器做不出來 —— 下面先用 ① 找一個做得出來的 air gap；② ③ 要等設計做得出來才有意義。</div></section>' + saGapHtml(d);
+  return h + saSumHtml(d, R, g) + saGapHtml(d) + saPwHtml(d) + saAmbHtml(d, g);
+}
+function saPlot(d){
+  const P = (id, fig) => { const el = document.getElementById(id); if (!el) return;
+    if (!(window.Plotly && Plotly.newPlot)) { el.innerHTML = '<div class="sa-noplot">圖表元件（Plotly）沒有載入，數字請看上面的文字。</div>'; return; }
+    Plotly.newPlot(el, fig.data, fig.layout, {responsive:true, displaylogo:false, displayModeBar:false}); };
+  if (d.gap) P('sa-gap', saGapFig(d));
+  if (d.st === 'ok') { P('sa-pw-fix', saPwFixFig(d)); P('sa-pw-new', saPwNewFig(d)); }
+}
+/* 換專案、改參數 → recalc() 呼叫；這頁不在畫面上只標記，切過來再畫（switchTab）。在畫面上時合併連續的重算（打字時） */
+function scheduleTab4(){ if (!tab4Active()) { tab4Stale = true; return; } clearTimeout(tab4Timer); tab4Timer = setTimeout(() => renderTab4(true), 150); }
+function renderTab4(force){
+  const body = document.getElementById('sa-body'); if (!body || !calcResults) return;
+  if (!force && !tab4Active()) { tab4Stale = true; return; }
+  tab4Stale = false; clearTimeout(tab4Timer);
+  const d = saData(calcResults, G, components);
+  body.innerHTML = saHtml(d, calcResults, G);
+  saPlot(d);
 }
 
 // =====================================================
@@ -4504,6 +4744,7 @@ const PDF_GLYPH_MAP = {'：':': ','，':', ','；':'; ','→':'->','←':'<-','�
   'η':'eta','θ':'theta','Δ':'d','α':'alpha','β':'beta','μ':'u','Ψ':'Psi'};
 function pdfSafeText(s){
   return String(s)
+    .replace(/[\u2460-\u2473]/g, c => '(' + (c.charCodeAt(0) - 0x245F) + ')')   // ①～⑳ → (1)～(20)（字型沒有圈數字）
     .replace(/[！-～←-⇿≤≥≈℃Ͱ-Ͽ・]/g, c => PDF_GLYPH_MAP[c] !== undefined ? PDF_GLYPH_MAP[c]
       : (c >= '！' && c <= '～') ? String.fromCharCode(c.charCodeAt(0) - 0xFEE0) : c)
     .replace(/[─-➿⬀-⯿️]|[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '');
@@ -4637,23 +4878,16 @@ async function generatePDFReport() {
       try { renderTab3(true); const img = RRU3D.snapshot(1800, 1150); if (img) chartImages['3d'] = img; }
       catch(e) { console.warn('[PDF] 3D snapshot failed:', e); }
     }
-    // Capture sensitivity charts (inside sa-sweep-results / sa-tornado-results containers)
-    ['sa-cl','sa-cr','tv','tt'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) {
-        // Chart might be the element itself or a child
-        const gd = el.classList.contains('js-plotly-plot') ? el : el.querySelector('.js-plotly-plot');
-        if (gd) {
-          chartPromises.push((async () => {
-            try {
-              chartImages[id] = await Plotly.toImage(gd, {format:'png', width:800, height:400, scale:2});
-              console.log('[PDF] Captured SA chart:', id);
-            } catch(e) { console.warn('[PDF] SA chart capture failed:', id, e); }
-          })());
-        }
-      }
-    });
-    console.log('[PDF] SA chart IDs found:', ['sa-cl','sa-cr','tv','tt'].filter(id => !!document.getElementById(id)));
+    // 敏感度分析：與畫面同一組資料（saData）與同一組圖（saGapFig…；opt.pdf＝字放大、圖例畫進圖裡），不截畫面上的圖
+    //（這頁不在畫面上時根本沒畫過；Plotly.toImage 吃 {data, layout}）
+    const saD = saData(R, G, components), saImg = {};
+    if (window.Plotly && Plotly.toImage && (saD.st === 'ok' || saD.st === 'drc')) {
+      const jobs = [['gap', saGapFig(saD, {pdf:true}), 520]];
+      if (saD.st === 'ok') jobs.push(['fix', saPwFixFig(saD, {pdf:true, h:380}), 380], ['new', saPwNewFig(saD, {pdf:true}), 340]);
+      jobs.forEach(([k, fig, h]) => chartPromises.push(
+        Plotly.toImage({data:fig.data, layout:Object.assign({}, fig.layout, {width:1000, height:h})}, {format:'png', width:1000, height:h, scale:2})
+          .then(u => { saImg[k] = u; }).catch(e => console.warn('[PDF] SA chart failed:', k, e))));
+    }
 
     await Promise.all(chartPromises);
 
@@ -5101,7 +5335,7 @@ async function generatePDFReport() {
         {text:h_value.toFixed(2) + ' W/m\u00b2K', bold:true, fontSize:9, color:cPrimary},
         {text:[{text:'h_conv (對流)\n',fontSize:7,color:cGray},{text:h_conv.toFixed(2),fontSize:8}]},
         {text:[{text:'h_rad (輻射)\n',fontSize:7,color:cGray},{text:h_rad.toFixed(2),fontSize:8}]},
-        {text:[{text:'Aspect Ratio (鰭片流阻比)\n',fontSize:7,color:cGray},{text:R.aspect_ratio.toFixed(1),fontSize:9,bold:true,color:R.aspect_ratio>12?cDanger:R.aspect_ratio>=4.5&&R.aspect_ratio<=6.5?cSuccess:cWarning},{text:'  (最佳範圍 4.5~6.5)',fontSize:6.5,color:'#94a3b8',italics:true}]}
+        {text:[{text:'Aspect Ratio (鰭片流阻比)\n',fontSize:7,color:cGray},{text:R.aspect_ratio.toFixed(1),fontSize:9,bold:true,color:R.aspect_ratio>12?cDanger:arGood(R.aspect_ratio)?cSuccess:cWarning},{text:'  (最佳範圍 '+AR_GOOD[0]+'~'+AR_GOOD[1]+')',fontSize:6.5,color:'#94a3b8',italics:true}]}
       ]]},
       layout:{hLineWidth:()=>0, vLineWidth:()=>0, paddingLeft:()=>6, paddingRight:()=>6, paddingTop:()=>5, paddingBottom:()=>5, fillColor:()=>'#f0f9ff'},
       margin:[0,0,0,10]
@@ -5184,82 +5418,59 @@ async function generatePDFReport() {
       });
     }
 
-    // ══ 7. SENSITIVITY ANALYSIS ══
-    let hasSA = chartImages['sa-cl'] || chartImages['sa-cr'] || chartImages['tv'] || chartImages['tt'];
-    // Also capture data tables from the DOM
-    function scrapeHtmlTable(containerId) {
-      var el = document.getElementById(containerId);
-      if (!el) return null;
-      var tbl = el.querySelector('table');
-      if (!tbl) return null;
-      var data = [];
-      tbl.querySelectorAll('tr').forEach(function(tr) {
-        var row = [];
-        tr.querySelectorAll('th,td').forEach(function(td) { row.push(td.textContent.trim()); });
-        if (row.length) data.push(row);
-      });
-      return data.length > 1 ? data : null;
+    // ══ 7. SENSITIVITY ANALYSIS ══ 與畫面「敏感度分析」同一組資料（saData）、同一組圖（saGapFig…）與文字（SA_READ、saGapAns…）；
+    //    沒有發熱元件／無法設計 → 不列這節（畫面上也只有一行說明）；DRC 不通過 → 只列 ①（找一個做得出來的 air gap）
+    function saPdf(d, no) {
+      if (d.st !== 'ok' && d.st !== 'drc') return [];
+      const out = [{text:'', pageBreak:'after'}, {text:no + '. Sensitivity Analysis / 敏感度分析', style:'heading1'},
+                   {text:SA_INTRO, fontSize:7.5, color:'#475569', margin:[0,0,0,8]}];
+      const head = (t, sub) => ({text:[{text:t, bold:true, fontSize:10.5, color:'#1e3a5f'}, {text:sub ? '   ' + sub : '', fontSize:7, color:'#64748b'}], margin:[0,6,0,4]});
+      const ans = list => ({ul:list.map(a => ({text:a.runs.map(r => ({text:r.t, bold:!!r.b})), fontSize:7.5, color:(a.k === 'bad' || a.k === 'nogood') ? '#64748b' : '#1e293b'})), margin:[0,0,0,5]});
+      const img = k => saImg[k] ? {image:saImg[k], width:515, margin:[0,0,0,4]} : {text:'（圖表元件沒有載入，數字見上方文字）', fontSize:7, color:'#94a3b8', margin:[0,0,0,4]};
+      const read = list => ({stack:[{text:'怎麼看', bold:true, fontSize:7, color:'#1e3a5f'}]
+        .concat(list.map((t, i) => ({text:(list.length > 1 ? (i + 1) + '. ' : '') + saReadTxt(t, true), fontSize:6.6, color:'#334155', margin:[0,1,0,0]}))), margin:[0,2,0,10]});
+      const box = {hLineWidth:k => k === 1 ? 2 : 0.6, hLineColor:k => k === 1 ? '#00DFD8' : '#e2e8f0', vLineWidth:(k, node) => (k === 0 || k === node.table.widths.length) ? 0.6 : 0.4,
+                   vLineColor:() => '#e2e8f0', paddingLeft:() => 8, paddingRight:() => 8, paddingTop:k => k === 0 ? 4 : 7, paddingBottom:k => k === 0 ? 4 : 7};
+      if (d.st === 'drc') {
+        out.push(vrNotePdf({cls:'fail', text:'目前的設計 DRC 不通過：' + String(R.drc_msg || '').replace(/^⛔\s*/, '') + '。這顆散熱器做不出來 —— 先用 ① 找一個做得出來的 air gap；② ③ 要等設計做得出來才有意義。'}));
+      } else {
+        const hr = d.hr, TW = hr.base.TW, bn = hr.base.min;
+        const cell = (lbl, num, unit, txt, big) => ({stack:[{text:lbl, fontSize:7, bold:true, color:'#475569'},
+          {text:[{text:num, fontSize:big ? 18 : 12, bold:true, color:big ? '#1e3a5f' : '#0f172a'}, {text:unit ? ' ' + unit : '', fontSize:7.5, bold:true, color:'#334155'}], margin:[0,2,0,1]},
+          {text:txt || '', fontSize:6.3, color:'#475569'}]});
+        out.push({unbreakable:true, stack:[
+          {table:{widths:['30%','32%','38%'], body:[
+            [{text:[{text:'目前這顆散熱器還有多少餘裕', bold:true, fontSize:8.5}, {text:'   固定目前的散熱器（' + R.Fin_Count + ' 片 × ' + saF1(R.Fin_Height) + ' mm、air gap ' + vrN(G.Gap) + ' mm），只讓環溫或熱耗變動 · 安全係數 ×' + fmtSF(_num(G.Margin)), fontSize:6.8}],
+              color:'#f8fafc', fillColor:'#1e3a5f', colSpan:3}, {}, {}],
+            [cell('環溫上限', saF1(G.T_amb + hr.dT), '°C', '目前 ' + vrN(G.T_amb) + ' °C → ' + (hr.dT >= 0 ? '還能再高 ' : '已超出 ') + saF1(Math.abs(hr.dT)) + ' °C', true),
+             cell('熱耗上限（全部元件同比例）', isFinite(hr.Pmax) ? saF0(hr.Pmax) : '—', 'W', '目前 ' + saF0(TW) + ' W → ' + (isFinite(hr.Pmax) ? saPct((hr.Pmax / TW - 1) * 100) : '—')),
+             cell('誰先超溫', bn.name, '', saWhoNote(d) + ' · 目前裕度 ' + saSgn(bn.margin) + ' °C（' + bn.ref + '）')]
+          ]}, layout:box, margin:[0,0,0,6]},
+          vrNotePdf(saSumNote(d, G))]});
+      }
+      out.push({unbreakable:true, stack:[head('① 鰭片 air gap：選多少？', '每一點都照那個 air gap 重新設計散熱器（片數、鰭片高跟著變）'), ans(saGapAns(d)), img('gap')]});
+      out.push(read(SA_READ.gap));
+      if (d.st !== 'ok') return out;
+      out.push({unbreakable:true, stack:[head('② 熱耗比預估高的時候', '全部元件同比例 ×' + SA_PW_RANGE[0] + '～×' + SA_PW_RANGE[1]), ans(saPwAns(d)), img('fix')]});
+      out.push({unbreakable:true, stack:[img('new'), read(SA_READ.pw)]});
+      const th = t => ({text:t, bold:true, fontSize:7, color:'#f8fafc', fillColor:'#1e3a5f', alignment:'right'});
+      out.push({unbreakable:true, stack:[head('③ 環溫規格：提高幾度要付出多少？', '固定散熱器時環溫與裕度 1:1 —— 每 +1 °C，裕度 −1 °C'), ans(saAmbAns(d, G)),
+        {table:{headerRows:1, widths:['26%','34%','40%'], body:[[Object.assign(th('環溫'), {alignment:'left'}), th('固定這顆散熱器：瓶頸裕度'), th('重新設計：需要的體積')]]
+          .concat(d.amb.rows.map(r => [
+            {text:vrN(r.T) + ' °C' + (r.d === 0 ? '（目前）' : '（+' + r.d + '）'), fontSize:7, bold:r.d === 0},
+            {text:saSgn(r.m) + ' °C' + (r.m < 0 ? '（超溫）' : ''), fontSize:7, bold:r.d === 0 || r.m < 0, color:r.m < 0 ? '#a61b1b' : '#1e293b', alignment:'right'},
+            {text:r.ok ? saF1(r.V) + ' L' + (r.d ? '（' + saPct((r.V / d.V0 - 1) * 100) + '）' : '') : '做不出來：' + r.why, fontSize:7, bold:r.d === 0, color:r.ok ? '#1e293b' : '#64748b', alignment:'right'}]))},
+         layout:{hLineWidth:k => k === 1 ? 2 : 0.4, hLineColor:k => k === 1 ? '#00DFD8' : '#e2e8f0', vLineWidth:() => 0, paddingLeft:() => 6, paddingRight:() => 6, paddingTop:() => 3, paddingBottom:() => 3},
+         margin:[0,0,0,4]},
+        read([SA_READ.amb])]});
+      return out;
     }
-    var sweepData = scrapeHtmlTable('sa-detail');
-    var tornadoData = scrapeHtmlTable('tornado-detail');
-    if (hasSA || sweepData || tornadoData) {
-      content.push({text: '', pageBreak:'after'});
-      content.push({text: '7. Sensitivity Analysis / 敏感度分析', style:'heading1'});
-      if (chartImages['sa-cl'] || chartImages['sa-cr']) {
-        content.push({text: 'Sweep Analysis / 單變數掃描', style:'heading2'});
-        content.push({
-          columns: [
-            chartImages['sa-cl'] ? {image: chartImages['sa-cl'], width: 245} : {},
-            chartImages['sa-cr'] ? {image: chartImages['sa-cr'], width: 245} : {}
-          ],
-          columnGap: 10,
-          margin:[0,0,0,8]
-        });
-      }
-      // Sweep data table
-      if (sweepData) {
-        content.push({text: 'Sweep Data / 掃描數據', fontSize:8, bold:true, color:'#64748b', margin:[0,4,0,4]});
-        var sweepBody = sweepData.map(function(row, ri) {
-          return row.map(function(cell) {
-            return {text: cell, fontSize:6.5, alignment:'center', bold: ri===0, fillColor: ri===0?'#f1f5f9':null};
-          });
-        });
-        content.push({table: {headerRows:1, widths: Array(sweepData[0].length).fill('auto'), body: sweepBody}, layout: {
-          hLineWidth: function(i,node){return i===0||i===1||i===node.table.body.length?0.6:0.2;},
-          vLineWidth:function(){return 0.2;}, hLineColor:function(){return '#e2e8f0';}, vLineColor:function(){return '#e2e8f0';},
-          paddingLeft:function(){return 3;}, paddingRight:function(){return 3;}, paddingTop:function(){return 2;}, paddingBottom:function(){return 2;}
-        }, margin:[0,0,0,12]});
-      }
-      if (chartImages['tv'] || chartImages['tt']) {
-        content.push({text: 'Tornado Analysis / 龍捲風圖', style:'heading2'});
-        content.push({
-          columns: [
-            chartImages['tv'] ? {image: chartImages['tv'], width: 245} : {},
-            chartImages['tt'] ? {image: chartImages['tt'], width: 245} : {}
-          ],
-          columnGap: 10,
-          margin:[0,0,0,8]
-        });
-      }
-      // Tornado data table
-      if (tornadoData) {
-        content.push({text: 'Tornado Data / 龍捲風數據', fontSize:8, bold:true, color:'#64748b', margin:[0,4,0,4]});
-        var torBody = tornadoData.map(function(row, ri) {
-          return row.map(function(cell) {
-            return {text: cell, fontSize:6.5, alignment:'center', bold: ri===0, fillColor: ri===0?'#f1f5f9':null};
-          });
-        });
-        content.push({table: {headerRows:1, widths: Array(tornadoData[0].length).fill('auto'), body: torBody}, layout: {
-          hLineWidth: function(i,node){return i===0||i===1||i===node.table.body.length?0.6:0.2;},
-          vLineWidth:function(){return 0.2;}, hLineColor:function(){return '#e2e8f0';}, vLineColor:function(){return '#e2e8f0';},
-          paddingLeft:function(){return 3;}, paddingRight:function(){return 3;}, paddingTop:function(){return 2;}, paddingBottom:function(){return 2;}
-        }, margin:[0,0,0,10]});
-      }
-    }
+    const saNo = chartImages['3d'] ? 7 : 6, saNodes = saPdf(saD, saNo), hasSA = saNodes.length > 0;
+    content.push(...saNodes);
 
-    // ══ 8. CONCLUSION ══
+    // ══ CONCLUSION（節號接在最後一節後面）══
     content.push({text: '', pageBreak:'after'});
-    let conclusionSection = hasSA ? '8' : (chartImages['3d'] ? '7' : '6');
+    let conclusionSection = String(hasSA ? saNo + 1 : saNo);
     content.push({text: conclusionSection + '. Conclusion / \u7d50\u8ad6', style:'heading1'});
 
     let statusText, statusColor;
@@ -5281,7 +5492,7 @@ async function generatePDFReport() {
         [{text:[{text:'Bottleneck\n',fontSize:8},{text:'瓶頸元件 (溫度裕度最小)',fontSize:6.5,color:'#94a3b8',italics:true}]},{text:R.Bottleneck_Name,fontSize:9},{text:'Margin: '+R.Bottleneck_Tj_Margin+'\u00b0C',fontSize:9,color:R.Bottleneck_Tj_Margin<5?cDanger:R.Bottleneck_Tj_Margin<15?cWarning:cSuccess}],
         [{text:[{text:'Volume\n',fontSize:8},{text:'預估整機體積',fontSize:6.5,color:'#94a3b8',italics:true}]},{text:R.drc_failed?'N/A':R.Volume_L.toFixed(2)+' L',fontSize:9},{text:R.drc_failed?'DRC Failed':'-',fontSize:9,color:R.drc_failed?cDanger:'#334155',alignment:'center'}],
         [{text:[{text:'Weight\n',fontSize:8},{text:'預估整機重量',fontSize:6.5,color:'#94a3b8',italics:true}]},{text:R.drc_failed?'N/A':R.total_weight_kg.toFixed(1)+' kg',fontSize:9},{text:'-',fontSize:9,alignment:'center'}],
-        [{text:[{text:'Aspect Ratio\n',fontSize:8},{text:'鰭片流阻比 (建議 4.5~6.5)',fontSize:6.5,color:'#94a3b8',italics:true}]},{text:R.aspect_ratio.toFixed(1),fontSize:9},{text:R.aspect_ratio>12?'FAIL':R.aspect_ratio>=4.5&&R.aspect_ratio<=6.5?'Good':'Fair',fontSize:9,color:R.aspect_ratio>12?cDanger:R.aspect_ratio>=4.5&&R.aspect_ratio<=6.5?cSuccess:cWarning}],
+        [{text:[{text:'Aspect Ratio\n',fontSize:8},{text:'鰭片流阻比 (建議 '+AR_GOOD[0]+'~'+AR_GOOD[1]+')',fontSize:6.5,color:'#94a3b8',italics:true}]},{text:R.aspect_ratio.toFixed(1),fontSize:9},{text:R.aspect_ratio>12?'FAIL':arGood(R.aspect_ratio)?'Good':'Fair',fontSize:9,color:R.aspect_ratio>12?cDanger:arGood(R.aspect_ratio)?cSuccess:cWarning}],
         [{text:[{text:'h_total\n',fontSize:8},{text:'散熱器表面熱傳係數',fontSize:6.5,color:'#94a3b8',italics:true}]},{text:h_value.toFixed(2)+' W/m\u00b2K',fontSize:9},{text:[{text:'h_conv: '+h_conv.toFixed(2)+'\n',fontSize:8,color:'#334155'},{text:'h_rad: '+h_rad.toFixed(2),fontSize:8,color:'#64748b'}]}]
       ],widths:['35%','35%','30%']},
       layout:{
