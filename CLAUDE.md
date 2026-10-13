@@ -25,7 +25,8 @@
     "<project_id>": {
       // 5G-RRU 寫: meta, project_name, global_params, rf_data, digital_data, pwr_data,
       //            layout3d（3D 頁的調整，以 _cid 為 key；見「3D 模擬視圖」）
-      // AI-Thermal Tab2 寫: thermal_specs, hidden_components,
+      // AI-Thermal Tab2 寫: thermal_specs（含 Thermal Via 計算頁的 thermal_specs[元件].via）, hidden_components,
+      //                     ⚠ 本工具**唯讀** thermal_specs（3D 元件大小、Thermal Via 逐顆 K_eff：via、epadSize），永遠不寫
       //                     param_temp, param_temp_custom,
       //                     param_backoff, param_backoff_rt,
       //                     param_duplex, param_duplex_rt,
@@ -118,7 +119,7 @@
 | `Board_Type` | `R_int` | `R_TIM` 的接觸面積 |
 |---|---|---|
 | `Copper Coin` | 銅塊 + die-attach solder | 銅塊面積 `Coin_L×Coin_W` |
-| `Thermal Via` | 導熱孔（`K_Via`／`Via_Eff`）| `(Pad_L+Thick)×(Pad_W+Thick)` 擴散面積 |
+| `Thermal Via` | 導熱孔：有 AI-Thermal 的 via 設計 → **`Thick ÷ (K_eff × A_pad)`**；沒有 → 通用值（`K_Via`、擴散面積、`÷ Via_Eff`），見「Thermal Via 逐顆 K_eff」| `(Pad_L+Thick)×(Pad_W+Thick)` 擴散面積 |
 | `IC top` | **0**（不穿板）| **`Pad_L×Pad_W`**（元件上表面積，不加板厚）|
 | `None` | 0 | `(Pad_L+Thick)×(Pad_W+Thick)`（沿用舊行為）|
 
@@ -154,9 +155,40 @@
 ### `K (銅塊)`：原本寫死的 380 已拉成參數
 
 `calcThermalResistance` 的 Copper Coin 分支原本是 `kb=380`（寫死）。現在取
-`global_params.K_Coin`，**沒有有效值時 fallback 380**（純銅）。Thermal Via 仍是
-`K_Via`（Via 等效 K，預設 30）＋ `Via_Eff`（0.9）；整份計算裡**沒有 FR4 基材 K**，
+`global_params.K_Coin`，**沒有有效值時 fallback 380**（純銅）。Thermal Via 有 AI-Thermal 的 via 設計時用逐顆
+`K_eff`（下一節），沒有才用通用值 `K_Via`（Via 等效 K，預設 30）＋ `Via_Eff`（0.9）—— 通用值那條路徑**沒有 FR4 基材 K**，
 穿板路徑就由「Via 等效 K」一個值代表。
+
+### Thermal Via 逐顆 K_eff（`viaCalc.js` ⚠️ 兩個 repo 共用同一份）
+
+導熱方式＝Thermal Via 的元件，AI-Thermal「Thermal Via 計算」頁有完整的 via 設計時，基板熱阻改用那顆的等效 K；
+抓不到才用參數控制台的通用值。**單一事實來源 `ViaCalc.keffForComp(comp, thermal_specs, global_params)`**
+（`viaCalc.js`，與 AI-Thermal 逐字相同）：兩邊各自從資料庫的原始輸入當場算、**不存結果**
+（不另存元件欄位：快選複製會把過期的值帶到別的專案，AI-Thermal 的存檔推導也只在兩頁同專案時才跑）。
+
+- **`viaCalc.js` 與 `tests/via-calc.unit.test.js` 在兩個 repo 內容逐字相同**（同 `compMerge.js`），改一邊就同步另一邊（`diff` 無輸出）。
+- 讀什麼（全部**唯讀**，本工具永遠不寫 `thermal_specs`）：`thermal_specs[specKey(元件名)].via`（找不到、且元件有 `_renamed_from`
+  → 用舊名稱找）、`epadSize`（空白 → 元件的 `Pad_L`/`Pad_W`，限 `Board_Type` Thermal Via 或 `_pad_from = epadSize`）、
+  元件的 `TV_Qty`／`TV_ID_mil`（`'N/A'`／空白／0＝沒填）。AI-Thermal 頁面 ✂ 改的**試算值**（`via.qty`／`via.diaMil`）**照用**
+  （使用者決定：與 AI-Thermal 畫面上的 K_eff 一致），tooltip 寫出 EE 清單的值。
+- **R_int（使用者決定，2026-10）**：ok → `R_int ＝ 板厚 ÷ (K_eff × A_pad)`（`ViaCalc.rint`）＝ AI-Thermal 頁面上的 R_th：
+  via 只在焊盤底下（焊盤外是 FR4）→ **不加擴散面積**；K_eff 已經算進銅壁、塞孔與 FR4 的比例 → **不除 `Via_Eff`**。
+  板厚用本工具的 `Thick(mm)`（＝參數控制台 `t_PCB`），不用 AI-Thermal 頁面的 `via.pcbT`。`A_pad` 用 via 計算的焊盤（圓形也行）。
+- **退回通用值**（`reason`，`ViaCalc.reasonText` 兩邊同一套文字）：`nodata`（還沒有 via 設計）、`skip`（暫不納入熱流評估）、
+  `missing`（缺 K_eff 需要的：焊盤、數量、內徑、鍍銅、塞孔材料 —— **與板厚、中心間距無關**）、`over`（via 佔用面積超過焊盤，K_eff 不成立）。
+- **配置有問題照用**（使用者決定）：孔壁超出焊盤／互相重疊／沒填中心間距（沒辦法檢查）→ K_eff 照用、標琥珀色 ⚠（`Via_Warn`）。
+- 計算：`viaKInfo(row, g)` → `calcThermalResistance` 回傳 `Via_Src`（`keff`／`generic`）、`Via_K`、`Via_APad`、`Via_Detail`（tooltip）、
+  `Via_Warn`、`Via_Why`。`viaKOf` 以元件相關欄位當 key 快取（`viaKCache`；敏感度分析一次算幾十次 computeAll），
+  **換 `projThermalSpecs` 一律走 `setProjThermalSpecs`**（會清快取）。
+- 畫面（三方同步）：元件表導熱方式底下 `viaKNoteHtml`（K_eff → 藍邊「AI-Thermal 推導值」樣式；通用值 → 灰字＋原因；⚠ → 琥珀色），
+  不給改（編輯入口只在 AI-Thermal）；分析表 R_int ◆／⚠＋tooltip、展開列寫算式（`viaRintFormula`）；PDF 元件清單導熱方式底下附 K＋說明、
+  分析表 R_int 標 `(K_eff)`／`(!)`；元件 Excel 多一欄「Via K（Thermal Via）」；參數控制台 K_Via 標「通用值」。
+- `thermal_specs` 要跟資料庫一致（`projThermalSpecs`）：載入／匯入 → 該 document 的；**切回分頁**（`checkProjectFreshness`）thermal_specs
+  變了 → 直接換成最新的並重算（`refreshThermalSpecs`；只改 via 設計時元件清單沒變，原本的比對看不出來；本工具唯讀，有未存修改也照換）；
+  **存檔**後換成寫入當下資料庫裡的那一份（`curSpecs`）；**複製專案** → 複本沒有 AI-Thermal 的資料 → 通用值，alert 提醒。
+  「💾 匯出專案」的 JSON 不含 thermal_specs（只有本工具的欄位）→ 匯入後 Thermal Via 用通用值。
+- 契約測試：`tests/via-k.test.js`（含改動前公式逐列回歸、非 Thermal Via 元件完全不變、存檔不寫 thermal_specs）、
+  `tests/via-calc.unit.test.js`（共用）。備份真實資料（兩份備份、8 個專案）**沒有任何 via 設計 → 結果完全不變**。
 
 > 5G-RRU 專屬的新 global_params keys：`t_PCB`、`Coin_T_Setting`、`K_Coin`
 > （三份清單都要同步：`readGlobals` / `saveProject` / `PROJECT_GLOBAL_KEYS`）。
@@ -950,7 +982,7 @@ await dbAdapter.updateDoc('projects', docId, {
 ### 運作方式
 
 - 原始碼裡只放佔位符 `__APP_VERSION__`（出現在 `index.html` 的 `window.APP_VERSION`、
-  6 支本地 JS（`config.js` / `fileDb.js` / `graphDb.js` / `dbAdapter.js` / `compMerge.js` / `viewer3d.js`）的
+  7 支本地 JS（`config.js` / `fileDb.js` / `graphDb.js` / `dbAdapter.js` / `compMerge.js` / `viaCalc.js` / `viewer3d.js`）的
   `?v=__APP_VERSION__` 快取戳記、以及 `version.json`）。
 - `.github/workflows/deploy-pages.yml` 在每次 push 到 `main` 時，用
   `TZ='Asia/Taipei' date +%Y.%m.%d.%H%M`＋短 SHA 算出版本號，`sed` 戳進上述佔位符，
