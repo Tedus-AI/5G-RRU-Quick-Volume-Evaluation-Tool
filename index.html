@@ -182,6 +182,8 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .sidebar .dim-derive .dd-sum{font-size:0.68rem;color:#94a3b8;text-align:right;margin:1px 0 5px;}
 .tim-lib-hint{margin-top:7px;font-size:0.72rem;color:#94a3b8;line-height:1.55;}
 .tim-lib-hint b{color:#cbd5e1;}
+.via-k-hint{margin:2px 0 6px;font-size:0.72rem;color:#94a3b8;line-height:1.55;}
+.via-k-hint b{color:#cbd5e1;}
 .db-restore-modal{width:860px;max-height:88vh;display:flex;flex-direction:column;box-sizing:border-box;}
 .db-restore-modal #dbRestoreBody{overflow:auto;min-height:0;flex:1 1 auto;}
 .db-restore-modal .dbr-file{margin:0 0 12px;color:#334155;font-size:0.85rem;line-height:1.6;}
@@ -524,6 +526,11 @@ tr.comp-excluded{opacity:0.4;}
 .tim-note-warn{color:#b45309;}
 .tim-note-src{color:#94a3b8;display:block;max-width:150px;overflow:hidden;text-overflow:ellipsis;}
 .tim-note-warn .tim-note-src{color:#b45309;}
+.via-k-note{font-size:0.72rem;color:#6b7280;margin-top:3px;cursor:help;line-height:1.35;white-space:nowrap;padding-left:5px;border-left:3px solid transparent;}
+.via-k-eff{border-left-color:#0550ae;background:#f5f9ff;color:#0f2e57;}
+.via-k-warn{color:#b45309;}
+.via-k-src{color:#94a3b8;display:block;max-width:150px;overflow:hidden;text-overflow:ellipsis;}
+.via-k-warn .via-k-src{color:#b45309;}
 .tim-mark{font-size:0.7rem;color:#94a3b8;margin-left:3px;cursor:help;}
 .tim-mark-warn{color:#b45309;}
 /* AI-Thermal 推導欄位的來源標記：欄位左側藍邊（資訊用，非錯誤 → 不用紅色）。
@@ -641,6 +648,8 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
 <script src="graphDb.js?v=__APP_VERSION__"></script>
 <script src="dbAdapter.js?v=__APP_VERSION__"></script>
 <script src="compMerge.js?v=__APP_VERSION__"></script>
+<!-- Thermal Via 逐顆等效 K（與 AI-Thermal 逐字相同的共用檔）：Board_Type = Thermal Via 的基板熱阻 R_int -->
+<script src="viaCalc.js?v=__APP_VERSION__"></script>
 <!-- 3D 模擬視圖（viewer3d.js）用的 three.js：importmap 一定要在 module script 之前 -->
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 </head>
@@ -811,7 +820,8 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
 
   <div class="section-title" onclick="toggleSection(this)">3. 材料參數 (含 Via K值)</div>
   <div class="section-body">
-    <div class="row2"><div><label>Via 等效 K 值</label><input type="number" id="K_Via" step="1" onchange="recalc()"></div><div><label>Via 製程係數</label><input type="number" id="Via_Eff" step="0.05" onchange="recalc()"></div></div>
+    <div class="row2"><div><label title="導熱方式＝Thermal Via 的元件，AI-Thermal「Thermal Via 計算」有完整的 via 設計時改用逐顆 K_eff；抓不到（沒有設計、資料不完整、暫不納入熱流評估、via 面積超過焊盤）才用這個通用值">Via 等效 K 值（通用值）</label><input type="number" id="K_Via" step="1" onchange="recalc()"></div><div><label title="只套用在通用值 K_Via：R_int ＝ 板厚 ÷ (K_Via × 擴散面積) ÷ 製程係數。逐顆 K_eff 已經算進銅壁、塞孔與 FR4 的比例，不再除這個係數">Via 製程係數</label><input type="number" id="Via_Eff" step="0.05" onchange="recalc()"></div></div>
+    <div class="via-k-hint">抓不到逐顆 K<sub>eff</sub> 時才用這兩個值。導熱方式＝Thermal Via 的元件，<b>AI-Thermal</b>「Thermal Via 計算」有完整的 via 設計時改用它的 K<sub>eff</sub>（元件設定的導熱方式底下會寫用哪一個）。</div>
     <label style="margin-top:8px;color:var(--primary-light);">🔷 熱介面材料 (TIM)</label>
     <button class="tim-lib-btn" onclick="timLibViewOpen()" title="檢視全工具共用的 TIM 型號庫（k 值與填縫厚度）。本工具唯讀，新增／修改請到 AI-Thermal">🧪 TIM 型號庫</button>
     <div class="tim-lib-hint">每顆元件的 k 與填縫厚度由它選用的<b>型號</b>決定（型號在 <b>AI-Thermal</b> 的元件清單選）。本工具<b>只能檢視</b>，新增／修改型號請到 AI-Thermal。</div>
@@ -1582,7 +1592,7 @@ const TAB2_TIPS = {
   'Loc_Amb':'該元件高度處的環境溫度。公式：全域環溫 + (元件高度 × 0.03)',
   'Drop':'從判定溫度的位置傳到散熱器表面的溫差。以 Tj 判定：單顆功耗 × (Rjc + R_int + R_TIM)；以 Tc 判定：單顆功耗 × (R_int + R_TIM)（限溫管的是外殼，不含 Rjc）',
   'R_jc':'結點到殼的內部熱阻 (°C/W)，取自規格書',
-  'R_int':'元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值。導熱方式 IC top／None 不穿板 → 顯示「—」',
+  'R_int':'元件穿過 PCB (Via) 或銅塊 (Coin) 傳導至底部的熱阻值。導熱方式 IC top／None 不穿板 → 顯示「—」。Thermal Via：◆ = 逐顆 K_eff（AI-Thermal「Thermal Via 計算」，R_int ＝ 板厚 ÷ (K_eff × 焊盤面積)）；⚠ = via 配置有問題（照用）；沒有記號 = 通用值 K_Via（滑鼠移到數字上看原因）',
   'R_TIM':'元件或銅塊底部與散熱器之間的接觸熱阻 (由 TIM 材料與面積決定)。介面材料 None → 顯示「—」。◆ = k/t 取自 TIM 型號庫的型號；⚠ = 來源有問題（滑鼠移到數字上看說明）',
   'Limit(C)':'元件允許最高運作溫度'
 };
@@ -2278,6 +2288,52 @@ function drcDieCasting(FH,T_tip,alpha_deg,Gap){
    真的沒有值時回 NaN —— 讓它在畫面上現形，不要偷偷當 0（R_jc/Height 當 0 都是低估溫度）。 */
 function _num(v){ return (typeof v==='number')?v:parseFloat(v); }
 
+/* ── Thermal Via 的 K：逐顆 K_eff（AI-Thermal「Thermal Via 計算」）或通用值 K_Via ────────────────
+   單一事實來源 ViaCalc.keffForComp（viaCalc.js，與 AI-Thermal 逐字相同）：兩邊各自從資料庫的原始輸入當場算、不存結果
+   （存成元件欄位的話，快選複製會把過期的值帶到別的專案）。本工具只讀 thermal_specs（projThermalSpecs），永遠不寫。
+   - ok    → R_int ＝ 板厚 ÷ (K_eff × 焊盤面積)＝AI-Thermal 頁面上的 R_th：via 只在焊盤底下（焊盤外是 FR4）→ 不加擴散面積；
+             K_eff 已經算進銅壁、塞孔與 FR4 的比例 → 不再除 Via_Eff。配置有問題（孔壁超出／重疊、沒填間距）照用、標 ⚠。
+   - 不 ok → 通用值 K_Via（擴散面積 √(pa·ba)、÷ Via_Eff，原本的算法），並寫出原因。
+   試算值（AI-Thermal 頁面 ✂ 改的 via.qty／via.diaMil）照用：與 AI-Thermal 畫面上看到的 K_eff 一致。 */
+var viaKCache=new Map();
+function setProjThermalSpecs(ts){projThermalSpecs=(ts&&typeof ts==='object')?ts:{};viaKCache.clear();}
+function viaKOf(row){
+  const key=JSON.stringify([row.Component,row._renamed_from,row.TV_Qty,row.TV_ID_mil,row.Board_Type,row._pad_from,row.Pad_L,row.Pad_W]);
+  let r=viaKCache.get(key);
+  if(!r){if(viaKCache.size>2000)viaKCache.clear();r=ViaCalc.keffForComp(row,projThermalSpecs,G);viaKCache.set(key,r);}
+  return r;
+}
+const VIA_PAD_SRC={epad:'AI-Thermal TH/ME 頁的 E-PAD',rru:'元件的 E-Pad 長寬（TH/ME 頁沒填 E-PAD）',circle:'圓形焊盤'};
+function _vf(v,d){return isFinite(+v)?String(+(+v).toFixed(d)):'—';}
+/* 這顆 Thermal Via 元件用哪個 K、為什麼（計算、元件表、分析表、PDF 共用同一份文字）；不是 Thermal Via → null */
+function viaKInfo(row,g){
+  if(String(row&&row.Board_Type||'')!=='Thermal Via')return null;
+  const r=viaKOf(row);
+  const kv=parseFloat(g.K_Via),ve=parseFloat(g.Via_Eff);
+  if(r.ok){
+    const fill=ViaCalc.fillOf(r.fill)||{};
+    const pad=r.shape==='circle'?'直徑 '+_vf(r.D,3)+' mm':_vf(r.L,3)+' × '+_vf(r.W,3)+' mm';
+    const lines=[
+      '基板熱阻用 AI-Thermal「Thermal Via 計算」的逐顆 K_eff = '+_vf(r.keff,3)+' W/m·K（取代通用值 K_Via = '+_vf(kv,2)+'）',
+      'R_int ＝ 板厚 ÷ (K_eff × 焊盤面積 '+_vf(r.aPad,2)+' mm²)：via 只在焊盤底下 → 不加擴散面積；K_eff 已含銅壁／塞孔／FR4 的比例 → 不除 Via_Eff',
+      'via：'+r.n+' 顆 × 內徑 '+_vf(r.diaMil,2)+' mil、鍍銅 '+_vf(r.plating*1000,1)+' µm'+(r.src.plating==='default'?'（預設）':'')+'、塞孔 '+(fill.label||r.fill)+'（K = '+_vf(r.kFill,3)+'）',
+      '焊盤：'+pad+'（'+(VIA_PAD_SRC[r.src.pad]||'')+'）'];
+    if(r.src.qty==='via')lines.push('Via 數量用 AI-Thermal 頁面的試算值 '+r.n+(r.srcQty!==null?'（EE 清單是 '+_vf(r.srcQty,0)+'）':'（EE 清單沒填）'));
+    if(r.src.dia==='via')lines.push('Via 內徑用 AI-Thermal 頁面的試算值 '+_vf(r.diaMil,2)+' mil'+(r.srcDia!==null?'（EE 清單是 '+_vf(r.srcDia,2)+' mil）':'（EE 清單沒填）'));
+    if(r.renamed)lines.push('via 設計還掛在舊名稱「'+row._renamed_from+'」底下（AI-Thermal 下次存檔會搬到新名稱）');
+    const warn=r.issues.map(i=>i.text).join('；');
+    if(warn)lines.push('⚠ 配置有問題：'+warn+' → 不影響 K_eff 的公式，照用；請到 AI-Thermal 調整');
+    lines.push('要改 via 設計請到 AI-Thermal 的「Thermal Via 計算」（本工具唯讀）。');
+    return {src:'keff',k:r.keff,label:'K_eff '+_vf(r.keff,1)+' W/m·K',from:'← AI-Thermal via 計算',detail:lines.join('\n'),warn:warn?'via 配置有問題：'+warn:'',why:'',r};
+  }
+  const why=ViaCalc.reasonText(r);
+  return {src:'generic',k:kv,label:'通用值 K_Via '+_vf(kv,2)+' W/m·K',from:why,warn:'',why,r,
+    detail:['基板熱阻用參數控制台的通用值 K_Via = '+_vf(kv,2)+' W/m·K',
+            'R_int ＝ 板厚 ÷ (K_Via × 擴散面積 √(焊盤 × (焊盤＋板厚))) ÷ Via 製程係數 '+_vf(ve,2),
+            '沒有用逐顆 K_eff：'+why,
+            '在 AI-Thermal 的「Thermal Via 計算」補齊 via 設計並存檔，這顆就會改用逐顆 K_eff。'].join('\n')};
+}
+
 function calcThermalResistance(row0,g){
   const row={...row0};
   ['Qty','Power(W)','Height(mm)','Pad_L','Pad_W','Thick(mm)','Limit(C)','R_jc'].forEach(k=>{ row[k]=_num(row[k]); });
@@ -2292,10 +2348,13 @@ function calcThermalResistance(row0,g){
   let la=g.T_amb+row['Height(mm)']*g.Slope;
   // 銅塊 K 值改由參數控制台的「K (銅塊)」提供；沒有有效值時沿用純銅 380（fallback 不可省）
   let kCoin=parseFloat(g.K_Coin);if(!(kCoin>0))kCoin=380;
+  // Thermal Via：AI-Thermal 有完整的 via 設計 → 逐顆 K_eff（R_int ＝ 板厚 ÷ (K_eff × 焊盤面積)）；抓不到 → 通用值 K_Via（見 viaKInfo）
+  const vi=viaKInfo(row,g);
   let kb=0;if(row.Board_Type==="Copper Coin")kb=kCoin;else if(row.Board_Type==="Thermal Via")kb=g.K_Via;
   let pa=(row.Pad_L*row.Pad_W)/1e6,ba=(bl*bw)/1e6;
   let ri=0;
-  if(kb>0&&pa>0){let ea=ba>0?Math.sqrt(pa*ba):pa;let rv=(row['Thick(mm)']/1000)/(kb*ea);
+  if(vi&&vi.src==='keff')ri=ViaCalc.rint(vi.r,row['Thick(mm)']);
+  else if(kb>0&&pa>0){let ea=ba>0?Math.sqrt(pa*ba):pa;let rv=(row['Thick(mm)']/1000)/(kb*ea);
     if(row.Board_Type==="Copper Coin")ri=rv+((g.t_Solder/1000)/(g.K_Solder*pa*g.Voiding));
     else if(row.Board_Type==="Thermal Via")ri=rv/g.Via_Eff;else ri=rv;}
   // TIM 的 k / t 一律走 resolveTim（型號優先，否則參數控制台）—— 它同時回報來源供畫面標註
@@ -2307,7 +2366,8 @@ function calcThermalResistance(row0,g){
   let tw=row.Qty*row['Power(W)'];let dr=row['Power(W)']*((lr.ref==='Tc'?0:row.R_jc)+ri+rt);let adt=row['Limit(C)']-dr-la;
   return{Base_L:bl,Base_W:bw,Loc_Amb:la,R_int:ri,R_TIM:rt,Total_W:tw,Drop:dr,Allowed_dT:adt,
     Temp_Label:lr.ref,Limit_Ref_Auto:lr.auto,Limit_Ref_Why:lr.why,
-    TIM_k:ti.k,TIM_t:ti.t,TIM_Src:ti.src,TIM_SrcLabel:ti.label,TIM_SrcDetail:ti.detail||'',TIM_Warn:ti.warn||''};
+    TIM_k:ti.k,TIM_t:ti.t,TIM_Src:ti.src,TIM_SrcLabel:ti.label,TIM_SrcDetail:ti.detail||'',TIM_Warn:ti.warn||'',
+    Via_Src:vi?vi.src:'',Via_K:vi?vi.k:NaN,Via_APad:vi&&vi.src==='keff'?vi.r.aPad:NaN,Via_Label:vi?vi.label:'',Via_Detail:vi?vi.detail:'',Via_Warn:vi?vi.warn:'',Via_Why:vi?vi.why:''};
 }
 
 function emptyCalcResult(){return{Total_Power:0,Min_dT_Allowed:50,Bottleneck_Name:"None",Area_req:0,Fin_Height:0,Volume_L:0,total_weight_kg:0,h_value:0,h_conv:0,h_rad:0,Bottleneck_Tj_Margin:0,Fin_Count:0,rows:[],drc_failed:false,drc_msg:"",drc_warn:"",L_hsk:0,W_hsk:0,RRU_Height:0,aspect_ratio:0,hs_weight_kg:0,shield_weight_kg:0,filter_weight_kg:0,shielding_weight_kg:0,pcb_weight_kg:0,eff:0,eta_fin:0,T_hsk_base:0,T_root:0,G_root:0};}
@@ -2856,7 +2916,15 @@ function boardTypeCellHtml(row,category,i,dis){
     opts+='<option value="'+_vEsc(o)+'"'+(cur===o?' selected':'')+'>'+_vEsc(o)+(unknown?'（未知值）':'')+'</option>';
   });
   return '<td data-col="Board_Type"><select style="min-width:110px;"'+(missingAttrs(row,'Board_Type')||stampedAttrs(row,'Board_Type',category)||derivedAttrs(row,'Board_Type'))+dis+
-         ' onchange="updateComp(\''+category+'\','+i+',\'Board_Type\',this.value)">'+opts+'</select></td>';
+         ' onchange="updateComp(\''+category+'\','+i+',\'Board_Type\',this.value)">'+opts+'</select>'+viaKNoteHtml(row)+'</td>';
+}
+/* Thermal Via 元件：這顆的基板熱阻用哪個 K、從哪來（每個數字都要回答得出「哪來的」）。
+   逐顆 K_eff 是 AI-Thermal 的值 → 沿用「AI-Thermal 推導值」的樣式（左側藍邊＋tooltip）；這裡不給改（編輯入口只在 AI-Thermal）。 */
+function viaKNoteHtml(row){
+  const vi=viaKInfo(row,G);if(!vi)return '';
+  const cls='via-k-note'+(vi.src==='keff'?' via-k-eff':'')+(vi.warn?' via-k-warn':'');
+  return '<div class="'+cls+'" title="'+_vEsc(vi.detail)+'">'+(vi.warn?'⚠ ':'')+_vEsc(vi.label)+
+         '<span class="via-k-src">'+_vEsc(vi.src==='keff'?'← AI-Thermal via 計算':vi.why)+'</span></div>';
 }
 
 /* ── 元件表的「介面材料」欄 ─────────────────────────────────────
@@ -2993,7 +3061,10 @@ function renderCompTable(arr,containerId,defaults,category){
   const cw=compWatts(arr);let pw=cw.w;
   let activeCount=arr.filter(r=>!r._excluded).length;
   lhtml+='<p style="color:#666;font-size:0.85rem;margin-bottom:8px;">📊 '+category.toUpperCase()+' 類總功耗：<b>'+pw.toFixed(1)+' W</b>'+(cw.unknown?'<span class="pw-unknown">（另有 '+cw.unknown+' 顆未填數量／瓦數）</span>':'')+' | 共 <b>'+activeCount+'</b>/<b>'+arr.length+'</b> 種元件納入計算</p>';
-  if(hasDerivedRow(arr))lhtml+='<p class="derived-legend"><span class="derived-swatch"></span> 左側藍邊的欄位由 <b>AI-Thermal</b> 推導：<b>導熱方式／E-Pad 尺寸</b>（Tab2「主散熱路徑」）在這裡改仍算得到，但下次從 AI-Thermal 存檔時會被覆寫；<b>Rjc</b> 是規格書值（熱阻表的 θJC）<b>直接鎖定 🔒 不開放修改</b>，要改請到 AI-Thermal 的熱阻（θ）填 θJC。滑鼠停在欄位上可看來源。</p>';
+  const viaKeff=arr.some(r=>{const vi=viaKInfo(r,G);return vi&&vi.src==='keff';});
+  if(hasDerivedRow(arr))lhtml+='<p class="derived-legend"><span class="derived-swatch"></span> 左側藍邊的欄位由 <b>AI-Thermal</b> 推導：<b>導熱方式／E-Pad 尺寸</b>（Tab2「主散熱路徑」）在這裡改仍算得到，但下次從 AI-Thermal 存檔時會被覆寫；<b>Rjc</b> 是規格書值（熱阻表的 θJC）<b>直接鎖定 🔒 不開放修改</b>，要改請到 AI-Thermal 的熱阻（θ）填 θJC。'+
+    (viaKeff?'導熱方式底下藍邊的 <b>K<sub>eff</sub></b> 是 AI-Thermal「Thermal Via 計算」的逐顆等效 K（只能在 AI-Thermal 改）。':'')+'滑鼠停在欄位上可看來源。</p>';
+  else if(viaKeff)lhtml+='<p class="derived-legend"><span class="derived-swatch"></span> 導熱方式底下藍邊的 <b>K<sub>eff</sub></b> 是 <b>AI-Thermal</b>「Thermal Via 計算」的逐顆等效 K（只能在 AI-Thermal 改）；滑鼠停在上面可看 via 設計與算式。</p>';
 
   // Table
   lhtml+='<div class="comp-table-wrap"><table class="comp-table"><thead><tr>';
@@ -3088,14 +3159,17 @@ function exportCompExcel(mode){
   var catLabels={rf:'RF Component',digital:'Digital Component',pwr:'PWR Component'};
   // 匯出多一欄「TIM 型號」：k/t 可能取自型號庫，少了它匯出的表看不出熱阻怎麼來的
   // 限溫後面多一欄「限溫對象」：同一個限溫數字，Tj 與 Tc 的意思差很多
-  var xCols=COLS.concat(['TIM_Model']);xCols.splice(xCols.indexOf('Limit(C)')+1,0,'Limit_Ref');
-  var xLabels=Object.assign({},COL_LABELS,{'TIM_Model':'TIM 型號','Limit_Ref':'限溫對象'});
+  // 導熱方式後面多一欄「Via K」：Thermal Via 的基板熱阻用逐顆 K_eff（AI-Thermal）還是通用值 K_Via、為什麼
+  var xCols=COLS.concat(['TIM_Model']);xCols.splice(xCols.indexOf('Limit(C)')+1,0,'Limit_Ref');xCols.splice(xCols.indexOf('Board_Type')+1,0,'_via_k');
+  var xLabels=Object.assign({},COL_LABELS,{'TIM_Model':'TIM 型號','Limit_Ref':'限溫對象','_via_k':'Via K（Thermal Via）'});
   var header=xCols.map(c=>xLabels[c]);
   cats.forEach(function(cat){
     var rows=components[cat];
     var data=[header];
     rows.forEach(function(r){data.push(xCols.map(function(c){
       if(c==='Limit_Ref'){var lr=CompMerge.limitRef(r,cat);return lr.auto?'自動 '+lr.ref+'（'+lr.why+'）':lr.ref;}
+      if(c==='_via_k'){var vi=viaKInfo(r,G);if(!vi)return '';
+        return vi.src==='keff'?'逐顆 K_eff '+_vf(vi.k,3)+' W/m·K（AI-Thermal）'+(vi.warn?'；⚠ '+vi.warn:''):'通用值 K_Via '+_vf(vi.k,2)+'：'+vi.why;}
       return r[c];}));});
     // Add power summary row
     var pw=rows.reduce(function(s,r){return s+r['Power(W)']*r.Qty;},0);
@@ -3104,7 +3178,7 @@ function exportCompExcel(mode){
     data.push(sumRow);
     var ws=XLSX.utils.aoa_to_sheet(data);
     // Column widths
-    ws['!cols']=xCols.map(function(c){return{wch:c==='Component'?18:c==='Board_Type'||c==='TIM_Type'||c==='TIM_Model'?14:12};});
+    ws['!cols']=xCols.map(function(c){return{wch:c==='Component'?18:c==='_via_k'?30:c==='Board_Type'||c==='TIM_Type'||c==='TIM_Model'?14:12};});
     XLSX.utils.book_append_sheet(wb,ws,catLabels[cat]);
   });
   var fname=mode==='all'?'Components_All.xlsx':catLabels[mode].replace(/\s/g,'_')+'.xlsx';
@@ -3181,6 +3255,12 @@ function renderTab1(){
         if(r.TIM_Warn)inner='<span class="tim-mark tim-mark-warn" title="'+_vEsc(r.TIM_Warn)+'">⚠</span>'+inner;
         else if(r.TIM_Src==='model')inner='<span class="tim-mark" title="'+_vEsc('k/t 來自 TIM 型號庫：'+(r.TIM_SrcLabel||''))+'">◆</span>'+inner;
       }
+      // R_int（Thermal Via）同理：◆＝逐顆 K_eff（AI-Thermal Thermal Via 計算）、⚠＝via 配置有問題（照用）；通用值只在 tooltip 說明原因
+      if(c==='R_int'&&!f.na&&r.Via_Src){
+        tip=r.Via_Detail;
+        if(r.Via_Warn)inner='<span class="tim-mark tim-mark-warn" title="'+_vEsc(r.Via_Warn)+'">⚠</span>'+inner;
+        else if(r.Via_Src==='keff')inner='<span class="tim-mark" title="'+_vEsc('逐顆 '+r.Via_Label+'（AI-Thermal Thermal Via 計算）')+'">◆</span>'+inner;
+      }
       th+='<td class="'+cls+'" data-col="'+c+'"'+(tip?' title="'+_vEsc(tip)+'"':'')+'>'+inner+'</td>';
     });
     th+='</tr>';
@@ -3204,9 +3284,19 @@ function budgetDetailHtml(r,R,g){
     (lv?'<div>裕度 <b style="color:'+lv.fg+'">'+r.Tj_Margin.toFixed(1)+' °C（'+lv.label+'）</b></div>':'')+
     '<div class="an-bd-f">內部溫降 '+(+r.Drop).toFixed(1)+' °C ＝ 單顆 '+fmtW(P)+' W × ('+terms.join(' + ')+')</div>'+
     '<div class="an-bd-f">限溫對象 '+r.Temp_Label+'：'+(r.Limit_Ref_Auto?'自動判定（'+_vEsc(r.Limit_Ref_Why)+'）':'元件設定已指定')+(r.Temp_Label==='Tc'?'，不含 Rjc':'')+'</div>'+
+    (r.Via_Src?'<div class="an-bd-f">'+viaRintFormula(r)+'</div>':'')+
     '</div></div>';
 }
 
+// Thermal Via 的基板熱阻算式（展開列；與 calcThermalResistance 同一組公式）
+function viaRintFormula(r){
+  const t=_num(r['Thick(mm)']);
+  if(r.Via_Src==='keff'){
+    return '基板 R_int '+(+r.R_int).toFixed(3)+' ＝ 板厚 '+_vf(t,3)+' mm ÷ (逐顆 K_eff '+_vf(r.Via_K,2)+' W/m·K × 焊盤 '+_vf(r.Via_APad,2)+' mm²)　← AI-Thermal「Thermal Via 計算」'+
+           (r.Via_Warn?'　<span class="an-sus">⚠ '+_vEsc(r.Via_Warn)+'</span>':'');
+  }
+  return '基板 R_int '+(+r.R_int).toFixed(3)+' 用通用值 K_Via '+_vf(r.Via_K,2)+' W/m·K（擴散面積、÷ Via 製程係數）：'+_vEsc(r.Via_Why);
+}
 // 前三名卡片：底色＝裕度分級、表頭帶＝名次；中間一條「溫升組成」說明溫度是在哪一段被吃掉的
 function riskCardHtml(r,i,top,R,g){
   const lv=marginLevel(r.Tj_Margin),roles=['設計瓶頸','次高風險','第三風險'];
@@ -3468,7 +3558,7 @@ function renderTab2(){
 // 元件相對高度在 3D 上改＝寫回元件設定的 Height(mm) 並重算（跟在元件設定改是同一件事）。
 // =====================================================
 var layout3d=null;            // 目前專案的 3D 調整（見上）；沒有調整＝null（var：init 之前就可能被讀到）
-var projThermalSpecs={};      // 目前專案的 thermal_specs（AI-Thermal TH/ME 頁，唯讀：3D 用元件本體大小／高度）
+var projThermalSpecs={};      // 目前專案的 thermal_specs（AI-Thermal TH/ME 頁，唯讀：3D 用元件本體大小／高度、Thermal Via 逐顆 K_eff）；換值一律走 setProjThermalSpecs
 var tab3Stale=true;           // 資料變了但 3D 頁不在畫面上 → 切過去時再畫（3D 重建要花時間）
 var dbSpecs3dCache=null,dbSpecs3dBusy=false;
 function specKey3d(n){return String(n||'').replace(/ /g,'_').replace(/\//g,'-');}   // ＝AI-Thermal 的 sgSpecKey
@@ -4057,7 +4147,7 @@ function renderGlobalsBanner(){
 function handleFileLoad(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=function(ev){try{let d=JSON.parse(ev.target.result);
   CompMerge.ensureProjectCids(d);
   layout3d=d.layout3d&&typeof d.layout3d==='object'?CompMerge.clone(d.layout3d):null;   // 3D 頁的調整跟著檔案走
-  projThermalSpecs=d.thermal_specs&&typeof d.thermal_specs==='object'?d.thermal_specs:{};
+  setProjThermalSpecs(d.thermal_specs);   // 檔案裡有 AI-Thermal 的規格（完整專案 document）才有；本工具匯出的專案檔沒有 → Thermal Via 用通用值
   setGlobalsNotes(loadGlobalsForProject(d.global_params),d.global_params);
   // 缺哪一類就是空的，不可沿用上一個專案的元件
   components.rf=Array.isArray(d.rf_data)?d.rf_data:[];components.digital=Array.isArray(d.digital_data)?d.digital_data:[];components.pwr=Array.isArray(d.pwr_data)?d.pwr_data:[];
@@ -4209,19 +4299,46 @@ async function checkProjectFreshness(force){
     try{await dbAdapter.refresh();}catch(e){console.warn('[fresh] refresh failed:',e);return;}
     const latest=await dbAdapter.getDoc('projects',currentProjectId);
     if(!latest)return;                                          // 被刪掉了：存檔時會問要不要重建
+    // thermal_specs 是 AI-Thermal 的資料、本工具只讀（Thermal Via 逐顆 K_eff、3D 元件大小）→ 有變就直接換成最新的，
+    // 不必管畫面有沒有未存修改（不會跟使用者的修改衝突）。只改了 via 設計時元件清單不變，下面的比對看不出來。
+    const specsChanged=CompMerge.canon(latest.thermal_specs||{})!==CompMerge.canon(projThermalSpecs||{});
     if(CompMerge.sameDoc(projBase,latest,MERGE_SCALARS.concat(['global_params']))){
       if(_staleNotice){_staleNotice=null;renderStaleBanner();}
+      if(specsChanged)refreshThermalSpecs(latest.thermal_specs);
       return;
     }
     if(!projectIsDirty()){
       const ok=await cloudLoadOne(currentProjectId,{silent:true});
       if(ok)CompMerge.toast('🔄 已載入最新資料：這個專案剛在其他地方（例如 AI-Thermal）更新過。');
     }else{
+      if(specsChanged)refreshThermalSpecs(latest.thermal_specs,true);
       _staleNotice={at:new Date()};
       renderStaleBanner();
       CompMerge.toast('⚠ 這個專案剛在其他地方更新過；你還沒存的修改都還在，存檔時會自動合併。',5000);
     }
   }finally{_freshBusy=false;}
+}
+// 換成資料庫最新的 thermal_specs 並重算；Thermal Via 用的 K 有變才提示（quiet：外面另有提示時不重複跳）
+function refreshThermalSpecs(ts,quiet){
+  const before=viaKSig();
+  setProjThermalSpecs(CompMerge.clone(ts));
+  dbSpecs3dCache=null;
+  recalc();
+  if(!quiet&&viaKSig()!==before)CompMerge.toast('🔄 AI-Thermal 的 Thermal Via 設計有更新 → 已重算基板熱阻。'+viaKChangeText(),6000);
+}
+// Thermal Via 元件用哪個 K 的指紋（逐顆 K_eff 的值／通用值的原因／配置警告）：存檔、複製、切回分頁時比對前後
+function viaKSig(){
+  const out=[];
+  ['rf','digital','pwr'].forEach(cat=>(components[cat]||[]).forEach(c=>{
+    const vi=c&&viaKInfo(c,G);
+    if(vi)out.push((c._cid||c.Component)+':'+vi.src+':'+(vi.src==='keff'?(+vi.k).toFixed(6):vi.why)+':'+vi.warn);
+  }));
+  return out.join('|');
+}
+function viaKChangeText(){
+  let k=0,n=0;
+  ['rf','digital','pwr'].forEach(cat=>(components[cat]||[]).forEach(c=>{const vi=c&&viaKInfo(c,G);if(vi){n++;if(vi.src==='keff')k++;}}));
+  return 'Thermal Via 元件 '+n+' 顆：'+k+' 顆用 AI-Thermal 的逐顆 K_eff、'+(n-k)+' 顆用通用值 K_Via。';
 }
 function renderStaleBanner(){
   const el=document.getElementById('stale-banner');if(!el)return;
@@ -4320,7 +4437,7 @@ async function cloudSaveProject(){
   // 合併的前提：畫面上的是「從資料庫載入的這個專案」（有載入時快照），而且資料庫裡還有它。
   // 新專案、覆蓋別的專案、或原專案已被刪除要重建 → 以畫面為準（沒有「載入時」可以比）。
   const base=(currentProjectId&&docId===currentProjectId&&existing)?projBase:null;
-  let written=null,merged=null;
+  let written=null,merged=null,curSpecs;
   _saveBusy=true;
   try{
     // updateDoc 傳函式：寫入時在「資料庫最新內容」上計算要寫的欄位（遇到 412 重讀後會重算），
@@ -4338,16 +4455,22 @@ async function cloudSaveProject(){
         }
         renameMarksApply(fields,base&&cur?cur:null,base);   // 改過名的元件標上舊名稱（給 AI-Thermal 搬資料用）
         written=fields;
+        curSpecs=cur?cur.thermal_specs:undefined;   // 寫入後資料庫裡的 thermal_specs（本工具不寫，原樣保留）
         return fields;
       });
     },{dialog:{title:'⚠ 這個專案在你載入後，已在資料庫被更新（可能是 AI-Thermal 或其他人剛存檔）'}});
     if(!res.ok)return;   // 衝突視窗按「取消」→ 不存檔，畫面維持原狀
   }catch(e){alert('❌ 儲存失敗: '+e.message);return;}
   finally{_saveBusy=false;}
+  // Thermal Via 的逐顆 K_eff 讀 thermal_specs：換成「這個 document 現在在資料庫裡的」那一份
+  // （AI-Thermal 可能剛改過 via 設計；匯入的檔案另存成新專案時，新文件沒有 AI-Thermal 的資料）
+  const viaBefore=viaKSig();
+  setProjThermalSpecs(CompMerge.clone(curSpecs));
   adoptWrittenProject(docId,written);
   variantsCache=null; renderTab0();   // 專案集合改變 → 失效快選快取，下次重繪重新聚合
   const note=merged?CompMerge.summaryText(merged):'';
-  alert('✅ 專案「'+written.project_name+'」已儲存！'+(note?'\n'+note:''));
+  const viaNote=viaKSig()!==viaBefore?viaKChangeText():'';
+  alert('✅ 專案「'+written.project_name+'」已儲存！'+(note?'\n'+note:'')+(viaNote?'\n'+viaNote:''));
 }
 
 // =====================================================
@@ -4392,9 +4515,14 @@ async function confirmCopyProject(){
     ['rf','digital','pwr'].forEach(cat=>(components[cat]||[]).forEach(c=>{specMarkFromIfUnset(c,srcName);delete c._renamed_from;}));
     variantsCache=null; renderTab0();
     projectIdentitySet(docId,name);   // 複製後切換到新專案（之後存檔寫到新 id）
+    // AI-Thermal 的資料（thermal_specs，含 Thermal Via 設計）不跟著複製 → 畫面改用複本在資料庫裡實際有的那一份
+    const viaBefore=viaKSig();
+    setProjThermalSpecs(CompMerge.clone(existing&&existing.thermal_specs));
+    recalc();
+    const viaNote=viaKSig()!==viaBefore?'\n\n注意：AI-Thermal 的資料（含 Thermal Via 設計）不會跟著複製。'+viaKChangeText():'';
     projBase=projBaseFrom(fields);markProjectClean();_staleNotice=null;renderStaleBanner();
     closeCopyModal();
-    alert('✅ 已複製為新專案「'+name+'」！');
+    alert('✅ 已複製為新專案「'+name+'」！'+viaNote);
   }catch(e){alert('❌ 複製失敗: '+e.message);}
 }
 
@@ -4433,7 +4561,7 @@ async function cloudLoadOne(docId,opts){
     CompMerge.ensureProjectCids(d);
     // 3D 頁的調整（layout3d）與 AI-Thermal 的規格（3D 用元件本體大小／高度，唯讀）；不可沿用上一個專案的
     layout3d=d.layout3d&&typeof d.layout3d==='object'?CompMerge.clone(d.layout3d):null;
-    projThermalSpecs=d.thermal_specs&&typeof d.thermal_specs==='object'?d.thermal_specs:{};
+    setProjThermalSpecs(d.thermal_specs);   // 也是 Thermal Via 逐顆 K_eff 的來源（唯讀）
     dbSpecs3dCache=null;
     // 載入時快照：一定要在下面的轉型／板厚遷移「之前」取（那些是本工具這次的修改，存檔時要算我的）
     const base=projBaseFrom(d);
@@ -4964,6 +5092,14 @@ async function generatePDFReport() {
                           {text:String(row.TIM_Model), fontSize:5.5, color:'#64748b'}],
                     alignment:'left', fillColor: fill};
           }
+          // Thermal Via 底下附這顆用的 K（逐顆 K_eff／通用值 K_Via）：螢幕元件表看得到，PDF 也要看得到
+          const vi = h === 'Board_Type' ? viaKInfo(row, G) : null;
+          if (vi) {
+            return {text:[{text:String(row[h]) + '\n', fontSize:7},
+                          {text:(vi.warn ? '(!) ' : '') + (vi.src === 'keff' ? 'K_eff ' + _vf(vi.k, 1) : 'K_Via ' + _vf(vi.k, 1) + ' 通用'), fontSize:5.5,
+                           color: vi.warn ? '#b45309' : (vi.src === 'keff' ? '#0550ae' : '#64748b')}],
+                    alignment:'left', fillColor: fill};
+          }
           return {
             text: String(row[h] != null ? row[h] : ''),
             fontSize:7, alignment: typeof row[h]==='number'?'center':'left',
@@ -4974,6 +5110,11 @@ async function generatePDFReport() {
       const totalP = active.reduce((s,r) => s + (r['Power(W)']||0) * (r.Qty||0), 0);
       const sus = active.map(r => ({r, s: CompMerge.limitSuspect(r)})).filter(x => x.s);
       const notes = [{text: '限溫後的 Tj／Tc ＝ 限溫對象（* ＝ 未指定、自動判定）。', fontSize:6, color:'#64748b', margin:[0,3,0,0]}];
+      const vis = active.map(r => ({r, vi: viaKInfo(r, G)})).filter(x => x.vi);
+      if (vis.length) notes.push({text: 'Thermal Via 底下的 K：K_eff ＝ AI-Thermal「Thermal Via 計算」的逐顆等效 K（基板熱阻 R_int ＝ 板厚 ÷ (K_eff × 焊盤面積)）；' +
+        'K_Via 通用 ＝ 參數控制台的通用值（沒有完整的 via 設計時使用：擴散面積、÷ Via 製程係數）；(!) ＝ via 配置有問題（K_eff 照用）。' +
+        (vis.some(x => x.vi.src === 'generic') ? '用通用值的原因：' + vis.filter(x => x.vi.src === 'generic').map(x => String(x.r.Component || '') + ' — ' + x.vi.why).join('；') + '。' : ''),
+        fontSize:6, color:'#64748b', margin:[0,2,0,0]});
       if (sus.length) notes.push({text: [{text:'(?) 限溫疑似範例值（不影響計算，請對照規格書確認）：', bold:true, color:'#b45309'},
         {text: sus.map(x => String(x.r.Component || '') + ' ' + x.s.value + ' °C（' + x.s.note + '）').join('；'), color:'#78350f'}], fontSize:6.2, margin:[0,2,0,0]});
       return [
@@ -5025,6 +5166,8 @@ async function generatePDFReport() {
             cell.text = [{text: f.text + '\n'}, {text: _num(row.Qty) + ' × ' + fmtW(_num(row['Power(W)'])), fontSize:5, color:'#94a3b8'}];
           if (c === 'R_TIM' && !f.na && (row.TIM_Warn || row.TIM_Src === 'model'))
             cell.text = [{text: row.TIM_Warn ? '(!) ' : '(型號) ', fontSize:4.5, color: row.TIM_Warn ? '#b45309' : '#94a3b8'}, {text: f.text}];
+          if (c === 'R_int' && !f.na && (row.Via_Warn || row.Via_Src === 'keff'))
+            cell.text = [{text: row.Via_Warn ? '(!) ' : '(K_eff) ', fontSize:4.5, color: row.Via_Warn ? '#b45309' : '#94a3b8'}, {text: f.text}];
           return cell;
         }));
       });
