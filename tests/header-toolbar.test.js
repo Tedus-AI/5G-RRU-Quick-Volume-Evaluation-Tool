@@ -10,7 +10,8 @@
  *       ⚠ 專案名稱輸入框已移除 → 整排按鈕要往右靠齊補上空出來的位置（換行時也要）。
  *   [C] 頂端專案名稱：顯示在 header 最上排、版本徽章與右側按鈕之間，
  *       純文字**不可有外框/底色/外筆畫**，顏色對「實際量到的背景像素」對比 ≥ 4.5，
- *       空間不夠時只有它會縮（ellipsis）且永遠不與兩邊重疊；
+ *       空間不夠時名稱先縮（ellipsis），名稱區不到 180px 時右側按鈕才收合（hdrFit：短標籤 → 只留圖示），
+ *       永遠不與兩邊重疊、右側按鈕不會被 header 裁掉（登入後最長的狀態見 tests/admin-panel.test.js [J]）；
  *       點一下可改名，載入／複製專案會自動帶入，取消改名不動原值。
  *
  * 執行：
@@ -300,7 +301,7 @@ const COLOR_UTILS = () => {
   ok('文字顏色對「實際背景像素」對比 ≥ 4.5（白字在這片青藍上只有 2.7:1）',
      cRatio >= 4.5, { fg: c1.color, bg: bgPix, ratio: +cRatio.toFixed(2) });
 
-  // 空間不夠時只有名稱會縮，兩邊永遠不重疊
+  // 空間不夠時名稱先縮；名稱區不到 180px 才收合右側按鈕（hdrFit），兩邊永遠不重疊、按鈕不會被裁掉
   const c2 = [];
   for (const w of [1600, 1440, 1366, 1280]) {
     await page.setViewportSize({ width: w, height: 950 });
@@ -310,15 +311,21 @@ const COLOR_UTILS = () => {
       const n = document.getElementById('projNameBox').getBoundingClientRect();
       const r = document.querySelector('.header .hdr-right').getBoundingClientRect();
       const v = document.querySelector('.proj-name .pn-value');
+      const h = document.querySelector('.header'), hr = h.getBoundingClientRect();
       return { vw, badgeW: Math.round(b.width), rightW: Math.round(r.width),
+               slotW: Math.round(document.querySelector('.hdr-name-slot').getBoundingClientRect().width),
+               lv: h.classList.contains('hdr-c2') ? 2 : h.classList.contains('hdr-c1') ? 1 : 0,
+               rightInside: r.right <= hr.right + 0.5,
                overlapL: b.right > n.left + 0.5, overlapR: n.right > r.left + 0.5,
                clipped: v.scrollWidth > v.clientWidth + 1,
                ellipsis: getComputedStyle(v).textOverflow,
                hscroll: document.documentElement.scrollWidth > vw };
     }, w));
   }
-  ok('變窄時徽章與右側按鈕寬度不變（只有名稱讓位）',
-     new Set(c2.map(x => x.badgeW)).size === 1 && new Set(c2.map(x => x.rightW)).size === 1, c2);
+  ok('變窄時徽章寬度不變；名稱先讓位，名稱區不到 180px 才收合右側按鈕（越窄收得越多、不會被裁掉）',
+     new Set(c2.map(x => x.badgeW)).size === 1 &&
+     c2.every((x, i) => i === 0 || (x.rightW <= c2[i - 1].rightW && x.lv >= c2[i - 1].lv)) &&
+     c2.every(x => x.rightInside && (x.slotW >= 180 || x.lv === 2)), c2);
   ok('四種寬度都不與徽章／右側按鈕重疊', c2.every(x => !x.overlapL && !x.overlapR), c2);
   ok('名稱過長時以 ellipsis 截斷，不撐出橫向捲軸',
      c2[0].ellipsis === 'ellipsis' && c2.every(x => !x.hscroll) && c2[c2.length - 1].clipped, c2);

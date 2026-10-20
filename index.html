@@ -115,8 +115,20 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
    右側按鈕就先掉到第二行」，反而蓋到標題。 */
 .header .hdr-topbar{position:absolute;top:12px;left:30px;right:16px;
   display:flex;align-items:center;gap:12px;}
-.header .hdr-topbar .hdr-name-slot{flex:1 1 auto;min-width:0;display:flex;justify-content:center;}
+.header .hdr-topbar .hdr-name-slot{flex:1 1 auto;min-width:0;display:flex;justify-content:center;overflow:hidden;}
 .header .hdr-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.header .hdr-right button{white-space:nowrap;}
+/* 登入後右側按鈕群很長（SharePoint｜姓名、email、離線、登出、備份、還原、管理），17 吋筆電＋參數控制台展開時放不下
+   → hdrFit() 依實際寬度逐級收合（名稱區至少留 HDR_NAME_MIN、右側不可超出 header）：
+   hdr-c1＝藏 email（改放 SharePoint 文字的 tooltip）＋按鈕改短標籤；hdr-c2＝按鈕只留圖示（title／aria-label 寫全名）＋姓名截斷。
+   原本放不下時 header 的 overflow 把最右邊的按鈕整個裁掉（備份／還原看不到）。 */
+.header .hb-s{display:none;}
+.header.hdr-c1 .hb-f{display:none;}
+.header.hdr-c1 .hb-s{display:inline;}
+.header.hdr-c1 #sp-user-info{display:none !important;}
+.header.hdr-c2 .hb-s{display:none;}
+.header.hdr-c2 .hdr-right button{padding:3px 7px !important;}
+.header.hdr-c2 #db-banner-text{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 /* 專案名稱：純文字、**不加外框/底色**（使用者指定）。
    ⚠ 顏色必須是「深色」：header 是青藍漸層，中段約 rgb(0,169,229)（相對亮度 0.34），
    白字只有 2.7:1、比旁邊的白底按鈕還糊；深藍 #062a46 有 5.1:1（≥AA）。
@@ -517,6 +529,33 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .lock-modal-btn:hover{background:#e8e8e8;}
 .lock-modal-teams-btn{background:#505ac9;color:#fff;border-color:#505ac9;text-decoration:none;display:inline-block;margin-right:10px;}
 .lock-modal-teams-btn:hover{background:#3f49a3;}
+/* 系統管理員面板（header「🛡 管理」）：與 AI-Thermal 的管理面板同一套版面（膠囊按鈕、請離鈕紫色、清除鎖鈕中性＋⚠） */
+#admin-modal .admin-box{max-width:480px;max-height:calc(100vh - 32px);overflow-y:auto;box-sizing:border-box;}
+#admin-modal .lock-modal-btn{border-radius:999px;font-weight:600;}
+#admin-modal .lock-modal-teams-btn{background:#4f46e5;border-color:#4f46e5;}
+#admin-modal .lock-modal-teams-btn:hover{background:#4338ca;}
+#admin-pwd{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;margin:2px 0 0;font-size:0.95rem;}
+.admin-err{min-height:1.3em;margin-top:4px;color:#b91c1c;font-size:0.82rem;}
+.admin-status{color:#1d4ed8;min-height:1.2em;margin:10px 0 0;font-size:0.88rem;line-height:1.5;}
+.admin-me{color:#64748b;font-size:0.82rem;margin-left:4px;}
+.admin-evict-note{color:#b45309;}
+.admin-actions{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:12px;}
+.admin-actions:empty{display:none;}
+#admin-modal .admin-actions .lock-modal-btn{margin:0;min-width:min(300px,100%);}
+.admin-sep{border:none;border-top:1px solid #e2e8f0;margin:18px 0 0;}
+#admin-loginhist{margin-top:10px;}
+.admin-lh-head{font-size:0.8rem;font-weight:600;color:#1a3a6b;margin:4px 2px 6px;}
+.admin-lh-list{max-height:260px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;}
+.admin-lh-row{display:flex;gap:8px;align-items:baseline;padding:5px 8px;font-size:0.78rem;border-bottom:1px solid #f1f5f9;}
+.admin-lh-row:last-child{border-bottom:none;}
+.admin-lh-row:nth-child(even){background:#f8fafc;}
+.admin-lh-time{color:#64748b;white-space:nowrap;font-variant-numeric:tabular-nums;flex:none;}
+.admin-lh-name{color:#0f172a;font-weight:600;flex:none;}
+.admin-lh-tool{flex:none;font-size:0.68rem;font-weight:700;padding:1px 6px;border-radius:999px;white-space:nowrap;}
+.admin-lh-tool.t-rru{color:#0f5f58;background:#d5f5ef;}
+.admin-lh-tool.t-ait{color:#1e40af;background:#dbeafe;}
+.admin-lh-email{color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;text-align:right;}
+.admin-lh-empty{padding:12px 8px;text-align:center;color:#94a3b8;font-size:0.8rem;}
 tr.comp-excluded{opacity:0.4;}
 /* TIM 型號選型 + 來源標註（UX：每個數字都要回答「哪來的」） */
 .tim-sub{margin-top:4px;}
@@ -849,20 +888,15 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
         </span>
       </div>
       <div class="hdr-right">
-        <button onclick="doLogout()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">🏠 返回首頁</button>
+        <button onclick="doLogout()" title="返回首頁" aria-label="返回首頁" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">🏠<span class="hb-f"> 返回首頁</span><span class="hb-s"> 首頁</span></button>
         <span id="db-banner-text" style="font-size:12px; color:#ffffffaa;">未選擇資料庫</span>
-        <button id="btn-pick-db" onclick="handlePickDb()" title="不在公司／連不到 SharePoint 時：開啟本機的資料庫 JSON（例如「💾 備份資料庫」下載的檔案）直接使用，修改會存回那個檔案" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">
-          💻 離線資料庫
-        </button>
-        <button id="btn-sp-login" onclick="handleSpLogin()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer; display:none;">🔐 登入 SharePoint</button>
-        <button id="btn-sp-logout" onclick="handleSpLogout()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer; display:none;">🚪 登出</button>
+        <button id="btn-pick-db" onclick="handlePickDb()" aria-label="離線資料庫" title="離線資料庫：不在公司／連不到 SharePoint 時，開啟本機的資料庫 JSON（例如「💾 備份資料庫」下載的檔案）直接使用，修改會存回那個檔案" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">💻<span class="hb-f"> 離線資料庫</span><span class="hb-s"> 離線</span></button>
+        <button id="btn-sp-login" onclick="handleSpLogin()" title="登入 SharePoint" aria-label="登入 SharePoint" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer; display:none;">🔐<span class="hb-f"> 登入 SharePoint</span><span class="hb-s"> 登入</span></button>
+        <button id="btn-sp-logout" onclick="handleSpLogout()" title="登出 SharePoint" aria-label="登出" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer; display:none;">🚪<span class="hb-f"> 登出</span><span class="hb-s"> 登出</span></button>
         <span id="sp-user-info" style="font-size:11px; color:#ffffffaa; display:none;"></span>
-        <button onclick="dbAdapter.exportBackup()" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">
-          💾 備份資料庫
-        </button>
-        <button id="btn-db-restore" onclick="dbRestoreStart()" title="從「💾 備份資料庫」下載的 JSON 還原（可只挑部分專案）" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">
-          ♻️ 還原資料庫
-        </button>
+        <button id="btn-db-backup" onclick="dbAdapter.exportBackup()" title="備份資料庫：下載整份 thermal_db.json" aria-label="備份資料庫" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">💾<span class="hb-f"> 備份資料庫</span><span class="hb-s"> 備份</span></button>
+        <button id="btn-db-restore" onclick="dbRestoreStart()" aria-label="還原資料庫" title="還原資料庫：從「💾 備份資料庫」下載的 JSON 還原（可只挑部分專案）" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">♻️<span class="hb-f"> 還原資料庫</span><span class="hb-s"> 還原</span></button>
+        <button id="btn-admin" onclick="adminOpen()" aria-label="系統管理員" title="系統管理員：查看／請離佔用編輯鎖的人員、查詢使用者登入紀錄（需密碼）" style="font-size:12px; padding:3px 10px; border-radius:4px; border:1px solid #ffffff88; background:transparent; color:white; cursor:pointer;">🛡<span class="hb-f"> 管理</span><span class="hb-s"> 管理</span></button>
         <input type="file" id="dbRestoreInput" accept=".json,application/json" style="display:none" onchange="dbRestoreFilePicked(this)">
       </div>
     </div>
@@ -1214,16 +1248,48 @@ function _updateSpHeaderSignedIn(){
   const acct=dbAdapter.getAccountInfo();
   if(!acct)return;
   updateDbStatusText('✅ SharePoint ｜ '+acct.name,'success');
+  const st=document.getElementById('db-banner-text');
+  if(st)st.title='SharePoint ｜ '+acct.name+'（'+acct.email+'）';   // header 收合時 email 藏起來 → 滑過這裡看得到
   const btnLogin=document.getElementById('btn-sp-login');
   const btnLogout=document.getElementById('btn-sp-logout');
   const userInfo=document.getElementById('sp-user-info');
   if(btnLogin)btnLogin.style.display='none';
   if(btnLogout)btnLogout.style.display='';
   if(userInfo){userInfo.style.display='';userInfo.textContent=acct.email;}
+  recordLoginHistory();   // 記錄登入（節流），給系統管理員查近期誰登入
+}
+
+// 記錄一筆登入到共用的 login_history（與 AI-Thermal 同一個頂層 collection，tool 欄分辨是哪個工具），
+// 給系統管理員面板查近期誰登入。節流：同一個帳號在「本工具」60 分鐘內已有紀錄就不寫（不必每次重新整理都寫共用檔）；
+// 一筆一個唯一 id（不同 key，樂觀寫入並發安全）；超過 500 筆刪最舊的。背景執行、失敗只記 console。
+const LOGIN_HIST_TOOL='5G-RRU',LOGIN_HIST_THROTTLE_MS=60*60*1000,LOGIN_HIST_CAP=500;
+async function recordLoginHistory(){
+  try{
+    if(!(dbAdapter.isSharePointMode&&dbAdapter.isSharePointMode()))return;
+    if(!(dbAdapter.isSignedIn&&dbAdapter.isSignedIn()))return;
+    const acct=dbAdapter.getAccountInfo&&dbAdapter.getAccountInfo();
+    if(!acct||!acct.email)return;
+    const hist=(await dbAdapter.getCollection('login_history'))||{};
+    let latest=0;
+    Object.values(hist).forEach(rec=>{   // 舊紀錄沒有 tool 欄＝AI-Thermal 寫的（原本只有它會寫）
+      if(rec&&rec.email===acct.email&&(rec.tool||'AI-Thermal')===LOGIN_HIST_TOOL)latest=Math.max(latest,Date.parse(rec.at||'')||0);
+    });
+    if(Date.now()-latest<LOGIN_HIST_THROTTLE_MS)return;
+    const iso=new Date().toISOString();
+    const id=iso.replace(/[:.]/g,'-')+'_'+Math.random().toString(36).slice(2,7);
+    await dbAdapter.setDoc('login_history',id,{name:acct.name||'',email:acct.email,at:iso,tool:LOGIN_HIST_TOOL});
+    const all={...hist,[id]:{at:iso}},ids=Object.keys(all);
+    if(ids.length>LOGIN_HIST_CAP){
+      ids.sort((a,b)=>(Date.parse(all[a].at||'')||0)-(Date.parse(all[b].at||'')||0));
+      for(const dId of ids.slice(0,ids.length-LOGIN_HIST_CAP)){try{await dbAdapter.deleteDoc('login_history',dId);}catch(e){}}
+    }
+  }catch(e){console.warn('[login-history] 記錄失敗：',e);}
 }
 
 function _updateSpHeaderSignedOut(){
   updateDbStatusText('SharePoint ｜ 未登入','');
+  const st=document.getElementById('db-banner-text');
+  if(st)st.removeAttribute('title');
   const btnLogin=document.getElementById('btn-sp-login');
   const btnLogout=document.getElementById('btn-sp-logout');
   const userInfo=document.getElementById('sp-user-info');
@@ -1238,6 +1304,30 @@ function updateDbStatusText(msg,level){
   el.textContent=msg;
   el.style.color=level==='success'?'#90ee90':level==='err'?'#ffb6b6':'#ffffffaa';
 }
+
+// header 頂排放不下時逐級收合（CSS 的 hdr-c1／hdr-c2）：先試完整標籤，名稱區至少要留 HDR_NAME_MIN、
+// 右側按鈕不可超出 header（header 是 overflow 裁切，超出去的按鈕會整個看不到）。
+// 頂排、右側按鈕群、版本徽章任一個尺寸變了（換視窗寬、收合參數控制台、登入／登出、切離線資料庫、CI 戳上版本號）
+// → ResizeObserver 下一格畫面重算；重算後的尺寸跟上一次一樣就不會再觸發。
+const HDR_NAME_MIN=180;
+function hdrFit(){
+  const hdr=document.querySelector('.header'),bar=hdr&&hdr.querySelector('.hdr-topbar');
+  if(!bar||!bar.offsetWidth)return;   // 登入前整個 header 藏起來 → 不量
+  const slot=bar.querySelector('.hdr-name-slot'),right=bar.querySelector('.hdr-right');
+  hdr.classList.remove('hdr-c1','hdr-c2');
+  const fits=()=>slot.getBoundingClientRect().width>=HDR_NAME_MIN&&right.getBoundingClientRect().right<=bar.getBoundingClientRect().right+0.5;
+  if(fits())return;
+  hdr.classList.add('hdr-c1');
+  if(fits())return;
+  hdr.classList.add('hdr-c2');
+}
+(function(){
+  const hdr=document.querySelector('.header'),bar=hdr&&hdr.querySelector('.hdr-topbar');
+  if(!bar||typeof ResizeObserver==='undefined')return;
+  let queued=false;
+  const ro=new ResizeObserver(()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;hdrFit();});});
+  [bar,bar.querySelector('.hdr-right'),document.getElementById('version-badge')].forEach(el=>{if(el)ro.observe(el);});
+})();
 
 function showLockWarning(err){
   const modal=document.getElementById('lock-warning-modal');
@@ -1402,6 +1492,117 @@ async function _ensureLockBeforeWrite(action){
   }
   _lastActivityTs=Date.now();   // 存檔/刪除是明確活動
   return true;
+}
+
+// =====================================================
+// 系統管理員（header「🛡 管理」，密碼與 AI-Thermal 相同）—— 與 AI-Thermal 的管理面板同一套
+// =====================================================
+// 兩個工具共用 thermal_db.json 上同一把編輯鎖與同一份 login_history → 這裡看到、請離、清除的就是 AI-Thermal 那邊的同一份。
+// 安全路徑：請離（只在持鎖者的鎖上下旗標、不搶鎖；對方端輪詢偵測到後自動儲存並釋放，本工具見 _handleEviction）；
+// 最後手段：強制清除鎖（對方還沒存的修改不會被寫入）。
+const ADMIN_PASSWORD='0420';
+let _adminAuthed=false,_adminBack=null;
+function adminOpen(){
+  _adminAuthed=false;
+  const m=document.getElementById('admin-modal');if(!m)return;
+  _adminBack=document.activeElement;
+  document.getElementById('admin-auth').hidden=false;
+  document.getElementById('admin-panel').hidden=true;
+  document.getElementById('admin-pwd-err').textContent='';
+  const pwd=document.getElementById('admin-pwd');pwd.value='';
+  m.style.display='flex';
+  pwd.focus();
+}
+function adminClose(){
+  const m=document.getElementById('admin-modal');if(!m||m.style.display==='none')return;
+  m.style.display='none';_adminAuthed=false;
+  document.getElementById('admin-pwd').value='';
+  if(_adminBack&&_adminBack.focus)_adminBack.focus();
+}
+function adminVerify(){
+  const pwd=document.getElementById('admin-pwd'),err=document.getElementById('admin-pwd-err');
+  if(pwd.value!==ADMIN_PASSWORD){err.textContent='密碼錯誤，請再輸入一次';pwd.select();return;}   // 錯了不關視窗、就地提示
+  pwd.value='';err.textContent='';
+  _adminAuthed=true;
+  document.getElementById('admin-auth').hidden=true;
+  document.getElementById('admin-panel').hidden=false;
+  document.getElementById('admin-loginhist').innerHTML='';
+  adminRefresh();
+}
+async function adminRefresh(){
+  if(!_adminAuthed)return;
+  const infoEl=document.getElementById('admin-lock-info'),statusEl=document.getElementById('admin-status'),actionsEl=document.getElementById('admin-actions');
+  statusEl.textContent='';actionsEl.innerHTML='';
+  if(!(dbAdapter.isSharePointMode&&dbAdapter.isSharePointMode())){
+    infoEl.innerHTML='<div>'+(dbAdapter.isOffline&&dbAdapter.isOffline()?'離線資料庫':'本機（單機檔案）')+'模式沒有共用編輯鎖，不需要管理。</div>';return;
+  }
+  if(!(dbAdapter.isSignedIn&&dbAdapter.isSignedIn())){infoEl.innerHTML='<div>尚未登入 SharePoint，請先按右上角「🔐 登入 SharePoint」再管理。</div>';return;}
+  infoEl.innerHTML='<div>讀取編輯鎖狀態中…</div>';
+  let lk=null;
+  try{lk=await dbAdapter.peekLock();}
+  catch(e){infoEl.innerHTML='<div>讀取鎖狀態失敗：'+_vEsc(e.message||e)+'</div>';return;}
+  updateLockStatusBar();   // 讀到的是最新的鎖 → 置頂佔用橫幅一起更新
+  const fmt=t=>t?new Date(t).toLocaleString('zh-TW'):'-';
+  if(!lk||!lk.lockedByEmail){infoEl.innerHTML='<div>✅ 目前<strong>無人</strong>佔用編輯鎖，資料庫可正常解鎖編輯。</div>';return;}
+  const expired=lk.expiresAt&&new Date(lk.expiresAt)<=new Date();
+  const acct=dbAdapter.getAccountInfo&&dbAdapter.getAccountInfo();
+  const me=acct&&acct.email===lk.lockedByEmail?'<span class="admin-me">（目前登入的帳號）</span>':'';
+  infoEl.innerHTML=
+    '<div><strong>佔用者：</strong>'+_vEsc(lk.lockedBy||'-')+me+'</div>'+
+    '<div><strong>信箱：</strong>'+_vEsc(lk.lockedByEmail||'-')+'</div>'+
+    '<div><strong>鎖定於：</strong>'+fmt(lk.lockedAt)+'</div>'+
+    '<div><strong>預計自動解鎖：</strong>'+fmt(lk.expiresAt)+(expired?'（已逾時）':'')+'</div>'+
+    (lk.evictRequested?'<div class="admin-evict-note">⏳ 已送出請離要求（'+_vEsc(lk.evictBy||'')+'），等待對方端自動儲存並釋放…</div>':'');
+  const evictBtn=document.createElement('button');
+  evictBtn.type='button';evictBtn.className='lock-modal-btn lock-modal-teams-btn';
+  evictBtn.textContent='🚪 強制請離（對方自動存檔並上鎖）';evictBtn.onclick=adminEvict;
+  const forceBtn=document.createElement('button');
+  forceBtn.type='button';forceBtn.className='lock-modal-btn';
+  forceBtn.textContent='⚠ 強制清除鎖（未存變更會遺失）';forceBtn.onclick=adminForceRelease;
+  actionsEl.append(evictBtn,forceBtn);
+}
+async function adminEvict(){
+  const statusEl=document.getElementById('admin-status');
+  const acct=dbAdapter.getAccountInfo&&dbAdapter.getAccountInfo();
+  statusEl.textContent='送出請離要求中…';
+  try{
+    const lk=await dbAdapter.requestEvict((acct&&acct.name)||'系統管理員');
+    await adminRefresh();   // 鎖資訊多一行「已送出請離要求」；會清掉狀態列 → 結果訊息放在重新整理之後
+    if(!lk){statusEl.textContent='目前無人佔用編輯鎖。';return;}
+    statusEl.textContent='✅ 已送出請離。對方端會在約 60 秒內自動儲存並釋放編輯鎖，之後即可解鎖編輯；可按「重新整理狀態」查看是否已釋放。';
+  }catch(e){statusEl.textContent='請離失敗：'+(e.message||e);}
+}
+async function adminForceRelease(){
+  if(!confirm('強制清除編輯鎖會讓對方「尚未儲存」的變更遺失，僅在對方已離線且無法自動儲存時使用。\n\n確定要強制清除嗎？'))return;
+  const statusEl=document.getElementById('admin-status');
+  statusEl.textContent='強制清除中…';
+  try{
+    const lk=await dbAdapter.forceReleaseLock();
+    await adminRefresh();   // 會清掉狀態列 → 結果訊息放在重新整理之後
+    statusEl.textContent=lk?'✅ 已強制清除編輯鎖，資料庫現在可解鎖編輯。':'目前無人佔用編輯鎖。';
+  }catch(e){statusEl.textContent='強制清除失敗：'+(e.message||e);}
+}
+// 使用者登入紀錄：讀共用的 login_history（兩個工具都會寫），依時間新→舊列出最近 100 筆，標出是哪個工具
+async function adminShowLoginHistory(){
+  if(!_adminAuthed)return;
+  const el=document.getElementById('admin-loginhist');if(!el)return;
+  if(!(dbAdapter.isSharePointMode&&dbAdapter.isSharePointMode())){el.innerHTML='<div class="admin-lh-empty">本機／離線資料庫模式沒有共用的登入紀錄。</div>';return;}
+  el.innerHTML='<div class="admin-lh-empty">讀取中…</div>';
+  let hist;
+  try{await dbAdapter.refresh();hist=(await dbAdapter.getCollection('login_history'))||{};}
+  catch(e){el.innerHTML='<div class="admin-lh-empty">讀取失敗：'+_vEsc(e.message||e)+'</div>';return;}
+  const rows=Object.values(hist).filter(r=>r&&r.at).sort((a,b)=>(Date.parse(b.at)||0)-(Date.parse(a.at)||0)).slice(0,100);
+  if(!rows.length){el.innerHTML='<div class="admin-lh-empty">目前尚無登入紀錄。</div>';return;}
+  const fmt=t=>{try{return new Date(t).toLocaleString('zh-TW');}catch(e){return t;}};
+  const users=new Set(rows.map(r=>r.email)).size;
+  el.innerHTML='<div class="admin-lh-head">最近 '+rows.length+' 筆登入 ｜ '+users+' 位使用者</div><div class="admin-lh-list">'+
+    rows.map(r=>{
+      const tool=r.tool||'AI-Thermal',rru=tool==='5G-RRU';
+      return '<div class="admin-lh-row"><span class="admin-lh-time">'+_vEsc(fmt(r.at))+'</span>'+
+        '<span class="admin-lh-name">'+_vEsc(r.name||'-')+'</span>'+
+        '<span class="admin-lh-tool '+(rru?'t-rru':'t-ait')+'">'+_vEsc(tool)+'</span>'+
+        '<span class="admin-lh-email" title="'+_vEsc(r.email||'')+'">'+_vEsc(r.email||'')+'</span></div>';
+    }).join('')+'</div>';
 }
 
 // 每 60 秒重新讀檔輪詢鎖狀態（登入 SharePoint 時），保持置頂佔用橫幅即時，並維護自己的鎖
@@ -5772,6 +5973,36 @@ window.addEventListener('DOMContentLoaded',function(){
 });
 </script>
 <!-- Lock Warning Modal (SharePoint pessimistic locking) -->
+<!-- 系統管理員（header「🛡 管理」）：與 AI-Thermal 的管理面板同一套 —— 查看／請離佔用編輯鎖的人員、查詢使用者登入紀錄 -->
+<div id="admin-modal" class="lock-modal-overlay" style="display:none" onclick="if(event.target===this)adminClose()" onkeydown="if(event.key==='Escape'){event.stopPropagation();adminClose();}">
+  <div class="lock-modal-box admin-box" role="dialog" aria-modal="true" aria-labelledby="admin-title">
+    <h3 class="lock-modal-title" id="admin-title">🛡 系統管理員</h3>
+    <form id="admin-auth" onsubmit="event.preventDefault();adminVerify();">
+      <p class="lock-modal-text">請輸入系統管理員密碼以繼續。</p>
+      <input type="password" id="admin-pwd" placeholder="密碼" autocomplete="off" aria-label="系統管理員密碼" aria-describedby="admin-pwd-err">
+      <div id="admin-pwd-err" class="admin-err" role="alert"></div>
+      <div class="lock-modal-actions">
+        <button type="submit" class="lock-modal-btn lock-modal-teams-btn">確認</button>
+        <button type="button" onclick="adminClose()" class="lock-modal-btn">取消</button>
+      </div>
+    </form>
+    <div id="admin-panel" hidden>
+      <div id="admin-lock-info" class="lock-modal-info"></div>
+      <p id="admin-status" class="admin-status" role="status" aria-live="polite"></p>
+      <div id="admin-actions" class="admin-actions"></div>
+      <hr class="admin-sep">
+      <div class="lock-modal-actions">
+        <button type="button" onclick="adminShowLoginHistory()" class="lock-modal-btn">🕘 使用者登入紀錄</button>
+      </div>
+      <div id="admin-loginhist"></div>
+      <div class="lock-modal-actions">
+        <button type="button" onclick="adminRefresh()" class="lock-modal-btn">🔄 重新整理狀態</button>
+        <button type="button" onclick="adminClose()" class="lock-modal-btn">關閉</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="lock-warning-modal" class="lock-modal-overlay" style="display:none" onclick="if(event.target===this)closeLockWarning()">
   <div class="lock-modal-box">
     <h3 class="lock-modal-title">🔒 資料庫目前鎖定中</h3>

@@ -42,7 +42,7 @@
                                 // TIM 型號庫：全工具共用、不屬於任何專案。
                                 // 維護介面只在 AI-Thermal Tab2；**本工具只讀不寫**。
                                 // 型號／k／廠商可參照 TIM 管理工具（AI-Thermal CLAUDE.md「TIM 型號目錄」）
-  "login_history":   { "<id>": { name, email, at, tool } },  // AI-Thermal 登入稽核（本工具尚未寫入）
+  "login_history":   { "<id>": { name, email, at, tool } },  // 登入稽核：兩個工具都寫（tool: 'AI-Thermal'／'5G-RRU'），管理面板查詢用
   "lock":            { lockedBy, lockedByEmail, lockedAt, expiresAt,
                        evictRequested?, evictBy?, evictAt? },   // 共用 SharePoint 編輯鎖（兩個工具同一把）；請離旗標見規則 7
   "version":         <number>   // 每次寫入遞增（兩個工具都要）：讀到比手上舊的不採用＝防版本回退；本機檔模式靠它偵測別人寫過檔
@@ -257,6 +257,17 @@
 ⚠ **不可加 `flex-wrap:wrap`**：flex 是「先分行、後壓縮」，加了會變成名稱還沒縮、右側按鈕
 就先掉到第二行蓋到標題。目前的設計是空間不夠時名稱縮到 ellipsis，兩端永遠不重疊。
 
+**登入後右側按鈕群放不下 → `hdrFit()` 逐級收合**（`hdr-c1`／`hdr-c2` 掛在 `.header` 上）：登入後右側是
+「首頁、SharePoint｜姓名、離線、登出、email、備份、還原、管理」約 930px，17 吋筆電＋參數控制台展開時遠超過頂排寬度，
+而 `.header` 是 overflow 裁切 → 原本**最右邊的備份／還原整個看不到**（`tests/header-toolbar.test.js` 只量沒登入的狀態，量不到）。
+- 先試完整標籤；名稱區 < `HDR_NAME_MIN`（180px）或右側超出 header → `hdr-c1`：藏 email（改放在 `#db-banner-text` 的 `title`）、
+  按鈕換短標籤（每顆按鈕裡 `.hb-f` 完整／`.hb-s` 短標籤兩個 span）；還放不下 → `hdr-c2`：按鈕只留圖示、姓名截斷（160px）。
+  每顆按鈕都有 `aria-label`／`title` 寫全名（只剩圖示時讀得到）。名稱區 `overflow:hidden`（再窄也不會把「專案名稱」字樣蓋到按鈕底下）。
+- 觸發：`ResizeObserver` 看頂排、右側按鈕群、版本徽章（換寬度、收合參數控制台、登入／登出、切離線、CI 戳版本號），
+  下一格畫面才重算（`requestAnimationFrame`，重算後尺寸不變就不會再觸發）。⚠ 新增 header 按鈕要照同一個格式包 `.hb-f`／`.hb-s` 並給 `aria-label`。
+- 實測（參數控制台展開、CI 版本號、長姓名／email）：1920 完整標籤、1600 `c1`、1280～1440 `c2`，五種寬度都沒有按鈕被裁掉；
+  契約測試 `tests/admin-panel.test.js` [J]。
+
 ### 專案名稱：狀態不是欄位（`#cloudProjectName` 已移除）
 
 工具列上的專案名稱輸入框已拿掉，改成頂排的**純文字顯示**（`#projNameBox` / `#projNameText`）：
@@ -415,7 +426,7 @@ AI-Thermal 有好幾份資料用「元件名稱」當 key：TH/ME 頁的 `therma
 拿不到時是「系統管理員」）／`evictAt`。兩個工具共用 `thermal_db.json` 上同一把鎖 → 本工具的使用者持鎖時也會被請離。
 
 - graphDb／dbAdapter 有同一組 API：`requestEvict(byName)`（不搶鎖、沒人持鎖回 null 不寫檔）、`forceReleaseLock()`（最後手段）。
-  本工具目前沒有管理介面（需要時從 AI-Thermal 操作）。
+  兩個工具都有操作介面（header「🛡 管理」，見下一節）。
 - 偵測：60 秒輪詢 `_maintainLock` 的 (2.5)：旗標在自己的鎖上 → `_handleEviction`：**有未存修改就 `cloudSaveProject({auto:true})`**
   → `releaseLock` → 資料庫保護重新啟用 → alert 寫出被誰請離、有沒有自動儲存。正在存檔（`_saveBusy`）→ 這一輪先不處理。
 - **自動儲存不跳任何對話框**（`opts.auto`：不問名稱、不確認、不開衝突視窗、不跳「已儲存」）；遇到要使用者決定的情況
@@ -427,6 +438,26 @@ AI-Thermal 有好幾份資料用「元件名稱」當 key：TH/ME 頁的 `therma
 - 別人持鎖且已被請離 → 置頂佔用橫幅多一行「⏳ 系統管理員（名稱）已要求對方釋放…」（`#lock-status-evict`）。
 - 管理員直接清掉鎖 → 原本的「鎖遺失」流程（`_onLockLost`）。
 - 契約測試：`tests/lock-evict.test.js`（headless、真的 graphDb＋假 Graph API）、`tests/optimistic-concurrency.test.js` [T20]–[T22]。
+
+### 系統管理員面板（header「🛡 管理」，`admin*`）＋登入紀錄（`login_history`）—— 與 AI-Thermal 同一套
+
+使用者要求「5G-RRU 也要有一個像 AI-Thermal 的介面」。版面、文字、密碼（`ADMIN_PASSWORD = '0420'`）與 AI-Thermal 的管理面板相同；
+兩個工具共用同一把鎖與同一份 `login_history`，在哪一邊操作都是同一份資料。
+
+- 流程：`adminOpen` → 密碼（**錯了就地提示、不關視窗**，不用 `alert`；Esc／取消關閉；每次打開都要重新輸入）→ `adminRefresh`：
+  - SharePoint 且已登入 → `peekLock` 讀最新的鎖（順便 `updateLockStatusBar`）：沒人持鎖 → 「無人佔用」、不給按鈕；有人 → 佔用者／信箱／
+    鎖定於／預計自動解鎖（逾時標出來、是目前登入的帳號也標出來、已請離加一行琥珀色「已送出請離要求」）＋兩顆鈕：
+    「🚪 強制請離（對方自動存檔並上鎖）」（紫色，`requestEvict(帳號名稱)`）、「⚠ 強制清除鎖（未存變更會遺失）」（中性，先 `confirm`，`forceReleaseLock`）。
+    兩個動作做完都 `adminRefresh` 再把結果訊息放回狀態列（`adminRefresh` 會清空狀態列）。
+  - 本機／離線資料庫 → 「沒有共用編輯鎖」；沒登入 → 指路「🔐 登入 SharePoint」。
+- 「🕘 使用者登入紀錄」（`adminShowLoginHistory`）：先 `dbAdapter.refresh()` 再讀 `login_history`，新→舊最近 100 筆、標頭寫筆數與人數；
+  每列標出**哪個工具**（`.admin-lh-tool`：5G-RRU 青綠／AI-Thermal 藍，兩邊同一組色；**沒有 `tool` 的舊紀錄＝AI-Thermal**，原本只有它會寫）。
+- **本工具也寫 `login_history`**（`recordLoginHistory`，`_updateSpHeaderSignedIn` 呼叫 → 啟動時已登入、按登入成功都會記）：
+  `{ name, email, at, tool: '5G-RRU' }`、一筆一個唯一 id（`setDoc`，不同 key → 樂觀寫入並發安全；不需要編輯鎖）。
+  節流 60 分鐘、**只看本工具的紀錄**（同一個人剛在 AI-Thermal 登入過，本工具照樣記；AI-Thermal 端同樣只看自己的）；
+  超過 500 筆刪最舊的（兩個工具共用上限）。背景執行，失敗只記 console。
+- 樣式限定在 `#admin-modal`（膠囊按鈕、請離鈕紫色、清除鎖鈕中性＋⚠，跟 AI-Thermal 畫面一致）；`.lock-modal-*` 其他對話框不受影響。
+- 契約測試：`tests/admin-panel.test.js`（[A]–[I] 面板與登入紀錄；[J] 見下方 header 頂排）。
 
 ### 還原資料庫（header「♻️ 還原資料庫」，`dbRestore*`）
 
