@@ -177,6 +177,18 @@ const dbAdapter = {
   async peekLock() {
     if (!this.isSharePointMode()) return null;
     return await graphDb.peekLock();
+  },
+
+  /* 系統管理員：對持鎖者下請離旗標（對方端會自動儲存並釋放）。與 AI-Thermal 同一套。 */
+  async requestEvict(byName) {
+    if (!this.isSharePointMode()) return null;
+    return await graphDb.requestEvict(byName);
+  },
+
+  /* 系統管理員最後手段：強制清除鎖（對方未存變更不會被寫入） */
+  async forceReleaseLock() {
+    if (!this.isSharePointMode()) return null;
+    return await graphDb.forceReleaseLock();
   }
 };
 

@@ -43,7 +43,9 @@
                                 // 維護介面只在 AI-Thermal Tab2；**本工具只讀不寫**。
                                 // 型號／k／廠商可參照 TIM 管理工具（AI-Thermal CLAUDE.md「TIM 型號目錄」）
   "login_history":   { "<id>": { name, email, at, tool } },  // AI-Thermal 登入稽核（本工具尚未寫入）
-  "version":         <number>
+  "lock":            { lockedBy, lockedByEmail, lockedAt, expiresAt,
+                       evictRequested?, evictBy?, evictAt? },   // 共用 SharePoint 編輯鎖（兩個工具同一把）；請離旗標見規則 7
+  "version":         <number>   // 每次寫入遞增（兩個工具都要）：讀到比手上舊的不採用＝防版本回退；本機檔模式靠它偵測別人寫過檔
 }
 ```
 
@@ -340,7 +342,8 @@ docId → id≠名稱的專案每存一次就多一份分身、原專案永遠�
 - 寫入時機：`dbAdapter.updateDoc('projects', id, (cur) => fields)` —— **fields 可以是函式**，後端在
   「寫入當下的最新內容」上呼叫（412 重讀後會重算）；函式裡有未決定的衝突就丟 `CompMerge.MergePending`，
   `CompMerge.saveWithMerge` 接到後開視窗、帶著選擇重試。後端規則：**先算完才動快取**（算的途中丟例外 →
-  快取不變、不寫入）。本機檔模式沒有 If-Match → 存檔前先 `dbAdapter.refresh()`（`fileDb.refresh`）。
+  快取不變、不寫入）。本機檔模式沒有 If-Match → 寫入前比對 `version`、衝突就在最新內容上重算（見「本機檔／離線資料庫的樂觀並發」），
+  存檔前也先 `dbAdapter.refresh()`（`fileDb.refresh`）把最新內容讀進來給合併用。
 - 不合併的情況：新專案、覆蓋別的專案、原專案已被刪除要重建 → 以畫面為準（沒有「載入時」可以比）。
 - 存檔成功 → `adoptWrittenProject`：畫面換成實際寫入的內容（含併入的對方修改）、當作新快照；
   alert 附一行「已合併：併入資料庫最新的 N 項修改…」（`CompMerge.summaryText`）。
@@ -379,6 +382,51 @@ AI-Thermal 有好幾份資料用「元件名稱」當 key：TH/ME 頁的 `therma
   得到 412 再重讀，不會蓋掉任何人的寫入）。
 - `_readFile`：metadata 多取 `size`。**本 session 第一次讀檔就讀到空內容、但檔案大小不是 0（或拿不到大小）→
   唯讀保護**，不可 bootstrap 空骨架（否則下一次寫入就把整份共用 DB 抹掉）；真的是 0 bytes 才建立空骨架。
+- **每次寫入都遞增 `version`**（`Math.max(Date.now(), currentVersion + 1)`，PUT 成功才提交 `currentVersion`）——
+  與 AI-Thermal 同一套。原本本工具不遞增 → AI-Thermal 的「防版本回退」與本機檔模式的版本比對都看不出本工具寫過檔。
+- **防版本回退**（`_readFile(opts)`）：SharePoint 剛寫完就重讀偶爾會回寫入前的舊內容（read-after-write 延遲）。
+  讀到的 `version` 比手上的舊 → **不採用，eTag 也保留舊的**（換成新 eTag 的話，下一次寫入的 If-Match 會對上，
+  把舊快取整檔寫回）→ 下一次寫入得到 412 → 以磁碟為準重讀。412／寫入失敗後的重讀一律 `{ force: true }`
+  （版本歷史還原、不遞增 version 的舊前端會讓磁碟版本變小，拒收的話重試就會回滾別人的寫入）。
+  ⚠ 測試要灌一份「版本比較小」的假檔案當新情境時，用 `graphDb._readFile({ force: true })`（見 `tests/db-restore.test.js` 的 seed）。
+- **`acquireLock` 寫入成功才認定持鎖**（`currentLock`）：原本在 mutateFn 裡就設 → 搶鎖輸了（412 → 重讀 → LockError）
+  或 412 用盡時，本地仍以為自己持鎖。
+- 契約測試：`tests/optimistic-concurrency.test.js`（移植自 AI-Thermal 同名測試 ＋ 版本遞增／防回退／假鎖／請離）。
+
+### 本機檔／離線資料庫的樂觀並發（`fileDb.js`）—— 與 AI-Thermal 同一套
+
+本機檔沒有 eTag／If-Match → **寫入前重讀磁碟比對 `version`**（`_writeFile`）：不同＝讀檔之後有人寫過這個檔
+（AI-Thermal、另一個分頁）→ 換成磁碟上的最新內容並丟 `ConflictError`（`window.ConflictError`，與 AI-Thermal 同名）。
+寫入一律走 `_withOptimisticWrite(mutateFn)`（與 graphDb 同介面）：接到 `ConflictError` 就在最新內容上重跑 mutateFn
+再寫（最多 4 次，等同 SharePoint 的 412）→ 呼叫端不必改；重試用盡才往外丟（存檔流程的 `saveWithMerge` 也把它當可重試）。
+
+- 每次寫入遞增 `version`（AI-Thermal 的本機檔模式靠它看出本工具寫過檔）；**讀檔不寫回**（沒有 `version` 的舊檔當 0，
+  第一次存檔才戳上 —— 開一份備份檔來看不該改到它；AI-Thermal 讀檔時會補寫，這點刻意不同）。
+- 寫入前發現磁碟檔壞掉／被截斷 → 唯讀保護（`_adoptText` 與 `_readFile` 共用），不寫入、保留快取。
+- `mutateWholeDb`（還原資料庫）寫入失敗 → 快取退回還原前（不可留著一份沒寫進檔案的還原結果）。
+- `createFile` 是使用者選了「另存新檔」→ `_writeFileRaw` 照寫，不比對。
+- ⚠ 不遞增 `version` 的寫入者（手動編輯檔案、還沒更新的舊版前端）偵測不到。
+- `cloudSaveProject` 在本機檔模式仍會先 `dbAdapter.refresh()`：合併要的「資料庫最新內容」要先讀進來。
+- 契約測試：`tests/filedb-version.test.js`。
+
+### 系統管理員請離（共用編輯鎖的 `evictRequested`）—— 被請離的那一半
+
+請離的操作介面在 AI-Thermal 的「🛡 管理」（密碼 0420）：對「目前持鎖者」的鎖寫 `evictRequested`／`evictBy`（管理員帳號名稱，
+拿不到時是「系統管理員」）／`evictAt`。兩個工具共用 `thermal_db.json` 上同一把鎖 → 本工具的使用者持鎖時也會被請離。
+
+- graphDb／dbAdapter 有同一組 API：`requestEvict(byName)`（不搶鎖、沒人持鎖回 null 不寫檔）、`forceReleaseLock()`（最後手段）。
+  本工具目前沒有管理介面（需要時從 AI-Thermal 操作）。
+- 偵測：60 秒輪詢 `_maintainLock` 的 (2.5)：旗標在自己的鎖上 → `_handleEviction`：**有未存修改就 `cloudSaveProject({auto:true})`**
+  → `releaseLock` → 資料庫保護重新啟用 → alert 寫出被誰請離、有沒有自動儲存。正在存檔（`_saveBusy`）→ 這一輪先不處理。
+- **自動儲存不跳任何對話框**（`opts.auto`：不問名稱、不確認、不開衝突視窗、不跳「已儲存」）；遇到要使用者決定的情況
+  —— 還沒存進資料庫的新專案、原專案已被刪除、名稱撞到別的專案、**兩邊改到同一格** —— **不寫入、回傳原因**，鎖照樣放掉。
+  與 AI-Thermal 不同（它會開衝突視窗等使用者）：本工具上鎖後畫面上的修改照樣留著，之後重新解鎖再存即可，
+  不必為了放掉鎖替使用者做決定，也不會因為使用者不在座位上而一直佔著鎖。
+- **續約保留旗標**（`acquireLock`）：本 session 已持鎖（`renewing`）、鎖是自己的且有旗標 → 新的鎖物件照帶 `evictRequested`／`evictBy`／`evictAt`
+  （輪詢讀過之後、續約寫入之前才下的請離，412 重讀後也留得住）；**重新解鎖不是續約 → 不沿用**上次留下的旗標。AI-Thermal 同一段。
+- 別人持鎖且已被請離 → 置頂佔用橫幅多一行「⏳ 系統管理員（名稱）已要求對方釋放…」（`#lock-status-evict`）。
+- 管理員直接清掉鎖 → 原本的「鎖遺失」流程（`_onLockLost`）。
+- 契約測試：`tests/lock-evict.test.js`（headless、真的 graphDb＋假 Graph API）、`tests/optimistic-concurrency.test.js` [T20]–[T22]。
 
 ### 還原資料庫（header「♻️ 還原資料庫」，`dbRestore*`）
 
@@ -389,8 +437,8 @@ AI-Thermal 有好幾份資料用「元件名稱」當 key：TH/ME 頁的 `therma
   `dbRestoreValidate`（單一專案檔指路「匯入專案」；0 個專案拒絕，不把 DB 清空）→ `dbAdapter.refresh()` 後
   `dbRestoreAnalyze` 逐專案標「新增／會覆蓋／相同」、集合同樣比對 → 視窗勾選（預設只勾「新增」＝資料庫已經沒有的）。
 - 寫入：`dbAdapter.restoreBackup(backup, plan)` → 後端 `mutateWholeDb`（graphDb 走 `_withOptimisticWrite`，412 在最新內容上重算；
-  fileDb 先重讀磁碟）。套用規則單一事實來源 `dbAdapter.restorePlanApply`；**`RESTORE_KEEP`（`lock`、`version`）永遠不被備份蓋掉**
-  （備份裡可能帶著當時別人的編輯鎖）。壞檔唯讀、projects 歸零保險絲照樣生效。
+  fileDb 先重讀磁碟、寫入前比對 version）。套用規則單一事實來源 `dbAdapter.restorePlanApply`；**`RESTORE_KEEP`（`lock`、`version`）永遠不被備份蓋掉**
+  （備份裡可能帶著當時別人的編輯鎖；`version` 由目前的值遞增，不會倒退回備份當時的值）。壞檔唯讀、projects 歸零保險絲照樣生效。
 - **寫入前一定先 `exportBackup('before_restore')`** 下載一份目前的 DB（還原錯了用它再還原回來）。
 - 還原後：`loadLibraryFromLocal`；目前開著的專案被刪 → 身分清空；被覆蓋 → `checkProjectFreshness(true)`（沒未存修改就重新載入）。
 - 契約測試：`tests/db-restore.test.js`（真的 graphDb ＋假 Graph API，含 412）。
@@ -956,7 +1004,14 @@ AI-Thermal 已支援「一顆元件多份規格書」（datasheet／application 
    CAS（兩人不會同時取得鎖）、(b) 他人對其他 doc/collection 的寫入不會被我們的整檔 PUT 回滾、
    (c) releaseLock 衝突時只刪自己的鎖。**兩個 repo 要同步實作**（共用同一份檔案，並發保護取決於最弱的寫入者）。
    參考實作：5G-RRU 的 `graphDb.js`（`_withOptimisticWrite`、`currentEtag`）/ `fileDb.js`
-   （`_assertWritable`、`lastReadProjects`、`sawRealData`；本機單人模式無 eTag）。
+   （`_assertWritable`、`lastReadProjects`、`sawRealData`；本機模式無 eTag → 寫入前比對 `version`）。
+   **每次寫入都遞增 `version`、讀到比手上舊的 `version` 不採用（eTag 也不換）**：兩個 repo 都要做，
+   一邊不遞增，另一邊的防回退與本機檔模式的版本比對就看不出它寫過檔（見「SharePoint 讀寫防護」）。
+7. **系統管理員強制請離（共用 `lock` 物件的欄位）**：`lock` 除 `lockedBy/lockedByEmail/lockedAt/expiresAt` 外，
+   還有 `evictRequested`(bool)、`evictBy`(name)、`evictAt`(iso)，由 AI-Thermal 的「🛡 管理」寫在**目前持鎖者**的鎖上（不搶鎖）。
+   持鎖者的 60 秒輪詢偵測到「旗標在自己鎖上」→ 自動儲存、釋放鎖、退回上鎖；**續約自己的鎖時要保留旗標**
+   （否則續約一次就把請離要求洗掉）。**兩個 repo 要同步實作**（`requestEvict`／`forceReleaseLock`／`_handleEviction`），
+   見「系統管理員請離」一節。
 
 ### 反例（造成 Bug 的寫法）
 

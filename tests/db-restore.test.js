@@ -5,7 +5,7 @@
  *   [A] 檔案檢查：不是物件、單一專案檔、沒有 projects、0 個專案 → 拒絕並說明原因。
  *   [B] 比對：每個專案標「新增／會覆蓋／相同」，只在資料庫裡的專案另外列出；集合同樣比對。
  *   [C] 選擇性還原（預設）：只勾「新增」；還原後新增的專案回來、沒勾的「會覆蓋」不動、
- *       只在資料庫裡的專案保留；編輯鎖與 version 不被備份蓋掉；還原前先下載一份目前的資料庫。
+ *       只在資料庫裡的專案保留；編輯鎖與 version 不被備份蓋掉（version 由目前的值遞增）；還原前先下載一份目前的資料庫。
  *   [D] 勾選「會覆蓋」的專案＋TIM 型號庫 → 被蓋回備份的內容；別人在同時寫入另一個專案（412）→ 保留。
  *   [E] 整份取代：沒輸入「還原」不能按；輸入後只在資料庫裡的專案被刪、編輯鎖保留。
  *   [F] 資料庫保護沒解除／唯讀保護／沒連線 → 不開檔案選擇。
@@ -98,7 +98,8 @@ const CURRENT = {
     fbOk = true; cloudLocked = false;
     window._ensureLockBeforeWrite = async () => true;
     _ensureLockBeforeWrite = window._ensureLockBeforeWrite;
-    return graphDb._readFile();
+    // 每個情境重新灌一份假檔案：version 可能比上一個情境寫過的還小 → 用 force 讀（否則「防版本回退」會忽略它）
+    return graphDb._readFile({ force: true });
   }, cur);
   const disk = () => page.evaluate(() => JSON.parse(window.__disk));
   const pick = async (obj, name) => {
@@ -162,7 +163,7 @@ const CURRENT = {
   ok('D 保留', !!d.projects.D);
   ok('TIM 型號庫沒勾 → 不動', d.tim_library.t1.model === 'NEW-PAD');
   ok('編輯鎖是目前的、不是備份裡的', d.lock && d.lock.lockedByEmail === 'me@x.com');
-  ok('version 不被備份蓋掉', d.version === 222, d.version);
+  ok('version 不被備份蓋掉（由目前的 222 往上遞增，不是備份裡的 111）', d.version > 222, d.version);
   const ex = await page.evaluate(() => window.__exports);
   ok('寫入前先下載 _before_restore 備份', ex.length === 1 && ex[0].tag === 'before_restore' && ex[0].puts === 0, ex);
   ok('完成訊息寫出結果', (await page.evaluate(() => window.__alerts.pop() || '')).includes('新增 1 個專案'));
@@ -202,7 +203,7 @@ const CURRENT = {
   ok('專案 = 備份的 A／B／C（D 被刪）', Object.keys(d.projects).sort().join() === 'A,B,C', Object.keys(d.projects));
   ok('B 是備份的內容', d.projects.B.rf_data[0]['Power(W)'] === 30);
   ok('編輯鎖保留目前的', d.lock.lockedByEmail === 'me@x.com');
-  ok('version 保留目前的', d.version === 222);
+  ok('version 保留目前的（往上遞增，不是備份裡的 111）', d.version > 222, d.version);
 
   console.log('\n[F] 不能還原的狀態');
   await seed(CURRENT);
