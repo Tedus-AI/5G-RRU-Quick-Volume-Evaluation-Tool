@@ -37,9 +37,11 @@
   },
   "feedback_items":  { ... },   // AI-Thermal Tab5
   "tim_library":     { "<id>": { model, timType, k, thickness, gapThickness, gapUnlock,
-                                 vendor, note, at, by, updatedAt, updatedBy } },
+                                 vendor, note, at, by, updatedAt, updatedBy,
+                                 src?, srcId? } },   // src='tim-manager'＋srcId＝TIM 管理工具的材料 id（連結時才有）
                                 // TIM 型號庫：全工具共用、不屬於任何專案。
                                 // 維護介面只在 AI-Thermal Tab2；**本工具只讀不寫**。
+                                // 型號／k／廠商可參照 TIM 管理工具（AI-Thermal CLAUDE.md「TIM 型號目錄」）
   "login_history":   { "<id>": { name, email, at, tool } },  // AI-Thermal 登入稽核（本工具尚未寫入）
   "version":         <number>
 }
@@ -72,6 +74,11 @@
 元件表每列標「k=… · t=… ← 型號 X／專案預設值」，Tab1 的 `R_TIM` 標 ◆（來自型號）或 ⚠（來源有問題）。
 
 ⚠ **本工具絕不寫入 `tim_library`**（維護介面只在 AI-Thermal Tab2 的「🧪 TIM 型號庫」）。
+
+**TIM 材料的建立來源是 TIM 管理工具**：AI-Thermal 的型號庫可以連結 TIM 管理工具的材料（`src: 'tim-manager'`、`srcId`），
+型號、k、廠商跟著 TIM 管理工具（AI-Thermal 開型號庫時套用、儲存時寫進 `tim_library`）；填縫厚度仍在 AI-Thermal 填。
+本工具**不直接讀** TIM 管理工具（`resolveTim` 只看 `tim_library`，k 以 AI-Thermal 存的為準，離線也算得出來），
+只在唯讀檢視的型號旁標「TIM 管理工具」並在說明文字交代更新的時機。`src`/`srcId` 是 AI-Thermal 寫的 key，原樣保留即可。
 載入時機：`loadLibraryFromLocal()`（DB 連線／取得鎖／換 DB 檔）、`cloudLoadOne()`（載入專案）
 與 `timLibViewOpen()`（按下型號庫按鈕）各 `timLibLoad(true)` 重讀一次，讀完 `recalc()`。
 

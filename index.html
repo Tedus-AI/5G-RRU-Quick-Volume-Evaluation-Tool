@@ -226,6 +226,7 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .tim-lib-modal td{padding:8px;border-top:1px solid #e2e8f0;text-align:center;color:#1e293b;}
 .tim-lib-modal td.tlv-model{font-weight:700;color:#0f172a;}
 .tim-lib-modal .tlv-gap{color:#0550ae;font-weight:700;}
+.tim-lib-modal .tlv-src{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:9px;font-size:0.7rem;font-weight:600;background:#e1f0fb;color:#01579b;border:1px solid #b3d7f2;white-space:nowrap;vertical-align:middle;cursor:help;}
 .tim-lib-modal .tlv-empty{padding:26px;text-align:center;color:#64748b;font-size:0.9rem;line-height:1.7;}
 .cloud-modal .cloud-close.tim-lib-go{background:#0ea5e9;color:#fff;text-decoration:none;display:inline-flex;align-items:center;}
 .cloud-modal .cloud-close.tim-lib-go:hover{background:#0284c7;}
@@ -824,7 +825,7 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
     <div class="via-k-hint">抓不到逐顆 K<sub>eff</sub> 時才用這兩個值。導熱方式＝Thermal Via 的元件，<b>AI-Thermal</b>「Thermal Via 計算」有完整的 via 設計時改用它的 K<sub>eff</sub>（元件設定的導熱方式底下會寫用哪一個）。</div>
     <label style="margin-top:8px;color:var(--primary-light);">🔷 熱介面材料 (TIM)</label>
     <button class="tim-lib-btn" onclick="timLibViewOpen()" title="檢視全工具共用的 TIM 型號庫（k 值與填縫厚度）。本工具唯讀，新增／修改請到 AI-Thermal">🧪 TIM 型號庫</button>
-    <div class="tim-lib-hint">每顆元件的 k 與填縫厚度由它選用的<b>型號</b>決定（型號在 <b>AI-Thermal</b> 的元件清單選）。本工具<b>只能檢視</b>，新增／修改型號請到 AI-Thermal。</div>
+    <div class="tim-lib-hint">每顆元件的 k 與填縫厚度由它選用的<b>型號</b>決定（型號在 <b>AI-Thermal</b> 的元件清單選；型號、k、廠商可參照 <b>TIM 管理工具</b>）。本工具<b>只能檢視</b>，新增／修改型號請到 AI-Thermal。</div>
     <label style="margin-top:8px;color:var(--primary-light);">🔘 Solder (錫片)</label>
     <div class="row2"><div><label>K (錫片)</label><input type="number" id="K_Solder" step="1" onchange="recalc()"></div><div><label>t (錫片)</label><input type="number" id="t_Solder" step="0.05" onchange="recalc()"></div></div>
     <label>錫片有效面積率 (Voiding)</label><input type="number" id="Voiding" step="0.05" min="0.1" max="1" placeholder="0.5 ~ 1.0 (建議 0.75)" onchange="recalc()">
@@ -898,6 +899,8 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
         <h3>🧪 TIM 型號庫（唯讀）</h3>
         <p class="tlv-note">這份型號庫<b>全工具共用、不屬於任何專案</b>，維護介面在 <b>AI-Thermal</b>。
           本工具只讀不寫 —— 要新增或修改型號，請到 AI-Thermal 的 Tab2「🧪 TIM 型號庫」。<br>
+          標「TIM 管理工具」的型號：<b>型號、k、廠商參照 TIM 管理工具</b>（TIM 材料在那裡建立），填縫厚度在 AI-Thermal 填；
+          TIM 管理工具改了 k，要等 AI-Thermal 開型號庫並儲存後，這裡才會用新值。<br>
           算 <code>R_TIM</code> 用的是 <b>k</b> 與 <b>填縫厚度</b>（壓縮後實際填在縫隙裡的厚度）；
           「預設厚度」是材料原始片厚，僅供規格書參考。</p>
         <div id="timLibViewBody"></div>
@@ -1781,11 +1784,16 @@ function renderTimLibView(){
     '<th>型號</th><th>TIM 類型</th><th>k (W/m·K)</th><th>填縫厚度 (mm)</th><th>預設厚度 (mm)</th><th>廠商</th><th>備註</th>'+
     '</tr></thead><tbody>';
   list.forEach(r=>{
-    h+='<tr><td class="tlv-model">'+_vEsc(r.model||'')+'</td><td>'+_vEsc(r.timType||'')+'</td>'+
+    // 連結 TIM 管理工具的型號（AI-Thermal 寫的 src/srcId）：型號、k、廠商參照 TIM 管理工具
+    const src=r.src==='tim-manager'&&r.srcId
+      ?'<span class="tlv-src" title="型號、k、廠商參照 TIM 管理工具；填縫厚度在 AI-Thermal 填">TIM 管理工具</span>':'';
+    h+='<tr><td class="tlv-model">'+_vEsc(r.model||'')+src+'</td><td>'+_vEsc(r.timType||'')+'</td>'+
        '<td>'+_timNum(r.k)+'</td><td class="tlv-gap">'+_timNum(r.gapThickness)+'</td>'+
        '<td>'+_timNum(r.thickness)+'</td><td>'+_vEsc(r.vendor||'')+'</td><td>'+_vEsc(r.note||'')+'</td></tr>';
   });
-  body.innerHTML=h+'</tbody></table></div><div style="margin-top:8px;font-size:0.78rem;color:#64748b;">共 '+list.length+' 筆型號。</div>';
+  const linked=list.filter(r=>r.src==='tim-manager'&&r.srcId).length;
+  body.innerHTML=h+'</tbody></table></div><div style="margin-top:8px;font-size:0.78rem;color:#64748b;">共 '+list.length+' 筆型號'+
+    (linked?'（其中 '+linked+' 筆參照 TIM 管理工具）':'')+'。</div>';
 }
 
 /* 沒選型號時的 fallback：專案 global_params 裡的 K_/t_（參數控制台已不再提供編輯欄位） */
