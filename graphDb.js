@@ -19,6 +19,7 @@ let dbCache = {};
 let driveItemId = null;
 let _siteId = null;
 let currentLock = null;
+let currentVersion = null;   // 我們手上這份內容的 version（防版本回退用；寫入成功才前進）
 let dbCorrupted = false;     // 壞檔唯讀保護：JSON 解析失敗時禁止一切寫入
 let lastReadProjects = 0;    // 上次成功讀檔時的 projects 筆數（歸零保險絲基準）
 let sawRealData = false;     // 本 session 是否曾持有實際資料（區分「全新空庫」vs「截斷成空檔」）
@@ -117,6 +118,7 @@ const graphDb = {
     driveItemId = null;
     _siteId = null;
     currentLock = null;
+    currentVersion = null;
     dbCorrupted = false;
     currentEtag = null;
     lastReadProjects = 0;
@@ -213,54 +215,76 @@ const graphDb = {
     return driveItemId;
   },
 
-  async _readFile() {
+  // opts.force：412／寫入失敗後的重讀 → 一律以磁碟為準（不做下面的「防版本回退」）
+  async _readFile(opts) {
     await this._resolveDriveItemId();
     // 先取 metadata 拿 eTag 作為樂觀並發基準。content GET 會被 302 導到下載主機，
     // 其 ETag 是儲存層的、不可用於 Graph 的 If-Match，所以要單獨取 DriveItem 的 eTag。
+    // ⚠ eTag 先暫存、等內容確定採用後才提交（見下方「防版本回退」）。
+    let metaEtag = null;   // 拿不到 → 採用內容時退化為無 If-Match（不比現況差）
     let metaSize = null;   // 檔案實際大小（bytes）：判斷「讀到空內容」是全新空檔還是讀取異常
     try {
       const metaResp = await this._graphGet(
         `https://graph.microsoft.com/v1.0/sites/${_siteId}/drive/items/${driveItemId}?$select=id,eTag,cTag,size`
       );
       const meta = await metaResp.json();
-      currentEtag = meta.eTag || meta.cTag || null;
+      metaEtag = meta.eTag || meta.cTag || null;
       if (typeof meta.size === 'number') metaSize = meta.size;
     } catch (e) {
-      currentEtag = null;   // 拿不到 etag → 退化為無 If-Match（不比現況差）
+      metaEtag = null;
     }
     const resp = await this._graphGet(
       `https://graph.microsoft.com/v1.0/sites/${_siteId}/drive/items/${driveItemId}/content`
     );
     const text = await resp.text();
+    let parsed;
     if (text.trim() === '') {
       if (sawRealData) {
         // 先前已持有實際資料、現在卻讀到空檔 → 視為截斷異常，保留舊快取進唯讀，
         // 絕不可 bootstrap 空骨架後寫回（否則把整份共用 DB 抹掉）。
         dbCorrupted = true;
         console.error('[graphDb] 讀到空檔但先前已有資料 → 截斷疑慮，進入唯讀保護');
-      } else if (metaSize !== 0) {
+        return;
+      }
+      if (metaSize !== 0) {
         // 本 session 第一次讀檔就讀到空內容，但檔案大小不是 0（或拿不到大小）→ 是讀取異常，不是全新空檔。
         // 若照舊 bootstrap 空骨架，下一次寫入就會把整份共用 DB 抹掉 → 進唯讀，請使用者重新整理。
         dbCorrupted = true;
         console.error('[graphDb] 讀到空內容但檔案大小為 ' + metaSize + ' bytes → 讀取異常，進入唯讀保護');
-      } else {
-        // 真正的全新空檔（首次建庫）→ bootstrap 空骨架
-        dbCache = { rf_library: {}, digital_library: {}, pwr_library: {}, projects: {} };
-        dbCorrupted = false;
+        return;
       }
+      // 真正的全新空檔（首次建庫）→ bootstrap 空骨架
+      parsed = { rf_library: {}, digital_library: {}, pwr_library: {}, projects: {} };
+      dbCorrupted = false;
     } else {
-      let parsed = null;
       try { parsed = JSON.parse(text); } catch (e) { parsed = null; }
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        dbCache = parsed;
         dbCorrupted = false;
       } else {
         // 壞檔（非法 JSON / 非物件）→ 保留舊快取、進入唯讀保護。
         // 絕不可 fallback 成空骨架，否則下一次寫入會把整份共用 DB 抹掉。
         dbCorrupted = true;
         console.error('[graphDb] thermal_db.json 解析失敗 → 唯讀保護模式（保留先前快取，禁止寫入）');
+        return;
       }
     }
+    if (!parsed.version) parsed.version = Date.now();
+    // 防版本回退（與 AI-Thermal 同一套）：SharePoint 在「剛寫入後立即重讀」偶爾會回傳寫入前的舊內容
+    // （服務端 read-after-write 延遲）。伺服器版本比我們手上的還舊 → 保留記憶體裡較新的 dbCache，
+    // 剛存好的修改才不會在重讀時看起來「消失」。
+    // 例外（force）：412 衝突後的重讀必須以磁碟為準 —— 不遞增 version 的寫入、版本歷史還原都會讓
+    // 磁碟的 version 變小，這時拒收的話，重試就會把過時的快取寫回、回滾別人的寫入。
+    if (!(opts && opts.force) && currentVersion && parsed.version < currentVersion &&
+        dbCache && Object.keys(dbCache).length) {
+      console.warn(`[graphDb] 忽略較舊的讀取結果 (server v${parsed.version} < local v${currentVersion})，保留本地較新版本`);
+      // ⚠ 內容不採用 → eTag 也不可換成這次讀到的：否則下一次寫入的 If-Match 會對上現在的檔案，
+      //   把這份（可能已過時的）快取整檔寫回，蓋掉磁碟上的內容。保留舊 eTag → 下一次寫入得到 412
+      //   → 以磁碟為準重讀（force）後，在最新內容上重算再寫。
+      return;
+    }
+    currentEtag = metaEtag;
+    dbCache = parsed;
+    currentVersion = dbCache.version;
     // 記錄這次讀到的 projects 筆數，作為「歸零保險絲」的比較基準（反映磁碟現況，
     // 而非 session 高水位）：唯有「讀檔時有資料、寫檔時卻歸零」才視為記憶體異常丟失。
     lastReadProjects = Object.keys((dbCache && dbCache.projects) || {}).length;
@@ -285,6 +309,11 @@ const graphDb = {
   async _writeFile(opts) {
     this._assertWritable(!!(opts && opts.allowEmptyProjects));
     await this._resolveDriveItemId();
+    // 每次寫入都遞增 version（與 AI-Thermal 同一套）：兩個工具讀檔時靠它擋「讀到比自己手上還舊的內容」；
+    // AI-Thermal 本機檔模式也靠它偵測別人寫過檔。currentVersion 等 PUT 成功才前進：
+    // 412 後的重讀才不會把磁碟上的最新內容誤判成回退。並發衝突本身由 If-Match 偵測。
+    const newVersion = Math.max(Date.now(), (currentVersion ?? 0) + 1);
+    dbCache.version = newVersion;
     const body = JSON.stringify(dbCache, null, 2);
     const headers = {};
     if (currentEtag) headers['If-Match'] = currentEtag;   // 自我們上次讀檔後若有人改過 → 412
@@ -294,6 +323,7 @@ const graphDb = {
       'application/json',
       headers
     );
+    currentVersion = newVersion;
     // 寫入成功 → 從 PUT 回應更新 etag 供下一次 If-Match；解析失敗就保留舊 etag
     // （下一次寫入會 412 → 自動重讀修正，安全但多一趟）。
     try {
@@ -324,7 +354,8 @@ const graphDb = {
         const retryable = e && (e.status === 412 || e.network || e.status === 429 || e.status >= 500);
         if (retryable && attempt < MAX) {
           await this._sleep(120 * (attempt + 1));
-          await this._readFile();   // 取得最新內容 + 新 etag，下一圈在最新狀態上重跑 mutateFn
+          // 取得最新內容＋新 etag（force：衝突後的重讀一律以磁碟為準），下一圈在最新狀態上重跑 mutateFn
+          await this._readFile({ force: true });
           continue;
         }
         throw e;
@@ -341,7 +372,8 @@ const graphDb = {
     // 取鎖檢查與寫入透過 If-Match 構成原子 check-and-set：
     // 若他人在我們讀檔後、寫入前搶先取鎖，PUT 會 412 → 重讀後重跑此函式，
     // 看到對方的有效鎖即丟 LockError，不會兩人同時取得鎖（H-2）。
-    return await this._withOptimisticWrite((cache) => {
+    const renewing = !!currentLock;   // 本 session 已持鎖 → 這次是續約
+    const lock = await this._withOptimisticWrite((cache) => {
       const now = new Date();
       const existingLock = cache.lock;
       if (existingLock && existingLock.lockedByEmail && existingLock.lockedByEmail !== msalAccount.username) {
@@ -349,15 +381,25 @@ const graphDb = {
         if (expiresAt > now) throw new LockError(existingLock);
       }
       const expiresAt = new Date(now.getTime() + SHAREPOINT_CONFIG.lockTimeoutMinutes * 60 * 1000);
-      cache.lock = {
+      const next = {
         lockedBy: msalAccount.name,
         lockedByEmail: msalAccount.username,
         lockedAt: now.toISOString(),
         expiresAt: expiresAt.toISOString()
       };
-      currentLock = cache.lock;
-      return { value: currentLock };
+      // 續約自己的鎖時，系統管理員的請離旗標要原樣帶著（不可續約一次就把請離要求洗掉）：
+      // 輪詢先看旗標、再續約，但兩次讀檔之間（或 412 重讀後）旗標才出現的話，只有這裡留得住它。
+      // 重新解鎖（不是續約）→ 新的編輯期間，不沿用上一次留下的旗標（例：上次關分頁時沒放掉的鎖）。
+      if (renewing && existingLock && existingLock.lockedByEmail === msalAccount.username && existingLock.evictRequested) {
+        next.evictRequested = true;
+        next.evictBy = existingLock.evictBy;
+        next.evictAt = existingLock.evictAt;
+      }
+      cache.lock = next;
+      return { value: next };
     });
+    currentLock = lock;   // 寫入成功才認定持鎖：LockError／412 用盡／斷線失敗都不殘留假鎖狀態
+    return currentLock;
   },
 
   async releaseLock() {
@@ -379,6 +421,33 @@ const graphDb = {
       console.warn('[graphDb] releaseLock failed:', e);
     }
     currentLock = null;
+  },
+
+  /* 系統管理員：對「目前持鎖者」下請離旗標（不搶鎖；與 AI-Thermal 同一套，共用 lock 物件上的
+     evictRequested／evictBy／evictAt）。持鎖者的 60 秒輪詢偵測到旗標在自己的鎖上 → 自動儲存、
+     釋放鎖、退回上鎖。回傳被請離的鎖資訊或 null。透過樂觀寫入（If-Match）套用，不影響其他資料。
+     請離的操作介面在 AI-Thermal 的「🛡 管理」；本工具負責「被請離時」的那一半（index.html _handleEviction）。 */
+  async requestEvict(byName) {
+    if (!msalAccount) throw new Error('尚未登入 SharePoint');
+    return await this._withOptimisticWrite((cache) => {
+      if (!cache.lock || !cache.lock.lockedByEmail) return { skipWrite: true, value: null };
+      cache.lock.evictRequested = true;
+      cache.lock.evictBy = byName || '系統管理員';
+      cache.lock.evictAt = new Date().toISOString();
+      return { value: { ...cache.lock } };
+    });
+  },
+
+  /* 系統管理員最後手段：強制清除編輯鎖（不論持有者）。對方尚未儲存的變更不會被寫入，
+     僅供對方已離線／無回應、無法自動儲存時使用。回傳被清除的鎖資訊或 null。 */
+  async forceReleaseLock() {
+    if (!msalAccount) throw new Error('尚未登入 SharePoint');
+    return await this._withOptimisticWrite((cache) => {
+      if (!cache.lock) return { skipWrite: true, value: null };
+      const prev = { ...cache.lock };
+      delete cache.lock;
+      return { value: prev };
+    });
   },
 
   hasLock() {

@@ -956,6 +956,7 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
       <strong id="lock-status-name"></strong>
       <span class="lock-status-meta">（<span id="lock-status-email"></span>）正在編輯資料庫中</span>
       <div class="lock-status-meta">鎖定於 <span id="lock-status-time"></span>，預計 <span id="lock-status-expires"></span> 自動解鎖</div>
+      <div class="lock-status-meta" id="lock-status-evict" hidden></div>
     </div>
     <a id="lock-status-teams-btn" class="lock-status-teams" href="#" target="_blank" rel="noopener">📩 傳送 Teams 訊息</a>
   </div>
@@ -1291,6 +1292,14 @@ function updateLockStatusBar(){
     document.getElementById('lock-status-email').textContent=lock.lockedByEmail||'-';
     document.getElementById('lock-status-time').textContent=fmt(lock.lockedAt);
     document.getElementById('lock-status-expires').textContent=fmt(lock.expiresAt);
+    // 系統管理員已對持鎖者下請離（AI-Thermal「🛡 管理」）→ 等對方端自動儲存並釋放
+    const ev=document.getElementById('lock-status-evict');
+    if(ev){
+      ev.hidden=!lock.evictRequested;
+      // evictBy＝AI-Thermal 管理員的帳號名稱（拿不到時它寫「系統管理員」→ 不重複寫）
+      const by=lock.evictBy&&lock.evictBy!=='系統管理員'?'（'+lock.evictBy+'）':'';
+      ev.textContent=lock.evictRequested?'⏳ 系統管理員'+by+'已要求對方釋放，等待對方端自動儲存並釋放編輯鎖…':'';
+    }
     const tb=document.getElementById('lock-status-teams-btn');
     if(tb){
       const msg=encodeURIComponent('Hi '+(lock.lockedBy||'')+'，我想使用 5G RRU Quick Volume Evaluation Tool 編輯資料庫，請你完成後通知我，謝謝！');
@@ -1319,7 +1328,28 @@ async function _onLockLost(msg){
   alert(msg);
 }
 
-// 由 60 秒輪詢呼叫：閒置自動釋放、偵測鎖被接手、接近過期則續約
+// 被系統管理員請離（AI-Thermal「🛡 管理」對目前持鎖者下的請離旗標，兩個工具共用同一把鎖）：此時仍持鎖 →
+// 有未存修改就先自動儲存（通過驗鎖），再釋放鎖、退回上鎖並通知。與 AI-Thermal 的 _handleEviction 同一套；
+// 差別：自動儲存遇到要使用者決定的情況（還沒存過的新專案、兩邊改到同一格…）不寫入 —— 本工具上鎖後畫面上的
+// 修改照樣留著，之後重新解鎖再存就好，不必為了放掉鎖而替使用者做決定。
+let _evicting=false;
+async function _handleEviction(lk){
+  let res=null;
+  if(projectIsDirty()){
+    try{ res=await cloudSaveProject({auto:true}); }
+    catch(e){ console.warn('[evict] 自動儲存失敗：',e); res={ok:false,why:'儲存失敗：'+((e&&e.message)||e)}; }
+  }
+  try{ await dbAdapter.releaseLock(); }catch(e){}   // 釋放前在最新內容上確認鎖是自己的，不會刪到別人的鎖
+  cloudLocked=true; _applyCloudLockUI(); updateLockStatusBar();
+  const who=lk&&lk.evictBy?'（由 '+lk.evictBy+' 執行）':'';
+  let tail;
+  if(!res) tail='（沒有未儲存的修改）資料庫保護已重新啟用。';
+  else if(res.ok) tail='你的修改已自動儲存（專案「'+res.name+'」），資料庫保護已重新啟用。'+(res.note?'\n'+res.note:'');
+  else tail='⚠ 你的修改沒有自動儲存：'+res.why+'。\n畫面上的修改都還在；需要時重新解除「🔒 資料庫保護」，再按「💾 儲存專案」。';
+  alert('🔔 系統管理員已將你請離編輯狀態'+who+'。\n'+tail);
+}
+
+// 由 60 秒輪詢呼叫：閒置自動釋放、偵測鎖被接手、處理請離、接近過期則續約
 async function _maintainLock(){
   if(!_iHoldLock()) return;
   const TTL_MS=((window.SHAREPOINT_CONFIG&&SHAREPOINT_CONFIG.lockTimeoutMinutes)||10)*60000;
@@ -1334,6 +1364,13 @@ async function _maintainLock(){
   const mine = lk && acct && lk.lockedByEmail===acct.email && new Date(lk.expiresAt)>new Date();
   if(!mine){
     await _onLockLost('⚠️ 你的編輯鎖已逾時並被釋放或被他人接手，已退出編輯狀態。需要時請重新取得鎖。');
+    return;
+  }
+  // (2.5) 系統管理員請離：旗標在自己的鎖上 → 自動儲存後釋放、退回上鎖（正在存檔 → 下一輪再處理）
+  if(lk.evictRequested){
+    if(_evicting||_saveBusy) return;
+    _evicting=true;
+    try{ await _handleEviction(lk); }finally{ _evicting=false; }
     return;
   }
   // (3) 剩不到半個 TTL → 續約（再次 acquireLock 會延長自己的 expiresAt；被接手時丟 LockError）
@@ -4414,31 +4451,39 @@ function _buildProjectFields(name, existing){
   return fields;
 }
 
-async function cloudSaveProject(){
-  if(!(await _ensureLockBeforeWrite('儲存專案')))return;
+// opts.auto：被系統管理員請離時的自動儲存（_handleEviction）—— 不跳任何對話框（命名、確認、衝突視窗、完成訊息），
+// 遇到要使用者決定的情況就不寫入、回傳原因；畫面上的修改都還在，之後重新解鎖再存。
+// 回傳 {ok:true, name, note} 或 {ok:false, why}（使用者取消也是 ok:false）。
+async function cloudSaveProject(opts){
+  const auto=!!(opts&&opts.auto);
+  const say=m=>{if(!auto)alert(m);};
+  if(!(await _ensureLockBeforeWrite('儲存專案')))return {ok:false,why:'沒有取得編輯鎖'};
   let name=projectNameGet();
-  if(!name)name=promptProjectName();   // 沒命名就當場問一次；取消就靜靜退出
-  if(!name)return;
-  if(!fbOk||!dbAdapter.isReady()){alert('⚠️ 資料庫未連線，無法儲存。');return;}
-  // 本機檔模式沒有 If-Match 版本檢查 → 先重讀磁碟，合併才看得到另一個工具剛寫進同一個檔的內容
-  // （SharePoint 模式在 _ensureLockBeforeWrite 驗鎖時已重讀，寫入時還有 If-Match 把關）
+  if(!name&&!auto)name=promptProjectName();   // 沒命名就當場問一次；取消就靜靜退出
+  if(!name)return {ok:false,why:'專案還沒命名'};
+  if(!fbOk||!dbAdapter.isReady()){say('⚠️ 資料庫未連線，無法儲存。');return {ok:false,why:'資料庫未連線'};}
+  // 本機檔模式：先重讀磁碟，合併才看得到另一個工具剛寫進同一個檔的內容（寫入前 fileDb 還會再比對 version，
+  // 讀完之後才被寫過 → 在最新內容上重算）。SharePoint 模式在 _ensureLockBeforeWrite 驗鎖時已重讀，寫入時有 If-Match 把關。
   if(!(dbAdapter.isSharePointMode&&dbAdapter.isSharePointMode())){try{await dbAdapter.refresh();}catch(e){console.warn('[save] refresh failed:',e);}}
   let docId=currentProjectId,existing=null;
   if(docId){
     // 已載入的專案 → 寫回同一個 id（改名只改 project_name，不另建文件）
     existing=await dbAdapter.getDoc('projects',docId);
-    if(!existing&&!confirm('專案「'+name+'」已不在資料庫裡（可能已被刪除）。\n要用目前畫面的內容重新建立嗎？'))return;
+    if(!existing&&(auto||!confirm('專案「'+name+'」已不在資料庫裡（可能已被刪除）。\n要用目前畫面的內容重新建立嗎？')))
+      return {ok:false,why:auto?'專案已不在資料庫裡（可能已被刪除）':'已取消'};
   }else{
     // 新專案（新開／匯入本機檔）→ 才由名稱推 id；撞到既有專案要確認覆蓋
+    if(auto)return {ok:false,why:'這是還沒存進資料庫的新專案'};   // 建新專案要使用者自己決定（名稱、會不會撞到別的專案）
     docId=projectDocIdFromName(name);
-    if(!docId){alert('⚠️ 專案名稱無效，請使用中英文或數字。');return;}
+    if(!docId){alert('⚠️ 專案名稱無效，請使用中英文或數字。');return {ok:false,why:'專案名稱無效'};}
     existing=await dbAdapter.getDoc('projects',docId);
-    if(existing&&!confirm('資料庫已有專案「'+(existing.project_name||docId)+'」。\n確定要用目前畫面的內容覆蓋它？'))return;
+    if(existing&&!confirm('資料庫已有專案「'+(existing.project_name||docId)+'」。\n確定要用目前畫面的內容覆蓋它？'))return {ok:false,why:'已取消'};
   }
   // 新專案或改了名 → 名稱不可與其他專案重複
   if(!currentProjectId||name!==currentProjectLoadedName){
     const dup=await projectNameTakenBy(name,docId);
-    if(dup){alert('⚠️ 已有另一個專案叫「'+name+'」（ID：'+dup+'）。\n專案名稱不可重複：規格書資料夾以專案名稱命名，同名會共用同一個資料夾。請改名後再存。');return;}
+    if(dup){say('⚠️ 已有另一個專案叫「'+name+'」（ID：'+dup+'）。\n專案名稱不可重複：規格書資料夾以專案名稱命名，同名會共用同一個資料夾。請改名後再存。');
+      return {ok:false,why:'專案名稱與另一個專案（ID：'+dup+'）重複'};}
   }
   // 畫面上每顆元件都要有 id（三方合併靠它配對；舊資料在這裡補發）
   ['rf','digital','pwr'].forEach(cat=>CompMerge.ensureCids(components[cat]));
@@ -4466,9 +4511,13 @@ async function cloudSaveProject(){
         curSpecs=cur?cur.thermal_specs:undefined;   // 寫入後資料庫裡的 thermal_specs（本工具不寫，原樣保留）
         return fields;
       });
-    },{dialog:{title:'⚠ 這個專案在你載入後，已在資料庫被更新（可能是 AI-Thermal 或其他人剛存檔）'}});
-    if(!res.ok)return;   // 衝突視窗按「取消」→ 不存檔，畫面維持原狀
-  }catch(e){alert('❌ 儲存失敗: '+e.message);return;}
+    },{dialog:{title:'⚠ 這個專案在你載入後，已在資料庫被更新（可能是 AI-Thermal 或其他人剛存檔）'},
+       ask:auto?(()=>null):undefined,   // 自動儲存不開衝突視窗：兩邊改到同一格 → 不寫入，留給使用者下次存檔時選
+       // 本機檔模式的版本衝突（fileDb 已換成磁碟上的最新內容，正常會在 fileDb 內重試；重試用盡才到這裡）→ 重算合併再存
+       isRetryable:e=>(typeof ConflictError!=='undefined'&&e instanceof ConflictError)});
+    // 衝突視窗按「取消」→ 不存檔，畫面維持原狀
+    if(!res.ok)return {ok:false,why:auto?'有欄位你和資料庫兩邊都改了，需要你選擇保留哪一邊':'已取消'};
+  }catch(e){say('❌ 儲存失敗: '+e.message);return {ok:false,why:'儲存失敗：'+e.message};}
   finally{_saveBusy=false;}
   // Thermal Via 的逐顆 K_eff 讀 thermal_specs：換成「這個 document 現在在資料庫裡的」那一份
   // （AI-Thermal 可能剛改過 via 設計；匯入的檔案另存成新專案時，新文件沒有 AI-Thermal 的資料）
@@ -4478,7 +4527,8 @@ async function cloudSaveProject(){
   variantsCache=null; renderTab0();   // 專案集合改變 → 失效快選快取，下次重繪重新聚合
   const note=merged?CompMerge.summaryText(merged):'';
   const viaNote=viaKSig()!==viaBefore?viaKChangeText():'';
-  alert('✅ 專案「'+written.project_name+'」已儲存！'+(note?'\n'+note:'')+(viaNote?'\n'+viaNote:''));
+  say('✅ 專案「'+written.project_name+'」已儲存！'+(note?'\n'+note:'')+(viaNote?'\n'+viaNote:''));
+  return {ok:true,name:written.project_name,note:[note,viaNote].filter(Boolean).join('\n')};
 }
 
 // =====================================================
