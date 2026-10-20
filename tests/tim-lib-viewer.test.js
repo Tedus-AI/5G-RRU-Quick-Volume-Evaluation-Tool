@@ -106,7 +106,7 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
     window.__lib = {
       t1: { model:'TG-A6200', timType:'Pad',    k:6.2, thickness:2.5,  gapThickness:1.2, vendor:'T-Global', note:'PA 用' },
       t2: { model:'TP-500',   timType:'Putty',  k:5.0, thickness:0.5,  gapThickness:0.5, vendor:'Fuji' },
-      t3: { model:'GR-9',     timType:'Grease', k:9.0, thickness:0.05, gapThickness:0.05 },
+      t3: { model:'GR-9',     timType:'Grease', k:9.0, thickness:0.05, gapThickness:0.05, src:'tim-manager', srcId:'mat_gr9' },
     };
     dbAdapter.isReady = () => true;
     dbAdapter.getCollection = async (c) => { if (c === 'tim_library') { window.__libCalls++; return window.__lib; } return {}; };
@@ -145,6 +145,15 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   ok('有前往 AI-Thermal 維護型號庫的連結（另開分頁）',
      b1.link.some(l => /AI-Thermal-pad-and-stud-size-Evaluation-Tool/.test(l.href || '') && l.tgt === '_blank'), b1.link);
   ok('開視窗時重讀了一次型號庫', b1.libCalls >= 1, b1.libCalls);
+  const b1b = await page.evaluate(() => ({
+    tags: [...document.querySelectorAll('#timLibViewBody tbody tr')].map(tr => [tr.children[0].textContent.trim(), !!tr.querySelector('.tlv-src')]),
+    foot: document.getElementById('timLibViewBody').textContent,
+    note: document.querySelector('#timLibModal .tlv-note').textContent,
+  }));
+  ok('連結 TIM 管理工具的型號（AI-Thermal 寫的 src/srcId）標「TIM 管理工具」，其他不標',
+     b1b.tags.some(t => /^GR-9TIM 管理工具$/.test(t[0]) && t[1]) && b1b.tags.filter(t => t[1]).length === 1, b1b.tags);
+  ok('筆數說明含參照 TIM 管理工具的筆數', /共 3 筆型號（其中 1 筆參照 TIM 管理工具）/.test(b1b.foot), b1b.foot);
+  ok('說明交代 k 更新的時機（AI-Thermal 儲存後才用新值）', /TIM 管理工具/.test(b1b.note) && /AI-Thermal 開型號庫並儲存後/.test(b1b.note), b1b.note);
 
   // 關閉
   await page.click('#timLibModal .cloud-close:not(.tim-lib-go)');
