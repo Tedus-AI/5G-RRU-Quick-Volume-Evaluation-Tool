@@ -35,8 +35,8 @@
       //                           FR2 不寫 param_backoff*／param_duplex*）—— 本工具不讀不寫，updateDoc 原樣保留；
       //                           「複製專案」不帶 AI-Thermal 的欄位 → 複本沒有 band（＝FR1）
       //                     pcb_thickness（PCB 板厚 mm：{ RF, Digital, PWR }，AI-Thermal EE/RF/PWR 頁三個分類標題列的下拉；
-      //                           沒有 key＝沒設定）—— 本工具不讀不寫（Thermal Via 的板厚仍是參數控制台的 t_PCB），
-      //                           updateDoc 原樣保留；熱網路工具匯入專案時讀
+      //                           沒有 key＝沒設定）—— ⚠ 本工具**唯讀**（Thermal Via 元件的板厚以它為主，那個分類沒設定才用
+      //                           參數控制台的 t_PCB，見「Thick(mm)」一節），永遠不寫、updateDoc 原樣保留；熱網路工具匯入專案時也讀
       // AI-Thermal Tab3 寫: validation_data, vd_hidden_components
       // global_params 兩邊都會碰（key set 幾乎重疊但不完全相同，例如 Draft_Angle 只有 RRU 有）
     }
@@ -145,16 +145,27 @@
 值不在 `BOARD_TYPES` 裡時（對方工具寫進未知值），下拉會臨時補上該選項並標「（未知值）」，
 不可讓瀏覽器把它靜默顯示成清單第一項、使用者一碰就改掉資料。
 
-### `Thick(mm)`（板厚）由參數控制台統一，不再逐顆填
+### `Thick(mm)`（板厚）統一帶入，不再逐顆填
 
-導熱方式決定該元件的板厚吃哪一個**全域值**（`THICK_SOURCE` / `applyThickFromGlobals`，
+導熱方式決定該元件的板厚吃哪一個值（`THICK_SOURCE` / `thickWant` / `applyThickFromGlobals`，
 每次 `recalc()` 都會套用）：
 
 | `Board_Type` | 板厚來源 | 元件清單顯示 |
 |---|---|---|
 | `Copper Coin` | `Coin_T_Setting`（銅塊厚度）| 白底黑字純參照文字 |
-| `Thermal Via` | `t_PCB`（PCB 板厚度）| 白底黑字純參照文字 |
+| `Thermal Via` | **AI-Thermal 該分類的 PCB 板厚**（`pcb_thickness[RF/Digital/PWR]`）→ 那個分類沒設定才用 `t_PCB`（PCB 板厚度）| 白底黑字純參照文字；取自 AI-Thermal 時加藍邊＋「AI-Thermal」小字 |
 | `IC top` / `None` | 不穿板 → 不適用，`Thick(mm)` 歸 **0** | 反灰「—」|
+
+- **PCB 板厚以 AI-Thermal 為主（使用者決定，2026-10）**：AI-Thermal EE/RF/PWR 頁三個分類標題列的板厚下拉寫
+  `projects[id].pcb_thickness`（mm），本工具**唯讀**（`projPcbThickness`，換值一律走 `setProjPcbThickness`）。
+  取值走 `ViaCalc.pcbOf(pcb_thickness, 分類)`（與 AI-Thermal 的 Thermal Via 頁同一個函式、同一個順序）。
+  - 參數控制台 `t_PCB` 底下 `#t_PCB_src`（`renderPcbTSrc`）寫出哪些分類用 AI-Thermal 的值、哪些用這一格；
+    元件表板厚格的 tooltip 寫出來源並指路回 AI-Thermal。要改板厚到 AI-Thermal 改（本工具不給第二個編輯入口）。
+  - 生命週期與 `thermal_specs` 同一套：載入／匯入 → 該 document 的（換專案不沿用）；**切回分頁**（`checkProjectFreshness`）
+    變了 → `refreshPcbThickness` 換成最新的並重算（推導值，原本沒有未存修改就維持乾淨；有未存修改也照換、修改保留）；
+    **存檔**時 `thickApplyToFields(fields, 寫入當下資料庫的 pcb_thickness)` 重新帶入、存完畫面也換成那一份（`curPcb`）；
+    **複製專案** → 複本沒有 AI-Thermal 的資料 → 改用 `t_PCB`，alert 提醒。
+  - 契約測試：`tests/pcb-thickness.test.js`。
 
 - 元件上仍保留 `Thick(mm)` 這個 key（Excel／PDF／共用 DB 都讀得到真實數字），只是它由全域值
   推導而來、不再是逐顆輸入的欄位。**AI-Thermal 仍然一律不寫這個 key。**
@@ -182,13 +193,16 @@
 （不另存元件欄位：快選複製會把過期的值帶到別的專案，AI-Thermal 的存檔推導也只在兩頁同專案時才跑）。
 
 - **`viaCalc.js` 與 `tests/via-calc.unit.test.js` 在兩個 repo 內容逐字相同**（同 `compMerge.js`），改一邊就同步另一邊（`diff` 無輸出）。
+  熱網路工具（RRU-Thermal-Network-Visualizer）匯入 AI-Thermal 專案時也放了一份逐字相同的 `viaCalc.js`（把 via 設計換成自訂導熱孔 K）。
 - 讀什麼（全部**唯讀**，本工具永遠不寫 `thermal_specs`）：`thermal_specs[specKey(元件名)].via`（找不到、且元件有 `_renamed_from`
   → 用舊名稱找）、`epadSize`（空白 → 元件的 `Pad_L`/`Pad_W`，限 `Board_Type` Thermal Via 或 `_pad_from = epadSize`）、
   元件的 `TV_Qty`／`TV_ID_mil`（`'N/A'`／空白／0＝沒填）。AI-Thermal 頁面 ✂ 改的**試算值**（`via.qty`／`via.diaMil`）**照用**
   （使用者決定：與 AI-Thermal 畫面上的 K_eff 一致），tooltip 寫出 EE 清單的值。
 - **R_int（使用者決定，2026-10）**：ok → `R_int ＝ 板厚 ÷ (K_eff × A_pad)`（`ViaCalc.rint`）＝ AI-Thermal 頁面上的 R_th：
   via 只在焊盤底下（焊盤外是 FR4）→ **不加擴散面積**；K_eff 已經算進銅壁、塞孔與 FR4 的比例 → **不除 `Via_Eff`**。
-  板厚用本工具的 `Thick(mm)`（＝參數控制台 `t_PCB`），不用 AI-Thermal 頁面的 `via.pcbT`。`A_pad` 用 via 計算的焊盤（圓形也行）。
+  板厚用本工具的 `Thick(mm)`（＝AI-Thermal 該分類的 PCB 板厚，沒設定才是參數控制台 `t_PCB`，見「Thick(mm)」一節），
+  不用 AI-Thermal 頁面的 `via.pcbT`（該頁指定的試算板厚）。`A_pad` 用 via 計算的焊盤（圓形也行）。
+  `ViaCalc.keffForComp` 的第 4 個參數 `pcbT`（AI-Thermal 頁面用）本工具不傳：K_eff 與板厚無關，R_int 另由 `Thick(mm)` 算。
 - **退回通用值**（`reason`，`ViaCalc.reasonText` 兩邊同一套文字）：`nodata`（還沒有 via 設計）、`skip`（暫不納入熱流評估）、
   `missing`（缺 K_eff 需要的：焊盤、數量、內徑、鍍銅、塞孔材料 —— **與板厚、中心間距無關**）、`over`（via 佔用面積超過焊盤，K_eff 不成立）。
 - **配置有問題照用**（使用者決定）：孔壁超出焊盤／互相重疊／沒填中心間距（沒辦法檢查）→ K_eff 照用、標琥珀色 ⚠（`Via_Warn`）。
@@ -915,7 +929,7 @@ AI-Thermal 下次存檔覆寫，還讓兩邊數字對不起來 → `rjcCellHtml`
 |---|---|
 | `Component`、`Qty`、`Power(W)`、`Limit(C)`、`Limit_Ref` | 兩邊（`Limit_Ref`＝限溫對象 Tj／Tc，兩邊都在限溫欄底下有小下拉）|
 | `Height(mm)` | 只有 5G-RRU（AI-Thermal 一律不寫）|
-| `Thick(mm)` | 只有 5G-RRU，且**由參數控制台的 PCB 板厚度／銅塊厚度推導**（見下節）；AI-Thermal 一律不寫 |
+| `Thick(mm)` | 只有 5G-RRU，且**由 AI-Thermal 的分類 PCB 板厚（Thermal Via）／參數控制台的 PCB 板厚度／銅塊厚度推導**（見「Thick(mm)」一節）；AI-Thermal 一律不寫 |
 | `Board_Type`、`Pad_L`、`Pad_W`、`TIM_Model`、`TIM_Type` | 5G-RRU 可編輯（標藍邊提醒會被覆寫）；AI-Thermal 存檔時由 Tab1/Tab2 推導後覆寫 |
 | `R_jc` | **有 `_rjc_from` 且有值時本工具鎖定不可改**（見下節）；沒有標記（或值是空的）才可自行輸入 |
 | `Type`、`Power_RT(W)`、`TV_ID_mil`、`TV_Qty`、`Temp_Sensor`、`Local_Qty`、`Remote_Qty`、`note`、`Rth`、`SpecFile` | 只有 AI-Thermal（本工具不顯示但原樣保留）|

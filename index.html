@@ -187,6 +187,9 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
   box-shadow:0 4px 14px rgba(14,165,233,0.35);transition:filter .15s,box-shadow .15s;}
 .tim-lib-btn:hover{filter:brightness(1.08);box-shadow:0 6px 20px rgba(14,165,233,0.5);}
 /* 整機長寬即時算式（參數控制台「PCB 板離外殼邊距」底下）：邊距加到哪個方向容易搞混 → 直接攤開算式 */
+.sidebar .pcbt-src{display:none;margin:4px 0 8px;font-size:0.7rem;color:#93c5fd;line-height:1.5;}
+.thick-ref .thick-from{margin-left:4px;font-size:0.65rem;color:#1d4ed8;font-weight:600;}
+.thick-ref.derived-src{border-left:3px solid #0550ae;white-space:nowrap;cursor:help;}
 .sidebar .dim-derive{margin-top:8px;padding:8px 10px;border:1px solid #334155;border-radius:8px;background:rgba(15,23,42,0.35);}
 .sidebar .dim-derive .dd-rule{font-size:0.7rem;color:#94a3b8;line-height:1.5;margin-bottom:6px;}
 .sidebar .dim-derive .dd-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:0.78rem;color:#cbd5e1;}
@@ -828,7 +831,8 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
   <div class="section-body">
     <label>📏 PCB 長度 L_pcb (mm)</label><input type="number" id="L_pcb" step="1" onchange="recalc()">
     <label>📏 PCB 寬度 W_pcb (mm)</label><input type="number" id="W_pcb" step="1" onchange="recalc()">
-    <label title="PCB 板厚。元件清單中「導熱方式 = Thermal Via」的元件，其板厚一律吃這一格">📏 PCB 板厚度 (mm)</label><input type="number" id="t_PCB" step="0.1" min="0" title="元件清單中所有 Thermal Via 元件的板厚都取這個值（R_int 的穿板厚度）" onchange="recalc()">
+    <label title="PCB 板厚。元件清單中「導熱方式 = Thermal Via」的元件，AI-Thermal 沒有設定該分類 PCB 板厚時吃這一格">📏 PCB 板厚度 (mm)</label><input type="number" id="t_PCB" step="0.1" min="0" title="Thermal Via 元件的板厚（R_int 的穿板厚度）以 AI-Thermal EE/RF/PWR 頁的分類 PCB 板厚為準；那個分類沒設定才取這個值" onchange="recalc()">
+    <div id="t_PCB_src" class="pcbt-src"></div>
     <label>散熱器基板厚 t_base (mm)</label><input type="number" id="t_base" step="0.5" onchange="recalc()">
     <label>HSK 內腔深度 H_shield (mm)</label><input type="number" id="H_shield" step="1" onchange="recalc()">
     <label>Cavity Filter 厚度 H_filter (mm)</label><input type="number" id="H_filter" step="1" onchange="recalc()">
@@ -2488,6 +2492,18 @@ function renderDimDerive(){
   document.getElementById('dd-W').textContent=n(f.W)+' mm';
   document.getElementById('dd-W-sum').textContent='PCB '+n(G.W_pcb)+' ＋ Left '+n(G.Left)+' ＋ Right '+n(G.Right);
 }
+/* 參數控制台「PCB 板厚度」底下：AI-Thermal 有設定分類板厚時寫出哪些分類用它、哪些用這一格 */
+function renderPcbTSrc(){
+  const el=document.getElementById('t_PCB_src');if(!el)return;
+  const set=['rf','digital','pwr'].map(c=>({c,v:ViaCalc.pcbOf(projPcbThickness,c)}));
+  if(!set.some(x=>x.v!==null)){el.textContent='';el.style.display='none';return;}
+  const n=v=>String(+(+v).toFixed(3));
+  const used=set.filter(x=>x.v!==null).map(x=>PCB_CAT_LABEL[x.c]+' '+n(x.v)+' mm').join('、');
+  const rest=set.filter(x=>x.v===null).map(x=>PCB_CAT_LABEL[x.c]);
+  el.style.display='block';
+  el.textContent='Thermal Via 元件的板厚以 AI-Thermal 的分類 PCB 板厚為準：'+used+
+    (rest.length?'；'+rest.join('、')+' 沒設定 → 用這一格。':'（這一格目前不會被用到）。');
+}
 function calcFinCount(W,gap,ft){if(gap+ft<=0)return 0;let n=Math.floor((W+gap)/(gap+ft));while(n>0&&(n*ft+(n-1)*gap)>W+0.001)n--;return Math.max(n,0);}
 
 // 各鰭片製程的預設係數（η_process 有效效率、K_FIN 鰭片導熱）。
@@ -2543,6 +2559,25 @@ function _num(v){ return (typeof v==='number')?v:parseFloat(v); }
    試算值（AI-Thermal 頁面 ✂ 改的 via.qty／via.diaMil）照用：與 AI-Thermal 畫面上看到的 K_eff 一致。 */
 var viaKCache=new Map();
 function setProjThermalSpecs(ts){projThermalSpecs=(ts&&typeof ts==='object')?ts:{};viaKCache.clear();}
+/* ── PCB 板厚以 AI-Thermal 為主（使用者決定，2026-10）─────────────────────────
+   projects[id].pcb_thickness = { RF, Digital, PWR }（mm）由 AI-Thermal EE/RF/PWR 頁三個分類標題列的下拉寫，本工具唯讀。
+   Thermal Via 元件的板厚＝它所屬分類的這個值（ViaCalc.pcbOf，與 AI-Thermal 的 Thermal Via 頁同一個順序），
+   那個分類沒設定才用參數控制台的 t_PCB。Copper Coin（銅塊厚度）不受影響。 */
+function setProjPcbThickness(p){projPcbThickness=(p&&typeof p==='object'&&!Array.isArray(p))?CompMerge.clone(p):{};}
+const PCB_CAT_LABEL={rf:'RF',digital:'Digital',pwr:'PWR'};
+function pcbCatKey(cat){return String(cat||'').toLowerCase().replace(/_data$/,'');}
+/* 這顆元件的板厚該吃哪個值：{v, from:'pcb'|'global'|null, label}；不穿板 → v 0。
+   pcb 省略＝目前專案的 projPcbThickness（存檔時傳「寫入當下資料庫裡的」那一份） */
+function thickWant(row,cat,pcb){
+  const src=thickSourceOf(row);
+  if(!src)return {v:0,from:null,label:''};
+  if(src.key==='t_PCB'){
+    const p=ViaCalc.pcbOf(pcb===undefined?projPcbThickness:pcb,cat);
+    if(p!==null)return {v:p,from:'pcb',label:'AI-Thermal '+(PCB_CAT_LABEL[pcbCatKey(cat)]||'')+' PCB 板厚'};
+  }
+  return {v:parseFloat(G[src.key]),from:'global',label:src.label};
+}
+function pcbThickSig(){return CompMerge.canon(projPcbThickness||{});}
 function viaKOf(row){
   const key=JSON.stringify([row.Component,row._renamed_from,row.TV_Qty,row.TV_ID_mil,row.Board_Type,row._pad_from,row.Pad_L,row.Pad_W]);
   let r=viaKCache.get(key);
@@ -2709,7 +2744,7 @@ function computeAll(params,comps){
 // =====================================================
 // MAIN RECALC
 // =====================================================
-function recalc(){readGlobals();applyThickFromGlobals();calcResults=computeAll(G,components);updateHDisplay();renderDimDerive();renderTab0();renderTab1();renderTab2();renderTab3();scheduleTab4();}
+function recalc(){readGlobals();applyThickFromGlobals();calcResults=computeAll(G,components);updateHDisplay();renderDimDerive();renderPcbTSrc();renderTab0();renderTab1();renderTab2();renderTab3();scheduleTab4();}
 
 function updateHDisplay(){
   let FH_disp=(calcResults&&calcResults.Fin_Height>0)?calcResults.Fin_Height:70;let{h_value,h_conv,h_rad}=calcHValue(G.Gap,FH_disp);let el=document.getElementById('h-val');
@@ -2761,12 +2796,11 @@ function applyThickFromGlobals(){
   const changed=[];
   ['rf','digital','pwr'].forEach(cat=>(components[cat]||[]).forEach(c=>{
     if(!c)return;
-    const src=thickSourceOf(c);
-    const want=src?parseFloat(G[src.key]):0;     // 不穿板 → 0
+    const tw=thickWant(c,cat),want=tw.v;          // 不穿板 → 0；Thermal Via → AI-Thermal 分類板厚 → t_PCB
     if(!isFinite(want))return;                   // 全域值還沒填 → 不動元件
     const cur=parseFloat(c['Thick(mm)']);
     if(cur===want)return;
-    changed.push({cat,name:String(c.Component||'(未命名)'),from:isFinite(cur)?cur:'(空)',to:want,bt:c.Board_Type||'(未選)'});
+    changed.push({cat,name:String(c.Component||'(未命名)'),from:isFinite(cur)?cur:'(空)',to:want,bt:c.Board_Type||'(未選)',pcb:tw.from==='pcb'?tw.label:''});
     c['Thick(mm)']=want;
   }));
   return changed;
@@ -2997,7 +3031,7 @@ function renderThickMigrateBanner(){
   const el=document.getElementById('thick-migrate-banner');if(!el)return;
   if(!_thickNotes){el.innerHTML='';return;}
   const n=_thickNotes;
-  let h='<div class="thick-migrate">⚙️ <b>板厚改為由參數控制台統一</b>（Thermal Via 吃「PCB 板厚度」、Copper Coin 吃「銅塊厚度」）。';
+  let h='<div class="thick-migrate">⚙️ <b>板厚改為統一帶入</b>（Thermal Via 吃 AI-Thermal 的分類 PCB 板厚，沒設定才吃參數控制台的「PCB 板厚度」；Copper Coin 吃「銅塊厚度」）。';
   if(n.inferred.length){
     h+='<br>本專案沒有存過這兩個值，已由元件回推：'+n.inferred.map(i=>
       i.empty?('<b>'+_vEsc(i.label)+'</b> 從元件推不出來（'+i.count+' 顆 '+_vEsc(i.bt)+' 元件都沒有非零板厚）→ 先用出廠預設 <b>'+i.value+' mm</b>，請確認')
@@ -3006,7 +3040,7 @@ function renderThickMigrateBanner(){
   }
   if(n.changed.length){
     h+='<br>以下 <b>'+n.changed.length+'</b> 顆元件的板厚因此被統一：'+
-      n.changed.map(c=>_vEsc(c.name)+' <b>'+c.from+' → '+c.to+'</b>').join('、')+'。';
+      n.changed.map(c=>_vEsc(c.name)+' <b>'+c.from+' → '+c.to+'</b>'+(c.pcb?'（'+_vEsc(c.pcb)+'）':'')).join('、')+'。';
   }
   h+='<div style="margin-top:8px;">此變更只在目前編輯中的專案（記憶體），確認沒問題請按「☁️ 儲存專案」寫回資料庫。'+
      ' <button class="btn btn-sm" onclick="dismissThickNotes()">知道了</button></div></div>';
@@ -3048,14 +3082,19 @@ function hasDerivedRow(arr){
 
 /* 板厚欄：由導熱方式決定吃哪個全域厚度。純參照值用白底黑字純文字（不用反灰 input）；
    IC top / None 不穿板 → 板厚不適用，反灰顯示「—」。 */
-function thickCellHtml(row){
+function thickCellHtml(row,category){
   const src=thickSourceOf(row);
   if(!src){
     return '<td data-col="Thick(mm)"><span class="thick-na" title="'+_vEsc('導熱方式「'+((row&&row.Board_Type)||'未選')+'」不穿板 → 板厚不適用（值為 0，也不參與熱阻計算）')+'">—</span></td>';
   }
-  const v=parseFloat(G[src.key]);
+  const tw=thickWant(row,category),v=tw.v;
   const shown=isFinite(v)?String(+v.toFixed(3)):'—';
-  return '<td data-col="Thick(mm)"><span class="thick-ref" title="'+_vEsc('由參數控制台的「'+src.label+'」帶入，所有 '+row.Board_Type+' 元件共用同一個值。要改請改參數控制台那一欄。')+'">'+_vEsc(shown)+'</span></td>';
+  const tip=tw.from==='pcb'
+    ?'取自 '+tw.label+'（AI-Thermal EE/RF/PWR 頁的分類標題列），這個分類的 Thermal Via 元件共用同一個值。要改請到 AI-Thermal 改；那邊沒設定時才用參數控制台的「PCB 板厚度」。'
+    :'由參數控制台的「'+src.label+'」帶入，所有 '+row.Board_Type+' 元件共用同一個值。要改請改參數控制台那一欄。'+
+     (src.key==='t_PCB'?'（AI-Thermal 的 EE/RF/PWR 頁設定這個分類的 PCB 板厚後，會改用那個值。）':'');
+  return '<td data-col="Thick(mm)"><span class="thick-ref'+(tw.from==='pcb'?' derived-src':'')+'" title="'+_vEsc(tip)+'">'+_vEsc(shown)+
+    (tw.from==='pcb'?'<span class="thick-from">AI-Thermal</span>':'')+'</span></td>';
 }
 
 /* 熱阻 Rjc 欄：由 AI-Thermal 熱阻表的 θJC 推導（comp._rjc_from 是來源標記）。
@@ -3324,7 +3363,7 @@ function renderCompTable(arr,containerId,defaults,category){
     let refOrigin=row._ref_origin_project||'';
     COLS.forEach(col=>{
       if(col==='Board_Type'){lhtml+=boardTypeCellHtml(row,category,i,dis);}
-      else if(col==='Thick(mm)'){lhtml+=thickCellHtml(row);}
+      else if(col==='Thick(mm)'){lhtml+=thickCellHtml(row,category);}
       else if(col==='R_jc'){lhtml+=rjcCellHtml(row,category,i,dis);}
       else if(col==='TIM_Type'){lhtml+=timCellHtml(row,category,i,dis);}
       else if(col==='Limit(C)'){lhtml+=limitCellHtml(row,category,i,dis);}
@@ -3805,6 +3844,7 @@ function renderTab2(){
 // =====================================================
 var layout3d=null;            // 目前專案的 3D 調整（見上）；沒有調整＝null（var：init 之前就可能被讀到）
 var projThermalSpecs={};      // 目前專案的 thermal_specs（AI-Thermal TH/ME 頁，唯讀：3D 用元件本體大小／高度、Thermal Via 逐顆 K_eff）；換值一律走 setProjThermalSpecs
+var projPcbThickness={};      // 目前專案的 pcb_thickness（AI-Thermal EE/RF/PWR 頁三個分類的 PCB 板厚 { RF, Digital, PWR }，唯讀）；換值一律走 setProjPcbThickness
 var tab3Stale=true;           // 資料變了但 3D 頁不在畫面上 → 切過去時再畫（3D 重建要花時間）
 var dbSpecs3dCache=null,dbSpecs3dBusy=false;
 function specKey3d(n){return String(n||'').replace(/ /g,'_').replace(/\//g,'-');}   // ＝AI-Thermal 的 sgSpecKey
@@ -4394,6 +4434,7 @@ function handleFileLoad(e){let f=e.target.files[0];if(!f)return;let r=new FileRe
   CompMerge.ensureProjectCids(d);
   layout3d=d.layout3d&&typeof d.layout3d==='object'?CompMerge.clone(d.layout3d):null;   // 3D 頁的調整跟著檔案走
   setProjThermalSpecs(d.thermal_specs);   // 檔案裡有 AI-Thermal 的規格（完整專案 document）才有；本工具匯出的專案檔沒有 → Thermal Via 用通用值
+  setProjPcbThickness(d.pcb_thickness);   // 同上：完整專案 document 才有 → 沒有就用參數控制台的 t_PCB
   setGlobalsNotes(loadGlobalsForProject(d.global_params),d.global_params);
   // 缺哪一類就是空的，不可沿用上一個專案的元件
   components.rf=Array.isArray(d.rf_data)?d.rf_data:[];components.digital=Array.isArray(d.digital_data)?d.digital_data:[];components.pwr=Array.isArray(d.pwr_data)?d.pwr_data:[];
@@ -4511,11 +4552,10 @@ function projScreenDigest(){
 function markProjectClean(){projClean=projScreenDigest();}
 function projectIsDirty(){return projClean!==null&&projScreenDigest()!==projClean;}
 // 合併進來的元件（對方可能改了導熱方式）→ 板厚依參數控制台重新帶入，寫進 DB 的數字才一致
-function thickApplyToFields(fields){
+function thickApplyToFields(fields,pcb){
   CompMerge.CATS.forEach(f=>(fields[f]||[]).forEach(c=>{
     if(!c)return;
-    const src=thickSourceOf(c);
-    const want=src?parseFloat(G[src.key]):0;
+    const want=thickWant(c,f,pcb).v;
     if(isFinite(want))c['Thick(mm)']=want;
   }));
 }
@@ -4548,8 +4588,11 @@ async function checkProjectFreshness(force){
     // thermal_specs 是 AI-Thermal 的資料、本工具只讀（Thermal Via 逐顆 K_eff、3D 元件大小）→ 有變就直接換成最新的，
     // 不必管畫面有沒有未存修改（不會跟使用者的修改衝突）。只改了 via 設計時元件清單不變，下面的比對看不出來。
     const specsChanged=CompMerge.canon(latest.thermal_specs||{})!==CompMerge.canon(projThermalSpecs||{});
+    // AI-Thermal 的分類 PCB 板厚同理（只讀）：變了就換成最新的、重算 Thermal Via 元件的板厚
+    const pcbChanged=CompMerge.canon(latest.pcb_thickness||{})!==pcbThickSig();
     if(CompMerge.sameDoc(projBase,latest,MERGE_SCALARS.concat(['global_params']))){
       if(_staleNotice){_staleNotice=null;renderStaleBanner();}
+      if(pcbChanged)refreshPcbThickness(latest.pcb_thickness,specsChanged);
       if(specsChanged)refreshThermalSpecs(latest.thermal_specs);
       return;
     }
@@ -4557,6 +4600,7 @@ async function checkProjectFreshness(force){
       const ok=await cloudLoadOne(currentProjectId,{silent:true});
       if(ok)CompMerge.toast('🔄 已載入最新資料：這個專案剛在其他地方（例如 AI-Thermal）更新過。');
     }else{
+      if(pcbChanged)refreshPcbThickness(latest.pcb_thickness,true);
       if(specsChanged)refreshThermalSpecs(latest.thermal_specs,true);
       _staleNotice={at:new Date()};
       renderStaleBanner();
@@ -4571,6 +4615,14 @@ function refreshThermalSpecs(ts,quiet){
   dbSpecs3dCache=null;
   recalc();
   if(!quiet&&viaKSig()!==before)CompMerge.toast('🔄 AI-Thermal 的 Thermal Via 設計有更新 → 已重算基板熱阻。'+viaKChangeText(),6000);
+}
+// AI-Thermal 改了分類 PCB 板厚 → 換成最新的並重算。板厚是推導值（不是使用者的修改）：原本沒有未存修改就維持「沒有未存修改」
+function refreshPcbThickness(p,quiet){
+  const clean=!projectIsDirty();
+  setProjPcbThickness(p);
+  recalc();
+  if(clean)markProjectClean();
+  if(!quiet)CompMerge.toast('🔄 AI-Thermal 的 PCB 板厚有更新 → 已重算 Thermal Via 元件的板厚與基板熱阻。',6000);
 }
 // Thermal Via 元件用哪個 K 的指紋（逐顆 K_eff 的值／通用值的原因／配置警告）：存檔、複製、切回分頁時比對前後
 function viaKSig(){
@@ -4691,7 +4743,7 @@ async function cloudSaveProject(opts){
   // 合併的前提：畫面上的是「從資料庫載入的這個專案」（有載入時快照），而且資料庫裡還有它。
   // 新專案、覆蓋別的專案、或原專案已被刪除要重建 → 以畫面為準（沒有「載入時」可以比）。
   const base=(currentProjectId&&docId===currentProjectId&&existing)?projBase:null;
-  let written=null,merged=null,curSpecs;
+  let written=null,merged=null,curSpecs,curPcb;
   _saveBusy=true;
   try{
     // updateDoc 傳函式：寫入時在「資料庫最新內容」上計算要寫的欄位（遇到 412 重讀後會重算），
@@ -4704,12 +4756,15 @@ async function cloudSaveProject(opts){
           const m=CompMerge.mergeProject(base,fields,cur,{resolutions,scalars:MERGE_SCALARS,derivedKeys:MERGE_DERIVED});
           if(m.unresolved.length)throw CompMerge.MergePending(m.unresolved);
           Object.assign(fields,m.fields);
-          thickApplyToFields(fields);   // 對方可能改了導熱方式 → 板厚依參數控制台重新帶入
           merged=m;
         }
+        // 板厚重新帶入：對方可能改了導熱方式，AI-Thermal 也可能剛改了分類 PCB 板厚
+        // → 用寫入當下資料庫裡的 pcb_thickness（存完畫面也換成這一份，兩邊才一致）
+        thickApplyToFields(fields,(cur&&cur.pcb_thickness)||{});
         renameMarksApply(fields,base&&cur?cur:null,base);   // 改過名的元件標上舊名稱（給 AI-Thermal 搬資料用）
         written=fields;
         curSpecs=cur?cur.thermal_specs:undefined;   // 寫入後資料庫裡的 thermal_specs（本工具不寫，原樣保留）
+        curPcb=cur?cur.pcb_thickness:undefined;      // 同上：AI-Thermal 的分類 PCB 板厚
         return fields;
       });
     },{dialog:{title:'⚠ 這個專案在你載入後，已在資料庫被更新（可能是 AI-Thermal 或其他人剛存檔）'},
@@ -4724,6 +4779,7 @@ async function cloudSaveProject(opts){
   // （AI-Thermal 可能剛改過 via 設計；匯入的檔案另存成新專案時，新文件沒有 AI-Thermal 的資料）
   const viaBefore=viaKSig();
   setProjThermalSpecs(CompMerge.clone(curSpecs));
+  setProjPcbThickness(curPcb);
   adoptWrittenProject(docId,written);
   variantsCache=null; renderTab0();   // 專案集合改變 → 失效快選快取，下次重繪重新聚合
   const note=merged?CompMerge.summaryText(merged):'';
@@ -4775,10 +4831,12 @@ async function confirmCopyProject(){
     variantsCache=null; renderTab0();
     projectIdentitySet(docId,name);   // 複製後切換到新專案（之後存檔寫到新 id）
     // AI-Thermal 的資料（thermal_specs，含 Thermal Via 設計）不跟著複製 → 畫面改用複本在資料庫裡實際有的那一份
-    const viaBefore=viaKSig();
+    const viaBefore=viaKSig(),pcbBefore=pcbThickSig();
     setProjThermalSpecs(CompMerge.clone(existing&&existing.thermal_specs));
+    setProjPcbThickness(existing&&existing.pcb_thickness);
     recalc();
-    const viaNote=viaKSig()!==viaBefore?'\n\n注意：AI-Thermal 的資料（含 Thermal Via 設計）不會跟著複製。'+viaKChangeText():'';
+    const aiLost=viaKSig()!==viaBefore||pcbThickSig()!==pcbBefore;
+    const viaNote=aiLost?'\n\n注意：AI-Thermal 的資料（含 Thermal Via 設計與分類 PCB 板厚）不會跟著複製；Thermal Via 元件的板厚改用參數控制台的 PCB 板厚度。'+viaKChangeText():'';
     projBase=projBaseFrom(fields);markProjectClean();_staleNotice=null;renderStaleBanner();
     closeCopyModal();
     alert('✅ 已複製為新專案「'+name+'」！'+viaNote);
@@ -4821,6 +4879,7 @@ async function cloudLoadOne(docId,opts){
     // 3D 頁的調整（layout3d）與 AI-Thermal 的規格（3D 用元件本體大小／高度，唯讀）；不可沿用上一個專案的
     layout3d=d.layout3d&&typeof d.layout3d==='object'?CompMerge.clone(d.layout3d):null;
     setProjThermalSpecs(d.thermal_specs);   // 也是 Thermal Via 逐顆 K_eff 的來源（唯讀）
+    setProjPcbThickness(d.pcb_thickness);   // AI-Thermal 的分類 PCB 板厚（Thermal Via 元件的板厚，唯讀）
     dbSpecs3dCache=null;
     // 載入時快照：一定要在下面的轉型／板厚遷移「之前」取（那些是本工具這次的修改，存檔時要算我的）
     const base=projBaseFrom(d);
