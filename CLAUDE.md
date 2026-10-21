@@ -30,7 +30,10 @@
       //                     param_temp, param_temp_custom,
       //                     param_backoff, param_backoff_rt,
       //                     param_duplex, param_duplex_rt,
-      //                     tcPlacement
+      //                     tcPlacement,
+      //                     band（專案頻段 'FR1'／'FR2'，AI-Thermal 新增專案時選、EE/RF/PWR 頁條件表可改；沒有 key＝FR1；
+      //                           FR2 不寫 param_backoff*／param_duplex*）—— 本工具不讀不寫，updateDoc 原樣保留；
+      //                           「複製專案」不帶 AI-Thermal 的欄位 → 複本沒有 band（＝FR1）
       // AI-Thermal Tab3 寫: validation_data, vd_hidden_components
       // global_params 兩邊都會碰（key set 幾乎重疊但不完全相同，例如 Draft_Angle 只有 RRU 有）
     }
