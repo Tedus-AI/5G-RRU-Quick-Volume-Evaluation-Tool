@@ -234,7 +234,7 @@ function ok(name, cond, extra) {
   const e4 = await page.evaluate(() => ({ src: calcResults.rows.find(x => x.Component === 'Driver PA').Via_Src, alerts: window.__alerts.slice(), id: currentProjectId,
     copySpecs: (window.__db.projects[currentProjectId] || {}).thermal_specs, dirty: projectIsDirty() }));
   ok('複製專案：複本沒有 thermal_specs → 畫面改用通用值、提示「不會跟著複製」、不算未存修改', e4.src === 'generic' && !e4.copySpecs
-     && /AI-Thermal 的資料（含 Thermal Via 設計）不會跟著複製/.test(e4.alerts[0] || '') && !e4.dirty, e4);
+     && /AI-Thermal 的資料（含 Thermal Via 設計與分類 PCB 板厚）不會跟著複製/.test(e4.alerts[0] || '') && !e4.dirty, e4);
 
   console.log('\n[F] PDF');
   await page.evaluate(async () => { await cloudLoadOne('X'); });
