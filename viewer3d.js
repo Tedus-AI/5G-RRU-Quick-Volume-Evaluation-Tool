@@ -277,6 +277,7 @@ function contactOf(r) {
     const L = r.baseL > 0 ? r.baseL : r.padL, W = r.baseW > 0 ? r.baseW : r.padW;
     return { L, W, kind: 'via', label: '(E-Pad＋板厚) ' + f2(L) + '×' + f2(W) };
   }
+  if (r.bt === 'Metal Face') return { L: r.padL, W: r.padW, kind: 'top', label: '金屬散熱面 ' + f2(r.padL) + '×' + f2(r.padW) };
   return { L: r.padL, W: r.padW, kind: 'top', label: '元件上表面 ' + f2(r.padL) + '×' + f2(r.padW) };
 }
 

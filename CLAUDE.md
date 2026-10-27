@@ -127,16 +127,23 @@
 
 ### `Board_Type`（導熱方式）與 AI-Thermal 的「主散熱路徑」同一組詞彙
 
-`BOARD_TYPES = ['Thermal Via','Copper Coin','IC top','None']`，與 AI-Thermal Tab2「主散熱路徑」
+`BOARD_TYPES = ['Thermal Via','Copper Coin','IC top','Metal Face','None']`，與 AI-Thermal Tab2「主散熱路徑」
 的選項同名；它存檔時把 `spec.heatDirection` 直接寫成本欄的值，並同時決定 `Pad_L`/`Pad_W`
-取 E-PAD 大小（Thermal Via）還是元件大小（Copper Coin／IC top）。
+取 E-PAD 大小（Thermal Via）還是元件大小（Copper Coin／IC top／Metal Face）。
+不穿板的三種（`IC top`／`Metal Face`／`None`）走同一個判斷 `noBoardPath(bt)`（`NO_BOARD_TYPES`）：計算、板厚、分析表的「—」都讀它。
 
 | `Board_Type` | `R_int` | `R_TIM` 的接觸面積 |
 |---|---|---|
 | `Copper Coin` | 銅塊 + die-attach solder | 銅塊面積 `Coin_L×Coin_W` |
 | `Thermal Via` | 導熱孔：有 AI-Thermal 的 via 設計 → **`Thick ÷ (K_eff × A_pad)`**；沒有 → 通用值（`K_Via`、擴散面積、`÷ Via_Eff`），見「Thermal Via 逐顆 K_eff」| `(Pad_L+Thick)×(Pad_W+Thick)` 擴散面積 |
 | `IC top` | **0**（不穿板）| **`Pad_L×Pad_W`**（元件上表面積，不加板厚）|
-| `None` | 0 | `(Pad_L+Thick)×(Pad_W+Thick)`（沿用舊行為）|
+| `Metal Face` | **0**（不穿板）| **`Pad_L×Pad_W`**（金屬散熱面：腔體濾波器本體、模組底板、法蘭；算法同 `IC top`）|
+| `None` | 0 | `Pad_L×Pad_W`（板厚連動之後與 `IC top` 一致，見下方「Thick(mm)」）|
+
+> `Metal Face` 是 AI-Thermal「主散熱路徑」2026-10 新增的選項（使用者要求：熱網路工具有「金屬散熱面（底板・法蘭・模組面）」，
+> 原本 AI-Thermal 沒有對應選項，腔體濾波器只能選 `None` → 熱網路工具鎖不上散熱路徑）。**三個 repo 一起改**；
+> θJC 不分上下（AI-Thermal 取標「主要」的那一筆），所以 `Board_Type` 與 `_rjc_from` 對不上的 ⚠ 不檢查 `Metal Face`。
+> 3D 視圖的接觸面標「金屬散熱面 L×W」（`contactOf`），放在 HSK 側（同 `IC top`）。
 
 ⚠ `IC top` 是後來補的：在它之前 AI-Thermal 的 `IC top` 被壓成 `None`，於是熱從封裝上表面出去
 的元件也吃到「加了板厚的擴散面積」，**高估接觸面積＝低估 `R_TIM`**（樂觀）。兩邊同名之後，
@@ -154,7 +161,7 @@
 |---|---|---|
 | `Copper Coin` | `Coin_T_Setting`（銅塊厚度）| 白底黑字純參照文字 |
 | `Thermal Via` | **AI-Thermal 該分類的 PCB 板厚**（`pcb_thickness[RF/Digital/PWR]`）→ 那個分類沒設定才用 `t_PCB`（PCB 板厚度）| 白底黑字純參照文字；取自 AI-Thermal 時加藍邊＋「AI-Thermal」小字 |
-| `IC top` / `None` | 不穿板 → 不適用，`Thick(mm)` 歸 **0** | 反灰「—」|
+| `IC top` / `Metal Face` / `None` | 不穿板 → 不適用，`Thick(mm)` 歸 **0** | 反灰「—」|
 
 - **PCB 板厚以 AI-Thermal 為主（使用者決定，2026-10）**：AI-Thermal EE/RF/PWR 頁三個分類標題列的板厚下拉寫
   `projects[id].pcb_thickness`（mm），本工具**唯讀**（`projPcbThickness`，換值一律走 `setProjPcbThickness`）。
@@ -548,7 +555,7 @@ fg 對 bg ≥ 5.9:1），畫面用 `marginVars(lv)` 塞進 CSS 變數 `--st-*`�
   （散熱器溫升 ＝ 允許溫升 ÷ 安全係數；係數 1.0 寫「未預留餘裕」）＋「只改善這顆最多多出幾度（之後換 #2）」
   ＝ `max(A₂,0) − max(A₁,0)`；允許溫升 < 0 → 「散熱器壓到環溫也救不了」＋改善方向。
 - **分析表格式 `tab2Cell(r, c)`（畫面與 PDF 共用）**：溫度／功耗 1 位、熱阻 3 位小數（原本 Rjc 1 位 → 0.16 顯示成 0.2）；
-  `IC top`／`None` 的 `R_int`、`TIM_Type = None` 的 `R_TIM` → 「—」（不適用，不是 0）；算不出 → 「—」。
+  `IC top`／`Metal Face`／`None` 的 `R_int`、`TIM_Type = None` 的 `R_TIM` → 「—」（不適用，不是 0）；算不出 → 「—」。
   數字靠右＋`tabular-nums`；表頭第二行是單位（`TAB2_UNITS`）；判定用的溫度（Tj 或 Tc）粗體、另一個淡色；
   裕度格標 `Tj`／`Tc`；數量 > 1 的總功耗第二行寫「數量 × 單顆」（`fmtW`：最多 3 位小數，0.55 不可顯示成 0.6）。
   前三名用名次徽章 `#1～#3`，**不再整列塗色**。
@@ -903,7 +910,7 @@ AI-Thermal 下次存檔覆寫，還讓兩邊數字對不起來 → `rjcCellHtml`
 - 📋 複製元件會沿用標記（同一顆元件的規格書值）→ 仍鎖定；「從資料庫快選」不帶底線開頭的
   內部標記 → 快選出來的新元件可自行輸入（`VARIANT_CARRY` 刻意不含標記）。
 - 圖例文案要跟著分開講：可編輯的推導欄位是「會被覆寫」，Rjc 是「鎖定不開放修改」。
-- AI-Thermal 依**主散熱路徑**取 θJC（`IC top` → θJC,top；`Copper Coin`／`Thermal Via` → θJC,bottom），
+- AI-Thermal 依**主散熱路徑**取 θJC（`IC top` → θJC,top；`Copper Coin`／`Thermal Via` → θJC,bottom；`Metal Face` 不分上下），
   熱阻表沒有對應的那一筆才暫用另一筆。本工具看 `Board_Type` 與 `_rjc_from` 對不上時，在鎖定值旁標琥珀色 ⚠
   （tooltip 說明「應該用哪一筆、Tj 可能被低估，請到 AI-Thermal 補上」）。只讀現有欄位，不新增 key。
 
