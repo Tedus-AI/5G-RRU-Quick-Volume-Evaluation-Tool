@@ -28,6 +28,13 @@ body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f
 .sidebar .fin-custom-toggle{display:flex;align-items:center;gap:7px;margin:0;font-size:0.8rem;color:#cbd5e1;cursor:pointer;user-select:none;}
 .sidebar .fin-custom-toggle input[type="checkbox"]{width:auto;margin:0;accent-color:var(--primary);cursor:pointer;}
 .sidebar .fin-custom-fields{margin-top:6px;}
+/* 目前採用的鰭片係數（預設或自訂）：純參照文字，要看得到預設值是多少（使用者要求） */
+.sidebar .fin-eff-now{margin:0 0 6px;font-size:0.78rem;line-height:1.45;color:#e2e8f0;}
+.sidebar .fin-eff-now b{color:#fff;font-variant-numeric:tabular-nums;}
+.sidebar .fin-eff-now .fe-src{margin-left:4px;font-size:0.7rem;color:#94a3b8;}
+.sidebar .fin-eff-now .fe-src.custom{color:#fbbf24;}
+.sidebar .fin-eff-now .fe-h{display:block;font-size:0.7rem;color:#94a3b8;}
+.sidebar .fin-eff-now .fe-v{white-space:nowrap;}   /* 側欄拉窄時只在兩項之間換行 */
 .sidebar .fin-custom-fields label{margin-top:4px;font-size:0.72rem;}
 .sidebar .section-title{color:var(--primary-light);font-size:0.9rem;font-weight:700;margin-top:18px;margin-bottom:8px;cursor:pointer;user-select:none;}
 .sidebar .section-title::before{content:"▼ ";font-size:0.7rem;}
@@ -801,9 +808,10 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
     <label>🌡️ 環境溫度 T_amb (°C)</label><input type="number" id="T_amb" step="1" onchange="recalc()">
     <label>🔒 設計安全係數 (Margin)</label><input type="number" id="Margin" step="0.1" onchange="recalc()">
     <label>🔨 鰭片製程 (Fin Tech)</label>
-    <select id="fin_tech_selector_v2" onchange="recalc()"><option value="Embedded Fin (0.95)">Embedded Fin (0.95)</option><option value="Die-casting Fin (0.90)">Die-casting Fin (0.90)</option></select>
+    <select id="fin_tech_selector_v2" onchange="recalc()"><option value="Embedded Fin (0.95)">Embedded Fin</option><option value="Die-casting Fin (0.90)">Die-casting Fin</option></select>
     <!-- 各製程獨立的自訂係數（η_process 有效效率係數 + K_FIN 鰭片導熱係數）。留白＝沿用製程預設值 -->
     <div id="fin-custom-emb" class="fin-custom-box">
+      <div class="fin-eff-now" id="fin-eff-emb"></div>
       <label class="fin-custom-toggle"><input type="checkbox" id="fin_custom_emb" onchange="toggleFinCustom('emb')">🛠️ 自訂 Embedded Fin 係數</label>
       <div id="fin-custom-emb-fields" class="fin-custom-fields" style="display:none;">
         <div class="row2">
@@ -813,11 +821,12 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
       </div>
     </div>
     <div id="fin-custom-dc" class="fin-custom-box" style="display:none;">
+      <div class="fin-eff-now" id="fin-eff-dc"></div>
       <label class="fin-custom-toggle"><input type="checkbox" id="fin_custom_dc" onchange="toggleFinCustom('dc')">🛠️ 自訂 Die-casting Fin 係數</label>
       <div id="fin-custom-dc-fields" class="fin-custom-fields" style="display:none;">
         <div class="row2">
           <div><label>η_process 有效效率</label><input type="number" id="fin_eta_dc" step="0.01" placeholder="預設 0.99" onchange="recalc()"></div>
-          <div><label>K_FIN 導熱 (W/mK)</label><input type="number" id="fin_kfin_dc" step="1" placeholder="預設 160" onchange="recalc()"></div>
+          <div><label>K_FIN 導熱 (W/mK)</label><input type="number" id="fin_kfin_dc" step="1" placeholder="預設 150" onchange="recalc()"></div>
         </div>
       </div>
     </div>
@@ -2457,6 +2466,26 @@ function readGlobals(){
 }
 
 // 勾選/取消「自訂係數」→ 顯示或隱藏該製程的輸入欄並重算
+// 參數控制台「目前採用」：η_process 與 K_FIN 各自寫出值與來源（出廠預設／自訂）。自訂但留白的那一項照樣是預設。
+// 鰭片製程的名稱（選項的 value 仍帶舊的「(0.95)」「(0.90)」：存進資料庫、別的工具也讀它，不改；
+// 那個數字不是實際採用的係數，畫面、3D、PDF 一律用這個名稱＋ finEffective 的值）
+function finTechName(g){return (g.fin_tech_selector_v2||'').includes('Die-casting')?'Die-casting Fin':'Embedded Fin';}
+function finCoefTxt(g){
+  const fe=finEffective(g),k=fe.key,on=!!g['fin_custom_'+k];
+  const etaC=on&&parseFloat(g['fin_eta_'+k])>0,kC=on&&parseFloat(g['fin_kfin_'+k])>0;
+  return 'η_process '+fe.eta_process+(etaC?'（自訂）':'（預設）')+'、K_FIN '+fe.k_fin+' W/m·K'+(kC?'（自訂）':'（預設）');
+}
+function renderFinEffective(){
+  ['emb','dc'].forEach(k=>{
+    const el=document.getElementById('fin-eff-'+k);if(!el)return;
+    const def=FIN_PROCESS_DEFAULTS[k],on=!!G['fin_custom_'+k];
+    const eta=parseFloat(G['fin_eta_'+k]),kf=parseFloat(G['fin_kfin_'+k]);
+    const etaC=on&&eta>0,kC=on&&kf>0;
+    const src=c=>'<span class="fe-src'+(c?' custom':'')+'">'+(c?'自訂':'預設')+'</span>';
+    el.innerHTML='<span class="fe-h">目前採用 </span><span class="fe-v">η_process <b>'+(etaC?eta:def.eta)+'</b>'+src(etaC)+'</span> · <span class="fe-v">K_FIN <b>'+(kC?kf:def.kfin)+'</b> W/m·K'+src(kC)+'</span>';
+    el.title='出廠預設：η_process '+def.eta+'、K_FIN '+def.kfin+' W/m·K。勾「自訂」並填值才會改用自訂值，留白的那一項照樣用預設。';
+  });
+}
 function toggleFinCustom(which){
   const on=document.getElementById('fin_custom_'+which).checked;
   document.getElementById('fin-custom-'+which+'-fields').style.display=on?'':'none';
@@ -2513,7 +2542,8 @@ function calcFinCount(W,gap,ft){if(gap+ft<=0)return 0;let n=Math.floor((W+gap)/(
 
 // 各鰭片製程的預設係數（η_process 有效效率、K_FIN 鰭片導熱）。
 // 使用者可在各製程底下勾選「自訂係數」覆蓋；未勾選或值無效時一律沿用預設，現有專案結果不變。
-const FIN_PROCESS_DEFAULTS={emb:{eta:1.06,kfin:200},dc:{eta:0.99,kfin:160}};
+// Die-casting 的 K_FIN 由 160 改為 150（使用者決定，2026-10）：壓鑄鋁合金鰭片。畫面上的預設值、placeholder 都讀這一份。
+const FIN_PROCESS_DEFAULTS={emb:{eta:1.06,kfin:200},dc:{eta:0.99,kfin:150}};
 function finEffective(p){
   const isDC=(p.fin_tech_selector_v2||'').includes('Die-casting');
   const key=isDC?'dc':'emb';
@@ -2766,6 +2796,7 @@ function updateHDisplay(){
   document.getElementById('diecast-params').style.display=isDC?'':'none';
   document.getElementById('fin-custom-emb').style.display=isDC?'none':'';
   document.getElementById('fin-custom-dc').style.display=isDC?'':'none';
+  renderFinEffective();
   document.getElementById('diecast-info').style.display=(isDC&&calcResults&&calcResults.Fin_Height>0)?'':'none';
   if(isDC&&calcResults&&calcResults.Fin_Height>0){
     document.getElementById('dc-troot').textContent='T_root 根部厚度: '+(calcResults.T_root||0).toFixed(2)+' mm';
@@ -3930,7 +3961,7 @@ function build3dData(){
     key:currentProjectId||'__new__',name:projectNameGet()||'（未命名）',
     g:{L_pcb:g.L_pcb,W_pcb:g.W_pcb,t_PCB:g.t_PCB,t_base:g.t_base,H_shield:g.H_shield,H_filter:g.H_filter,Top:g.Top,Btm:g.Btm,Left:g.Left,Right:g.Right,
        Coin_L:g.Coin_L_Setting,Coin_W:g.Coin_W_Setting,Coin_T:g.Coin_T_Setting,Gap:g.Gap,Fin_t:g.Fin_t,T_amb:g.T_amb,Margin:g.Margin,Slope:g.Slope,
-       tech:fs?fs.value:g.fin_tech_selector_v2,Draft:g.Draft_Angle},
+       tech:finTechName({fin_tech_selector_v2:fs?fs.value:g.fin_tech_selector_v2}),Draft:g.Draft_Angle},
     r:{L:R.L_hsk,W:R.W_hsk,H:R.RRU_Height,FH:R.Fin_Height,n:R.Fin_Count,T_base:R.T_hsk_base,T_root:R.T_root,G_root:R.G_root,h:hv.h_value,eta:R.eta_fin,
        k_fin:fe.k_fin,isDC:fe.isDC,V:R.Volume_L,kg:R.total_weight_kg,Q:R.rows.filter(x=>x.Total_W>0).reduce((a,x)=>a+x.Total_W,0),TP:R.Total_Power,
        bn:R.Bottleneck_Name,MDA:R.Min_dT_Allowed},
@@ -4689,6 +4720,28 @@ function saveProject(){readGlobals();let d={meta:{version:"v4.30 (GitHub Pages)"
 // 專案 global_params 欄位清單（5G-RRU 擁有的 keys）。集中一處，避免儲存/複製兩處各自漂移。
 const PROJECT_GLOBAL_KEYS=['T_amb','Margin','L_pcb','W_pcb','t_PCB','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Coin_T_Setting','K_Coin','Gap','Fin_t','K_Via','Via_Eff','K_Putty','t_Putty','K_Pad','t_Pad','K_Grease','t_Grease','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle','fin_custom_emb','fin_eta_emb','fin_kfin_emb','fin_custom_dc','fin_eta_dc','fin_kfin_dc'];
 
+// 5G-RRU 的設計結果（存檔時寫 projects[id].rru_result，只有本工具寫；AI-Thermal 原樣保留、熱網路工具唯讀）：
+// 熱網路工具 06 的鰭片陣列（鰭片高、片數、air gap、厚度、拔模角、K_FIN）連動這一份，h／η 當對照。
+// 每次存檔都重算一次寫進去（算不出來也寫，ok:false＋原因 → 對方工具不會拿到上一次的舊結果）。
+const RRU_RESULT_WHY={blocked:'必填欄位未填，無法計算',nohot:'沒有發熱元件',nosol:'瓶頸元件的允許溫升 ≤ 0，散熱器壓到環溫也不夠',drc:'DRC 不通過'};
+function rruDesignResult(g,comps){
+  const R=computeAll(g,comps),st=vrState(R),fe=finEffective(g),r3=x=>Math.round(x*1000)/1000;
+  const out={at:new Date().toISOString(),version:window.APP_VERSION||'',ok:st==='ok'};
+  if(st!=='ok'){out.why=RRU_RESULT_WHY[st]+(st==='drc'&&R.drc_msg?'：'+String(R.drc_msg).replace(/^⛔\s*/,''):'');}
+  if(st==='blocked'||st==='nohot')return out;
+  const isDC=fe.isDC;
+  Object.assign(out,{
+    fin_tech:isDC?'Die-casting':'Embedded',
+    L_hsk:r3(R.L_hsk),W_hsk:r3(R.W_hsk),H_rru:r3(R.RRU_Height),t_base:r3(g.t_base),
+    fin_height:r3(R.Fin_Height),fin_count:R.Fin_Count,fin_t:r3(g.Fin_t),gap:r3(g.Gap),
+    h:r3(R.h_value),h_conv:r3(R.h_conv),h_rad:r3(R.h_rad),eta_fin:r3(R.eta_fin),
+    eta_process:fe.eta_process,k_fin:fe.k_fin,coef_custom:!!g['fin_custom_'+fe.key],
+    heat_W:r3(vrHeatLoad(R)),margin:g.Margin,T_amb:g.T_amb,volume_L:r3(R.Volume_L)
+  });
+  if(isDC)Object.assign(out,{draft_deg:g.Draft_Angle,T_root:r3(R.T_root),G_root:r3(R.G_root)});
+  return out;
+}
+
 // 由目前畫面狀態組出要寫入 DB 的 project fields。
 // existing：DB 既有 document（若有）→ 用來保留 sibling tool 寫入、我們不認識的 global_params keys。
 function _buildProjectFields(name, existing){
@@ -4704,6 +4757,7 @@ function _buildProjectFields(name, existing){
   const strip=arr=>(arr||[]).map(c=>{const{_filled,...rest}=c||{};return JSON.parse(JSON.stringify(rest));});
   const fields={meta:{version:"v4.30 (GitHub Pages)",timestamp:new Date().toISOString()},project_name:name,global_params:mergedGlobals,
           rf_data:strip(components.rf),digital_data:strip(components.digital),pwr_data:strip(components.pwr)};
+  fields.rru_result=rruDesignResult(G,components);
   // 3D 頁的調整（專案層級、只有本工具寫；以 _cid 為 key）：有調整、或資料庫裡原本有（全部回到自動 → 寫空物件）才寫
   if(l3dHas())fields.layout3d=CompMerge.clone(layout3d);
   else if(existing&&existing.layout3d)fields.layout3d={};
@@ -5774,7 +5828,7 @@ async function generatePDFReport() {
           {table:{body:[
             paramRow('T_amb', '外部環境溫度', G.T_amb+'\u00b0C'),
             paramRow('Margin', '功耗安全係數', G.Margin+'x'),
-            paramRow('Fin Tech', '鰭片加工技術', (function(){var fe=finEffective(G);return G.fin_tech_selector_v2+(fe.custom?('\n自訂 η='+fe.eta_process+', K_FIN='+fe.k_fin):'');})())
+            paramRow('Fin Tech', '鰭片加工技術', finTechName(G)+'\n'+finCoefTxt(G))
           ],widths:['55%','45%']},layout:{hLineWidth:()=>0.3,vLineWidth:()=>0,hLineColor:()=>'#f1f5f9',paddingTop:()=>2,paddingBottom:()=>2,paddingLeft:()=>4,paddingRight:()=>2},margin:[0,0,10,0]}
         ]},
         {width:'50%', stack:[
