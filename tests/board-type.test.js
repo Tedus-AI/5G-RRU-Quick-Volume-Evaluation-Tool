@@ -9,6 +9,7 @@
  *   [D] 來源標記：Board_Type / Pad_L / Pad_W / R_jc 有 AI-Thermal 的標記時顯示 ↩ 與說明，
  *       沒有標記的列不顯示；表格上方出現圖例。
  *   [E] 未知的 Board_Type 值不會被靜默改成清單第一項。
+ *   [F] Metal Face（金屬散熱面，AI-Thermal 2026-10 新增）：不穿板，算法同 IC top；板厚、R_int 顯示「—」。
  *
  * 執行：
  *   npx http-server . -p 8123 -c-1 &      # 於 repo 根目錄
@@ -48,8 +49,8 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
 
   console.log('\n[A] 下拉選項');
   const a = await page.evaluate(() => ({ types: BOARD_TYPES.slice() }));
-  ok('BOARD_TYPES 含 IC top 且與 AI-Thermal 主散熱路徑同詞彙',
-     a.types.join(',') === 'Thermal Via,Copper Coin,IC top,None', a.types);
+  ok('BOARD_TYPES 含 IC top、Metal Face 且與 AI-Thermal 主散熱路徑同詞彙',
+     a.types.join(',') === 'Thermal Via,Copper Coin,IC top,Metal Face,None', a.types);
 
   console.log('\n[B] IC top 的熱阻計算');
   const b = await page.evaluate(() => {
@@ -158,6 +159,28 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   });
   ok('未知的導熱方式仍被選中並標「未知值」',
      e.value === 'Something-Else' && e.opts.some(t => /Something-Else（未知值）/.test(t)), e);
+
+  console.log('\n[F] Metal Face（金屬散熱面）');
+  const f = await page.evaluate(() => {
+    const g = G;
+    const row = {Component:'Cavity Filter', Qty:1, 'Power(W)':25, 'Height(mm)':200, Pad_L:120, Pad_W:80,
+                 'Thick(mm)':2, 'Limit(C)':125, R_jc:0, TIM_Type:'Putty', Board_Type:'Metal Face'};
+    const metal = calcThermalResistance(row, g);
+    const icTop = calcThermalResistance(Object.assign({}, row, {Board_Type:'IC top'}), g);
+    components.rf[1].Board_Type = 'Metal Face';
+    recalc();
+    const tr = document.querySelectorAll('#subtab0 table.comp-table tbody tr')[1];
+    const sel = tr.querySelector('td[data-col="Board_Type"] select');
+    const thick = tr.querySelector('td[data-col="Thick(mm)"]').textContent.trim();
+    const r = calcResults.rows.find(x => x.Component === components.rf[1].Component);
+    return { metal, icTop, value: sel.value, unknown: Array.from(sel.options).some(o => /未知值/.test(o.text)),
+             thick, thickKey: components.rf[1]['Thick(mm)'], rint: r ? tab2Cell(r, 'R_int').text : null };
+  });
+  ok('Metal Face 不穿板：R_int = 0、沒有基板擴散', f.metal.R_int === 0 && f.metal.Base_L === 0 && f.metal.Base_W === 0, f.metal);
+  ok('Metal Face 的 R_TIM 與 IC top 相同（Pad_L×Pad_W）', near(f.metal.R_TIM, f.icTop.R_TIM, 1e-12), [f.metal.R_TIM, f.icTop.R_TIM]);
+  ok('下拉選得到 Metal Face，不標「未知值」', f.value === 'Metal Face' && !f.unknown, f);
+  ok('板厚不適用：顯示「—」、值歸 0', f.thick === '—' && f.thickKey === 0, f);
+  ok('詳細分析的 R_int 顯示「—」', f.rint === '—', f.rint);
 
   ok('頁面無 JS 例外', errors.length === 0, errors.slice(0, 3));
   await browser.close();
