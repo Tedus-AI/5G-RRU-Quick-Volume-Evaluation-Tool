@@ -24,7 +24,8 @@
   "projects": {
     "<project_id>": {
       // 5G-RRU 寫: meta, project_name, global_params, rf_data, digital_data, pwr_data,
-      //            layout3d（3D 頁的調整，以 _cid 為 key；見「3D 模擬視圖」）
+      //            layout3d（3D 頁的調整，以 _cid 為 key；見「3D 模擬視圖」）,
+      //            rru_result（存檔時的設計結果：鰭片高、片數、外型、h、η、K_FIN；熱網路工具 06 唯讀，見「鰭片係數與設計結果」）
       // AI-Thermal Tab2 寫: thermal_specs（含 Thermal Via 計算頁的 thermal_specs[元件].via）, hidden_components,
       //                     ⚠ 本工具**唯讀** thermal_specs（3D 元件大小、Thermal Via 逐顆 K_eff：via、epadSize），永遠不寫
       //                     param_temp, param_temp_custom,
@@ -228,6 +229,27 @@
 
 > 5G-RRU 專屬的新 global_params keys：`t_PCB`、`Coin_T_Setting`、`K_Coin`
 > （三份清單都要同步：`readGlobals` / `saveProject` / `PROJECT_GLOBAL_KEYS`）。
+
+### 鰭片係數與設計結果（`FIN_PROCESS_DEFAULTS`、`rru_result`）
+
+- **出廠預設**（`FIN_PROCESS_DEFAULTS`，單一事實來源）：Embedded η_process 1.06／K_FIN 200 W/m·K；
+  **Die-casting η_process 0.99／K_FIN 150**（原本 160，使用者決定 2026-10：壓鑄鋁合金鰭片）。勾「自訂」並填值才改用自訂值，
+  留白的那一項照樣用預設（`finEffective`）。Die-casting 專案的鰭片效率因此略降、鰭片高與體積略增。
+- **參數控制台要看得到預設值**（使用者要求）：每個製程框的第一行 `#fin-eff-emb`／`#fin-eff-dc`（`renderFinEffective`，每次 recalc）
+  寫「目前採用 η_process … · K_FIN … W/m·K」，各自標「預設／自訂」。自訂的 placeholder 也讀 `FIN_PROCESS_DEFAULTS`。
+- **製程下拉的顯示文字**改成 `Embedded Fin`／`Die-casting Fin`：原本的「(0.95)」「(0.90)」不是實際採用的係數。
+  ⚠ **value 不改**（`'Embedded Fin (0.95)'`／`'Die-casting Fin (0.90)'` 存在 `global_params.fin_tech_selector_v2`，
+  熱網路工具與本工具都用 `includes('Die-casting')` 判斷）。畫面、3D（`build3dData` 的 `tech`）、PDF 參數表一律用
+  `finTechName(g)`＋`finCoefTxt(g)`，不直接印 value。
+- **`projects[id].rru_result`**（只有本工具寫，`_buildProjectFields` 每次存檔都重算一次 `rruDesignResult(G, components)`）：
+  `{ at, version, ok, why?, fin_tech, L_hsk, W_hsk, H_rru, t_base, fin_height, fin_count, fin_t, gap, h, h_conv, h_rad, eta_fin,
+  eta_process, k_fin, coef_custom, heat_W, margin, T_amb, volume_L, draft_deg?, T_root?, G_root? }`（mm、W/m²K、W）。
+  - 算不出來也寫：`ok:false`＋`why`（`RRU_RESULT_WHY`：必填未填／沒有發熱元件／允許溫升 ≤ 0／DRC 不通過）；
+    必填未填、沒有發熱元件時不帶任何鰭片欄位 → 熱網路工具不會拿到上一次的舊結果。
+  - 用途：熱網路工具 06 的鰭片陣列連動（鰭片高、片數、air gap、厚度、拔模角、K_FIN），h／η_fin 當對照（不參與它的計算）。
+    `heat_W` 是實際熱負載（不含安全係數），熱網路工具拿它比對自己的元件總功耗，看得出存檔之後 AI-Thermal 改過功耗。
+  - AI-Thermal 不讀不寫（`updateDoc` 原樣保留）；本工具也不讀它（每次存檔重算）。
+- 契約測試：`tests/fin-coef.test.js`。
 
 ### 整機長寬：防水邊距的方向（`rruFootprint`）
 
