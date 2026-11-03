@@ -174,17 +174,30 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .tab-content{display:none;}.tab-content.active{display:block;}
 .comp-table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:var(--card-shadow);margin-bottom:15px;font-size:0.82rem;}
 /* 表頭要一眼看得出是表頭：深藍底＋白字＋青色底線（原本淺灰底與白色表身融在一起） */
-.comp-table th{background:linear-gradient(180deg,var(--th-bg),var(--th-bg2));color:var(--th-fg);padding:11px 8px;text-align:center;font-weight:700;white-space:nowrap;cursor:help;border-bottom:3px solid var(--th-accent);letter-spacing:0.02em;}
-.comp-table td{padding:8px;border-top:1px solid #e2e8f0;text-align:center;}
+.comp-table th{background:linear-gradient(180deg,var(--th-bg),var(--th-bg2));color:var(--th-fg);padding:9px 6px;text-align:center;font-weight:700;white-space:nowrap;cursor:help;border-bottom:3px solid var(--th-accent);letter-spacing:0.02em;line-height:1.3;vertical-align:middle;}
+/* 表頭分兩行：名稱／單位（compThHtml）。單位放第二行，「元件相對高度 (mm)」這種長表頭才不會把數字欄撐寬、
+   把寬度從元件名稱與說明文字那裡搶走。 */
+.comp-table th .th-l{display:block;}
+.comp-table th .th-u{font-size:0.72rem;font-weight:600;opacity:0.82;letter-spacing:0;}
+.comp-table td{padding:8px 6px;border-top:1px solid #e2e8f0;text-align:center;}
 .comp-table td input,.comp-table td select{width:100%;padding:4px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:0.82rem;background:#fff;text-align:center;}
-.comp-table td input[type="number"]{width:50%;min-width:50px;}
-/* 數量／單顆功耗：欄寬收到「放得下內容」即可（width:1% 讓表格把多餘寬度讓給其他欄） */
-.comp-table th[data-col="Qty"],.comp-table td[data-col="Qty"],
-.comp-table th[data-col="Power(W)"],.comp-table td[data-col="Power(W)"]{width:1%;white-space:nowrap;}
-.comp-table td[data-col="Qty"] input[type="number"]{width:52px;min-width:0;}
-.comp-table td[data-col="Power(W)"] input[type="number"]{width:74px;min-width:0;}
-/* 收窄數量／功耗省下來的寬度給元件名稱（原本只分到 68px，名字會被截斷） */
+/* 數字欄的輸入框用固定寬度（原本 50%：欄寬被表頭撐到 130px，框卻只有 55px，扣掉上下箭頭 20.57 只看得到 20.5）。
+   76px 放得下 6 位數字＋上下箭頭＋左側藍邊；欄寬由這個寬度與兩行表頭決定。 */
+.comp-table td input[type="number"]{width:76px;min-width:0;}
+/* 數字欄與操作欄：欄寬收到「放得下內容」即可（width:1%）；元件名稱是量出來的固定寬度（compNameColStyle）；
+   多出來的寬度全部讓給導熱方式、介面材料兩欄（自動版面依底下說明文字的長度分配）。 */
+.comp-table th[data-col="Qty"],.comp-table th[data-col="Power(W)"],.comp-table th[data-col="Height(mm)"],
+.comp-table th[data-col="Pad_L"],.comp-table th[data-col="Pad_W"],.comp-table th[data-col="Thick(mm)"],
+.comp-table th[data-col="Limit(C)"],.comp-table th[data-col="R_jc"],.comp-table th.col-ops{width:1%;}
+.comp-table td[data-col="Qty"],.comp-table td[data-col="Power(W)"],.comp-table td.col-ops{white-space:nowrap;}
+.comp-table td[data-col="Qty"] input[type="number"]{width:52px;}
+/* 元件名稱：欄寬由 compNameColW 依這一頁最長的名稱量出來（寫在 th 的 width／min-width），名稱才不會被輸入框截斷；140px 是下限 */
 .comp-table th[data-col="Component"],.comp-table td[data-col="Component"]{min-width:140px;}
+/* 導熱方式的下限 200px：畫面窄（17 吋筆電）時 Thermal Via 的原因說明換成兩行「AI-Thermal「Thermal Via 計算」／還沒有這顆的 via 設計」，
+   不會被擠成四行把整列撐高（第一段實測 175px ＋左側標線 8px ＋儲存格內距 12px） */
+.comp-table th[data-col="Board_Type"]{min-width:200px;}
+/* 導熱方式／介面材料的下拉不跟著欄寬拉長（欄位變寬是為了底下的說明文字） */
+.comp-table td[data-col="Board_Type"] > select,.comp-table td.tim-cell select{max-width:170px;}
 /* 欄位多時表格會比容器寬：給它自己的橫向捲軸，才不會把「操作」欄切掉 */
 .comp-table-wrap{overflow-x:auto;}
 /* 新增元件列：「直接新增」與「從資料庫快選」並排在表格下方（原本快選在表格上方） */
@@ -240,9 +253,19 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .db-restore-modal .dbr-go{background:#0369a1;color:#fff;}
 .db-restore-modal .dbr-go.dbr-go-danger{background:#b91c1c;}
 .db-restore-modal .dbr-go:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}
-.tim-lib-modal{width:820px;}
+/* TIM 型號庫唯讀檢視：高度跟著畫面走。原本整個視窗卡在 70vh、表格另外固定 46vh —— 17 吋筆電（125% 縮放）
+   70vh 只有 ~510px，說明＋表格＋按鈕裝不下，表格就跑到白框外面。改成彈性欄：標題、說明、按鈕固定，
+   表格區吃剩下的高度、在裡面捲動（表頭 sticky）；寬度 820 → 960（型號＋「TIM 管理工具」標籤＋備註放得下，不出橫向捲軸）。 */
+.tim-lib-modal{width:min(960px,calc(100vw - 32px));max-width:none;max-height:calc(100vh - 32px);display:flex;flex-direction:column;overflow:auto;}
+.tim-lib-modal > h3,.tim-lib-modal > .tlv-note,.tim-lib-modal > .tlv-actions{flex:none;}
+.tim-lib-modal #timLibViewBody{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;}
+.tim-lib-modal .tlv-actions{display:flex;gap:10px;margin-top:18px;justify-content:flex-end;flex-wrap:wrap;}
+.tim-lib-modal .tlv-actions .cloud-close{margin-top:0;}
+.tim-lib-modal .tlv-count{flex:none;margin-top:8px;font-size:0.78rem;color:#64748b;}
+@media (max-height:700px){.tim-lib-modal{padding:20px 24px;}.tim-lib-modal > h3{margin-bottom:10px;}
+  .tim-lib-modal .tlv-note{font-size:0.8rem;line-height:1.5;margin-bottom:10px;}.tim-lib-modal .tlv-actions{margin-top:12px;}}
 .tim-lib-modal .tlv-note{margin:0 0 14px;color:#475569;font-size:0.85rem;line-height:1.6;}
-.tim-lib-modal .tlv-wrap{max-height:46vh;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;}
+.tim-lib-modal .tlv-wrap{flex:1 1 auto;min-height:120px;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;}
 .tim-lib-modal table{width:100%;border-collapse:collapse;font-size:0.82rem;}
 .tim-lib-modal th{position:sticky;top:0;background:linear-gradient(180deg,var(--th-bg),var(--th-bg2));color:var(--th-fg);font-weight:700;padding:9px 8px;text-align:center;white-space:nowrap;}
 .tim-lib-modal td{padding:8px;border-top:1px solid #e2e8f0;text-align:center;color:#1e293b;}
@@ -572,14 +595,22 @@ tr.comp-excluded{opacity:0.4;}
 .comp-table td .tim-sub select{font-size:0.75rem;padding:2px 4px;}
 .tim-sub-empty{font-size:0.72rem;color:#9ca3af;cursor:help;}
 .tim-sub-gone select{border-color:#f59e0b;background:#fffbeb;}
-.tim-note{font-size:0.72rem;color:#6b7280;margin-top:3px;cursor:help;line-height:1.35;white-space:nowrap;}
+/* 來源說明（介面材料、導熱方式底下）：不截斷（原本 max-width 150px＋省略號，「AI-Thermal「Thermal Via …」只看得到一半）。
+   欄位夠寬就一行，不夠就以「段」為單位換行（timSrcSegHtml／viaKSegHtml），不會從型號或詞的中間斷開。
+   數值那一段（.tim-note-val／.via-k-lbl）不拆開。 */
+.tim-note{font-size:0.72rem;color:#6b7280;margin-top:3px;cursor:help;line-height:1.35;}
+.tim-note-val,.via-k-lbl{white-space:nowrap;}
 .tim-note-warn{color:#b45309;}
-.tim-note-src{color:#94a3b8;display:block;max-width:150px;overflow:hidden;text-overflow:ellipsis;}
+.tim-note-src{color:#94a3b8;display:block;}
+.tim-note-src .tim-note-seg{display:inline-block;white-space:nowrap;}
 .tim-note-warn .tim-note-src{color:#b45309;}
-.via-k-note{font-size:0.72rem;color:#6b7280;margin-top:3px;cursor:help;line-height:1.35;white-space:nowrap;padding-left:5px;border-left:3px solid transparent;}
+.via-k-note{font-size:0.72rem;color:#6b7280;margin-top:3px;cursor:help;line-height:1.35;padding-left:5px;border-left:3px solid transparent;}
 .via-k-eff{border-left-color:#0550ae;background:#f5f9ff;color:#0f2e57;}
 .via-k-warn{color:#b45309;}
-.via-k-src{color:#94a3b8;display:block;max-width:150px;overflow:hidden;text-overflow:ellipsis;}
+.via-k-src{color:#94a3b8;display:block;}
+/* 原因說明以「」：）切成幾段、每段 inline-block：放不下就整段換到下一行（「AI-Thermal「Thermal Via 計算」／還沒有這顆的 via 設計」），
+   不會從「計算」中間或「via 設計」前面斷開；單一段比欄位還寬時才在段內換行。 */
+.via-k-src .via-k-seg{display:inline-block;}
 .via-k-warn .via-k-src{color:#b45309;}
 .tim-mark{font-size:0.7rem;color:#94a3b8;margin-left:3px;cursor:help;}
 .tim-mark-warn{color:#b45309;}
@@ -951,7 +982,7 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
           算 <code>R_TIM</code> 用的是 <b>k</b> 與 <b>填縫厚度</b>（壓縮後實際填在縫隙裡的厚度）；
           「預設厚度」是材料原始片厚，僅供規格書參考。</p>
         <div id="timLibViewBody"></div>
-        <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;flex-wrap:wrap;">
+        <div class="tlv-actions">
           <a class="cloud-close tim-lib-go" href="https://tedus-ai.github.io/AI-Thermal-pad-and-stud-size-Evaluation-Tool/" target="_blank" rel="noopener">↗ 前往 AI-Thermal 維護型號庫</a>
           <button class="cloud-close" onclick="timLibViewClose()">關閉</button>
         </div>
@@ -1825,6 +1856,32 @@ let calcResults = null;
 
 const COLS = ['Component','Qty','Power(W)','Height(mm)','Pad_L','Pad_W','Thick(mm)','Board_Type','Limit(C)','R_jc','TIM_Type'];
 const COL_LABELS = {'Component':'元件名稱','Qty':'數量','Power(W)':'單顆功耗 (W)','Height(mm)':'元件相對高度 (mm)','Pad_L':'E-Pad 長 (mm)','Pad_W':'E-Pad 寬 (mm)','Thick(mm)':'板厚 (mm) 或銅厚','Board_Type':'導熱方式','Limit(C)':'限溫 (°C)','R_jc':'熱阻 Rjc','TIM_Type':'介面材料'};
+/* 元件清單表頭分兩行（第二行是單位）：數字欄才不會被長表頭撐寬。合起來的文字（以空白相接）＝ COL_LABELS；
+   Rjc 的單位只加在表頭（COL_LABELS 另外用在缺值清單、Excel 欄名）。 */
+const COL_HEAD = {'Power(W)':['單顆功耗','(W)'],'Height(mm)':['元件相對高度','(mm)'],'Pad_L':['E-Pad 長','(mm)'],'Pad_W':['E-Pad 寬','(mm)'],
+  'Thick(mm)':['板厚 (mm)','或銅厚'],'Limit(C)':['限溫','(°C)'],'R_jc':['熱阻 Rjc','(°C/W)']};
+function compThHtml(c){
+  const h=COL_HEAD[c];
+  if(!h)return _vEsc(COL_LABELS[c]||c);
+  return '<span class="th-l">'+_vEsc(h[0])+'</span> <span class="th-l'+(h[1].charAt(0)==='('?' th-u':'')+'">'+_vEsc(h[1])+'</span>';
+}
+/* 元件名稱欄的寬度＝這一頁最長的名稱（用畫面上的字型實際量），名稱才不會被輸入框截斷（GTRB097152NCV1-Final-B20B28）。
+   下限 140px；上限 300px：再長的名稱，滑鼠停在輸入框上看全名（title）。 */
+let _compNameCtx=null;
+function compNameColW(arr){
+  let w=0;
+  try{
+    if(!_compNameCtx)_compNameCtx=document.createElement('canvas').getContext('2d');
+    const fs=parseFloat(getComputedStyle(document.documentElement).fontSize)||16;
+    _compNameCtx.font=(0.82*fs)+'px '+getComputedStyle(document.body).fontFamily;
+    (arr||[]).forEach(r=>{const t=String((r&&r.Component)||'');if(t)w=Math.max(w,_compNameCtx.measureText(t).width);});
+  }catch(e){}
+  // ＋輸入框內距 12、框線 2、儲存格內距 12、字型量測誤差的餘裕 8
+  return Math.round(Math.min(300,Math.max(140,w+34)));
+}
+// 寫成固定寬度（不只是下限）：自動版面才不會因為底下的「↩ 參照自 … 解除參照」很長，就把多出來的寬度分給名稱欄，
+// 反而擠到導熱方式／介面材料的說明文字。多出來的寬度只分給那兩欄。
+function compNameColStyle(arr){const w=compNameColW(arr);return 'width:'+w+'px;min-width:'+w+'px;';}
 const COL_TIPS = {
   'Component':'元件型號或代號','Qty':'該元件的使用數量',
   'Power(W)':'單一顆元件的發熱瓦數 (TDP)',
@@ -2048,7 +2105,7 @@ function renderTimLibView(){
        '<td>'+_timNum(r.thickness)+'</td><td>'+_vEsc(r.vendor||'')+'</td><td>'+_vEsc(r.note||'')+'</td></tr>';
   });
   const linked=list.filter(r=>r.src==='tim-manager'&&r.srcId).length;
-  body.innerHTML=h+'</tbody></table></div><div style="margin-top:8px;font-size:0.78rem;color:#64748b;">共 '+list.length+' 筆型號'+
+  body.innerHTML=h+'</tbody></table></div><div class="tlv-count">共 '+list.length+' 筆型號'+
     (linked?'（其中 '+linked+' 筆參照 TIM 管理工具）':'')+'。</div>';
 }
 
@@ -3245,8 +3302,11 @@ function boardTypeCellHtml(row,category,i,dis){
 function viaKNoteHtml(row){
   const vi=viaKInfo(row,G);if(!vi)return '';
   const cls='via-k-note'+(vi.src==='keff'?' via-k-eff':'')+(vi.warn?' via-k-warn':'');
-  return '<div class="'+cls+'" title="'+_vEsc(vi.detail)+'">'+(vi.warn?'⚠ ':'')+_vEsc(vi.label)+
-         '<span class="via-k-src">'+_vEsc(vi.src==='keff'?'← AI-Thermal via 計算':vi.why)+'</span></div>';
+  return '<div class="'+cls+'" title="'+_vEsc(vi.detail)+'"><span class="via-k-lbl">'+(vi.warn?'⚠ ':'')+_vEsc(vi.label)+'</span>'+
+         '<span class="via-k-src">'+viaKSegHtml(vi.src==='keff'?'← AI-Thermal via 計算':vi.why)+'</span></div>';
+}
+function viaKSegHtml(t){
+  return (String(t||'').match(/[^」：）]+[」：）]*|[」：）]+/g)||[]).map(x=>'<span class="via-k-seg">'+_vEsc(x)+'</span>').join('');
 }
 
 /* ── 元件表的「介面材料」欄 ─────────────────────────────────────
@@ -3296,7 +3356,15 @@ function timSourceNoteHtml(row){
   else{val='k='+_timNum(ti.k)+' · t='+_timNum(ti.t)+'mm';from='← '+ti.label;}
   const tip=(ti.detail||'')+(ti.warn?'\n⚠ '+ti.warn:'');
   return '<div class="tim-note'+(ti.warn?' tim-note-warn':'')+'" title="'+_vEsc(tip)+'">'+
-         (ti.warn?'⚠ ':'')+_vEsc(val)+'<br><span class="tim-note-src">'+_vEsc(from)+'</span></div>';
+         '<span class="tim-note-val">'+(ti.warn?'⚠ ':'')+_vEsc(val)+'</span><span class="tim-note-src">'+timSrcSegHtml(from)+'</span></div>';
+}
+/* 「← 型號 Tgrease 2500」「← 專案預設值 K_Grease／t_Grease」：前半（← 型號）與型號／參數名稱各自不拆開，
+   欄位夠寬就一行，不夠就整段換到第二行（不會變成「Tgrease」／「2500」）。 */
+function timSrcSegHtml(t){
+  t=String(t||'');
+  const m=t.match(/^(←\s*\S+)\s+(.+)$/);
+  const seg=x=>'<span class="tim-note-seg">'+_vEsc(x)+'</span>';
+  return m?seg(m[1])+' '+seg(m[2]):seg(t);
 }
 
 /* 選型號。空值一律「不寫 key」而不是寫 ''：共用 DB 規則——寫 '' 會覆蓋掉對方工具的預設值，
@@ -3390,8 +3458,8 @@ function renderCompTable(arr,containerId,defaults,category){
 
   // Table
   lhtml+='<div class="comp-table-wrap"><table class="comp-table"><thead><tr>';
-  COLS.forEach(c=>lhtml+='<th data-col="'+c+'" title="'+COL_TIPS[c]+'">'+COL_LABELS[c]+'</th>');
-  lhtml+='<th>操作</th></tr></thead><tbody>';
+  COLS.forEach(c=>lhtml+='<th data-col="'+c+'" title="'+COL_TIPS[c]+'"'+(c==='Component'?' style="'+compNameColStyle(arr)+'"':'')+'>'+compThHtml(c)+'</th>');
+  lhtml+='<th class="col-ops">操作</th></tr></thead><tbody>';
   arr.forEach((row,i)=>{
     let excl=row._excluded;
     lhtml+='<tr'+(excl?' class="comp-excluded"':'')+'>';
@@ -3409,7 +3477,7 @@ function renderCompTable(arr,containerId,defaults,category){
           ? '<div style="font-size:0.72rem;color:#b45309;margin-top:3px;">↩ 參照自 '+_vEsc(refOrigin)+' <button class="btn btn-sm" style="padding:1px 6px;font-size:0.7rem;" title="解除後可自行修改瓦數" onclick="detachRef(\''+category+'\','+i+')">🔓 解除參照</button></div>'
           : (refOrigin?'<div style="font-size:0.72rem;color:#9ca3af;margin-top:3px;">曾參照自 '+_vEsc(refOrigin)+'</div>':'');
         if(compStamped(row,category))badge+='<div class="stamped-note">⚠ 疑似舊預設值 <button class="btn btn-sm" title="這顆元件的 7 個欄位全部等於舊版自動帶入的預設值；確認都是實際值才會納入計算" onclick="confirmStampedDefaults(\''+category+'\','+i+')">✓ 確認是實際值</button></div>';
-        lhtml+='<td data-col="Component"><input type="text" value="'+_vEsc(row[col]||'')+'"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">'+badge+'</td>';
+        lhtml+='<td data-col="Component"><input type="text" value="'+_vEsc(row[col]||'')+'"'+(row[col]?' title="'+_vEsc(row[col])+'"':'')+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">'+badge+'</td>';
       }
       else if(col==='Power(W)'&&refLocked&&_hasVal(row[col],true)){lhtml+='<td data-col="Power(W)"><span title="瓦數已鎖定，請先按「解除參照」" style="display:inline-block;padding:4px 8px;color:#6b7280;background:#f3f4f6;border-radius:4px;white-space:nowrap;">'+(row[col]!=null?row[col]:'')+' 🔒</span></td>';}
       else{
@@ -3419,7 +3487,7 @@ function renderCompTable(arr,containerId,defaults,category){
         const attrs=missingAttrs(row,col)||stampedAttrs(row,col,category)||derivedAttrs(row,col);
         lhtml+='<td data-col="'+col+'"><input type="number"'+attrs+' value="'+(has?row[col]:'')+'" step="any"'+dis+' onchange="updateCompNum(\''+category+'\','+i+',\''+col+'\',this.value)"></td>';}
     });
-    lhtml+='<td style="white-space:nowrap;">';
+    lhtml+='<td class="col-ops">';
     lhtml+='<button class="btn btn-sm eye-btn'+(excl?' excluded':'')+'" title="'+(excl?'顯示（納入計算）':'隱藏（排除計算）')+'" onclick="toggleComp(\''+category+'\','+i+')">👁️</button> ';
     lhtml+='<button class="btn btn-sm btn-danger" title="刪除" onclick="removeComp(\''+category+'\','+i+')">🗑️</button> ';
     lhtml+='<button class="btn btn-sm btn-primary" title="複製" onclick="copyComp(\''+category+'\','+i+')">📋</button>';

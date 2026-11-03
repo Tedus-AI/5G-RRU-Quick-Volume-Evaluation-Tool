@@ -129,6 +129,76 @@ function ok(name, cond, extra) {
   ok('快選下拉仍是 lib_sel_<分類> 且位在新增元件列裡', d3.hasSel && d3.inAddRow, d3);
   ok('快選「加入」仍可用', d3.added, d3);
 
+  // [E] 使用者回報（24 吋螢幕）：元件名稱「GTRB097152NCV1-…」、E-Pad「20.57」「9.78」、導熱方式底下「AI-Thermal「Thermal Via …」被儲存格吃掉。
+  //     原因：數字欄的表頭一行寫完（「元件相對高度 (mm)」）把欄撐到 130～150px，輸入框卻只有 50%（~55px，扣掉上下箭頭只剩 20px）；
+  //     說明文字固定 150px＋省略號；元件名稱只有 140px。
+  console.log('\n[E] 欄寬：每個欄位的內容都完整顯示');
+  // 仿使用者的 FDD 專案（長元件名稱、E-Pad 兩位小數、Thermal Via 通用值、TIM 型號）
+  const FDD = [
+    { Component:'GTRB097152NCV1-Final-B8', Type:'Final PA', Qty:4, 'Power(W)':75.61, 'Height(mm)':400, Board_Type:'Copper Coin', Pad_L:20.57, Pad_W:9.78,
+      R_jc:1.24, _rjc_from:'JC_bot', _bt_from:'heatDirection', _pad_from:'heatSourceSize', TIM_Type:'Grease', TIM_Model:'Tgrease 2500', 'Limit(C)':225, _ref_origin_project:'FDD B8B20B28 4T4R 480W' },
+    { Component:'GTRB097152NCV1-Final-B20B28', Type:'Final PA', Qty:4, 'Power(W)':72.688, 'Height(mm)':330, Board_Type:'Copper Coin', Pad_L:20.57, Pad_W:9.78,
+      R_jc:1.24, _rjc_from:'JC_bot', _bt_from:'heatDirection', _pad_from:'heatSourceSize', TIM_Type:'Grease', TIM_Model:'Tgrease 2500', 'Limit(C)':225 },
+    { Component:'B10H0710N40D-Driver-B20B28', Type:'Driver', Qty:8, 'Power(W)':7.886, 'Height(mm)':350, Board_Type:'Thermal Via', Pad_L:9.4, Pad_W:5.5,
+      R_jc:4.1, _rjc_from:'JC_bot', _bt_from:'heatDirection', _pad_from:'epadSize', TIM_Type:'None', 'Limit(C)':225 },
+    { Component:'BTS6201U-PreDriver-B1', Type:'Pre-driver', Qty:8, 'Power(W)':0.75, 'Height(mm)':310, Board_Type:'Thermal Via', Pad_L:1.5, Pad_W:1.5,
+      R_jc:50, _rjc_from:'JC_bot', TIM_Type:'None', 'Limit(C)':175, _ref_origin_project:'FDD 4T4R 60W', _ref_locked:true },
+    { Component:'Circulators', Type:'CR', Qty:8, 'Power(W)':3.81, 'Height(mm)':450, Board_Type:'Thermal Via', Pad_L:7, Pad_W:7, R_jc:0, TIM_Type:'None', 'Limit(C)':125 },
+    { Component:'Cavity Filter', Type:'filter', Qty:8, 'Power(W)':19.1, 'Height(mm)':0, Board_Type:'None', Pad_L:0, Pad_W:0, R_jc:0, TIM_Type:'None', 'Limit(C)':125 },
+    // 沒選型號 → 「← 專案預設值 K_Pad／t_Pad」（最長的 TIM 來源說明）
+    { Component:'LNA', Type:'LNA', Qty:4, 'Power(W)':0.5, 'Height(mm)':200, Board_Type:'IC top', Pad_L:3, Pad_W:3, R_jc:10, TIM_Type:'Pad', 'Limit(C)':150 },
+  ];
+  const LIB = { g1:{ model:'Tgrease 2500', timType:'Grease', k:3.8, gapThickness:0.05, thickness:0.05, vendor:'Laird', src:'tim-manager', srcId:'x1' } };
+  const measure = () => page.evaluate(() => {
+    const cv = document.createElement('canvas').getContext('2d');
+    const tw = (el, t) => { const cs = getComputedStyle(el); cv.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; return cv.measureText(t).width; };
+    const tbl = document.querySelector('#subtab0 table.comp-table'), wrap = tbl.parentElement;
+    const clip = [];
+    tbl.querySelectorAll('tbody tr').forEach((tr, ri) => {
+      tr.querySelectorAll('input').forEach(inp => {
+        const cs = getComputedStyle(inp), col = inp.closest('td').dataset.col;
+        // 數字欄扣掉上下箭頭（Chrome 約 15px）
+        const room = inp.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - (inp.type === 'number' ? 15 : 0);
+        if (tw(inp, inp.value) > room + 0.5) clip.push([ri, col, inp.value, Math.round(tw(inp, inp.value)), Math.round(room)]);
+      });
+      tr.querySelectorAll('.via-k-note,.via-k-src,.tim-note,.tim-note-src,.thick-ref,.rjc-ref').forEach(el => {
+        if (el.scrollWidth > el.clientWidth + 1 || getComputedStyle(el).textOverflow === 'ellipsis') clip.push([ri, el.className, el.textContent]);
+      });
+    });
+    const segs = [...tbl.querySelectorAll('.via-k-seg,.tim-note-seg')].map(s => s.getClientRects().length);
+    const th = c => tbl.querySelector('thead th[data-col="' + c + '"]');
+    const w = c => Math.round(th(c).getBoundingClientRect().width);
+    const sel = tbl.querySelector('tbody td[data-col="Board_Type"] select');
+    return { clip, hScroll: wrap.scrollWidth > wrap.clientWidth + 1, tableW: Math.round(tbl.getBoundingClientRect().width),
+      segBroken: segs.filter(n => n > 1).length, segN: segs.length,
+      heights: { comp: w('Component'), height: w('Height(mm)'), padL: w('Pad_L'), thick: w('Thick(mm)'), bt: w('Board_Type'), tim: w('TIM_Type') },
+      btSelW: Math.round(sel.getBoundingClientRect().width),
+      heads: [...tbl.querySelectorAll('thead th')].map(t => [t.dataset.col || '操作', t.textContent.trim(), t.querySelectorAll('.th-l').length]),
+      labels: COL_LABELS,
+      nameTitle: tbl.querySelector('tbody td[data-col="Component"] input').title };
+  });
+  await page.setViewportSize({ width: 1920, height: 1000 });
+  await page.evaluate(({ FDD, LIB }) => { timLibrary = LIB; timLibLoaded = true; switchTab(0);
+    components.rf = JSON.parse(JSON.stringify(FDD)); normalizeComps(); recalc(); }, { FDD, LIB });
+  const e1 = await measure();
+  ok('24 吋：數值、元件名稱、說明文字沒有任何一格被截斷', e1.clip.length === 0, e1.clip);
+  ok('24 吋：表格放得下，不需要橫向捲動', !e1.hScroll, e1);
+  ok('24 吋：Thermal Via 原因、TIM 來源（型號）每一段都沒有從中間斷開', e1.segN > 0 && e1.segBroken === 0, e1);
+  ok('表頭分兩行（名稱／單位），文字與 COL_LABELS 相同', ['Power(W)','Height(mm)','Pad_L','Pad_W','Thick(mm)','Limit(C)'].every(c => {
+       const h = e1.heads.find(x => x[0] === c); return h && h[2] === 2 && h[1] === e1.labels[c]; }), e1.heads);
+  ok('Rjc 表頭標出單位 °C/W', (e1.heads.find(x => x[0] === 'R_jc') || [])[1] === '熱阻 Rjc (°C/W)', e1.heads);
+  ok('數字欄收窄（元件相對高度 < 110px、E-Pad < 100px）', e1.heights.height < 110 && e1.heights.padL < 100, e1.heights);
+  ok('導熱方式的下拉不跟著欄寬拉長（≤ 170px）', e1.btSelW <= 170, e1.btSelW);
+  ok('元件名稱輸入框有 title（超過上限時滑鼠停著看全名）', e1.nameTitle === FDD[0].Component, e1.nameTitle);
+
+  await page.setViewportSize({ width: 1536, height: 730 });   // 17 吋筆電、125% 縮放、參數控制台展開
+  await page.evaluate(() => recalc());
+  const e2 = await measure();
+  ok('17 吋筆電：一樣沒有被截斷的內容（放不下時表格自己橫向捲動）', e2.clip.length === 0, e2.clip);
+  ok('17 吋筆電：說明換成兩行時不從「計算」或型號中間斷開', e2.segBroken === 0, e2);
+  ok('17 吋筆電：表格比原本窄（原本 1385px）', e2.tableW < 1385, e2.tableW);
+  await page.setViewportSize({ width: 1440, height: 900 });
+
   ok('頁面無 JS 例外', errors.length === 0, errors.slice(0, 3));
   await browser.close();
   console.log('\n通過 ' + pass + ' 項，失敗 ' + fail + ' 項');
