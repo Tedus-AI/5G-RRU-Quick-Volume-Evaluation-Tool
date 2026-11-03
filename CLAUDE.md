@@ -389,7 +389,7 @@ docId → id≠名稱的專案每存一次就多一份分身、原專案永遠�
   `TIM_Type`／`TIM_Model`、`Limit(C)`／`Limit_Ref` —— 不會拼出兩邊都沒有過的組合（例：我的長＋對方的寬、
   對方的限溫數字＋我的限溫對象）。`_limit_ok`（確認標記）刻意**不**綁進限溫那組：它記的是「確認的值」，
   數字被對方改掉時標記自然對不上、照樣提醒，不需要為它跳衝突。
-- `compMerge.js` 也放了兩個**共用元件語意**函式（`limitRef`／`limitSuspect`，見「限溫對象」一節）：
+- `compMerge.js` 也放了幾個**共用元件語意**函式（`limitRef`／`limitSuspect`，見「限溫對象」一節；快選參照的 `refOrigin`／`refTidy`，見「快選參照」）：
   兩個工具的畫面與計算必須判斷一致，放在這份逐字相同的檔案裡才不會各寫一份。
 - **推導欄位不比對**（`MERGE_DERIVED = ['Thick(mm)', '_renamed_from']`，`derivedKeys`）：板厚每次 recalc 都由參數控制台帶入，
   若列入比對，載入時自動帶入的板厚會被當成「我改過這顆」→ 對方刪掉那顆元件時變成假衝突。
@@ -965,7 +965,7 @@ AI-Thermal 下次存檔覆寫，還讓兩邊數字對不起來 → `rjcCellHtml`
 
 > 內部欄位（底線開頭，兩個工具都原樣保留、不列入 carry 白名單）：`_cid`（元件 id，存檔三方合併配對用，
 > 兩邊都會補發）、`_defaults_ok`（本工具寫：確認過不是舊預設值）、`_rjc_from`／`_bt_from`／`_pad_from`
-> （AI-Thermal 寫：推導來源）、`_excluded`、`_ref_*`（本工具的快選參照）、`_renamed_from`（本工具寫：改過名的元件，
+> （AI-Thermal 寫：推導來源）、`_excluded`、`_ref_*`（兩個工具的快選參照；來源不存在時存檔會清掉，見「快選參照」）、`_renamed_from`（本工具寫：改過名的元件，
 > AI-Thermal 以名稱當 key 的資料還掛在哪個名稱底下；AI-Thermal 搬完就清掉，見「元件改名」）、`_limit_ok`（兩邊都會寫：
 > 使用者確認「限溫疑似範例值」其實是實際規格時，記下**確認的那個限溫數字**，見「限溫對象」一節）。
 
@@ -994,6 +994,26 @@ AI-Thermal 已支援「一顆元件多份規格書」（datasheet／application 
 遇到陣列會整批漏標，AI-Thermal 之後會把那些檔案當成本專案自己的而**刪掉來源專案的原始檔**。
 新增任何會碰 `SpecFile` 的程式碼時，兩種形狀都要處理（AI-Thermal 端對應 `sgSpecList()` /
 `sgSpecStore()` / `sgSpecMarkFrom()`）。
+
+#### 快選參照（`_ref_*`）：來源名稱用 id 查、來源不存在就清掉 ⚠️ 兩個工具共用規則
+
+快選時元件上記下 `_ref_origin_id`（來源專案 id）、`_ref_origin_project`（**當時的名稱**）、`_ref_locked`（瓦數鎖定）；
+規格書每一份的 `_from`、AI-Thermal 的 `_pd_meas_from` 也是當時的名稱。使用者回報兩件事：
+① 來源專案改名後（兩個工具都只改 `project_name`、id 不變）還是顯示舊名稱；
+② 來源已經不存在（專案被刪、或來源裡已經沒有同名元件 —— 多半是這顆快選後改了名、已經是另一顆料）還寫著「曾參照自 X」。
+
+- **判斷在兩邊逐字相同的 `compMerge.js`**：`CompMerge.refOrigin(comp, projects)` → `{ id, name（目前名稱）, stored, gone }`，
+  `gone` ＝ `'project'`（來源專案已刪除）／`'comp'`（來源專案三類都找過、沒有同名元件）／`false`；
+  `CompMerge.refTidy(comp, projects)` 存檔時整理。`projects` 沒讀到就傳 `null` → **不判斷失效**（不在不確定時刪參照）。
+- 畫面（`refInfoOf`／`refLockedOf`，名單＝`refProjects`，`loadVariantsCache` 讀專案時順手存、只讀）：
+  「↩ 參照自／曾參照自」顯示**來源目前的名稱**，tooltip 寫出快選當時的名稱；**參照失效 → 整個不顯示、瓦數不鎖**。
+- 存檔（`cloudSaveProject`）：先讀一次 `getCollection('projects')`（讀不到 → 沿用 `refProjects`），在 updateDoc 的
+  fields 函式裡、合併**之後**對要寫的那份 `refTidyFields`：還在 → 換成目前名稱（`_pd_meas_from`、規格書 `_from` 等於舊名稱的一起換）；
+  失效 → 拿掉 `_ref_origin_project`／`_ref_origin_id`／`_ref_locked`（瓦數照留）。合併後才做 → 不跳衝突。
+  有清掉時存檔提示多一行「清掉 N 顆元件的失效參照」。**規格書的 `_from` 不拿掉**（AI-Thermal 刪除時的保護標記：檔案在別的專案資料夾）、
+  路徑也不動（實體檔沒有搬）。
+- AI-Thermal 同一套（`sgRefInfo`／`sgRefTidyAll`，見它的 CLAUDE.md「快選參照的來源專案名稱用 id 查」）。
+- 契約測試：`tests/ref-origin.test.js`；規則本身在共用的 `tests/comp-merge.unit.test.js` [O]。
 
 #### ⚠ 元件欄位**不補預設值**：缺必填 → 告警並擋下計算（`compMissing`／`listMissing`）
 

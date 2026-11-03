@@ -2233,6 +2233,23 @@ function carrySrc(comp){
 
 let variantsCache = null;     // { rf:[...], digital:[...], pwr:[...] } 或 null（未載入）
 let variantsLoading = false;
+/* 快選參照的來源（「↩ 參照自／曾參照自」）：判斷在兩個工具共用的 CompMerge.refOrigin／refTidy。
+   快選時元件上抄的是來源專案「當時的名稱」（_ref_origin_project），來源改名（任一個工具改都一樣：只動 project_name、
+   id 不變）就過時；來源專案被刪、或來源裡已經沒有同名元件（多半是這顆改了名、已經是另一顆料）→ 參照已失效。
+   → 顯示：用 _ref_origin_id 查目前名稱；失效 → 不顯示、瓦數不鎖（refInfoOf／refLockedOf）。
+   → 存檔：要寫的那份換成目前名稱、拿掉失效的參照標記（refTidyFields）。
+   refProjects＝資料庫的 projects（loadVariantsCache 讀的那一份，只讀不改）；還沒讀到 → null，不判斷失效。 */
+let refProjects = null;
+function refProjs(){ return (refProjects && Object.keys(refProjects).length) ? refProjects : null; }
+function refInfoOf(row){ return CompMerge.refOrigin(row, refProjs()); }
+function refLockedOf(row){ if(!row||!row._ref_locked)return false; const r=refInfoOf(row); return !(r&&r.gone); }
+// 存檔時對「要寫的那份」整理參照：回傳拿掉了幾顆失效參照
+function refTidyFields(fields, projects){
+  const p=(projects&&Object.keys(projects).length)?projects:null;
+  let dropped=0;
+  CompMerge.CATS.forEach(f=>(fields[f]||[]).forEach(c=>{ const r=CompMerge.refTidy(c,p); if(r&&r.dropped)dropped++; }));
+  return dropped;
+}
 
 function _vEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
@@ -2266,6 +2283,7 @@ async function loadVariantsCache(){
   let projects;
   try{ projects = await dbAdapter.getCollection('projects'); }
   catch(e){ console.warn('[variants] 讀取 projects 失敗：', e); variantsCache = {rf:[],digital:[],pwr:[]}; return variantsCache; }
+  refProjects = projects;   // 參照來源的目前名稱、在不在（只讀）
   variantsCache = {
     rf:      aggregateVariants(projects,'rf'),
     digital: aggregateVariants(projects,'digital'),
@@ -3396,8 +3414,12 @@ function renderCompTable(arr,containerId,defaults,category){
     let excl=row._excluded;
     lhtml+='<tr'+(excl?' class="comp-excluded"':'')+'>';
     let dis=excl?' disabled':'';
-    let refLocked=!!row._ref_locked;
-    let refOrigin=row._ref_origin_project||'';
+    // 快選參照：來源目前的名稱（用 id 查，來源改名會跟著變）；參照失效（來源專案已刪除／來源裡沒有同名元件）→ 不顯示、瓦數不鎖
+    let refInfo=refInfoOf(row);
+    let refLocked=refLockedOf(row);
+    let refOrigin=(refInfo&&!refInfo.gone)?refInfo.name:'';
+    let refOld=row._ref_origin_project||'';
+    let refTip='來源專案：'+refOrigin+((refOld&&refOld!==refOrigin)?'\n（快選當時名稱：'+refOld+'；來源之後改名，下次存檔時一併更新）':'');
     COLS.forEach(col=>{
       if(col==='Board_Type'){lhtml+=boardTypeCellHtml(row,category,i,dis);}
       else if(col==='Thick(mm)'){lhtml+=thickCellHtml(row,category);}
@@ -3406,8 +3428,8 @@ function renderCompTable(arr,containerId,defaults,category){
       else if(col==='Limit(C)'){lhtml+=limitCellHtml(row,category,i,dis);}
       else if(col==='Component'){
         let badge=refLocked
-          ? '<div style="font-size:0.72rem;color:#b45309;margin-top:3px;">↩ 參照自 '+_vEsc(refOrigin)+' <button class="btn btn-sm" style="padding:1px 6px;font-size:0.7rem;" title="解除後可自行修改瓦數" onclick="detachRef(\''+category+'\','+i+')">🔓 解除參照</button></div>'
-          : (refOrigin?'<div style="font-size:0.72rem;color:#9ca3af;margin-top:3px;">曾參照自 '+_vEsc(refOrigin)+'</div>':'');
+          ? '<div class="ref-badge" style="font-size:0.72rem;color:#b45309;margin-top:3px;"><span class="ref-origin" title="'+_vEsc(refTip)+'">↩ 參照自 '+_vEsc(refOrigin)+'</span> <button class="btn btn-sm" style="padding:1px 6px;font-size:0.7rem;" title="解除後可自行修改瓦數" onclick="detachRef(\''+category+'\','+i+')">🔓 解除參照</button></div>'
+          : (refOrigin?'<div class="ref-badge" style="font-size:0.72rem;color:#9ca3af;margin-top:3px;"><span class="ref-origin" title="'+_vEsc(refTip)+'">曾參照自 '+_vEsc(refOrigin)+'</span></div>':'');
         if(compStamped(row,category))badge+='<div class="stamped-note">⚠ 疑似舊預設值 <button class="btn btn-sm" title="這顆元件的 7 個欄位全部等於舊版自動帶入的預設值；確認都是實際值才會納入計算" onclick="confirmStampedDefaults(\''+category+'\','+i+')">✓ 確認是實際值</button></div>';
         lhtml+='<td data-col="Component"><input type="text" value="'+_vEsc(row[col]||'')+'"'+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">'+badge+'</td>';
       }
@@ -4803,7 +4825,11 @@ async function cloudSaveProject(opts){
   // 合併的前提：畫面上的是「從資料庫載入的這個專案」（有載入時快照），而且資料庫裡還有它。
   // 新專案、覆蓋別的專案、或原專案已被刪除要重建 → 以畫面為準（沒有「載入時」可以比）。
   const base=(currentProjectId&&docId===currentProjectId&&existing)?projBase:null;
-  let written=null,merged=null,curSpecs,curPcb;
+  let written=null,merged=null,curSpecs,curPcb,refDropped=0;
+  // 快選參照：存檔前讀一次目前的專案（別的工具剛改名／刪專案也跟得上），寫入時在要寫的那份上
+  // 換成目前名稱、拿掉失效的參照（refTidyFields）。讀不到 → 沿用快選快取讀的那一份；都沒有 → 不整理。
+  let refAll=refProjs();
+  try{const pj=await dbAdapter.getCollection('projects');if(pj&&Object.keys(pj).length){refAll=pj;refProjects=pj;}}catch(e){console.warn('[save] 讀取專案名單失敗：',e);}
   _saveBusy=true;
   try{
     // updateDoc 傳函式：寫入時在「資料庫最新內容」上計算要寫的欄位（遇到 412 重讀後會重算），
@@ -4822,6 +4848,7 @@ async function cloudSaveProject(opts){
         // → 用寫入當下資料庫裡的 pcb_thickness（存完畫面也換成這一份，兩邊才一致）
         thickApplyToFields(fields,(cur&&cur.pcb_thickness)||{});
         renameMarksApply(fields,base&&cur?cur:null,base);   // 改過名的元件標上舊名稱（給 AI-Thermal 搬資料用）
+        refDropped=refTidyFields(fields,refAll);             // 快選參照：換成來源目前的名稱、拿掉失效的（合併後才做 → 不跳衝突）
         written=fields;
         curSpecs=cur?cur.thermal_specs:undefined;   // 寫入後資料庫裡的 thermal_specs（本工具不寫，原樣保留）
         curPcb=cur?cur.pcb_thickness:undefined;      // 同上：AI-Thermal 的分類 PCB 板厚
@@ -4842,7 +4869,8 @@ async function cloudSaveProject(opts){
   setProjPcbThickness(curPcb);
   adoptWrittenProject(docId,written);
   variantsCache=null; renderTab0();   // 專案集合改變 → 失效快選快取，下次重繪重新聚合
-  const note=merged?CompMerge.summaryText(merged):'';
+  const note=[merged?CompMerge.summaryText(merged):'',
+    refDropped?'清掉 '+refDropped+' 顆元件的失效參照（來源專案已刪除或已找不到同名元件）':''].filter(Boolean).join('\n');
   const viaNote=viaKSig()!==viaBefore?viaKChangeText():'';
   say('✅ 專案「'+written.project_name+'」已儲存！'+(note?'\n'+note:'')+(viaNote?'\n'+viaNote:''));
   return {ok:true,name:written.project_name,note:[note,viaNote].filter(Boolean).join('\n')};
