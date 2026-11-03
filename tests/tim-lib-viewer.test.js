@@ -247,6 +247,43 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   ok('接著載入 B 案回推的是 B 案自己的 1.6（不是 A 案的 2.0）', e1.b.t_PCB === 1.6 && e1.b.thick === 1.6, e1.b);
   ok('PCB 板厚度欄位也同步成 1.6', String(e1.b.field) === '1.6', e1.b);
 
+  // [F] 使用者回報：17 吋筆電（125% 縮放 → 視窗約 1536×730）打開型號庫，表格跑到白色視窗外面、還有橫向捲軸；
+  //     24 吋正常。原因：整個視窗卡在 70vh、表格另外固定 46vh，說明文字＋表格＋按鈕裝不下。
+  console.log('\n[F] 型號庫視窗在矮螢幕也裝得下（不跑出白框、按鈕看得到）');
+  const LIB9 = {};
+  [['Tgrease 2500','Grease',3.8,0.05,0.05,'Laird',''],['CoolZorb 500','Pad',4,1,2,'Laird',''],['CoolZorb-Ultra','Pad',11.5,1.5,3,'Laird',''],
+   ['F54-L40','Pad',4,1.7,2.5,'錩潤',''],['Tflex HD7.5','Pad',7.5,1.7,2.5,'Laird','相較HD7.5硬'],['Tflex HD90000','Pad',7.5,1.7,2.5,'Laird',''],
+   ['Tflex P300','Pad',3,1.7,2.5,'Laird','有膜'],['Tputty 910','Putty',9.1,0.5,0.5,'Laird',''],['Tputty 607','Putty',6.4,0.5,0.5,'Laird','']]
+    .forEach((r, i) => { LIB9['m' + i] = { model:r[0], timType:r[1], k:r[2], gapThickness:r[3], thickness:r[4], vendor:r[5], note:r[6], src:'tim-manager', srcId:'tm' + i }; });
+  for (const [w, h, label] of [[1920, 960, '24 吋'], [1536, 730, '17 吋筆電 125%'], [1280, 560, '更矮的視窗']]) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.evaluate((LIB) => { timLibViewClose(); dbAdapter.isReady = () => true;
+      dbAdapter.getCollection = async (c) => (c === 'tim_library' ? LIB : {}); }, LIB9);
+    await page.evaluate(() => timLibViewOpen());
+    await page.waitForFunction(() => document.querySelectorAll('#timLibViewBody tbody tr').length === 9, { timeout: 5000 });
+    const f = await page.evaluate(() => {
+      const box = document.querySelector('#timLibModal .cloud-modal');
+      const B = box.getBoundingClientRect();
+      const wrap = box.querySelector('.tlv-wrap');
+      const parts = { '說明': box.querySelector('.tlv-note'), '表格': wrap, '筆數': box.querySelector('#timLibViewBody > div:last-child'),
+                      '前往 AI-Thermal': box.querySelector('a.tim-lib-go'), '關閉': [...box.querySelectorAll('button.cloud-close')].pop() };
+      const out = Object.entries(parts).filter(([, el]) => { const r = el.getBoundingClientRect();
+        return r.top < B.top - 0.5 || r.bottom > B.bottom + 0.5 || r.right > B.right + 0.5; }).map(([k]) => k);
+      const th = wrap.querySelector('th');
+      return { out, inView: B.top >= 0 && B.bottom <= innerHeight && B.right <= innerWidth,
+               boxScroll: box.scrollHeight > box.clientHeight + 1,
+               hScroll: wrap.scrollWidth > wrap.clientWidth + 1,
+               vScroll: wrap.scrollHeight > wrap.clientHeight + 1, sticky: getComputedStyle(th).position,
+               wrapH: Math.round(wrap.clientHeight), boxW: Math.round(B.width), vw: innerWidth };
+    });
+    ok(label + '：說明、表格、筆數、兩顆按鈕都在白色視窗裡', f.out.length === 0, f);
+    ok(label + '：整個視窗在畫面內（按鈕不用捲就按得到）', f.inView && !f.boxScroll, f);
+    ok(label + '：型號、標籤、備註放得下，沒有橫向捲軸', !f.hScroll, f);
+    if (h <= 600) ok(label + '：表格區縮矮、在裡面捲動（表頭固定在上面）', f.vScroll && f.sticky === 'sticky' && f.wrapH >= 120, f);
+  }
+  await page.evaluate(() => timLibViewClose());
+  await page.setViewportSize({ width: 1440, height: 900 });
+
   ok('頁面無 JS 例外', errors.length === 0, errors.slice(0, 3));
 
   await browser.close();
