@@ -228,7 +228,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
 
   console.log('\n[H] 版面寬度（17 吋筆電）');
   const lay = {};
-  for (const w of [1366, 1600, 1920]) {
+  for (const w of [1280, 1366, 1600, 1920]) {   // 參數控制台預設 227px（原本 340）→ 1366 的主區已經夠寬並排，上下排的情境改用 1280
     await page.setViewportSize({ width: w, height: 1000 });
     await page.waitForTimeout(120);
     lay[w] = await page.evaluate(() => {
@@ -237,8 +237,8 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
                steps: getComputedStyle(document.querySelector('#tab2-result .vr-steps')).gridTemplateColumns.split(' ').length };
     });
   }
-  ok('1366／1600／1920 都沒有水平溢出', [1366, 1600, 1920].every(w => lay[w].over <= 0 && lay[w].doc <= 0), lay);
-  ok('窄（1366）時兩張圖上下排；寬（1920）時並排', !lay[1366].side && lay[1920].side, lay);
+  ok('1280／1366／1600／1920 都沒有水平溢出', [1280, 1366, 1600, 1920].every(w => lay[w].over <= 0 && lay[w].doc <= 0), lay);
+  ok('窄（1280）時兩張圖上下排；1366 起並排', !lay[1280].side && lay[1366].side && lay[1920].side, lay);
   ok('推導 5 步在 1366 仍排成一列（箭頭接得起來）', lay[1366].steps === 5 && lay[1600].steps === 5, lay);
   await page.setViewportSize({ width: 1600, height: 1000 });
 

@@ -156,7 +156,7 @@ function ok(name, cond, extra) {
   ok('Pre Driver：「通用值 K_Via 30 W/m·K」＋原因、不是藍邊', D.pd && !/via-k-eff/.test(D.pd.cls) && /^通用值 K_Via 30 W\/m·K/.test(D.pd.text) && /還沒有這顆的 via 設計/.test(D.pd.text), D.pd);
   ok('Copper Coin 元件沒有 K 標示', !D.fpNote);
   ok('圖例說明藍邊的 K_eff 來自 AI-Thermal、只能在 AI-Thermal 改', /K\s*eff 是 AI-Thermal「Thermal Via 計算」的逐顆等效 K（只能在 AI-Thermal 改）/.test(D.legend), D.legend);
-  ok('參數控制台：K_Via 標「通用值」、製程係數 tooltip 寫「只套用在通用值」＋說明', /Via 等效 K 值（通用值）/.test(D.lbl) && /只套用在通用值/.test(D.effTip) && /抓不到逐顆 K\s*eff 時才用這兩個值/.test(D.hint), D);
+  ok('參數控制台：K_Via 標「通用值」、製程係數 tooltip 寫「只套用在通用值」＋說明', /Via K（通用值）/.test(D.lbl) && /只套用在通用值/.test(D.effTip) && /抓不到逐顆 K\s*eff 時才用這兩個值/.test(D.hint), D);
   await page.evaluate(() => { switchTab(1); tab1Expanded.clear(); const r = calcResults.rows.find(x => x.Component === 'Driver PA'); tab1Expanded.add(tab1RowKey(r)); renderTab1(); });
   const T = await page.evaluate(() => {
     const tr = [...document.querySelectorAll('#tab1-table tbody tr')].find(x => /Driver PA/.test((x.querySelector('td.an-name') || {}).textContent || '') && !/Pre/.test(x.querySelector('td.an-name').textContent));

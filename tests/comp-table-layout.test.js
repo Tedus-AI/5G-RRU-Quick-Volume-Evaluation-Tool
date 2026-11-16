@@ -157,8 +157,9 @@ function ok(name, cond, extra) {
     tbl.querySelectorAll('tbody tr').forEach((tr, ri) => {
       tr.querySelectorAll('input').forEach(inp => {
         const cs = getComputedStyle(inp), col = inp.closest('td').dataset.col;
-        // 數字欄扣掉上下箭頭（Chrome 約 15px）
-        const room = inp.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - (inp.type === 'number' ? 15 : 0);
+        // 數字欄若還顯示上下箭頭要扣掉（Chrome 約 15px）；現在元件表的數字欄不顯示箭頭（appearance:textfield）
+        const spin = inp.type === 'number' && !/textfield/.test(cs.appearance || cs.webkitAppearance || '');
+        const room = inp.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - (spin ? 15 : 0);
         if (tw(inp, inp.value) > room + 0.5) clip.push([ri, col, inp.value, Math.round(tw(inp, inp.value)), Math.round(room)]);
       });
       tr.querySelectorAll('.via-k-note,.via-k-src,.tim-note,.tim-note-src,.thick-ref,.rjc-ref').forEach(el => {

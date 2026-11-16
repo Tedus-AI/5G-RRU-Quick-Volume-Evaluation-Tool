@@ -288,7 +288,23 @@
   - ⚠ sticky＋z-index 讓頂列自成一個堆疊層，而專案列表、3D 頁的解鎖密碼等對話框的 DOM 在 `.header` 裡 →
     `.header:has(.cloud-modal-overlay.active){z-index:3200}`，否則會被全螢幕的 3D 檢視器（3000）蓋住（`tests/viewer3d.test.js` [N]）。
   - 專案工具列：外框膠囊鈕，**「儲存專案」是唯一的深色實心鈕**；三組用細線分隔。專案名稱在白底上是深色字（對比遠高於原本）。
-- **參數控制台是亮色**（白底、淺灰輸入框、台達藍區段標題）；標題列照舊 sticky（`top:-24px`＝側欄上內距）。
+- **參數控制台是深台達藍底**（`--sb-bg:#0d2a45`；使用者回報白底過亮、淺色小字看不清楚）；標題列照舊 sticky（`top:-24px`＝側欄上內距）。
+  - 側欄的色票集中在 `--sb-*`（文字 `--sb-text`／標籤 `--sb-label`／說明 `--sb-hint`／區段標題 `--sb-title`／副標 `--sb-sub`／狀態 `--sb-ok`·`--sb-warn`·`--sb-bad`）。
+    **側欄裡不可再寫行內的 `color`／`background`**（原本很多小字的顏色是為舊底色寫的行內樣式 → 換底色就看不見）；
+    流阻比卡的狀態色由 class 決定（`#ar-display.is-ok／is-poor／is-bad`，recalc 切換），h 值偏低是 `.h-val.is-low`。
+  - **預設寬度 227px（原本 340 的 2/3，使用者要求）、可拖到 200–560**（`SIDEBAR_DEFAULT`／`SIDEBAR_MIN`；localStorage key 換成
+    `rru.sidebarWidth.v2`，舊的寬度偏好不沿用 → 每個人都先看到新的預設）。排列是**每個參數一列：標籤在左、輸入框在右（固定 72px）**：
+    `.section-body` 是兩欄 grid，`.row2`（原本兩個參數並排）用 `display:contents` 攤平；副標題（`label.sb-sub`）、整列的標籤（`label.sb-full`）、
+    卡片、說明、下拉、按鈕佔滿一列。`.fin-custom-fields`、`#diecast-params` 用同一組欄寬。**新增參數照 `<label>…</label><input type="number">` 相鄰寫**
+    （或包在 `.row2 > div` 裡）就會自動對齊；標籤要短到一行放得下（變數名、完整說明放 `title`），不要放 emoji。
+  - 說明小字縮到一行（使用者要求）：`.via-k-hint`「抓不到逐顆 K_eff 時才用這兩個值」、`.tim-lib-hint`「唯讀檢視；修改請到 AI-Thermal」、
+    `#t_PCB_src`「AI-Thermal 板厚：RF 2.4 mm…」；完整說明在各自的 `title`。讀值卡片：h（`#h-display`：標題／數值／h_conv＋h_rad／η_fin）、
+    流阻比、Die-casting 衍生參數（名稱左、數值右）。
+  - 契約測試：`tests/sidebar-contrast.test.js`（每一個看得到的文字／輸入框／placeholder 對實際底色 ≥ 4.5:1、字 ≥ 11px，Embedded／Die-casting／
+    流阻比三種狀態；[F] 窄版排列：輸入框左右緣對齊、標籤一行、沒有截斷、200px 也成立）。
+- **卡片不畫左側色條**（使用者：太像 AI 的樣板）：提示／警告／說明框一律四邊同粗細的 1px 框線＋淡底色（`.alert-*`、`.power-summary`、`.calc-gate`、
+  `.ls-note`、`.stale-note`、`.tim-migrate`、`.thick-migrate`、`.lock-modal-info`、登入頁 `.info-card`、3D 的 `.asm .q`）。
+  例外只有**欄位**上的藍色左邊（`.derived-src`／`.rjc-ref`／`.via-k-eff`＝「AI-Thermal 推導值」的標記，不是卡片）。
 - **分頁**：白色膠囊容器，作用中＝實心台達藍。元件分類頁籤作用中整顆塗滿分類色：RF 藍 `#0f6fc6`／Digital 紫 `#5b3fc4`／PWR 橘 `#c05a12`
   （與 AI-Thermal 同一組；紅色保留給錯誤）。
 - **表頭仍是深底白字**（`--th-bg` 換成深墨色 `#0f1b2d`、底線青色；`tests/header-toolbar.test.js` 的對比契約不變）。
@@ -324,7 +340,8 @@
 
 - **表頭分兩行**（`COL_HEAD`／`compThHtml`）：第二行是單位（`.th-u`）；合起來的文字（空白相接）＝ `COL_LABELS`（Rjc 例外，表頭多一個「(°C/W)」）。
   `COL_LABELS` 不放 HTML（缺值清單、Excel 欄名也用它）。
-- **數字欄的輸入框固定 76px**（數量 52px），不用百分比：放得下 6 位數字（72.688）＋上下箭頭＋左側藍邊。
+- **數字欄的輸入框固定 68px**（數量 52px；原本 76px），不用百分比：上下箭頭收掉（`appearance:textfield`，鍵盤 ↑↓ 照樣可以加減）
+  → 放得下 6 位數字（72.688）＋左側藍邊。
 - **欄寬分配**：數字欄與操作欄 `width:1%`（收到內容寬）；元件名稱是**固定寬度**＝這一頁最長的名稱實際量出來（`compNameColW`，canvas
   `measureText`，下限 140、上限 300；超過上限看輸入框的 `title`）—— 寫成固定寬度是因為底下「↩ 參照自 … 解除參照」很長，只給下限的話
   自動版面會把多出來的寬度分給名稱欄、反而擠到說明文字。多出來的寬度只分給**導熱方式、介面材料**兩欄（依說明文字長度）。
@@ -333,6 +350,10 @@
   → 放不下就整段換到下一行，不會從「計算」或型號中間斷開。不要再加 `max-width`＋`text-overflow:ellipsis`。
 - 實測（FDD 專案資料）：24 吋（1920，參數控制台展開）表格 1513px 完全放得下、沒有任何截斷；17 吋筆電 125%（1536×730）參數控制台展開時
   表格 1367px（原本 1385px）仍需橫向捲動、但沒有截斷，收合參數控制台就放得下。
+- **列高**（使用者要求壓低）：導熱方式／介面材料底下的說明改成跟著標籤走的行內文字（`.via-k-src`／`.tim-note-src` `display:inline`），
+  通用值的原因只顯示後半（`viaWhyShort`：拿掉開頭的「AI-Thermal「Thermal Via 計算」」，完整文字在 tooltip）；表格容器 ≥ 1400px（`@container comptbl`）
+  時限溫＋限溫對象並排、介面材料的類型＋型號並排。實測：24 吋 64～81px（原本 79～100）；17 吋（1536）參數控制台展開時表格 1262px **不再需要橫向捲動**
+  （側欄縮窄之後），列高 80～117px。
 - 契約測試：`tests/comp-table-layout.test.js` [E]（canvas 量每一格的字寬對輸入框可用寬度）。
 
 ### header 頂排：版本徽章 ─ 專案名稱 ─ 右側按鈕
@@ -588,7 +609,7 @@ AI-Thermal 有好幾份資料用「元件名稱」當 key：TH/ME 頁的 `therma
 
 `#sidebar-resizer` 同時是拖曳把手與收合鈕：`mousedown` 後位移超過 4px 才算拖曳，
 沒超過就當點一下 → 收合／展開（收合後分隔線變 ▶，這是收合狀態唯一回得去的路，不可拿掉）；
-標題列也有一顆同功能的按鈕。寬度（220–560px）與收合狀態存 localStorage，
+標題列也有一顆同功能的按鈕。寬度（200–560px，預設 227）與收合狀態存 localStorage，
 讀寫一律 try/catch。⚠ **寬度變動後要呼叫 `resizePlots()`**，否則 Plotly 圖停在舊寬度；
 登入前／登出後由 `_setShellVisible(false)` 把側欄、分隔線、主區一起藏起來。
 
