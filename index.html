@@ -10,6 +10,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 <script src="https://alcdn.msauth.net/browser/2.38.2/js/msal-browser.min.js"></script>
+<!-- 數字用的等寬字（JetBrains Mono）。載不到就退回系統的 Cascadia Mono／Consolas -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
 <style>
 :root{--primary:#007CF0;--primary-light:#00DFD8;--sidebar-bg:#1e293b;--sidebar-text:#e2e8f0;--card-shadow:0 4px 6px rgba(0,0,0,0.1);--danger:#e74c3c;--warning:#f39c12;--success:#2ecc71;--info:#3498db;
   /* 表頭色票：三張表（元件清單／詳細分析／型號庫）共用一組值，改一次就全部同步 */
@@ -723,6 +727,107 @@ tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
 }
 #db-corrupt-bar strong{color:#b91c1c;}
 #db-corrupt-bar .lock-status-meta{color:#b91c1c;}
+/* ▣V4-BEGIN */
+
+/* ══════════════════════════════════════════════════════════════════════
+   ▣ 方案 C「Thermal Spectrum」視覺層（最後一層，與 AI-Thermal 同一套；使用者 2026-11 選定）
+   亮色、頂端一條熱影像色帶當識別、台達藍主色、膠囊形按鈕、圓角卡片、等寬數字。
+   原本 200px 高的青藍漸層大標題 → 白色精簡頂列（兩排共約 100px，捲動時第二排固定在頂端）；
+   深色參數控制台 → 亮色。色票集中在下面的 :root，之後要調色只改這裡。
+   ══════════════════════════════════════════════════════════════════════ */
+:root{
+  --primary:#0079c8; --primary-light:#00b3c4;
+  --c-bg:#f4f6fa; --c-surface:#fff; --c-text:#0f1b2d; --c-text2:#44546a; --c-text3:#76859a;
+  --c-border:#dfe5ee; --c-border2:#ebeff5; --c-tint:#e4f2fc; --c-tint2:#f2f9fe;
+  --cat-rf:#0f6fc6; --cat-digital:#5b3fc4; --cat-pwr:#c05a12;
+  --heat:linear-gradient(90deg,#1b3fa0 0%,#0079c8 18%,#00b3c4 36%,#35c46a 52%,#f2c230 70%,#f08a24 85%,#e23b2e 100%);
+  --sidebar-bg:#fff; --sidebar-text:#0f1b2d;
+  --th-bg:#0f1b2d; --th-bg2:#0f1b2d; --th-fg:#f8fafc; --th-accent:#00b3c4;
+  --io-h:34px;
+  --ui-font:'Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,'PingFang TC','Microsoft JhengHei UI','Microsoft JhengHei','Noto Sans TC',sans-serif;
+  --num-font:'JetBrains Mono','Cascadia Mono',Consolas,'Segoe UI','Noto Sans TC',sans-serif;
+}
+body{font-family:var(--ui-font);background:var(--c-bg);color:var(--c-text);}
+body::before{content:'';position:fixed;top:0;left:0;right:0;height:4px;background:var(--heat);z-index:2000;pointer-events:none;}
+input,select,button,textarea{font-family:inherit;}
+.comp-table td input[type=number],.detail-table td,.vr-num,.vr-val,.kpi-value,.sidebar input[type=number],.rc-margin,#vb-ver{font-family:var(--num-font);}
+
+/* ── 參數控制台：亮色 ── */
+.sidebar{background:#fff;color:var(--c-text);border-right:1px solid var(--c-border);padding-top:24px;}
+.sidebar h2{color:var(--c-text);border-bottom:1px solid var(--c-border2);background:#fff;top:-24px;margin:-24px -20px 12px;padding:24px 20px 10px;font-size:1.02rem;}
+.sidebar label{color:var(--c-text2);font-size:.8rem;}
+.sidebar input[type="number"],.sidebar select{background:#f6f8fb;border:1px solid transparent;color:var(--c-text);border-radius:8px;height:32px;}
+.sidebar input[type="number"]:hover,.sidebar select:hover{border-color:#c8d3e0;}
+.sidebar input[type="number"]:focus,.sidebar select:focus{background:#fff;border-color:var(--primary);box-shadow:0 0 0 3px rgba(0,121,200,.14);}
+.sidebar .section-title{color:var(--primary);font-size:.86rem;letter-spacing:.02em;margin-top:20px;padding-top:12px;border-top:1px solid var(--c-border2);}
+.sidebar .section-title:first-of-type{border-top:none;padding-top:0;margin-top:6px;}
+.sidebar .fin-custom-box{border:1px dashed #c8d3e0;background:var(--c-bg);border-radius:10px;}
+.sidebar .fin-custom-toggle{color:var(--c-text2);}
+.sidebar .fin-eff-now{color:var(--c-text);} .sidebar .fin-eff-now b{color:var(--c-text);}
+.sidebar .fin-eff-now .fe-src,.sidebar .fin-eff-now .fe-h{color:var(--c-text3);} .sidebar .fin-eff-now .fe-src.custom{color:#b45309;}
+.sidebar .pcbt-src{color:#0064a8;}
+.sidebar .dim-derive{border:1px solid var(--c-border2);background:var(--c-bg);border-radius:10px;}
+.sidebar .dim-derive .dd-rule,.sidebar .dim-derive .dd-sum{color:var(--c-text3);}
+.sidebar .dim-derive .dd-row{color:var(--c-text2);} .sidebar .dim-derive .dd-row b{color:var(--c-text);}
+.sidebar-toggle{border:1px solid var(--c-border);color:var(--c-text2);border-radius:999px;padding:5px 8px;}
+.sidebar-toggle:hover{background:var(--c-bg);border-color:#b3bfcd;color:var(--c-text);}
+.sidebar [style*="color:#94a3b8"],.sidebar [style*="color: #94a3b8"],.sidebar [style*="color:#cbd5e1"],.sidebar [style*="color:#e2e8f0"]{color:var(--c-text2) !important;}
+.sidebar [style*="background:#334155"],.sidebar [style*="background:rgba(51,65,85"]{background:var(--c-bg) !important;color:var(--c-text) !important;border-color:var(--c-border) !important;}
+#sidebar-resizer{background:var(--c-bg);}
+
+/* ── 頂列：白色、兩排；第一排（版本／專案名稱／資料庫與帳號）會捲走，第二排（品牌＋專案工具列）固定在頂端 ── */
+.main{padding:0 20px 40px;}
+.header{background:#fff;color:var(--c-text);border-radius:0;margin:0 -20px 14px;padding:10px 20px 8px;
+  border-bottom:1px solid var(--c-border);box-shadow:0 6px 20px -14px rgba(15,27,45,.35);
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 14px;
+  position:sticky;top:-40px;z-index:900;}
+.header .hdr-topbar{position:static;flex:1 1 100%;order:0;height:30px;display:flex;align-items:center;gap:10px;min-width:0;}
+.header > div:not(.hdr-topbar):not(.project-io):not(.cloud-modal-overlay){order:1;display:flex;align-items:center;gap:10px;}
+.header h1{font-family:var(--ui-font);font-size:1.06rem;font-weight:800;color:var(--c-text);white-space:nowrap;display:flex;align-items:center;gap:8px;}
+.header h1::before{content:'';width:30px;height:30px;border-radius:9px;background:var(--heat);box-shadow:0 4px 10px -4px rgba(226,59,46,.5);flex:none;}
+.header .subtitle{display:none;}
+.header .project-io{order:2;background:none;border:none;box-shadow:none;padding:0;gap:6px;}
+.header .project-io .io-group+.io-group{margin-left:6px;padding-left:10px;border-left:1px solid var(--c-border);}
+.header .project-io .io-btn{border-radius:999px;border:1px solid var(--c-border);background:#fff;color:var(--c-text2);box-shadow:none;font-size:.82rem;font-weight:600;padding:0 13px;}
+.header .project-io .io-btn:hover{background:var(--c-bg);border-color:#b3bfcd;color:var(--c-text);box-shadow:none;transform:none;}
+.header .project-io .io-btn-primary{background:#0f1b2d;border-color:#0f1b2d;color:#fff;padding:0 20px;font-weight:700;box-shadow:0 6px 14px -6px rgba(15,27,45,.6);}
+.header .project-io .io-btn-primary:hover{background:#1c2f4a;color:#fff;}
+.header .project-io .io-btn-copy{color:var(--c-text2);border-color:var(--c-border);}
+.header .project-io .io-btn-copy:hover{background:var(--c-bg);}
+.header .project-io .cloud-lock{border-radius:999px;box-shadow:none;}
+.header .hdr-right button{background:#fff !important;color:var(--c-text2) !important;border:1px solid var(--c-border) !important;border-radius:999px !important;height:26px;padding:0 11px !important;font-size:.74rem !important;font-weight:600;}
+.header .hdr-right button:hover{background:var(--c-bg) !important;color:var(--c-text) !important;border-color:#b3bfcd !important;}
+.header.hdr-c2 .hdr-right button{padding:0 8px !important;}
+.header #db-banner-text,.header #sp-user-info{color:var(--c-text3) !important;}
+.header .proj-name .pn-label{color:var(--c-text3);font-weight:600;}
+.header .proj-name .pn-value{color:var(--c-text);font-weight:800;}
+#version-badge{background:none !important;border:none !important;color:var(--c-text3) !important;padding:0 !important;font-size:.7rem !important;}
+
+/* ── 分頁：白色膠囊容器，作用中＝實心台達藍 ── */
+.tabs{background:#fff;border:1px solid var(--c-border);border-radius:999px;padding:5px;gap:6px;box-shadow:0 4px 14px -10px rgba(15,27,45,.4);align-items:center;}
+.tab-btn{background:none;color:var(--c-text2);border-radius:999px;height:34px;padding:0 18px;transition:background .12s,color .12s;}
+.tab-btn:hover{background:var(--c-bg);color:var(--c-text);}
+.tab-btn.active{background:var(--primary);color:#fff;box-shadow:0 6px 14px -6px rgba(0,121,200,.7);}
+#pdf-btn{border:1px solid var(--c-border) !important;background:#fff !important;color:var(--c-text2) !important;border-radius:999px !important;height:34px;padding:0 16px !important;font-weight:700;}
+#pdf-btn:hover{background:var(--c-bg) !important;color:var(--c-text) !important;}
+
+/* ── 元件分類頁籤：整顆塗滿分類色（RF 藍／Digital 紫／PWR 橘，與 AI-Thermal 同一組） ── */
+.sub-tab-btn{border-radius:999px;border:1px solid var(--c-border);height:32px;padding:0 16px;color:var(--c-text2);}
+.sub-tab-btn:nth-child(1).active{background:var(--cat-rf);border-color:var(--cat-rf);}
+.sub-tab-btn:nth-child(2).active{background:var(--cat-digital);border-color:var(--cat-digital);}
+.sub-tab-btn:nth-child(3).active{background:var(--cat-pwr);border-color:var(--cat-pwr);}
+
+/* ── 表格、卡片 ── */
+.comp-table td input,.comp-table td select{border-radius:8px;}
+.cloud-modal{border-radius:14px;}
+#r3dToast:empty{display:none;}
+/* 匯出鈕：同一種外框膠囊（原本一顆一個顏色） */
+#tab0 button[onclick*="exportCat"],#tab0 button[onclick*="Excel"],#tab0 button[onclick*="export"]{background:#fff !important;color:var(--c-text2) !important;border:1px solid var(--c-border) !important;border-radius:999px !important;box-shadow:none !important;font-weight:600 !important;}
+#tab0 button[onclick*="export"]:hover{background:var(--c-bg) !important;color:var(--c-text) !important;}
+/* 頂列是 sticky＋z-index → 自成一個堆疊層；裡面的對話框（專案列表、3D 頁的解鎖密碼…）打開時把整層拉到最上面，
+   否則會被全螢幕的 3D 檢視器（z-index 3000）蓋住 */
+.header:has(.cloud-modal-overlay.active){z-index:3200;}
+/* ▣V4-END */
 </style>
 <script src="config.js?v=__APP_VERSION__"></script>
 <script src="fileDb.js?v=__APP_VERSION__"></script>
