@@ -343,12 +343,19 @@ const graphDb = {
   async _withOptimisticWrite(mutateFn, opts) {
     const MAX = 4;
     for (let attempt = 0; ; attempt++) {
-      const decision = mutateFn(dbCache) || {};
+      // 在複本上套用、寫入成功才算數：寫入失敗（權限不足、重試用盡、唯讀保護…）時快取退回寫入前。
+      // ⚠ 原本直接改 dbCache → 存檔失敗後那份「沒存成功」的修改留在快取裡，之後任何一次整檔寫入
+      //   （釋放編輯鎖、登入紀錄）會把它一起寫進共用 DB；重新載入專案也會讀到它。與 AI-Thermal 的 graphDb 同一段。
+      const base = dbCache;
+      const draft = _clone(base) || {};
+      const decision = mutateFn(draft) || {};
       if (decision.skipWrite) return decision.value;
+      dbCache = draft;
       try {
         await this._writeFile(opts);
         return decision.value;
       } catch (e) {
+        if (dbCache === draft) dbCache = base;   // 沒寫成功 → 退回（下面的重讀會再換成磁碟上的最新內容）
         // 412：別人改過 → 重讀後在最新狀態上重算；逾時／斷線／429／5xx：不確定有沒有寫成功 →
         // 一樣重讀再試（帶 If-Match：若其實已寫成功會得到 412 再重讀，不會蓋掉任何人的寫入）
         const retryable = e && (e.status === 412 || e.network || e.status === 429 || e.status >= 500);

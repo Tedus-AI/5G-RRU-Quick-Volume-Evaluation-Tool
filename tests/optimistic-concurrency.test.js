@@ -78,6 +78,7 @@ global.fetch = async (url, opts = {}) => {
     server.putAttempts++;
     if (server.alwaysBump) server.etag++;
     if (server.beforePut) { const h = server.beforePut; server.beforePut = null; h(); }
+    if (server.failPut) return { ok: false, status: server.failPut, statusText: 'Fail', json: async () => ({}), text: async () => 'denied' };
     const ifMatch = opts.headers && (opts.headers['If-Match'] || opts.headers['if-match']);
     if (ifMatch && ifMatch !== server.eTagStr()) {
       return { ok: false, status: 412, statusText: 'Precondition Failed',
@@ -326,6 +327,17 @@ const otherLock = (extra) => Object.assign({ lockedBy: 'Other', lockedByEmail: '
   check('其他資料完整', !!server.db().projects.p1 && !!server.db().projects.pFresh);
   base = server.putAttempts;
   check('沒有鎖時 → 回傳 null、不寫檔', (await graphDb.forceReleaseLock()) === null && server.putAttempts === base);
+
+  console.log('[T23] 寫入失敗（非 412，例：403 權限不足）→ 快取退回寫入前，沒存成功的修改不會留在快取裡');
+  await graphDb.refresh();
+  await graphDb.setDoc('projects', 'pRb', { a: 1 });
+  server.failPut = 403;
+  let rbErr = null; try { await graphDb.updateDoc('projects', 'pRb', { unsaved: 'x' }); } catch (e) { rbErr = e; }
+  server.failPut = 0;
+  check('403 原樣丟出', rbErr && rbErr.status === 403);
+  check('快取沒有留下沒存成功的修改', (await graphDb.getDoc('projects', 'pRb')).unsaved === undefined);
+  await graphDb.setDoc('projects', 'pRb2', { z: 1 });
+  check('之後的寫入不會把那份修改一起寫進資料庫', server.db().projects.pRb.unsaved === undefined && server.db().projects.pRb2.z === 1);
 
   console.log(`\n結果：${pass} pass / ${fail} fail`);
   process.exit(fail ? 1 : 0);

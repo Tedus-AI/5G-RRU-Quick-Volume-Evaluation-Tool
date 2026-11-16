@@ -161,20 +161,8 @@ const fileDb = {
     this._assertReady();
     await this._readFile();
     if (dbCorrupted) this._assertWritable(false);   // 讀到壞檔 → 直接丟唯讀錯誤，不動快取
-    let prev = null;
-    try {
-      await this._withOptimisticWrite(() => {
-        const next = _fdbClone(dbCache);
-        mutateFn(next);                              // 先算完再換快取：算的途中丟例外 → 快取不變
-        prev = dbCache;
-        dbCache = next;
-      });
-    } catch (e) {
-      // 沒寫成功 → 快取退回還原前的內容（不可留著一份沒寫進檔案的還原結果，下一次存檔會把它整份寫出去）。
-      // 版本衝突用盡重試時，_writeFile 已換成磁碟上的最新內容 → 不退回。
-      if (prev && !(e instanceof ConflictError)) dbCache = prev;
-      throw e;
-    }
+    // _withOptimisticWrite 在複本上套用：mutateFn 丟例外或寫入失敗 → 快取不變（不會留著一份沒寫進檔案的還原結果）
+    await this._withOptimisticWrite((cache) => { mutateFn(cache); });
     lastReadProjects = Object.keys(dbCache.projects || {}).length;
   },
 
@@ -281,12 +269,18 @@ const fileDb = {
   async _withOptimisticWrite(mutateFn, opts) {
     const MAX = 4;
     for (let attempt = 0; ; attempt++) {
-      const decision = mutateFn(dbCache) || {};
+      // 在複本上套用、寫入成功才算數（與 graphDb 同一套）：寫入失敗時快取退回寫入前。
+      // 版本衝突時 _writeFile 已把快取換成磁碟上的最新內容（不是這份複本）→ 不退回，下一圈在最新內容上重算。
+      const base = dbCache;
+      const draft = _fdbClone(base) || {};
+      const decision = mutateFn(draft) || {};
       if (decision.skipWrite) return decision.value;
+      dbCache = draft;
       try {
         await this._writeFile(opts);
         return decision.value;
       } catch (e) {
+        if (dbCache === draft) dbCache = base;
         if (e instanceof ConflictError && attempt < MAX) continue;
         throw e;
       }
