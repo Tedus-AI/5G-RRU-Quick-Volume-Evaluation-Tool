@@ -22,7 +22,7 @@
   --io-h:36px;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:"Microsoft JhengHei","Segoe UI",Roboto,sans-serif;background:#f5f7fa;display:flex;min-height:100vh;}
-.sidebar{width:340px;min-width:340px;background:var(--sidebar-bg);color:var(--sidebar-text);padding:20px;overflow-y:auto;height:100vh;position:sticky;top:0;}
+.sidebar{width:227px;min-width:227px;background:var(--sidebar-bg);color:var(--sidebar-text);padding:20px;overflow-y:auto;height:100vh;position:sticky;top:0;}
 .sidebar h2{color:#fff;font-size:1.1rem;margin-bottom:15px;border-bottom:1px solid #334155;padding-bottom:10px;}
 .sidebar label{display:block;font-size:0.82rem;color:#94a3b8;margin-top:10px;margin-bottom:3px;}
 .sidebar input[type="number"],.sidebar select{width:100%;padding:6px 8px;border:1px solid #475569;border-radius:6px;background:#334155;color:#e2e8f0;font-size:0.85rem;}
@@ -79,7 +79,7 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .rjc-ref{border-left:3px solid #0550ae;white-space:nowrap;}
 .rjc-ref .rjc-lock{font-size:0.7rem;color:#94a3b8;margin-left:3px;}
 .thick-na{display:inline-block;padding:4px 8px;color:#9ca3af;cursor:help;}
-.thick-migrate{background:#eff6ff;border:1px solid #60a5fa;border-left-width:5px;border-radius:8px;
+.thick-migrate{background:#eff6ff;border:1px solid #b9d7f2;border-radius:8px;
   padding:12px;margin-bottom:12px;color:#1e3a5f;font-size:0.85rem;line-height:1.5;}
 .thick-migrate b{color:#1d4ed8;}
 .main{flex:1;padding:25px 30px;overflow-y:auto;min-width:0;}
@@ -301,10 +301,10 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .sub-tab-btn.active{background:var(--primary);color:#fff;border-color:var(--primary);}
 .sub-content{display:none;}.sub-content.active{display:block;}
 .alert{padding:12px 16px;border-radius:8px;margin-bottom:12px;font-size:0.88rem;}
-.alert-danger{background:#fdeded;border-left:4px solid var(--danger);color:#c0392b;}
-.alert-warning{background:#fff8e1;border-left:4px solid var(--warning);color:#e67e22;}
-.alert-info{background:#e3f2fd;border-left:4px solid var(--info);color:#1565c0;}
-.alert-success{background:#e8f5e9;border-left:4px solid var(--success);color:#2e7d32;}
+.alert-danger{background:#fdeded;border:1px solid #f3c1c1;color:#a61b1b;}
+.alert-warning{background:#fff8e1;border:1px solid #f1d38c;color:#8a4b06;}
+.alert-info{background:#e3f2fd;border:1px solid #b9d7f2;color:#1565c0;}
+.alert-success{background:#e8f5e9;border:1px solid #b7dfc7;color:#2e7d32;}
 .cloud-lock{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;border:1.5px solid;user-select:none;transition:all .2s;}
 .cloud-lock.locked{background:#fdeded;border-color:#e74c3c;color:#c0392b;}
 .cloud-lock.unlocked{background:#e8f5e9;border-color:#2e7d32;color:#2e7d32;}
@@ -514,7 +514,7 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .sa-tbl th:first-child,.sa-tbl td:first-child{text-align:left;}
 .sa-tbl td{padding:6px 8px;text-align:right;border-bottom:1px solid #eef2f7;}
 .sa-tbl tr.cur td{font-weight:800;background:#f0f9ff;}
-.power-summary{background:#e3f2fd;border-left:4px solid var(--info);padding:12px 16px;border-radius:8px;margin-top:10px;font-weight:600;color:#1565c0;}
+.power-summary{background:#e3f2fd;border:1px solid #b9d7f2;padding:12px 16px;border-radius:8px;margin-top:10px;font-weight:600;color:#1565c0;}
 .drc-error{background:#ffebee;border:2px solid var(--danger);border-radius:10px;padding:20px;text-align:center;color:var(--danger);}
 .lib-section{background:#f8f9fa;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:12px;}
 .lib-section select{padding:5px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:0.82rem;min-width:200px;}
@@ -558,7 +558,7 @@ body.sidebar-resizing{user-select:none;cursor:col-resize;}
 .lock-modal-box{background:#fff;border-radius:12px;padding:24px 28px;max-width:460px;width:90%;box-shadow:0 12px 40px rgba(0,0,0,0.25);}
 .lock-modal-title{color:#c0392b;margin:0 0 12px 0;font-size:1.2rem;}
 .lock-modal-text{color:#333;margin:0 0 16px 0;line-height:1.5;}
-.lock-modal-info{background:#fff7e6;border-left:4px solid #f39c12;padding:12px 14px;border-radius:4px;font-size:0.9rem;line-height:1.8;color:#5a4320;}
+.lock-modal-info{background:#fff7e6;border:1px solid #f1d38c;padding:12px 14px;border-radius:10px;font-size:0.9rem;line-height:1.8;color:#5a4320;}
 .lock-modal-info strong{color:#8b5a00;margin-right:4px;}
 .lock-modal-hint{margin:14px 0 0 0;font-size:0.85rem;color:#888;}
 .lock-modal-actions{text-align:center;margin-top:18px;}
@@ -629,7 +629,7 @@ tr.comp-excluded{opacity:0.4;}
 .comp-table td input.cell-missing::placeholder{color:#dc2626;font-weight:700;opacity:1;font-size:0.72rem;}
 .cell-flash{animation:cellflash 1.4s ease-out 1;}
 @keyframes cellflash{0%{box-shadow:inset 0 0 0 3px rgba(220,38,38,.9);}100%{box-shadow:inset 0 0 0 3px rgba(220,38,38,0);}}
-.calc-gate{border:1px solid #fca5a5;border-left:5px solid #dc2626;background:#fef2f2;border-radius:8px;
+.calc-gate{border:1px solid #f3b4b4;background:#fef2f2;border-radius:8px;
   padding:12px 14px;margin:0 0 12px;color:#7f1d1d;font-size:0.88rem;line-height:1.6;}
 .calc-gate .cg-title{font-weight:800;font-size:0.98rem;color:#b91c1c;}
 .calc-gate .cg-sub{margin:3px 0 6px;color:#991b1b;font-size:0.82rem;}
@@ -648,7 +648,7 @@ tr.comp-excluded{opacity:0.4;}
 .comp-table td input.cell-suspect{border:2px dashed #d97706;background:#fffbeb;padding-left:3px;padding-right:2px;}
 .lim-sus{margin-top:3px;font-size:0.7rem;color:#92400e;line-height:1.35;white-space:nowrap;}
 .lim-sus .btn{padding:1px 6px;font-size:0.68rem;}
-.ls-note{background:#fffbeb;border:1px solid #fcd34d;border-left:5px solid #d97706;color:#78350f;border-radius:8px;padding:10px 14px;margin:0 0 12px;font-size:0.85rem;line-height:1.6;}
+.ls-note{background:#fffbeb;border:1px solid #f1d38c;color:#78350f;border-radius:8px;padding:10px 14px;margin:0 0 12px;font-size:0.85rem;line-height:1.6;}
 .ls-note ul{margin:4px 0 0 18px;}.ls-note li{margin:2px 0;}
 .ls-note .ls-cat{margin-left:4px;font-size:0.7rem;font-weight:800;color:#92400e;}
 .ls-note .btn{padding:1px 8px;font-size:0.72rem;margin-left:6px;}
@@ -657,11 +657,11 @@ tr.comp-excluded{opacity:0.4;}
 .calc-gate .cg-h{margin:8px 0 2px;font-weight:700;color:#991b1b;font-size:0.86rem;}
 .calc-gate .cg-ok{margin-left:6px;padding:1px 8px;font-size:0.74rem;border:1px solid #b91c1c;background:#fff;color:#b91c1c;border-radius:4px;cursor:pointer;}
 /* 資料庫在載入之後被更新、畫面上又有還沒存的修改 → 琥珀色提示（提醒，不是錯誤） */
-.stale-note{background:#fffbeb;border:1px solid #fcd34d;border-left:5px solid #d97706;color:#78350f;border-radius:8px;padding:10px 14px;margin:0 0 12px;font-size:0.86rem;line-height:1.6;}
+.stale-note{background:#fffbeb;border:1px solid #f1d38c;color:#78350f;border-radius:8px;padding:10px 14px;margin:0 0 12px;font-size:0.86rem;line-height:1.6;}
 .rjc-warn{color:#b45309;margin-left:3px;}
 .derived-legend{color:#64748b;font-size:0.76rem;margin:-4px 0 8px;line-height:1.4;}
 .derived-swatch{display:inline-block;width:10px;height:12px;border:1px solid #d1d5db;border-left:3px solid #0550ae;background:#f5f9ff;vertical-align:-2px;border-radius:2px;}
-.tim-migrate{background:#fffbeb;border:1px solid #f59e0b;border-left-width:5px;border-radius:8px;padding:12px;margin-bottom:12px;color:#7c4a03;font-size:0.85rem;}
+.tim-migrate{background:#fffbeb;border:1px solid #f1d38c;border-radius:8px;padding:12px;margin-bottom:12px;color:#7c4a03;font-size:0.85rem;}
 .tim-migrate b{color:#b45309;}
 .tim-migrate select{padding:5px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:0.82rem;min-width:220px;}
 tr.comp-excluded input,tr.comp-excluded select{pointer-events:none;}
@@ -752,28 +752,72 @@ body::before{content:'';position:fixed;top:0;left:0;right:0;height:4px;backgroun
 input,select,button,textarea{font-family:inherit;}
 .comp-table td input[type=number],.detail-table td,.vr-num,.vr-val,.kpi-value,.sidebar input[type=number],.rc-margin,#vb-ver{font-family:var(--num-font);}
 
-/* ── 參數控制台：亮色 ── */
-.sidebar{background:#fff;color:var(--c-text);border-right:1px solid var(--c-border);padding-top:24px;}
-.sidebar h2{color:var(--c-text);border-bottom:1px solid var(--c-border2);background:#fff;top:-24px;margin:-24px -20px 12px;padding:24px 20px 10px;font-size:1.02rem;}
-.sidebar label{color:var(--c-text2);font-size:.8rem;}
-.sidebar input[type="number"],.sidebar select{background:#f6f8fb;border:1px solid transparent;color:var(--c-text);border-radius:8px;height:32px;}
-.sidebar input[type="number"]:hover,.sidebar select:hover{border-color:#c8d3e0;}
-.sidebar input[type="number"]:focus,.sidebar select:focus{background:#fff;border-color:var(--primary);box-shadow:0 0 0 3px rgba(0,121,200,.14);}
-.sidebar .section-title{color:var(--primary);font-size:.86rem;letter-spacing:.02em;margin-top:20px;padding-top:12px;border-top:1px solid var(--c-border2);}
-.sidebar .section-title:first-of-type{border-top:none;padding-top:0;margin-top:6px;}
-.sidebar .fin-custom-box{border:1px dashed #c8d3e0;background:var(--c-bg);border-radius:10px;}
-.sidebar .fin-custom-toggle{color:var(--c-text2);}
-.sidebar .fin-eff-now{color:var(--c-text);} .sidebar .fin-eff-now b{color:var(--c-text);}
-.sidebar .fin-eff-now .fe-src,.sidebar .fin-eff-now .fe-h{color:var(--c-text3);} .sidebar .fin-eff-now .fe-src.custom{color:#b45309;}
-.sidebar .pcbt-src{color:#0064a8;}
-.sidebar .dim-derive{border:1px solid var(--c-border2);background:var(--c-bg);border-radius:10px;}
-.sidebar .dim-derive .dd-rule,.sidebar .dim-derive .dd-sum{color:var(--c-text3);}
-.sidebar .dim-derive .dd-row{color:var(--c-text2);} .sidebar .dim-derive .dd-row b{color:var(--c-text);}
-.sidebar-toggle{border:1px solid var(--c-border);color:var(--c-text2);border-radius:999px;padding:5px 8px;}
-.sidebar-toggle:hover{background:var(--c-bg);border-color:#b3bfcd;color:var(--c-text);}
-.sidebar [style*="color:#94a3b8"],.sidebar [style*="color: #94a3b8"],.sidebar [style*="color:#cbd5e1"],.sidebar [style*="color:#e2e8f0"]{color:var(--c-text2) !important;}
-.sidebar [style*="background:#334155"],.sidebar [style*="background:rgba(51,65,85"]{background:var(--c-bg) !important;color:var(--c-text) !important;border-color:var(--c-border) !important;}
+/* ── 參數控制台：深台達藍底（使用者回報白底過亮、淺色小字看不清楚）──
+   底色 #0d2a45；文字一律指定在這裡（原本很多小字的顏色是為舊的深灰底寫的行內樣式，已改成 class）。
+   每一種文字對底色的對比都 ≥ 4.5:1（小字多半 ≥ 7:1），由 tests/sidebar-contrast.test.js 逐一量。 */
+:root{--sb-bg:#0d2a45;--sb-card:#143657;--sb-line:#2b4f73;--sb-text:#eef5fc;--sb-label:#d3e3f3;--sb-hint:#b4cbe1;
+  --sb-title:#7fd3ff;--sb-sub:#8fe6d8;--sb-num:#ffffff;--sb-ok:#6ee7a0;--sb-warn:#ffd166;--sb-bad:#ffa3a3;--sidebar-bg:#0d2a45;--sidebar-text:#eef5fc;}
+.sidebar{background:var(--sb-bg);color:var(--sb-text);border-right:none;padding:24px 14px 20px;}
+.sidebar h2{color:#fff;border-bottom:1px solid var(--sb-line);background:var(--sb-bg);top:-24px;margin:-24px -14px 10px;padding:24px 14px 10px;font-size:1rem;}
+/* 窄版（預設 227px，原本 340 的 2/3；使用者要求）：每個參數一列 —— 標籤在左、輸入框在右（固定 72px），
+   所有輸入框的左右緣對齊成一直線。.row2（原本兩個參數並排）攤平成兩列；副標題、卡片、說明、整列的下拉佔滿一列。 */
+.sidebar .section-body,.sidebar .fin-custom-fields,.sidebar #diecast-params{display:grid;grid-template-columns:minmax(0,1fr) 72px;column-gap:8px;row-gap:4px;align-items:center;}
+.sidebar #diecast-params[style*="none"],.sidebar .fin-custom-fields[style*="none"]{display:none;}
+.sidebar .section-body>*,.sidebar .fin-custom-fields>*{grid-column:1/-1;min-width:0;}
+.sidebar .row2,.sidebar .row2>div{display:contents;}
+.sidebar .section-body>label:not(.sb-sub):not(.sb-full),.sidebar .row2>div>label,.sidebar #diecast-params>label{grid-column:1;margin:0;line-height:1.25;}
+.sidebar .section-body>label:not(.sb-sub):not(.sb-full)+input,.sidebar .row2>div>input,.sidebar #diecast-params>input{grid-column:2;}
+.sidebar label{color:var(--sb-label);font-size:.8rem;}
+.sidebar label.sb-full{margin:2px 0 -2px;}
+.sidebar label.sb-sub{margin:10px 0 0;padding-top:9px;border-top:1px dashed var(--sb-line);color:var(--sb-sub);font-weight:700;font-size:.78rem;letter-spacing:.04em;}
+.sidebar input[type="number"],.sidebar select{background:#f4f8fc;border:1px solid transparent;color:#0f1b2d;border-radius:7px;height:27px;padding:0 7px;font-weight:500;font-size:.82rem;}
+/* 參數不合理（清空／0）→ 擋下計算：紅框＋淡紅底（紅色＝擋計算的錯誤） */
+.sidebar input[type="number"].sb-bad{background:#ffe3e3;border-color:#ff6b6b;box-shadow:0 0 0 2px rgba(255,107,107,.55);color:#7a0b0b;}
+.sidebar input[type="number"]::placeholder{font-size:.74rem;font-family:var(--ui-font,inherit);}
+.sidebar .section-body>.fin-custom-box,.sidebar .section-body>.dim-derive,.sidebar .section-body>.h-display,.sidebar .section-body>.ar-display,.sidebar .section-body>.tim-lib-btn{margin-top:3px;}
+.sidebar .fin-custom-fields{margin-top:7px;grid-template-columns:minmax(0,1fr) 84px;}
+.sidebar #diecast-info{text-align:left;} .sidebar #diecast-info .rd-title{margin-bottom:4px;}
+.sidebar #diecast-info .dd-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:.78rem;color:var(--sb-label);line-height:1.7;}
+.sidebar #diecast-info .dd-row b{color:var(--sb-num);font-family:var(--num-font);font-size:.84rem;white-space:nowrap;}
+.sidebar .fin-custom-fields label{font-size:.78rem;margin:0;}
+.sidebar .pcbt-src,.sidebar .via-k-hint,.sidebar .tim-lib-hint{margin:0;line-height:1.45;}
+.sidebar input[type="number"]::placeholder{color:#5b6b7d;}
+.sidebar input[type="number"]:hover,.sidebar select:hover{background:#fff;}
+.sidebar input[type="number"]:focus,.sidebar select:focus{background:#fff;border-color:#7fd3ff;box-shadow:0 0 0 3px rgba(127,211,255,.35);}
+.sidebar .section-title{color:var(--sb-title);font-size:.88rem;letter-spacing:.02em;margin-top:16px;padding-top:12px;border-top:1px solid var(--sb-line);}
+.sidebar #fb-status+.section-title{border-top:none;padding-top:0;margin-top:4px;}
+.sidebar .fin-custom-box,.sidebar .dim-derive{border:1px solid var(--sb-line);background:var(--sb-card);border-radius:10px;}
+.sidebar .fin-custom-toggle{color:var(--sb-label);}
+.sidebar .fin-custom-fields label{color:var(--sb-label);}
+.sidebar .fin-eff-now{color:var(--sb-text);} .sidebar .fin-eff-now b{color:var(--sb-num);}
+.sidebar .fin-eff-now .fe-src,.sidebar .fin-eff-now .fe-h{color:var(--sb-hint);} .sidebar .fin-eff-now .fe-src.custom{color:var(--sb-warn);}
+.sidebar .pcbt-src{color:var(--sb-title);}
+.sidebar .dim-derive .dd-rule,.sidebar .dim-derive .dd-sum{color:var(--sb-hint);}
+.sidebar .dim-derive .dd-rule,.sidebar .dim-derive .dd-sum{font-size:.74rem;}
+.sidebar .dim-derive .dd-row{color:var(--sb-label);} .sidebar .dim-derive .dd-row b{color:var(--sb-num);}
+.sidebar .tim-lib-hint,.sidebar .via-k-hint{color:var(--sb-hint);font-size:.74rem;}
+.sidebar .tim-lib-hint b,.sidebar .via-k-hint b{color:var(--sb-text);}
+.sidebar .tim-lib-btn{background:#fff;color:#0d2a45;border:none;border-radius:999px;box-shadow:none;font-weight:700;padding:9px 12px;}
+.sidebar .tim-lib-btn:hover{background:#e4f2fc;filter:none;box-shadow:none;}
+.sidebar-toggle{border:1px solid var(--sb-line);color:var(--sb-label);border-radius:999px;padding:5px 8px;background:transparent;}
+.sidebar-toggle:hover{background:var(--sb-card);border-color:#5f86ad;color:#fff;}
 #sidebar-resizer{background:var(--c-bg);}
+/* 讀值卡：自動計算 h、流阻比、Die-casting 衍生參數 —— 同一種卡片（深一階的藍＋細框），字色全部在這裡指定 */
+.sidebar .h-display,.sidebar .ar-display{background:var(--sb-card);border:1px solid var(--sb-line);border-radius:10px;padding:10px 12px;margin-top:10px;text-align:center;}
+.sidebar .h-display{background:#0a4f86;border-color:#3b8fd0;}
+.sidebar .h-display .rd-title{font-size:.78rem;font-weight:600;color:#d6e8f8;}
+.sidebar .h-display .h-val{color:#fff;font-size:1.3rem;font-weight:800;font-family:var(--num-font);line-height:1.3;}
+.sidebar .h-display .h-val.is-low{color:#ffd9d9;}
+.sidebar .h-display .h-sub{color:#d6e8f8;font-size:.74rem;font-family:var(--num-font);margin-top:2px;line-height:1.5;}
+.sidebar .h-display .h-sub span{white-space:nowrap;} .sidebar .h-display .h-sub .h-eta{display:block;} .sidebar .h-display .h-sub i{font-style:normal;opacity:.75;}
+.sidebar .ar-display .rd-title{font-size:.8rem;font-weight:600;color:var(--sb-label);}
+.sidebar .ar-display .rd-val{font-size:1.3rem;font-weight:800;color:#fff;font-family:var(--num-font);line-height:1.3;}
+.sidebar .ar-display .rd-msg{font-size:.8rem;font-weight:700;color:var(--sb-label);}
+.sidebar .ar-display .rd-tip{font-size:.74rem;color:var(--sb-hint);margin-top:5px;line-height:1.5;}
+.sidebar .ar-display .rd-line{font-size:.84rem;color:var(--sb-text);font-family:var(--num-font);line-height:1.6;}
+.sidebar .ar-display.is-ok .rd-val,.sidebar .ar-display.is-ok .rd-msg{color:var(--sb-ok);}
+.sidebar .ar-display.is-poor .rd-val,.sidebar .ar-display.is-poor .rd-msg{color:var(--sb-warn);}
+.sidebar .ar-display.is-bad .rd-val,.sidebar .ar-display.is-bad .rd-msg{color:var(--sb-bad);}
 
 /* ── 頂列：白色、兩排；第一排（版本／專案名稱／資料庫與帳號）會捲走，第二排（品牌＋專案工具列）固定在頂端 ── */
 .main{padding:0 20px 40px;}
@@ -827,6 +871,30 @@ input,select,button,textarea{font-family:inherit;}
 /* 頂列是 sticky＋z-index → 自成一個堆疊層；裡面的對話框（專案列表、3D 頁的解鎖密碼…）打開時把整層拉到最上面，
    否則會被全螢幕的 3D 檢視器（z-index 3000）蓋住 */
 .header:has(.cloud-modal-overlay.active){z-index:3200;}
+
+/* ── 元件清單：壓低列高（原本 Thermal Via 列約 95～115px）──
+   說明文字接成同一行、放不下才以「段」換行；容器夠寬（24 吋，或 17 吋收合參數控制台）時
+   限溫＋限溫對象並排、介面材料的類型＋型號並排。數字欄不顯示上下箭頭（省下的寬度給說明文字）。 */
+.comp-table td input[type="number"]{width:68px;-moz-appearance:textfield;appearance:textfield;}
+.comp-table td input[type="number"]::-webkit-inner-spin-button,.comp-table td input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+.via-k-src,.tim-note-src{display:inline;}
+.via-k-note:not(.via-k-eff) .via-k-lbl::after{content:' ·';color:#94a3b8;}
+.via-k-src::before,.tim-note-src::before{content:' ';}
+.via-k-note,.tim-note{line-height:1.4;}
+.comp-table-wrap{container-type:inline-size;container-name:comptbl;}
+@container comptbl (min-width:1400px){
+  .comp-table td[data-col="Limit(C)"]{white-space:nowrap;}
+  .comp-table td[data-col="Limit(C)"] .lim-ref{display:inline-block;margin:0 0 0 4px;vertical-align:middle;}
+  .comp-table td.tim-cell{white-space:nowrap;}
+  .comp-table td.tim-cell > select{width:auto;min-width:86px !important;display:inline-block;vertical-align:middle;}
+  .comp-table td.tim-cell > .tim-sub{display:inline-block;margin:0 0 0 4px;vertical-align:middle;}
+  .comp-table td.tim-cell > .tim-sub select{width:auto;min-width:120px;max-width:170px;}
+  .comp-table td.tim-cell > .tim-note{white-space:normal;}
+}
+
+/* 提醒／狀態卡片一律四邊同樣的細框＋淡底色（基礎規則裡原本的「左側一條深色粗邊」已拿掉：使用者說太像 AI 產生的版面）。
+   欄位左側的藍邊（AI-Thermal 推導值的標記）是欄位的來源記號，不是卡片，照舊。 */
+.alert,.power-summary,.calc-gate,.ls-note,.stale-note,.tim-migrate,.info-card{border-radius:10px;}
 /* ▣V4-END */
 </style>
 <script src="config.js?v=__APP_VERSION__"></script>
@@ -860,7 +928,7 @@ input,select,button,textarea{font-family:inherit;}
     <div class="error" id="login-error">❌ 密碼錯誤，請重新輸入</div>
   </div>
   <div class="info-cards">
-    <div class="info-card" style="background:#e9f7ef;border-left:6px solid #2ecc71;">
+    <div class="info-card" style="background:#e9f7ef;border:1px solid #b7dfc7;">
       <h3 style="color:#27ae60;">🛠️ 主要功能一覽</h3>
       <ul style="color:#34495e;">
         <li><strong>元件熱源管理</strong>：動態新增/編輯/複製/刪除元件清單，支援 Copper Coin、Thermal Via、多種 TIM（Grease / Pad / Putty；k 值與填縫厚度可由共用 TIM 型號庫依型號帶入）</li>
@@ -874,7 +942,7 @@ input,select,button,textarea{font-family:inherit;}
         <li><strong>專案存取</strong>：JSON 格式載入/儲存</li>
       </ul>
     </div>
-    <div class="info-card" style="background:#e8f4fd;border-left:6px solid #3498db;">
+    <div class="info-card" style="background:#e8f4fd;border:1px solid #b9d7f2;">
       <h3 style="color:#2980b9;">🔥 綜合熱傳係數 h 的計算原理</h3>
       <p style="color:#2c3e50;">本工具採用<strong>動態 h(FH) + 動態 η_fin 鰭片效率耦合</strong>物理模型，經多款 5G RRU 實機 CFD 校準：<br>
       • <strong>h_conv</strong> = 6.4 × tanh(Gap / 7.0) × (70 / FH)<sup>0.20</sup>　→ 對流項加入鰭片高度修正（FH 越長邊界層越厚、h 越低）<br>
@@ -884,7 +952,7 @@ input,select,button,textarea{font-family:inherit;}
       由於 h 與 η_fin 皆隨鰭片高度 FH 變化、而 FH 又由兩者反推求得，工具採用<strong>迭代收斂演算法</strong>解出唯一自洽解。<br>
       與舊版固定 h 模型相比，新模型能正確反映高 T_amb 高功率情境下鰭片變長後 h 的衰減與效率損失，經 CFD 比對 <strong>FH 預測誤差顯著改善</strong>。</p>
     </div>
-    <div class="info-card" style="background:#f3e8ff;border-left:6px solid #8b5cf6;">
+    <div class="info-card" style="background:#f3e8ff;border:1px solid #d6c2f7;">
       <h3 style="color:#6d28d9;">🔍 設計規則檢查 (DRC) 總覽</h3>
       <div style="color:#34495e;font-size:0.92rem;line-height:1.7;">
         <p style="margin:8px 0 4px;"><strong>📏 通用規則 (Universal)</strong></p>
@@ -915,7 +983,7 @@ input,select,button,textarea{font-family:inherit;}
         </ul>
       </div>
     </div>
-    <div class="info-card" style="background:#fffacd;border-left:6px solid #f39c12;">
+    <div class="info-card" style="background:#fff8dc;border:1px solid #f1d38c;">
       <h3 style="color:#d35400;">⚠️ 使用注意事項</h3>
       <ul style="color:#34495e;">
         <li>本工具為<strong>快速概念設計與尺寸評估</strong>用途，非最終驗證級熱模擬</li>
@@ -930,7 +998,7 @@ input,select,button,textarea{font-family:inherit;}
 <div id="loading" style="display:none;"><h2>📡 5G RRU 熱流引擎 Pro</h2><p>⚙️ 初始化熱流引擎中，請稍候...</p><progress></progress></div>
 
 <div class="sidebar" id="sidebar">
-  <h2><span>🛠️ 參數控制台</span>
+  <h2><span>參數控制台</span>
     <button class="sidebar-toggle" onclick="toggleSidebar()" title="收合參數控制台（也可以點中間的分隔線；拖曳分隔線可調寬度）">
       <svg width="17" height="15" viewBox="0 0 18 16" fill="none" stroke="currentColor" stroke-width="1.6">
         <rect x="1" y="1" width="16" height="14" rx="2.5"/><line x1="7" y1="1" x2="7" y2="15"/>
@@ -941,82 +1009,82 @@ input,select,button,textarea{font-family:inherit;}
 
   <div class="section-title" onclick="toggleSection(this)">1. 環境與係數</div>
   <div class="section-body">
-    <label>🌡️ 環境溫度 T_amb (°C)</label><input type="number" id="T_amb" step="1" onchange="recalc()">
-    <label>🔒 設計安全係數 (Margin)</label><input type="number" id="Margin" step="0.1" onchange="recalc()">
-    <label>🔨 鰭片製程 (Fin Tech)</label>
+    <label title="T_amb：環境溫度">環境溫度 (°C)</label><input type="number" id="T_amb" step="1" onchange="recalc()">
+    <label title="Margin：散熱器依「熱負載 × 安全係數」設計">設計安全係數</label><input type="number" id="Margin" step="0.1" onchange="recalc()">
+    <label class="sb-full">鰭片製程</label>
     <select id="fin_tech_selector_v2" onchange="recalc()"><option value="Embedded Fin (0.95)">Embedded Fin</option><option value="Die-casting Fin (0.90)">Die-casting Fin</option></select>
     <!-- 各製程獨立的自訂係數（η_process 有效效率係數 + K_FIN 鰭片導熱係數）。留白＝沿用製程預設值 -->
     <div id="fin-custom-emb" class="fin-custom-box">
       <div class="fin-eff-now" id="fin-eff-emb"></div>
-      <label class="fin-custom-toggle"><input type="checkbox" id="fin_custom_emb" onchange="toggleFinCustom('emb')">🛠️ 自訂 Embedded Fin 係數</label>
+      <label class="fin-custom-toggle"><input type="checkbox" id="fin_custom_emb" onchange="toggleFinCustom('emb')">自訂 Embedded Fin 係數</label>
       <div id="fin-custom-emb-fields" class="fin-custom-fields" style="display:none;">
         <div class="row2">
-          <div><label>η_process 有效效率</label><input type="number" id="fin_eta_emb" step="0.01" placeholder="預設 1.06" onchange="recalc()"></div>
-          <div><label>K_FIN 導熱 (W/mK)</label><input type="number" id="fin_kfin_emb" step="1" placeholder="預設 200" onchange="recalc()"></div>
+          <div><label title="η_process：製程有效效率係數">η_process</label><input type="number" id="fin_eta_emb" step="0.01" placeholder="預設 1.06" onchange="recalc()"></div>
+          <div><label title="K_FIN：鰭片導熱係數 (W/m·K)">K_FIN</label><input type="number" id="fin_kfin_emb" step="1" placeholder="預設 200" onchange="recalc()"></div>
         </div>
       </div>
     </div>
     <div id="fin-custom-dc" class="fin-custom-box" style="display:none;">
       <div class="fin-eff-now" id="fin-eff-dc"></div>
-      <label class="fin-custom-toggle"><input type="checkbox" id="fin_custom_dc" onchange="toggleFinCustom('dc')">🛠️ 自訂 Die-casting Fin 係數</label>
+      <label class="fin-custom-toggle"><input type="checkbox" id="fin_custom_dc" onchange="toggleFinCustom('dc')">自訂 Die-casting Fin 係數</label>
       <div id="fin-custom-dc-fields" class="fin-custom-fields" style="display:none;">
         <div class="row2">
-          <div><label>η_process 有效效率</label><input type="number" id="fin_eta_dc" step="0.01" placeholder="預設 0.99" onchange="recalc()"></div>
-          <div><label>K_FIN 導熱 (W/mK)</label><input type="number" id="fin_kfin_dc" step="1" placeholder="預設 150" onchange="recalc()"></div>
+          <div><label title="η_process：製程有效效率係數">η_process</label><input type="number" id="fin_eta_dc" step="0.01" placeholder="預設 0.99" onchange="recalc()"></div>
+          <div><label title="K_FIN：鰭片導熱係數 (W/m·K)">K_FIN</label><input type="number" id="fin_kfin_dc" step="1" placeholder="預設 150" onchange="recalc()"></div>
         </div>
       </div>
     </div>
     <div id="diecast-params" style="display:none;">
-      <label>📐 拔模角 Draft Angle α (°)</label>
+      <label title="Draft Angle α：壓鑄鰭片單側拔模角">拔模角 α (°)</label>
       <input type="number" id="Draft_Angle" step="0.05" value="1.25" onchange="recalc()">
     </div>
   </div>
 
   <div class="section-title" onclick="toggleSection(this)">2. PCB 與機構尺寸</div>
   <div class="section-body">
-    <label>📏 PCB 長度 L_pcb (mm)</label><input type="number" id="L_pcb" step="1" onchange="recalc()">
-    <label>📏 PCB 寬度 W_pcb (mm)</label><input type="number" id="W_pcb" step="1" onchange="recalc()">
-    <label title="PCB 板厚。元件清單中「導熱方式 = Thermal Via」的元件，AI-Thermal 沒有設定該分類 PCB 板厚時吃這一格">📏 PCB 板厚度 (mm)</label><input type="number" id="t_PCB" step="0.1" min="0" title="Thermal Via 元件的板厚（R_int 的穿板厚度）以 AI-Thermal EE/RF/PWR 頁的分類 PCB 板厚為準；那個分類沒設定才取這個值" onchange="recalc()">
+    <label title="L_pcb">PCB 長度 (mm)</label><input type="number" id="L_pcb" step="1" onchange="recalc()">
+    <label title="W_pcb">PCB 寬度 (mm)</label><input type="number" id="W_pcb" step="1" onchange="recalc()">
+    <label title="PCB 板厚。元件清單中「導熱方式 = Thermal Via」的元件，AI-Thermal 沒有設定該分類 PCB 板厚時吃這一格">PCB 板厚 (mm)</label><input type="number" id="t_PCB" step="0.1" min="0" title="Thermal Via 元件的板厚（R_int 的穿板厚度）以 AI-Thermal EE/RF/PWR 頁的分類 PCB 板厚為準；那個分類沒設定才取這個值" onchange="recalc()">
     <div id="t_PCB_src" class="pcbt-src"></div>
-    <label>散熱器基板厚 t_base (mm)</label><input type="number" id="t_base" step="0.5" onchange="recalc()">
-    <label>HSK 內腔深度 H_shield (mm)</label><input type="number" id="H_shield" step="1" onchange="recalc()">
-    <label>Cavity Filter 厚度 H_filter (mm)</label><input type="number" id="H_filter" step="1" onchange="recalc()">
-    <label style="margin-top:12px;color:var(--primary-light);">⚖️ 重量估算參數</label>
+    <label title="t_base：散熱器基板厚度">散熱器基板厚 (mm)</label><input type="number" id="t_base" step="0.5" onchange="recalc()">
+    <label title="H_shield：HSK 內腔深度（PCB 到分模面）">HSK 內腔深度 (mm)</label><input type="number" id="H_shield" step="1" onchange="recalc()">
+    <label title="H_filter：Cavity Filter 厚度">Filter 厚度 (mm)</label><input type="number" id="H_filter" step="1" onchange="recalc()">
+    <label class="sb-sub">重量估算</label>
     <div class="row2"><div><label>鋁材密度 (g/cm³)</label><input type="number" id="al_density" step="0.01" onchange="recalc()"></div><div><label>Filter (g/cm³)</label><input type="number" id="filter_density" step="0.05" onchange="recalc()"></div></div>
     <div class="row2"><div><label>Shielding (g/cm³)</label><input type="number" id="shielding_density" step="0.05" onchange="recalc()"></div><div><label>PCB (g/cm²)</label><input type="number" id="pcb_surface_density" step="0.05" onchange="recalc()"></div></div>
-    <label style="margin-top:12px;color:var(--primary-light);">📏 PCB 板離外殼邊距 (防水)</label>
+    <label class="sb-sub" title="PCB 板離外殼的邊距（防水）">外殼邊距（防水）</label>
     <div class="row2"><div><label>Top (mm)</label><input type="number" id="Top" step="1" onchange="recalc()"></div><div><label>Bottom (mm)</label><input type="number" id="Btm" step="1" onchange="recalc()"></div></div>
     <div class="row2"><div><label>Left (mm)</label><input type="number" id="Left" step="1" onchange="recalc()"></div><div><label>Right (mm)</label><input type="number" id="Right" step="1" onchange="recalc()"></div></div>
-    <div class="dim-derive" id="dim-derive" title="鰭片沿長度方向延伸（每片鰭片長＝整機長 L，片數由整機寬 W 決定）；自然對流時鰭片是垂直的，所以 L 就是吊掛後的上下方向。">
-      <div class="dd-rule">Top／Bottom＝長度方向兩端（吊掛時的上下）<br>Left／Right＝寬度方向兩側</div>
+    <div class="dim-derive" id="dim-derive" title="Top／Bottom＝長度方向兩端（吊掛時的上下）；Left／Right＝寬度方向兩側。鰭片沿長度方向延伸（每片鰭片長＝整機長 L，片數由整機寬 W 決定）；自然對流時鰭片是垂直的，所以 L 就是吊掛後的上下方向。">
+      <div class="dd-rule">Top／Bottom＝長度方向<br>Left／Right＝寬度方向</div>
       <div class="dd-row"><span>整機長 L</span><b id="dd-L">—</b></div><div class="dd-sum" id="dd-L-sum"></div>
       <div class="dd-row"><span>整機寬 W</span><b id="dd-W">—</b></div><div class="dd-sum" id="dd-W-sum"></div>
     </div>
-    <label style="margin-top:12px;color:var(--primary-light);">🔶 Cu Coin 銅塊設定（套用於所有 Board_Type = Copper Coin 元件）</label>
+    <label class="sb-sub" title="套用於所有導熱方式＝Copper Coin 的元件">銅塊 Cu Coin</label>
     <div class="row2"><div><label>銅塊長 (mm)</label><input type="number" id="Coin_L_Setting" step="1" onchange="recalc()"></div><div><label>銅塊寬 (mm)</label><input type="number" id="Coin_W_Setting" step="1" onchange="recalc()"></div></div>
-    <div class="row2"><div><label title="元件清單中「導熱方式 = Copper Coin」的元件，其板厚一律吃這一格">銅塊厚度 (mm)</label><input type="number" id="Coin_T_Setting" step="0.1" min="0" title="所有 Copper Coin 元件的板厚都取這個值（銅塊穿板厚度）" onchange="recalc()"></div><div><label title="銅塊材質的導熱係數。純銅約 380 W/m·K；C1100/C1020 等材質可自行調整">K (銅塊) (W/m·K)</label><input type="number" id="K_Coin" step="10" min="1" title="Copper Coin 的 R_int 用它：rv = 板厚 /(K × 等效面積)。預設 380（純銅）" onchange="recalc()"></div></div>
-    <label style="margin-top:12px;color:var(--primary-light);">🌊 鰭片幾何</label>
-    <div class="row2"><div><label>鰭片 Air Gap (mm)</label><input type="number" id="Gap" step="0.1" onchange="recalc()"></div><div><label>鰭片厚度 (mm)</label><input type="number" id="Fin_t" step="0.1" onchange="recalc()"></div></div>
-    <div class="h-display" id="h-display"><div class="h-val" id="h-val">--</div><div class="h-sub" id="h-sub">h = h_conv + h_rad</div></div>
-    <div class="ar-display" id="ar-display"><div style="font-size:0.78rem;color:#94a3b8;">📐 流阻比 (Aspect Ratio)</div><div id="ar-val" style="font-size:1.1rem;font-weight:700;color:#60a5fa;">--</div><div id="ar-msg" style="font-size:0.7rem;color:#888;">✅ 最佳建議：4.5 ~ 6.5</div><div id="ar-tip" style="font-size:0.65rem;color:#64748b;margin-top:4px;line-height:1.4;">最佳建議：4.5 ~ 6.5（建議值內，無風 AR 往低趨勢設計，反之亦然）</div></div>
+    <div class="row2"><div><label title="元件清單中「導熱方式 = Copper Coin」的元件，其板厚一律吃這一格">銅塊厚度 (mm)</label><input type="number" id="Coin_T_Setting" step="0.1" min="0" title="所有 Copper Coin 元件的板厚都取這個值（銅塊穿板厚度）" onchange="recalc()"></div><div><label title="銅塊材質的導熱係數。純銅約 380 W/m·K；C1100/C1020 等材質可自行調整">銅塊 K (W/m·K)</label><input type="number" id="K_Coin" step="10" min="1" title="Copper Coin 的 R_int 用它：rv = 板厚 /(K × 等效面積)。預設 380（純銅）" onchange="recalc()"></div></div>
+    <label class="sb-sub">鰭片幾何</label>
+    <div class="row2"><div><label title="相鄰兩片鰭片之間的空氣間隙">Air Gap (mm)</label><input type="number" id="Gap" step="0.1" onchange="recalc()"></div><div><label>鰭片厚度 (mm)</label><input type="number" id="Fin_t" step="0.1" onchange="recalc()"></div></div>
+    <div class="h-display" id="h-display" title="h 由鰭片 air gap 與鰭片高自動計算（h = h_conv + h_rad）"><div class="rd-title">h 自動計算 (W/m²K)</div><div class="h-val" id="h-val">--</div><div class="h-sub" id="h-sub">h = h_conv + h_rad</div></div>
+    <div class="ar-display" id="ar-display"><div class="rd-title">流阻比 Aspect Ratio</div><div id="ar-val" class="rd-val">--</div><div id="ar-msg" class="rd-msg">✅ 最佳建議：4.5 ~ 6.5</div><div id="ar-tip" class="rd-tip">最佳建議：4.5 ~ 6.5（建議值內，無風 AR 往低趨勢設計，反之亦然）</div></div>
     <div id="diecast-info" class="ar-display" style="display:none;">
-      <div style="font-size:0.78rem;color:#94a3b8;">🏭 Die-casting 衍生參數</div>
-      <div id="dc-troot" style="font-size:0.85rem;color:#60a5fa;">T_root 根部厚度: --</div>
-      <div id="dc-groot" style="font-size:0.85rem;color:#60a5fa;">G_root 根部間隙: --</div>
-      <div id="dc-ar" style="font-size:0.85rem;color:#60a5fa;">AR 高寬比 (H/T_tip): --</div>
+      <div class="rd-title">Die-casting 衍生參數</div>
+      <div id="dc-troot" class="dd-row"><span>根部厚度 T_root</span><b>--</b></div>
+      <div id="dc-groot" class="dd-row"><span>根部間隙 G_root</span><b>--</b></div>
+      <div id="dc-ar" class="dd-row" title="AR 高寬比 ＝ 鰭片高 H ÷ 鰭尖厚 T_tip"><span>高寬比 H/T_tip</span><b>--</b></div>
     </div>
   </div>
 
   <div class="section-title" onclick="toggleSection(this)">3. 材料參數 (含 Via K值)</div>
   <div class="section-body">
-    <div class="row2"><div><label title="導熱方式＝Thermal Via 的元件，AI-Thermal「Thermal Via 計算」有完整的 via 設計時改用逐顆 K_eff；抓不到（沒有設計、資料不完整、暫不納入熱流評估、via 面積超過焊盤）才用這個通用值">Via 等效 K 值（通用值）</label><input type="number" id="K_Via" step="1" onchange="recalc()"></div><div><label title="只套用在通用值 K_Via：R_int ＝ 板厚 ÷ (K_Via × 擴散面積) ÷ 製程係數。逐顆 K_eff 已經算進銅壁、塞孔與 FR4 的比例，不再除這個係數">Via 製程係數</label><input type="number" id="Via_Eff" step="0.05" onchange="recalc()"></div></div>
-    <div class="via-k-hint">抓不到逐顆 K<sub>eff</sub> 時才用這兩個值。導熱方式＝Thermal Via 的元件，<b>AI-Thermal</b>「Thermal Via 計算」有完整的 via 設計時改用它的 K<sub>eff</sub>（元件設定的導熱方式底下會寫用哪一個）。</div>
-    <label style="margin-top:8px;color:var(--primary-light);">🔷 熱介面材料 (TIM)</label>
-    <button class="tim-lib-btn" onclick="timLibViewOpen()" title="檢視全工具共用的 TIM 型號庫（k 值與填縫厚度）。本工具唯讀，新增／修改請到 AI-Thermal">🧪 TIM 型號庫</button>
-    <div class="tim-lib-hint">每顆元件的 k 與填縫厚度由它選用的<b>型號</b>決定（型號在 <b>AI-Thermal</b> 的元件清單選；型號、k、廠商可參照 <b>TIM 管理工具</b>）。本工具<b>只能檢視</b>，新增／修改型號請到 AI-Thermal。</div>
-    <label style="margin-top:8px;color:var(--primary-light);">🔘 Solder (錫片)</label>
-    <div class="row2"><div><label>K (錫片)</label><input type="number" id="K_Solder" step="1" onchange="recalc()"></div><div><label>t (錫片)</label><input type="number" id="t_Solder" step="0.05" onchange="recalc()"></div></div>
-    <label>錫片有效面積率 (Voiding)</label><input type="number" id="Voiding" step="0.05" min="0.1" max="1" placeholder="0.5 ~ 1.0 (建議 0.75)" onchange="recalc()">
+    <div class="row2"><div><label title="導熱方式＝Thermal Via 的元件，AI-Thermal「Thermal Via 計算」有完整的 via 設計時改用逐顆 K_eff；抓不到（沒有設計、資料不完整、暫不納入熱流評估、via 面積超過焊盤）才用這個通用值">Via K（通用值）</label><input type="number" id="K_Via" step="1" onchange="recalc()"></div><div><label title="只套用在通用值 K_Via：R_int ＝ 板厚 ÷ (K_Via × 擴散面積) ÷ 製程係數。逐顆 K_eff 已經算進銅壁、塞孔與 FR4 的比例，不再除這個係數">Via 製程係數</label><input type="number" id="Via_Eff" step="0.05" onchange="recalc()"></div></div>
+    <div class="via-k-hint" title="導熱方式＝Thermal Via 的元件，AI-Thermal「Thermal Via 計算」有完整的 via 設計時改用它的 K_eff（元件設定的導熱方式底下會寫用哪一個）；抓不到才用這兩個通用值。">抓不到逐顆 K<sub>eff</sub> 時才用這兩個值</div>
+    <label class="sb-sub">熱介面材料 TIM</label>
+    <button class="tim-lib-btn" onclick="timLibViewOpen()" title="檢視全工具共用的 TIM 型號庫（k 值與填縫厚度）。本工具唯讀，新增／修改請到 AI-Thermal">TIM 型號庫</button>
+    <div class="tim-lib-hint" title="每顆元件的 k 與填縫厚度由它選用的型號決定（型號在 AI-Thermal 的元件清單選；型號、k、廠商可參照 TIM 管理工具）。本工具只能檢視，新增／修改型號請到 AI-Thermal。">唯讀檢視；修改請到 AI-Thermal</div>
+    <label class="sb-sub">錫片 Solder</label>
+    <div class="row2"><div><label title="K_Solder：錫片導熱係數">錫片 K (W/m·K)</label><input type="number" id="K_Solder" step="1" onchange="recalc()"></div><div><label title="t_Solder：錫片厚度">錫片厚度 (mm)</label><input type="number" id="t_Solder" step="0.05" onchange="recalc()"></div></div>
+    <label title="Voiding：錫片有效面積率，0.5 ~ 1.0（建議 0.75）">有效面積率 Voiding</label><input type="number" id="Voiding" step="0.05" min="0.1" max="1" placeholder="0.75" title="0.5 ~ 1.0（建議 0.75）" onchange="recalc()">
   </div>
 </div>
 
@@ -2535,8 +2603,8 @@ function init() {
 // 寬度與收合狀態記在 localStorage：那是每個人自己的畫面偏好，讀寫一律包 try/catch，
 // 拿不到就退回預設值，不能讓瀏覽器擋 storage 就開不了畫面。
 // =====================================================
-const SIDEBAR_MIN=220, SIDEBAR_MAX=560, SIDEBAR_DEFAULT=340;
-const LS_SB_W='rru.sidebarWidth', LS_SB_C='rru.sidebarCollapsed';
+const SIDEBAR_MIN=200, SIDEBAR_MAX=560, SIDEBAR_DEFAULT=227;
+const LS_SB_W='rru.sidebarWidth.v2', LS_SB_C='rru.sidebarCollapsed';
 let _sbDrag=null;
 
 function _lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
@@ -2634,7 +2702,9 @@ function initSidebarLayout(){
 function toggleSection(el){el.classList.toggle('collapsed');el.nextElementSibling.classList.toggle('collapsed');}
 
 function readGlobals(){
-  ['T_amb','Margin','L_pcb','W_pcb','t_PCB','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Coin_T_Setting','K_Coin','Gap','Fin_t','K_Via','Via_Eff','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(id=>{let el=document.getElementById(id);if(el&&el.tagName!=='SELECT')G[id]=parseFloat(el.value)||0;});
+  const empty=[];
+  ['T_amb','Margin','L_pcb','W_pcb','t_PCB','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Coin_T_Setting','K_Coin','Gap','Fin_t','K_Via','Via_Eff','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(id=>{let el=document.getElementById(id);if(el&&el.tagName!=='SELECT'){G[id]=parseFloat(el.value)||0;if(String(el.value).trim()==='')empty.push(id);}});
+  G._emptyIds=empty;   // 清空的欄位（parseFloat('')||0 會變 0，看不出是沒填）→ listBadGlobals 用
   G.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;G.Slope=0.03;
   if(!G.Draft_Angle||G.Draft_Angle<0.1)G.Draft_Angle=1.25;
   // 各製程自訂係數（勾選狀態 + η_process + K_FIN）
@@ -2715,8 +2785,8 @@ function renderPcbTSrc(){
   const used=set.filter(x=>x.v!==null).map(x=>PCB_CAT_LABEL[x.c]+' '+n(x.v)+' mm').join('、');
   const rest=set.filter(x=>x.v===null).map(x=>PCB_CAT_LABEL[x.c]);
   el.style.display='block';
-  el.textContent='Thermal Via 元件的板厚以 AI-Thermal 的分類 PCB 板厚為準：'+used+
-    (rest.length?'；'+rest.join('、')+' 沒設定 → 用這一格。':'（這一格目前不會被用到）。');
+  el.textContent='AI-Thermal 板厚：'+used+(rest.length?'；'+rest.join('、')+' 沒設定 → 用這一格':'（這一格目前用不到）');
+  el.title='Thermal Via 元件的板厚以 AI-Thermal EE/RF/PWR 頁的分類 PCB 板厚為準；那個分類沒設定才用這一格。要改板厚請到 AI-Thermal。';
 }
 function calcFinCount(W,gap,ft){if(gap+ft<=0)return 0;let n=Math.floor((W+gap)/(gap+ft));while(n>0&&(n*ft+(n-1)*gap)>W+0.001)n--;return Math.max(n,0);}
 
@@ -2873,8 +2943,8 @@ function rowTemps(r,THB,p){r.T_hsk_eff=THB+r['Height(mm)']*p.Slope;r.Tc=r.T_hsk_
 function computeAll(params,comps){
   let p={...params};let all=[];
   // 必填欄位沒填 → 不計算（元件欄位不套預設值：寧可擋下，也不要用猜的值算出看似合理的體積）
-  const missing=listMissing(comps);
-  if(missing.length)return Object.assign(emptyCalcResult(),{blocked:true,missing});
+  const missing=listMissing(comps),badGlobals=listBadGlobals(p,comps);
+  if(missing.length||badGlobals.length)return Object.assign(emptyCalcResult(),{blocked:true,missing,badGlobals});
   ['rf','digital','pwr'].forEach(cat=>(comps[cat]||[]).forEach(c=>{if(!c._excluded)all.push({...c,_src:cat.toUpperCase()});}));
   if(!all.length)return emptyCalcResult();
   let rows=all.map(c=>{let tr=calcThermalResistance(c,p);return{...c,...tr};});
@@ -2963,15 +3033,18 @@ function recalc(){readGlobals();applyThickFromGlobals();calcResults=computeAll(G
 
 function updateHDisplay(){
   let FH_disp=(calcResults&&calcResults.Fin_Height>0)?calcResults.Fin_Height:70;let{h_value,h_conv,h_rad}=calcHValue(G.Gap,FH_disp);let el=document.getElementById('h-val');
-  el.textContent='🔥 自動計算 h: '+h_value.toFixed(2);el.style.color=h_conv<4?'#ef4444':'#60a5fa';
-  let etaStr=(calcResults&&calcResults.eta_fin>0)?(' | η_fin: '+calcResults.eta_fin.toFixed(3)):'';
-  document.getElementById('h-sub').textContent='h_conv: '+h_conv.toFixed(2)+' + h_rad: '+h_rad.toFixed(2)+etaStr;
+  el.textContent=h_value.toFixed(2);el.classList.toggle('is-low',h_conv<4);
+  let etaStr=(calcResults&&calcResults.eta_fin>0)?('<span class="h-eta">η_fin '+calcResults.eta_fin.toFixed(3)+'</span>'):'';
+  document.getElementById('h-sub').innerHTML='<span>h_conv '+h_conv.toFixed(2)+'</span> <i>+</i> <span>h_rad '+h_rad.toFixed(2)+'</span>'+etaStr;
   let ar=calcResults?calcResults.aspect_ratio:0;let arEl=document.getElementById('ar-val');let arMsg=document.getElementById('ar-msg');
+  // 狀態用 class（is-ok／is-poor／is-bad），顏色在 CSS 指定 —— 不寫行內色，換底色時才不會漏改、文字看不清
+  let arBox=document.getElementById('ar-display'),arSt='';
   if(ar>0){arEl.textContent=ar.toFixed(1);
-    if(ar>12){arEl.style.color='#e74c3c';arMsg.textContent='⛔ 過高 (High)';arMsg.style.color='#e74c3c';}
-    else if(arGood(ar)){arEl.style.color='#00b894';arMsg.textContent='✅ 良好 (Good)';arMsg.style.color='#00b894';}
-    else{arEl.style.color='#f39c12';arMsg.textContent='⚠️ 不佳 (Poor)';arMsg.style.color='#f39c12';}
+    if(ar>12){arSt='is-bad';arMsg.textContent='⛔ 過高 (High)';}
+    else if(arGood(ar)){arSt='is-ok';arMsg.textContent='✅ 良好 (Good)';}
+    else{arSt='is-poor';arMsg.textContent='⚠️ 不佳 (Poor)';}
   } else {arEl.textContent='--';arMsg.textContent='等待計算...';}
+  ['is-ok','is-poor','is-bad'].forEach(c=>arBox.classList.toggle(c,c===arSt));
   let isDC=G.fin_tech_selector_v2.includes("Die-casting");
   document.getElementById('diecast-params').style.display=isDC?'':'none';
   document.getElementById('fin-custom-emb').style.display=isDC?'none':'';
@@ -2979,9 +3052,9 @@ function updateHDisplay(){
   renderFinEffective();
   document.getElementById('diecast-info').style.display=(isDC&&calcResults&&calcResults.Fin_Height>0)?'':'none';
   if(isDC&&calcResults&&calcResults.Fin_Height>0){
-    document.getElementById('dc-troot').textContent='T_root 根部厚度: '+(calcResults.T_root||0).toFixed(2)+' mm';
-    document.getElementById('dc-groot').textContent='G_root 根部間隙: '+(calcResults.G_root||0).toFixed(2)+' mm';
-    document.getElementById('dc-ar').textContent='AR 高寬比 (H/T_tip): '+(calcResults.Fin_Height/G.Fin_t).toFixed(1);
+    document.querySelector('#dc-troot b').textContent=(calcResults.T_root||0).toFixed(2)+' mm';
+    document.querySelector('#dc-groot b').textContent=(calcResults.G_root||0).toFixed(2)+' mm';
+    document.querySelector('#dc-ar b').textContent=(calcResults.Fin_Height/G.Fin_t).toFixed(1);
   }
 }
 
@@ -3105,6 +3178,41 @@ function listMissing(comps){
   }));
   return out;
 }
+/* 參數控制台的值不合理 → 一樣擋下計算（code review 2026-11）。
+   原本 readGlobals 把清空的欄位當 0，而且照算：環境溫度 0 °C、Via K 0（R_int 直接變 0）、安全係數 0（鰭片高 0 卻照樣列出體積）……
+   都是偏樂觀、畫面上又看不出來的結果。規則：
+   · 一律：環境溫度要有填（0 可以）；安全係數、PCB 長寬、基板厚、air gap、鰭片厚度 > 0。
+   · 有發熱的 Thermal Via 元件：PCB 板厚、Via K、Via 製程係數 > 0。
+   · 有發熱的 Copper Coin 元件：銅塊長／寬／厚、錫片 K > 0、有效面積率在 0～1。
+   出廠預設與備份裡的真實專案都符合 → 只有使用者把欄位清空或填 0 才會被擋。 */
+const GLOBAL_REQ_ALWAYS=['Margin','L_pcb','W_pcb','t_base','Gap','Fin_t'];
+const GLOBAL_REQ_VIA=['t_PCB','K_Via','Via_Eff'];
+const GLOBAL_REQ_COIN=['Coin_L_Setting','Coin_W_Setting','Coin_T_Setting','K_Solder','Voiding'];
+function listBadGlobals(p,comps){
+  const bad=[],pos=k=>parseFloat(p[k])>0;
+  const hot=bt=>['rf','digital','pwr'].some(cat=>((comps&&comps[cat])||[]).some(c=>c&&!c._excluded&&c.Board_Type===bt&&_num(c.Qty)*_num(c['Power(W)'])>0));
+  if((p._emptyIds||[]).includes('T_amb')||!isFinite(parseFloat(p.T_amb)))bad.push({key:'T_amb',why:'未填'});
+  GLOBAL_REQ_ALWAYS.forEach(k=>{if(!pos(k))bad.push({key:k,why:'須大於 0'});});
+  if(hot('Thermal Via'))GLOBAL_REQ_VIA.forEach(k=>{if(!pos(k))bad.push({key:k,why:'須大於 0（有 Thermal Via 元件）'});});
+  if(hot('Copper Coin'))GLOBAL_REQ_COIN.forEach(k=>{if(!pos(k))bad.push({key:k,why:'須大於 0（有 Copper Coin 元件）'});else if(k==='Voiding'&&parseFloat(p[k])>1)bad.push({key:k,why:'須在 0～1 之間'});});
+  return bad;
+}
+function globalLabel(id){const el=document.getElementById(id),l=el&&el.previousElementSibling;return (l&&l.tagName==='LABEL'?l.textContent.trim():'')||id;}
+function badGlobalsHtml(bad){
+  if(!bad||!bad.length)return '';
+  return '<div class="cg-h">參數控制台（'+bad.length+' 個參數）</div><div class="cg-sub">清空的欄位不會當成 0 來算（那會算出偏樂觀的結果）。請填入實際值。</div><ul class="cg-list">'+
+    bad.map(b=>'<li><a href="javascript:void(0)" onclick="jumpToGlobal(\''+b.key+'\')">'+_vEsc(globalLabel(b.key))+'</a>：'+_vEsc(b.why)+'</li>').join('')+'</ul>';
+}
+function markBadGlobals(bad){
+  const set=new Set((bad||[]).map(b=>b.key));
+  document.querySelectorAll('#sidebar input[type=number]').forEach(el=>{const on=set.has(el.id);el.classList.toggle('sb-bad',on);if(on)el.setAttribute('aria-invalid','true');else el.removeAttribute('aria-invalid');});
+}
+function jumpToGlobal(id){
+  const el=document.getElementById(id);if(!el)return;
+  if(document.body.classList.contains('sidebar-collapsed'))setSidebarCollapsed(false);
+  const body=el.closest('.section-body');if(body&&body.classList.contains('collapsed')){const t=body.previousElementSibling;if(t)toggleSection(t);}
+  el.scrollIntoView({block:'center'});el.focus();el.classList.add('cell-flash');setTimeout(()=>el.classList.remove('cell-flash'),1600);
+}
 /* 按「確認是實際值」：標 _defaults_ok（要按「儲存專案」才寫回 DB）。改成別的值則不需要確認。 */
 function confirmStampedDefaults(cat,idx){
   const c=components[cat]&&components[cat][idx];if(!c)return;
@@ -3125,14 +3233,16 @@ function missingSummaryText(){
     '。\n請到「元件設定」看紅色提示（點欄位名稱可以直接跳過去）。';
 }
 /* 擋下計算的提示：元件設定的橫幅與各結果頁共用同一份內容。點欄位名稱 → 跳到那一格。 */
-function calcGateHtml(missing){
+function calcGateHtml(missing,badG){
+  missing=missing||[];badG=badG||[];
   const miss=missing.filter(m=>m.kind!=='stamped'),st=missing.filter(m=>m.kind==='stamped');
   const link=m=>m.fields.map(f=>'<a href="javascript:void(0)" onclick="jumpToMissing(\''+m.cat+'\','+m.idx+',\''+f+'\')">'+_vEsc(COL_LABELS[f]||f)+'</a>').join('、');
-  const title=!st.length?(miss.length+' 顆元件的必填欄位還沒填')
+  const tComp=!missing.length?'':!st.length?(miss.length+' 顆元件的必填欄位還沒填')
              :!miss.length?(st.length+' 顆元件的值疑似舊版自動帶入的預設值')
              :(missing.length+' 顆元件需要處理');
-  let h='<div class="calc-gate"><div class="cg-title">⛔ 無法計算體積：'+title+'</div>'+
-        '<div class="cg-sub">元件欄位不會自動套用預設值（預設值若是錯的，算出來的體積也是錯的）。'+
+  const title=[badG.length?'參數控制台有 '+badG.length+' 個參數沒填或不合理':'',tComp].filter(Boolean).join('；');
+  let h='<div class="calc-gate"><div class="cg-title">⛔ 無法計算體積：'+title+'</div>'+badGlobalsHtml(badG);
+  if(missing.length)h+=(badG.length?'<div class="cg-h">元件設定</div>':'')+'<div class="cg-sub">元件欄位不會自動套用預設值（預設值若是錯的，算出來的體積也是錯的）。'+
         '暫時不想納入計算的元件，可以在元件設定按 👁 排除。</div>';
   if(miss.length){
     if(st.length)h+='<div class="cg-h">必填欄位還沒填（'+miss.length+' 顆）</div>';
@@ -3154,8 +3264,9 @@ function calcGateHtml(missing){
 }
 function renderMissingBanner(){
   const el=document.getElementById('comp-missing-banner');if(!el)return;
-  const m=listMissing(components);
-  el.innerHTML=m.length?calcGateHtml(m):'';
+  const m=listMissing(components),bg=listBadGlobals(G,components);
+  markBadGlobals(bg);
+  el.innerHTML=(m.length||bg.length)?calcGateHtml(m,bg):'';
 }
 /* 跳到缺值的那一格：切到元件設定 → 對應分類 → 捲到該列、聚焦並閃一下 */
 function jumpToMissing(cat,idx,field){
@@ -3426,8 +3537,11 @@ function viaKNoteHtml(row){
   const vi=viaKInfo(row,G);if(!vi)return '';
   const cls='via-k-note'+(vi.src==='keff'?' via-k-eff':'')+(vi.warn?' via-k-warn':'');
   return '<div class="'+cls+'" title="'+_vEsc(vi.detail)+'"><span class="via-k-lbl">'+(vi.warn?'⚠ ':'')+_vEsc(vi.label)+'</span>'+
-         '<span class="via-k-src">'+viaKSegHtml(vi.src==='keff'?'← AI-Thermal via 計算':vi.why)+'</span></div>';
+         '<span class="via-k-src">'+viaKSegHtml(vi.src==='keff'?'← AI-Thermal via 計算':viaWhyShort(vi.why))+'</span></div>';
 }
+/* 表格裡顯示的原因：拿掉開頭的「AI-Thermal「Thermal Via 計算」」（每一列都一樣、佔一整行，把列撐高）；
+   完整的句子在 tooltip（vi.detail）與詳細分析的展開列。其餘原因（暫不納入、還缺什麼、超過焊盤）照原字。 */
+function viaWhyShort(t){ return String(t||'').replace(/^AI-Thermal「Thermal Via 計算」/,''); }
 function viaKSegHtml(t){
   return (String(t||'').match(/[^」：）]+[」：）]*|[」：）]+/g)||[]).map(x=>'<span class="via-k-seg">'+_vEsc(x)+'</span>').join('');
 }
@@ -3707,7 +3821,7 @@ function exportCompExcel(mode){
 // =====================================================
 function renderTab1(){
   if(calcResults&&calcResults.blocked){
-    document.getElementById('tab1-alerts').innerHTML=calcGateHtml(calcResults.missing);
+    document.getElementById('tab1-alerts').innerHTML=calcGateHtml(calcResults.missing,calcResults.badGlobals);
     ['tab1-risk','tab1-scale','tab1-col-toggle','tab1-table'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='';});
     return;
   }
@@ -3966,7 +4080,7 @@ function vrStateNote(R,st){
 
 function vrResultHtml(R,g){
   const st=vrState(R);
-  if(st==='blocked')return calcGateHtml(R.missing);
+  if(st==='blocked')return calcGateHtml(R.missing,R.badGlobals);
   const pill=st==='ok'?(R.drc_warn?'<span class="vr-state warn">⚠ DRC 提醒</span>':'<span class="vr-state">✓ DRC 通過</span>')
             :st==='drc'?'<span class="vr-state fail">✖ DRC 不通過</span>'
             :st==='nosol'?'<span class="vr-state fail">✖ 無法設計</span>':'';
@@ -4169,7 +4283,7 @@ function renderTab3(force){
   tab3Stale=false;
   const msg=document.getElementById('tab3-msg'),box=document.getElementById('tab3-3d');
   const show=html=>{msg.innerHTML=html;msg.hidden=!html;box.hidden=!!html;};
-  if(R.blocked){show(calcGateHtml(R.missing));return;}
+  if(R.blocked){show(calcGateHtml(R.missing,R.badGlobals));return;}
   if(R.drc_failed||R.Fin_Height<=0){show('<div class="drc-error">🚫 '+(R.drc_msg||'無效尺寸')+'</div>');return;}
   if(!window.RRU3D){const f=window.__rru3dFail;
     show(f==='webgl'?'<div class="alert alert-danger">⚠️ 這台電腦的瀏覽器無法啟用 WebGL，3D 視窗無法顯示（其他分頁不受影響）。</div>'
@@ -4559,7 +4673,7 @@ function saAmbHtml(d, g){
 const SA_INTRO = '這頁回答三個問題：鰭片 air gap 選多少、功耗比預估高時這顆散熱器撐不撐得住、環溫規格提高的代價。全部用參數控制台與元件設定的目前值計算，改了參數這頁會跟著更新。';
 function saHtml(d, R, g){
   let h = '<p class="sa-intro">' + SA_INTRO + '</p>';
-  if (d.st === 'blocked') return h + calcGateHtml(R.missing);
+  if (d.st === 'blocked') return h + calcGateHtml(R.missing, R.badGlobals);
   if (d.st === 'nohot' || d.st === 'nosol') { const n = vrStateNote(R, d.st); return h + '<section class="vr-panel"><div class="vr-alert ' + n.cls + '" style="border-top:0">' + _vEsc(n.text) + (d.st === 'nosol' ? ' 先處理瓶頸元件，敏感度分析才有意義。' : '') + '</div></section>'; }
   if (d.st === 'drc') return h + '<section class="vr-panel"><div class="vr-alert fail" style="border-top:0">目前的設計 DRC 不通過：' + _vEsc(String(R.drc_msg || '').replace(/^⛔\s*/, ''))
     + '。這顆散熱器做不出來 —— 下面先用 ① 找一個做得出來的 air gap；② ③ 要等設計做得出來才有意義。</div></section>' + saGapHtml(d);
@@ -5548,8 +5662,9 @@ async function captureChartImage(divId, w, h) {
 async function generatePDFReport() {
   console.log('[PDF] generatePDFReport called, calcResults:', !!calcResults);
   if (calcResults && calcResults.blocked) {
-    const m = calcResults.missing;
-    alert('⛔ 無法產生報告：' + m.length + ' 顆元件需要處理（必填欄位還沒填，或值疑似舊版自動帶入的預設值），處理完才能計算體積。\n\n' +
+    const m = calcResults.missing || [], bg = calcResults.badGlobals || [];
+    if (!m.length && bg.length) { alert('⛔ 無法產生報告：參數控制台有 ' + bg.length + ' 個參數沒填或不合理，補上才能計算體積。\n\n' + bg.map(b => '・' + globalLabel(b.key) + '：' + b.why).join('\n')); return; }
+    alert('⛔ 無法產生報告：' + (bg.length ? '參數控制台有 ' + bg.length + ' 個參數沒填或不合理（' + bg.map(b => globalLabel(b.key)).join('、') + '）；' : '') + m.length + ' 顆元件需要處理（必填欄位還沒填，或值疑似舊版自動帶入的預設值），處理完才能計算體積。\n\n' +
       m.slice(0, 12).map(x => '・' + x.name + '（' + x.cat.toUpperCase() + '）：' +
         (x.kind === 'stamped' ? '疑似舊預設值（7 個欄位全等於舊版自動帶入的值，請確認）' : x.fields.map(f => COL_LABELS[f] || f).join('、'))).join('\n') +
       (m.length > 12 ? '\n…還有 ' + (m.length - 12) + ' 顆' : '') + '\n\n請到「元件設定」處理紅框欄位。');

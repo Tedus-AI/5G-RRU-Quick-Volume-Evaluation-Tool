@@ -160,7 +160,7 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
 
   console.log('\n[D] 參數控制台調寬 / 收合');
   const w0 = await page.evaluate(() => document.getElementById('sidebar').getBoundingClientRect().width);
-  ok('預設寬度 340', Math.round(w0) === 340, w0);
+  ok('預設寬度 227（原本 340 的 2/3）', Math.round(w0) === 227, w0);
 
   // 拖曳：往右 +80
   const box = await page.locator('#sidebar-resizer').boundingBox();
@@ -170,11 +170,11 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   await page.mouse.up();
   const d1 = await page.evaluate(() => ({
     w: document.getElementById('sidebar').getBoundingClientRect().width,
-    saved: localStorage.getItem('rru.sidebarWidth'),
+    saved: localStorage.getItem('rru.sidebarWidth.v2'),
     collapsed: document.body.classList.contains('sidebar-collapsed'),
     resizes: window.__plotlyResizes,
   }));
-  ok('拖曳可調整寬度（340 → 約 420）', Math.abs(d1.w - 420) <= 2, d1);
+  ok('拖曳可調整寬度（227 → 約 307）', Math.abs(d1.w - 307) <= 2, d1);
   ok('拖曳不會誤觸收合', d1.collapsed === false);
   ok('寬度記進 localStorage', String(Math.round(d1.w)) === d1.saved, d1);
 
@@ -221,7 +221,7 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   await page.evaluate(() => setSidebarCollapsed(false));
 
   // 重新載入 → 記憶還在
-  await page.evaluate(() => { try { localStorage.setItem('rru.sidebarWidth','300'); localStorage.setItem('rru.sidebarCollapsed','0'); } catch(e){} });
+  await page.evaluate(() => { try { localStorage.setItem('rru.sidebarWidth.v2','300'); localStorage.setItem('rru.sidebarCollapsed','0'); } catch(e){} });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.fill('#login-pw', 'tedus');
   await page.click('#login-page button');

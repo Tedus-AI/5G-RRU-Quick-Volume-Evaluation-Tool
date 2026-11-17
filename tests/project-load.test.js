@@ -246,7 +246,7 @@ const FULL = (name, extra) => Object.assign({ Component: name, Qty: 1, 'Power(W)
   ok('橫幅說明「還沒在 5G-RRU 存過參數 → 全部是出廠預設」', /還沒在 5G-RRU 存過參數/.test(h.nogp.banner), h.nogp.banner);
   ok('部分參數的專案：有存的用專案值、沒存的用出廠預設',
      h.part.T_amb === 50 && h.part.L_pcb === 450 && h.part.K_Coin === h.def.K_Coin && h.part.W_pcb === h.def.W_pcb, h.part);
-  ok('橫幅列出採用出廠預設的參數（例：K (銅塊)）', /沒有存過以下/.test(h.part.banner) && /K \(銅塊\)/.test(h.part.banner), h.part.banner.slice(0, 160));
+  ok('橫幅列出採用出廠預設的參數（例：銅塊 K）', /沒有存過以下/.test(h.part.banner) && /銅塊 K/.test(h.part.banner), h.part.banner.slice(0, 400));
 
   console.log('\n[I] 板厚推不出來 → 用出廠預設，不是 0');
   const i2 = await page.evaluate(async (rf) => {
