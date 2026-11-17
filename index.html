@@ -771,6 +771,8 @@ input,select,button,textarea{font-family:inherit;}
 .sidebar label.sb-full{margin:2px 0 -2px;}
 .sidebar label.sb-sub{margin:10px 0 0;padding-top:9px;border-top:1px dashed var(--sb-line);color:var(--sb-sub);font-weight:700;font-size:.78rem;letter-spacing:.04em;}
 .sidebar input[type="number"],.sidebar select{background:#f4f8fc;border:1px solid transparent;color:#0f1b2d;border-radius:7px;height:27px;padding:0 7px;font-weight:500;font-size:.82rem;}
+/* 參數不合理（清空／0）→ 擋下計算：紅框＋淡紅底（紅色＝擋計算的錯誤） */
+.sidebar input[type="number"].sb-bad{background:#ffe3e3;border-color:#ff6b6b;box-shadow:0 0 0 2px rgba(255,107,107,.55);color:#7a0b0b;}
 .sidebar input[type="number"]::placeholder{font-size:.74rem;font-family:var(--ui-font,inherit);}
 .sidebar .section-body>.fin-custom-box,.sidebar .section-body>.dim-derive,.sidebar .section-body>.h-display,.sidebar .section-body>.ar-display,.sidebar .section-body>.tim-lib-btn{margin-top:3px;}
 .sidebar .fin-custom-fields{margin-top:7px;grid-template-columns:minmax(0,1fr) 84px;}
@@ -2700,7 +2702,9 @@ function initSidebarLayout(){
 function toggleSection(el){el.classList.toggle('collapsed');el.nextElementSibling.classList.toggle('collapsed');}
 
 function readGlobals(){
-  ['T_amb','Margin','L_pcb','W_pcb','t_PCB','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Coin_T_Setting','K_Coin','Gap','Fin_t','K_Via','Via_Eff','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(id=>{let el=document.getElementById(id);if(el&&el.tagName!=='SELECT')G[id]=parseFloat(el.value)||0;});
+  const empty=[];
+  ['T_amb','Margin','L_pcb','W_pcb','t_PCB','t_base','H_shield','H_filter','Top','Btm','Left','Right','Coin_L_Setting','Coin_W_Setting','Coin_T_Setting','K_Coin','Gap','Fin_t','K_Via','Via_Eff','K_Solder','t_Solder','Voiding','al_density','filter_density','shielding_density','pcb_surface_density','Draft_Angle'].forEach(id=>{let el=document.getElementById(id);if(el&&el.tagName!=='SELECT'){G[id]=parseFloat(el.value)||0;if(String(el.value).trim()==='')empty.push(id);}});
+  G._emptyIds=empty;   // 清空的欄位（parseFloat('')||0 會變 0，看不出是沒填）→ listBadGlobals 用
   G.fin_tech_selector_v2=document.getElementById('fin_tech_selector_v2').value;G.Slope=0.03;
   if(!G.Draft_Angle||G.Draft_Angle<0.1)G.Draft_Angle=1.25;
   // 各製程自訂係數（勾選狀態 + η_process + K_FIN）
@@ -2939,8 +2943,8 @@ function rowTemps(r,THB,p){r.T_hsk_eff=THB+r['Height(mm)']*p.Slope;r.Tc=r.T_hsk_
 function computeAll(params,comps){
   let p={...params};let all=[];
   // 必填欄位沒填 → 不計算（元件欄位不套預設值：寧可擋下，也不要用猜的值算出看似合理的體積）
-  const missing=listMissing(comps);
-  if(missing.length)return Object.assign(emptyCalcResult(),{blocked:true,missing});
+  const missing=listMissing(comps),badGlobals=listBadGlobals(p,comps);
+  if(missing.length||badGlobals.length)return Object.assign(emptyCalcResult(),{blocked:true,missing,badGlobals});
   ['rf','digital','pwr'].forEach(cat=>(comps[cat]||[]).forEach(c=>{if(!c._excluded)all.push({...c,_src:cat.toUpperCase()});}));
   if(!all.length)return emptyCalcResult();
   let rows=all.map(c=>{let tr=calcThermalResistance(c,p);return{...c,...tr};});
@@ -3174,6 +3178,41 @@ function listMissing(comps){
   }));
   return out;
 }
+/* 參數控制台的值不合理 → 一樣擋下計算（code review 2026-11）。
+   原本 readGlobals 把清空的欄位當 0，而且照算：環境溫度 0 °C、Via K 0（R_int 直接變 0）、安全係數 0（鰭片高 0 卻照樣列出體積）……
+   都是偏樂觀、畫面上又看不出來的結果。規則：
+   · 一律：環境溫度要有填（0 可以）；安全係數、PCB 長寬、基板厚、air gap、鰭片厚度 > 0。
+   · 有發熱的 Thermal Via 元件：PCB 板厚、Via K、Via 製程係數 > 0。
+   · 有發熱的 Copper Coin 元件：銅塊長／寬／厚、錫片 K > 0、有效面積率在 0～1。
+   出廠預設與備份裡的真實專案都符合 → 只有使用者把欄位清空或填 0 才會被擋。 */
+const GLOBAL_REQ_ALWAYS=['Margin','L_pcb','W_pcb','t_base','Gap','Fin_t'];
+const GLOBAL_REQ_VIA=['t_PCB','K_Via','Via_Eff'];
+const GLOBAL_REQ_COIN=['Coin_L_Setting','Coin_W_Setting','Coin_T_Setting','K_Solder','Voiding'];
+function listBadGlobals(p,comps){
+  const bad=[],pos=k=>parseFloat(p[k])>0;
+  const hot=bt=>['rf','digital','pwr'].some(cat=>((comps&&comps[cat])||[]).some(c=>c&&!c._excluded&&c.Board_Type===bt&&_num(c.Qty)*_num(c['Power(W)'])>0));
+  if((p._emptyIds||[]).includes('T_amb')||!isFinite(parseFloat(p.T_amb)))bad.push({key:'T_amb',why:'未填'});
+  GLOBAL_REQ_ALWAYS.forEach(k=>{if(!pos(k))bad.push({key:k,why:'須大於 0'});});
+  if(hot('Thermal Via'))GLOBAL_REQ_VIA.forEach(k=>{if(!pos(k))bad.push({key:k,why:'須大於 0（有 Thermal Via 元件）'});});
+  if(hot('Copper Coin'))GLOBAL_REQ_COIN.forEach(k=>{if(!pos(k))bad.push({key:k,why:'須大於 0（有 Copper Coin 元件）'});else if(k==='Voiding'&&parseFloat(p[k])>1)bad.push({key:k,why:'須在 0～1 之間'});});
+  return bad;
+}
+function globalLabel(id){const el=document.getElementById(id),l=el&&el.previousElementSibling;return (l&&l.tagName==='LABEL'?l.textContent.trim():'')||id;}
+function badGlobalsHtml(bad){
+  if(!bad||!bad.length)return '';
+  return '<div class="cg-h">參數控制台（'+bad.length+' 個參數）</div><div class="cg-sub">清空的欄位不會當成 0 來算（那會算出偏樂觀的結果）。請填入實際值。</div><ul class="cg-list">'+
+    bad.map(b=>'<li><a href="javascript:void(0)" onclick="jumpToGlobal(\''+b.key+'\')">'+_vEsc(globalLabel(b.key))+'</a>：'+_vEsc(b.why)+'</li>').join('')+'</ul>';
+}
+function markBadGlobals(bad){
+  const set=new Set((bad||[]).map(b=>b.key));
+  document.querySelectorAll('#sidebar input[type=number]').forEach(el=>{const on=set.has(el.id);el.classList.toggle('sb-bad',on);if(on)el.setAttribute('aria-invalid','true');else el.removeAttribute('aria-invalid');});
+}
+function jumpToGlobal(id){
+  const el=document.getElementById(id);if(!el)return;
+  if(document.body.classList.contains('sidebar-collapsed'))setSidebarCollapsed(false);
+  const body=el.closest('.section-body');if(body&&body.classList.contains('collapsed')){const t=body.previousElementSibling;if(t)toggleSection(t);}
+  el.scrollIntoView({block:'center'});el.focus();el.classList.add('cell-flash');setTimeout(()=>el.classList.remove('cell-flash'),1600);
+}
 /* 按「確認是實際值」：標 _defaults_ok（要按「儲存專案」才寫回 DB）。改成別的值則不需要確認。 */
 function confirmStampedDefaults(cat,idx){
   const c=components[cat]&&components[cat][idx];if(!c)return;
@@ -3194,14 +3233,16 @@ function missingSummaryText(){
     '。\n請到「元件設定」看紅色提示（點欄位名稱可以直接跳過去）。';
 }
 /* 擋下計算的提示：元件設定的橫幅與各結果頁共用同一份內容。點欄位名稱 → 跳到那一格。 */
-function calcGateHtml(missing){
+function calcGateHtml(missing,badG){
+  missing=missing||[];badG=badG||[];
   const miss=missing.filter(m=>m.kind!=='stamped'),st=missing.filter(m=>m.kind==='stamped');
   const link=m=>m.fields.map(f=>'<a href="javascript:void(0)" onclick="jumpToMissing(\''+m.cat+'\','+m.idx+',\''+f+'\')">'+_vEsc(COL_LABELS[f]||f)+'</a>').join('、');
-  const title=!st.length?(miss.length+' 顆元件的必填欄位還沒填')
+  const tComp=!missing.length?'':!st.length?(miss.length+' 顆元件的必填欄位還沒填')
              :!miss.length?(st.length+' 顆元件的值疑似舊版自動帶入的預設值')
              :(missing.length+' 顆元件需要處理');
-  let h='<div class="calc-gate"><div class="cg-title">⛔ 無法計算體積：'+title+'</div>'+
-        '<div class="cg-sub">元件欄位不會自動套用預設值（預設值若是錯的，算出來的體積也是錯的）。'+
+  const title=[badG.length?'參數控制台有 '+badG.length+' 個參數沒填或不合理':'',tComp].filter(Boolean).join('；');
+  let h='<div class="calc-gate"><div class="cg-title">⛔ 無法計算體積：'+title+'</div>'+badGlobalsHtml(badG);
+  if(missing.length)h+=(badG.length?'<div class="cg-h">元件設定</div>':'')+'<div class="cg-sub">元件欄位不會自動套用預設值（預設值若是錯的，算出來的體積也是錯的）。'+
         '暫時不想納入計算的元件，可以在元件設定按 👁 排除。</div>';
   if(miss.length){
     if(st.length)h+='<div class="cg-h">必填欄位還沒填（'+miss.length+' 顆）</div>';
@@ -3223,8 +3264,9 @@ function calcGateHtml(missing){
 }
 function renderMissingBanner(){
   const el=document.getElementById('comp-missing-banner');if(!el)return;
-  const m=listMissing(components);
-  el.innerHTML=m.length?calcGateHtml(m):'';
+  const m=listMissing(components),bg=listBadGlobals(G,components);
+  markBadGlobals(bg);
+  el.innerHTML=(m.length||bg.length)?calcGateHtml(m,bg):'';
 }
 /* 跳到缺值的那一格：切到元件設定 → 對應分類 → 捲到該列、聚焦並閃一下 */
 function jumpToMissing(cat,idx,field){
@@ -3779,7 +3821,7 @@ function exportCompExcel(mode){
 // =====================================================
 function renderTab1(){
   if(calcResults&&calcResults.blocked){
-    document.getElementById('tab1-alerts').innerHTML=calcGateHtml(calcResults.missing);
+    document.getElementById('tab1-alerts').innerHTML=calcGateHtml(calcResults.missing,calcResults.badGlobals);
     ['tab1-risk','tab1-scale','tab1-col-toggle','tab1-table'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='';});
     return;
   }
@@ -4038,7 +4080,7 @@ function vrStateNote(R,st){
 
 function vrResultHtml(R,g){
   const st=vrState(R);
-  if(st==='blocked')return calcGateHtml(R.missing);
+  if(st==='blocked')return calcGateHtml(R.missing,R.badGlobals);
   const pill=st==='ok'?(R.drc_warn?'<span class="vr-state warn">⚠ DRC 提醒</span>':'<span class="vr-state">✓ DRC 通過</span>')
             :st==='drc'?'<span class="vr-state fail">✖ DRC 不通過</span>'
             :st==='nosol'?'<span class="vr-state fail">✖ 無法設計</span>':'';
@@ -4241,7 +4283,7 @@ function renderTab3(force){
   tab3Stale=false;
   const msg=document.getElementById('tab3-msg'),box=document.getElementById('tab3-3d');
   const show=html=>{msg.innerHTML=html;msg.hidden=!html;box.hidden=!!html;};
-  if(R.blocked){show(calcGateHtml(R.missing));return;}
+  if(R.blocked){show(calcGateHtml(R.missing,R.badGlobals));return;}
   if(R.drc_failed||R.Fin_Height<=0){show('<div class="drc-error">🚫 '+(R.drc_msg||'無效尺寸')+'</div>');return;}
   if(!window.RRU3D){const f=window.__rru3dFail;
     show(f==='webgl'?'<div class="alert alert-danger">⚠️ 這台電腦的瀏覽器無法啟用 WebGL，3D 視窗無法顯示（其他分頁不受影響）。</div>'
@@ -4631,7 +4673,7 @@ function saAmbHtml(d, g){
 const SA_INTRO = '這頁回答三個問題：鰭片 air gap 選多少、功耗比預估高時這顆散熱器撐不撐得住、環溫規格提高的代價。全部用參數控制台與元件設定的目前值計算，改了參數這頁會跟著更新。';
 function saHtml(d, R, g){
   let h = '<p class="sa-intro">' + SA_INTRO + '</p>';
-  if (d.st === 'blocked') return h + calcGateHtml(R.missing);
+  if (d.st === 'blocked') return h + calcGateHtml(R.missing, R.badGlobals);
   if (d.st === 'nohot' || d.st === 'nosol') { const n = vrStateNote(R, d.st); return h + '<section class="vr-panel"><div class="vr-alert ' + n.cls + '" style="border-top:0">' + _vEsc(n.text) + (d.st === 'nosol' ? ' 先處理瓶頸元件，敏感度分析才有意義。' : '') + '</div></section>'; }
   if (d.st === 'drc') return h + '<section class="vr-panel"><div class="vr-alert fail" style="border-top:0">目前的設計 DRC 不通過：' + _vEsc(String(R.drc_msg || '').replace(/^⛔\s*/, ''))
     + '。這顆散熱器做不出來 —— 下面先用 ① 找一個做得出來的 air gap；② ③ 要等設計做得出來才有意義。</div></section>' + saGapHtml(d);
@@ -5620,8 +5662,9 @@ async function captureChartImage(divId, w, h) {
 async function generatePDFReport() {
   console.log('[PDF] generatePDFReport called, calcResults:', !!calcResults);
   if (calcResults && calcResults.blocked) {
-    const m = calcResults.missing;
-    alert('⛔ 無法產生報告：' + m.length + ' 顆元件需要處理（必填欄位還沒填，或值疑似舊版自動帶入的預設值），處理完才能計算體積。\n\n' +
+    const m = calcResults.missing || [], bg = calcResults.badGlobals || [];
+    if (!m.length && bg.length) { alert('⛔ 無法產生報告：參數控制台有 ' + bg.length + ' 個參數沒填或不合理，補上才能計算體積。\n\n' + bg.map(b => '・' + globalLabel(b.key) + '：' + b.why).join('\n')); return; }
+    alert('⛔ 無法產生報告：' + (bg.length ? '參數控制台有 ' + bg.length + ' 個參數沒填或不合理（' + bg.map(b => globalLabel(b.key)).join('、') + '）；' : '') + m.length + ' 顆元件需要處理（必填欄位還沒填，或值疑似舊版自動帶入的預設值），處理完才能計算體積。\n\n' +
       m.slice(0, 12).map(x => '・' + x.name + '（' + x.cat.toUpperCase() + '）：' +
         (x.kind === 'stamped' ? '疑似舊預設值（7 個欄位全等於舊版自動帶入的值，請確認）' : x.fields.map(f => COL_LABELS[f] || f).join('、'))).join('\n') +
       (m.length > 12 ? '\n…還有 ' + (m.length - 12) + ' 顆' : '') + '\n\n請到「元件設定」處理紅框欄位。');

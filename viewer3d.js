@@ -1325,6 +1325,7 @@ function buildPCB() {
   const texTop = boardTexture('hsk'), texBot = boardTexture('filter');
   const mTop = new THREE.MeshPhysicalMaterial({ map: texTop, roughness: 0.42, clearcoat: 0.35, clearcoatRoughness: 0.35 });
   const mBot = new THREE.MeshPhysicalMaterial({ map: texBot, roughness: 0.42, clearcoat: 0.35, clearcoatRoughness: 0.35 });
+  mTop.userData.own = mBot.userData.own = true;   // 這次建模專屬 → 重建時由 disposeTree 連貼圖一起釋放
   // 銅塊的凸台穿過 PCB：開孔≈PA 本體大小（圓角）
   const cut = LAY.inst.filter(o => o.ct.kind === 'coin').map(o => { const hl = o.bL + 0.3, hw = o.bW + 0.3;
     return [o.x - hl / 2, o.z - hw / 2, o.x + hl / 2, o.z + hw / 2, Math.min(1.2, hl / 4, hw / 4)]; });
@@ -1601,7 +1602,14 @@ const state = { mode: 'real', dims: true, st: 'asm', flip: false, upright: false
 const HIDE = {};                                   // 模型樹取消勾選的零件（重建後照樣藏）
 const HIDEI = new Set();                           // 個別隱藏的零件（選取鍵：c:元件#i、io:id、ant:id）；只在這次檢視、不存檔，換專案清掉
 
-function disposeTree(o) { o.traverse(x => { if (x.geometry) x.geometry.dispose(); if (x.element) x.element.remove(); }); }
+/* 重建前釋放上一個模型：幾何，以及「這一次建模專屬」的貼圖（material.userData.own 的 map）。
+   PCB 兩面的板面貼圖每次重建都重畫（最長邊 2400px，兩張合計約 50 MB 顯示記憶體）；three.js 不會自己釋放，
+   原本只釋放幾何 → 每重建一次（重算、拖曳放開、改一個欄位）就多佔一份，在 3D 頁調久了越來越慢、甚至掉 WebGL context。
+   ⚠ 只釋放貼圖、不可 material.dispose()：材質釋放會把它的著色器程式引用數降到 0 → three.js 刪掉程式，
+   下一次建模（同樣參數的新材質）就得重新編譯 MeshPhysicalMaterial 的著色器（軟體繪圖實測一次重建 0.17 s → 9.5 s，
+   GPU 上也是一次明顯的頓）。材質本身是小的 JS 物件，沒有引用後由 GC 回收；程式留在快取裡給下一次建模重用。 */
+function disposeTree(o) { o.traverse(x => { if (x.geometry) x.geometry.dispose(); if (x.element) x.element.remove();
+  (Array.isArray(x.material) ? x.material : x.material ? [x.material] : []).forEach(m => { if (m && m.userData && m.userData.own && m.map && !m.map.userData.gone) { m.map.userData.gone = true; m.map.dispose(); } }); }); }
 function rebuild(projKey, keepView) {
   const newProj = !!projKey;
   if (!P) return;
@@ -3849,7 +3857,7 @@ resize();
 requestAnimationFrame(tick);
 window.RRU3D = {
   update, gate, snapshot, left, resize,
-  dbg: { LAY: () => LAY, P: () => P, ed, scene, camera, controls, A, state, select, setEdit, setTab, rebuild, ioList, antList, saveEdit, sel: () => SELK,
+  dbg: { LAY: () => LAY, P: () => P, ed, scene, mem: () => ({ ...renderer.info.memory, programs: (renderer.info.programs || []).map(p => p.id).sort((a, b) => a - b) }), camera, controls, A, state, select, setEdit, setTab, rebuild, ioList, antList, saveEdit, sel: () => SELK,
     frame, setProjection, ortho: () => ORTHO, acam, panView, recenter, soloBox, ioLayout, rotateSel, applySolo, SHD: () => SHD, HSK: () => HSK, PCB: () => PCB, FIL: () => FIL, partCenter, partBox, targets, targets0, flipPivot, shownParts, fsOn, frames: () => FRAMES, tween: () => tween, tweenApply,
     settle: () => { if (tween) { tweenApply(tween, 1); tween = null; } if (camTween) { camera.position.copy(camTween.p1); controls.target.copy(camTween.t1); camera.up.copy(camTween.u1); controls.update(); camTween = null; } },
     busy: () => !!(camTween || tween), frameSize: () => frameSize, curView: () => curView, viewRoll: () => viewRoll, rollView, hideSet, HIDEI, hidKeys, pairPlan: () => LAY && LAY.pair, fdd: () => LAY && LAY.fdd, fddPlace, selTarget, selJob, tipHtml, grpLabel, bandOf, finLayout, finLayoutOf, cutCfg, setCut, cutSet, cavRect, wallSides, shdScrewTip, cellTipHtml, cellAt, pdf: () => PDF_OUT, pdfBusy: () => pdfBusy, screws: () => LAY.screws, loops: () => LAY.loops, shotCanvas,

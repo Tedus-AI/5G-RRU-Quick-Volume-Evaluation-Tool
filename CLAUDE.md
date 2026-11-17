@@ -777,6 +777,13 @@ fg 對 bg ≥ 5.9:1），畫面用 `marginVars(lv)` 塞進 CSS 變數 `--st-*`�
   - 顯示：鰭片分頁寫出截斷幾片、從哪到哪、拿掉的鰭片面積與比例；尺寸標註（組裝）在鰭片尖那一面、L 的另一側畫一條「截斷 … · 中心距底端 …」
     （翻轉時跟著「鰭片」標註移，`finDimPlace`）；模型樹、3D PDF 第 1 頁鰭片那一行附 `cutTxt()`。
   - ⚠ **只影響 3D**：溫度計算、鰭片高、體積照完整鰭片面積（工具的 h 公式沒有截斷這一項；拿掉的面積與截斷帶來的對流改善都沒算）。分頁上有寫。
+- **重建要釋放上一個模型的貼圖**（code review 2026-11）：`rebuild()` 的 `disposeTree` 原本只釋放幾何；PCB 兩面的板面貼圖（`boardTexture`，
+  最長邊 2400px，兩張合計約 50 MB 顯示記憶體）每重建一次就多佔一份 —— 重算、拖曳放開、改一個欄位都會重建，在 3D 頁調久了越來越慢、甚至掉 WebGL context。
+  現在「這一次建模專屬」的材質標 `material.userData.own = true`，`disposeTree` 釋放它的 `map`；模組層級共用的材質不標、不釋放。
+  **在 `build*` 裡新建帶貼圖的材質就要標 `own`。** ⚠ **只釋放貼圖、不可 `material.dispose()`**：材質釋放會讓它的著色器程式引用數歸零、
+  three.js 把程式刪掉，下一次建模就得重新編譯 MeshPhysicalMaterial 的著色器（第一版就這樣做：軟體繪圖下一次重建 0.17 s → 9.5 s，
+  `tests/viewer3d.test.js` 的匯出／匯入那一步因此逾時）。材質是小的 JS 物件，沒有引用後由 GC 回收。
+  契約測試：`tests/viewer3d-leak.test.js`（重建 8 次貼圖數不增加；重建後沿用同一批著色器程式 —— 比對程式 id，`RRU3D.dbg.mem().programs`）。
 - **不影響工具其他頁面**：版面由模組自己掛進 `#tab3-3d`；樣式全部限定在 `.r3d`（`#r3d-css`），id 一律 `r3d-` 前綴，
   模組內查 DOM 一律 `ROOT.querySelector` —— **不可用 `document.querySelector`**（工具本身也有 `#loading`、`[data-tab]` 之類）。
   視窗寬度的 `@media` 改成 `@container r3d`（旁邊有參數控制台，視窗寬 ≠ 3D 頁可用的寬）。
@@ -1113,6 +1120,25 @@ AI-Thermal 已支援「一顆元件多份規格書」（datasheet／application 
   但**只做型別整理**：字串數字轉 number、`''`／`null`／非數字 → 刪 key、清掉舊版 `_filled`。**不補任何值。**
 - 舊版的 `_filled`／琥珀色「自動補值」機制已整個拿掉；`_buildProjectFields` 仍會剝掉殘留的 `_filled`。
 - 契約測試：`tests/comp-normalize.test.js`。
+
+#### ⚠ 參數控制台的值不合理：一樣擋計算（`listBadGlobals`）
+
+Code review（2026-11）發現：`readGlobals` 是 `parseFloat(el.value)||0` —— **清空的欄位被當成 0，而且照算**：環境溫度清空 → 以 0 °C 計算；
+Via K 清空 → `kb>0` 不成立、`R_int` 直接變 0；PCB 板厚／銅塊厚度 0 → `R_int = 0`；安全係數 0 → 鰭片高 0 卻照樣列出體積。
+都是偏樂觀、畫面上又看不出來的結果（參數控制台「可以用出廠預設」不等於「清空了也照算」）。
+
+- 規則（`GLOBAL_REQ_ALWAYS`／`GLOBAL_REQ_VIA`／`GLOBAL_REQ_COIN`，`listBadGlobals(p, comps)`）：
+  - 一律：環境溫度要**有填**（0、負值都可以；`readGlobals` 另外記 `G._emptyIds`＝清空的欄位，因為空白與 0 在 `G` 裡分不出來）；
+    安全係數、PCB 長寬、基板厚、air gap、鰭片厚度 > 0。
+  - 有發熱且沒排除的 **Thermal Via** 元件：PCB 板厚、Via K、Via 製程係數 > 0。
+  - 有發熱且沒排除的 **Copper Coin** 元件：銅塊長／寬／厚、錫片 K > 0，有效面積率在 0～1。
+  - 沒有對應元件就不檢查（用不到的參數不擋）。出廠預設與備份裡 8 個專案的 `global_params` 全部符合 → 既有專案不受影響。
+- 處理：`computeAll` 回 `{blocked:true, missing, badGlobals}`；所有擋計算的畫面共用 `calcGateHtml(missing, badGlobals)`
+  （元件設定橫幅、詳細分析、視覺化報告、3D、敏感度分析），PDF 拒絕產生並寫出是哪個參數。側欄那一格紅框（`.sb-bad`＋`aria-invalid`，`markBadGlobals`），
+  提示裡的參數名稱可以點（`jumpToGlobal`：打開收合的側欄與區段、聚焦那一格）。
+- `_emptyIds` 是底線開頭的內部記號：不在 `PROJECT_GLOBAL_KEYS` → 不會寫進 `global_params`。
+- **新增「會進分母或決定熱阻」的參數時，要一起加進對應的 `GLOBAL_REQ_*`。**
+- 契約測試：`tests/globals-guard.test.js`。
 
 #### ⚠ 疑似舊版罐頭預設值：一樣擋計算（`compStamped`／`_defaults_ok`）
 
