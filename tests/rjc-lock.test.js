@@ -85,14 +85,12 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   });
   ok('沒有輸入框／下拉／可編輯區塊（改不動）', !a.hasInput && !a.hasSelect && !a.editable, a);
   ok('顯示的數值就是 R_jc（0.35）', /^0\.35/.test(a.text), a.text);
-  ok('白底黑字純文字，不是反灰 disabled input',
-     a.bg === 'rgb(255, 255, 255)' && a.color === 'rgb(17, 24, 39)' && a.opacity === '1', a);
-  ok('保留 AI-Thermal 推導的藍邊識別（3px #0550ae）',
-     parseFloat(a.borderLeft) >= 3 && /rgb\(5, 80, 174\)/.test(a.borderLeft), a.borderLeft);
+  ok('純文字（深色字、不反灰；跟其他唯讀欄位同一種樣式）', /rgb\(15, 27, 45\)|rgb\(17, 24, 39\)/.test(a.color) && a.opacity === '1', a);
+  ok('不再加藍邊／🔒（表格上方一句話已說明數值取自 AI-Thermal）', parseFloat(a.borderLeft) < 2 && !/🔒/.test(a.text), a);
   ok('滑鼠指標是 help（看得出可看說明）', a.cursor === 'help', a.cursor);
   ok('tooltip 寫出來源 θ 型別', /θJC,bottom/.test(a.title), a.title);
   ok('tooltip 帶出量測條件（讀 AI-Thermal 寫的 Rth）', /@85°C 冷板/.test(a.title), a.title);
-  ok('tooltip 指路到 AI-Thermal 的熱阻表，並寫明依主散熱路徑取用哪一筆', /AI-Thermal/.test(a.title) && /依主散熱路徑取用/.test(a.title), a.title);
+  ok('tooltip 指路到 AI-Thermal 的熱阻表（5G-RRU 唯讀），並寫明依主散熱路徑取用哪一筆', /AI-Thermal/.test(a.title) && /5G-RRU 唯讀/.test(a.title) && /依主散熱路徑取用/.test(a.title), a.title);
 
   // 窄欄換行會把整列撐高（行內圖示踩過這個坑）→ 同一列鎖定前後必須等高
   const aH = await page.evaluate(() => {
@@ -179,8 +177,8 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
     return el ? el.textContent : '';
   });
   // 圖例只說「有這個標記＝AI-Thermal 自動帶入」（使用者要求精簡）；Rjc 鎖定的說明在鎖定值的 tooltip（[B] 已驗）
-  ok('圖例一行：有標記的儲存格＝AI-Thermal 自動帶入（不再逐欄說明）',
-     /有這個標記的儲存格是由 AI-Thermal 自動帶入的值/.test(e) && e.length < 60, e.slice(0, 120));
+  ok('表格上方一句話：數值取自 AI-Thermal、只需填元件相對高度、修改回 AI-Thermal',
+     /表中數值皆取自 AI-Thermal/.test(e) && /元件相對高度/.test(e) && /回 AI-Thermal 修改/.test(e), e.slice(0, 120));
 
   ok('頁面無 JS 例外', errors.length === 0, errors.slice(0, 3));
 

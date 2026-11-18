@@ -118,8 +118,8 @@ function ok(name, cond, extra) {
     const note = document.getElementById('t_PCB_src');
     return { dp: cell('Driver PA'), si: cell('Si5518'), fp: cell('Final PA'), note: note.textContent, show: getComputedStyle(note).display };
   });
-  ok('元件表：RF Thermal Via 的板厚寫「2.4」（不再另寫 AI-Thermal 字樣）、藍邊、tooltip 指路回 AI-Thermal',
-     C.dp && C.dp.txt === '2.4' && /derived-src/.test(C.dp.cls) && /AI-Thermal RF PCB 板厚/.test(C.dp.tip) && /要改請到 AI-Thermal 改/.test(C.dp.tip), C.dp);
+  ok('元件表：RF Thermal Via 的板厚寫「2.4」（純文字、不加標記）、tooltip 指路回 AI-Thermal',
+     C.dp && C.dp.txt === '2.4' && !/derived-src/.test(C.dp.cls) && /AI-Thermal RF PCB 板厚/.test(C.dp.tip) && /要改請到 AI-Thermal 改/.test(C.dp.tip), C.dp);
   ok('元件表：Digital 的 Thermal Via 照舊寫參數控制台的值、tooltip 說明 AI-Thermal 設定後會改用那個值',
      C.si && C.si.txt === '2' && !/derived-src/.test(C.si.cls) && /AI-Thermal 的 EE\/RF\/PWR 頁設定這個分類的 PCB 板厚後/.test(C.si.tip), C.si);
   ok('元件表：銅塊元件不提 AI-Thermal 板厚', C.fp && C.fp.txt === '2.5' && !/PCB 板厚/.test(C.fp.tip), C.fp);

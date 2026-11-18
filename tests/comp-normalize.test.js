@@ -186,29 +186,28 @@ const AIT_PROJECT = {
   ok('敏感度分析顯示擋下原因、不做任何分析', /無法計算體積/.test(e2.sa) && e2.saSecs === 0, e2);
   ok('PDF 報告拒絕產生並列出缺什麼', /無法產生報告/.test(e2.pdf) && /Circulators-B20B28/.test(e2.pdf), e2.pdf.slice(0, 80));
 
-  console.log('\n[F] 元件表：缺值格不顯示 0、紅框「必填」、下拉顯示「請選擇」');
+  console.log('\n[F] 元件表：缺值格不顯示 0、紅框（高度是空白輸入框＋「必填」；其他欄位是唯讀「未填」）');
   const f = await page.evaluate(() => {
     const rows = [...document.querySelectorAll('#subtab0 table.comp-table tbody tr')];
-    const row = rows.find(r => (r.querySelector('td[data-col="Component"] input') || {}).value === 'Circulators-B20B28');
-    const full = rows.find(r => (r.querySelector('td[data-col="Component"] input') || {}).value === 'Circulators-B8');
+    const nm = r => ((r.querySelector('td[data-col="Component"] .ro-name') || {}).textContent || '').trim();
+    const row = rows.find(r => nm(r) === 'Circulators-B20B28');
+    const full = rows.find(r => nm(r) === 'Circulators-B8');
     const h = row.querySelector('td[data-col="Height(mm)"] input');
-    const bt = row.querySelector('td[data-col="Board_Type"] select');
-    const tim = row.querySelector('td[data-col="TIM_Type"] select');
-    const rj = row.querySelector('td[data-col="R_jc"] input');
+    const ro = c => row.querySelector('td[data-col="' + c + '"] .ro-val');
     const cs = getComputedStyle(h);
     return {
       hVal: h.value, hMissing: h.classList.contains('cell-missing'), hPh: h.placeholder, border: cs.borderTopColor,
-      btText: bt.options[bt.selectedIndex].textContent, btVal: bt.value, btMissing: bt.classList.contains('cell-missing'),
-      timText: tim.options[tim.selectedIndex].textContent, timMissing: tim.classList.contains('cell-missing'),
-      rjVal: rj.value, rjMissing: rj.classList.contains('cell-missing'),
-      fullMarked: !!full.querySelector('.cell-missing'),
+      bt: ro('Board_Type').textContent, btMissing: ro('Board_Type').classList.contains('ro-missing'), btTip: ro('Board_Type').title,
+      tim: ro('TIM_Type').textContent, timMissing: ro('TIM_Type').classList.contains('ro-missing'),
+      rj: ro('R_jc').textContent, rjMissing: ro('R_jc').classList.contains('ro-missing'),
+      fullMarked: !!full.querySelector('.cell-missing, .ro-missing'),
     };
   });
-  ok('缺值的數字格是空白（不是 0）、紅框、placeholder「必填」',
+  ok('缺值的高度格是空白（不是 0）、紅框、placeholder「必填」',
      f.hVal === '' && f.hMissing && f.hPh === '必填' && f.border === 'rgb(220, 38, 38)', f);
-  ok('導熱方式下拉顯示「— 請選擇 —」而不是清單第一項', /請選擇/.test(f.btText) && f.btVal === '' && f.btMissing, f);
-  ok('介面材料下拉同樣顯示「— 請選擇 —」並標紅', /請選擇/.test(f.timText) && f.timMissing, f);
-  ok('Rjc 缺值 → 可輸入的空白欄位並標紅', f.rjVal === '' && f.rjMissing, f);
+  ok('導熱方式缺值 → 紅框「未填」，tooltip 指路到 AI-Thermal（不顯示成清單第一項）', f.bt === '未填' && f.btMissing && /AI-Thermal/.test(f.btTip), f);
+  ok('介面材料缺值同樣紅框「未填」', f.tim === '未填' && f.timMissing, f);
+  ok('Rjc 缺值 → 紅框「未填」', f.rj === '未填' && f.rjMissing, f);
   ok('完整的元件沒有任何紅框', !f.fullMarked, f);
 
   console.log('\n[G] 點欄位名稱 → 跳到那一格');
@@ -222,7 +221,7 @@ const AIT_PROJECT = {
     const tr = a && a.closest('tr');
     return { tab0: document.querySelectorAll('.tab-content')[0].classList.contains('active'),
              col: td && td.dataset.col,
-             comp: tr && (tr.querySelector('td[data-col="Component"] input') || {}).value,
+             comp: tr && ((tr.querySelector('td[data-col="Component"] .ro-name') || {}).textContent || '').trim(),
              flashed: !!(td && td.classList.contains('cell-flash')) };
   });
   ok('切回元件設定、聚焦在 Circulators-B20B28 的「限溫」並閃一下',
@@ -275,8 +274,10 @@ const AIT_PROJECT = {
     variantsCache = { rf: [], pwr: [], digital: [
       { name:'快選元件', power:'', originProjectName:'StarKcore-12L', originProjectId:'StarKcore-12L',
         src: { Qty:1, 'Power(W)':'', 'Limit(C)':105, Type:'DC-DC' } } ] };
-    renderTab0();
-    const sel = document.getElementById('lib_sel_digital'); sel.value = '0';
+    // 元件表唯讀之後畫面上沒有快選下拉（addFromVariant 保留給程式）→ 測試自己放一個同 id 的下拉
+    let sel = document.getElementById('lib_sel_digital');
+    if (!sel) { sel = document.createElement('select'); sel.id = 'lib_sel_digital'; sel.style.display = 'none'; document.body.appendChild(sel); }
+    sel.innerHTML = '<option value="0">快選元件</option>'; sel.value = '0';
     addFromVariant('digital');
     const q = components.digital[components.digital.length - 1];
     // Thick(mm) 每次 recalc 都由參數控制台依導熱方式帶入（推導值，不是元件預設值）→ 不列入比對

@@ -83,7 +83,8 @@ const PROJ = {
     const inputs = [...tb.querySelectorAll('tbody input, tbody select')].map(e => e.closest('td').dataset.col);
     const ops = [...tb.querySelectorAll('tbody td.col-ops button')].map(b => b.textContent.trim());
     return { inputs: [...new Set(inputs)], ops: [...new Set(ops)], addRow: !!document.querySelector('#subtab0 .add-row, #subtab0 .btn-add-direct, #lib_sel_rf'),
-      ro: [...tb.querySelectorAll('tbody tr:first-child .ro-val')].map(e => e.closest('td').dataset.col), note: (document.querySelector('#subtab0 .ro-note') || {}).textContent || '' };
+      ro: [...tb.querySelectorAll('tbody tr:first-child .ro-val')].map(e => e.closest('td').dataset.col), note: (document.querySelector('#subtab0 .ro-legend') || {}).textContent || '', bottomNote: !!document.querySelector('#subtab0 .ro-note'),
+      marks: tb.querySelectorAll('.derived-src, .rjc-lock').length, lockTxt: /🔒/.test(tb.textContent) };
   });
 
   console.log('\n[A] 元件表唯讀');
@@ -92,7 +93,9 @@ const PROJ = {
   ok('只有「元件相對高度」是輸入框', a.inputs.length === 1 && a.inputs[0] === 'Height(mm)', a.inputs);
   ok('名稱、數量、功耗、E-Pad、導熱方式、限溫、Rjc、介面材料是唯讀文字',
      ['Component', 'Qty', 'Power(W)', 'Pad_L', 'Pad_W', 'Board_Type', 'Limit(C)', 'R_jc', 'TIM_Type'].every(c => a.ro.includes(c)), a.ro);
-  ok('沒有新增／快選元件的入口，表格下方說明到 AI-Thermal 改', !a.addRow && /新增、刪除或修改元件請到 AI-Thermal/.test(a.note), a);
+  ok('沒有新增／快選元件的入口；表格上方一句話：數值取自 AI-Thermal、只需填元件相對高度、修改請回 AI-Thermal（下方不重複）',
+     !a.addRow && /取自 AI-Thermal/.test(a.note) && /只需填寫「元件相對高度」/.test(a.note) && /回 AI-Thermal 修改/.test(a.note) && !a.bottomNote, a);
+  ok('儲存格不再加藍邊／🔒 標記', a.marks === 0 && !a.lockTxt, a);
   ok('操作欄只剩 👁（沒有刪除、複製）', a.ops.length === 1 && /👁/.test(a.ops[0]), a.ops);
 
   console.log('\n[B] 缺值：紅框「未填」＋指路');
