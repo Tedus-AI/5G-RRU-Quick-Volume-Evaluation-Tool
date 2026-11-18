@@ -129,11 +129,11 @@ const OFFLINE_DB = {
   await page.evaluate(() => { cloudLocked = true; });
   const blocked = await page.evaluate(() => _ensureLockBeforeWrite('儲存專案'));
   ok('寫入保護沒解除 → 一樣擋下', blocked === false);
-  await page.evaluate(() => { cloudLocked = false; _applyCloudLockUI(); components.rf[0]['Power(W)'] = 35; recalc(); });
+  await page.evaluate(() => { cloudLocked = false; _applyCloudLockUI(); components.rf[0]['Height(mm)'] = 335; recalc(); });
   await page.evaluate(() => cloudSaveProject());
   await page.waitForTimeout(300);
   let f = await fileJson();
-  ok('存檔寫回本機檔（35 W）', f.projects.P1.rf_data[0]['Power(W)'] === 35, f.projects.P1.rf_data[0]);
+  ok('存檔寫回本機檔（高度 335）', f.projects.P1.rf_data[0]['Height(mm)'] === 335, f.projects.P1.rf_data[0]);
   ok('AI-Thermal 的欄位保留（thermal_specs）', !!(f.projects.P1.thermal_specs && f.projects.P1.thermal_specs.PA));
   ok('過程中完全沒有打 Graph API', (await page.evaluate(() => window.__graphCalls)) === 0);
 
@@ -150,7 +150,7 @@ const OFFLINE_DB = {
   await page.click('#dbRestoreGo');
   await page.waitForFunction(() => !document.getElementById('dbRestoreModal').classList.contains('active'));
   f = await fileJson();
-  ok('P2 還原進本機檔、P1 維持 35 W', !!f.projects.P2 && f.projects.P1.rf_data[0]['Power(W)'] === 35);
+  ok('P2 還原進本機檔、P1 維持高度 335', !!f.projects.P2 && f.projects.P1.rf_data[0]['Height(mm)'] === 335);
 
   await setFile('{ broken', 'broken2.json');
   await page.evaluate(() => handlePickDb());

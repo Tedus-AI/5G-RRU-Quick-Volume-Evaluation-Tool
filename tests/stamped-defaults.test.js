@@ -113,15 +113,15 @@ const PROJ = {
   const b = await page.evaluate(() => {
     switchTab(0); switchSubTab(1);
     const tr = document.querySelectorAll('#subtab1 table.comp-table tbody tr')[0];   // SoC
-    const cells = STAMPED_FIELDS.map(k => tr.querySelector('td[data-col="' + k + '"] input, td[data-col="' + k + '"] select'));
+    const cells = STAMPED_FIELDS.map(k => tr.querySelector('td[data-col="' + k + '"] input, td[data-col="' + k + '"] .ro-val'));
     const h = tr.querySelector('td[data-col="Height(mm)"] input');
     const cs = getComputedStyle(h);
     const note = tr.querySelector('td[data-col="Component"] .stamped-note');
-    return { marked: cells.map(c => !!(c && c.classList.contains('cell-stamped'))), value: h.value,
+    return { marked: cells.map(c => !!(c && (c.classList.contains('cell-stamped') || c.classList.contains('ro-stamped')))), value: h.value,
              border: cs.borderTopStyle + ' ' + cs.borderTopColor, note: note ? note.textContent : '',
              tip: h.getAttribute('title') || '' };
   });
-  ok('7 格都有虛線紅框（值照常顯示 50，不是空白）', b.marked.every(Boolean) && b.value === '50' && /dashed/.test(b.border) && /220, 38, 38/.test(b.border), b);
+  ok('7 格都有虛線紅框（值照常顯示 50，不是空白；高度是輸入框、其餘是唯讀文字）', b.marked.every(Boolean) && b.value === '50' && /dashed/.test(b.border) && /220, 38, 38/.test(b.border), b);
   ok('名稱下方寫「疑似舊預設值」並有確認鈕；滑鼠停留有說明', /疑似舊預設值/.test(b.note) && /確認是實際值/.test(b.note) && /確認前無法計算/.test(b.tip), b);
 
   console.log('\n[C] 確認 → 解除；全部處理完 → 恢復計算');
@@ -145,6 +145,7 @@ const PROJ = {
   const c2 = await page.evaluate(() => {
     confirmStampedDefaults('digital', 1);
     updateCompNum('pwr', 0, 'Power(W)', '35');                // 補上電源模組瓦數 → 7 欄全等於 PWR 舊預設
+    window.__db.projects.S.pwr_data[0]['Power(W)'] = 35;     // 瓦數是 AI-Thermal 的欄位：模擬 AI-Thermal 那邊也存了（5G-RRU 存檔時以資料庫為準）
     const st = listMissing(components).filter(x => x.kind === 'stamped').map(x => x.name);
     confirmStampedDefaults('pwr', 0);
     return { st, blocked: !!calcResults.blocked, rows: calcResults.rows.length };

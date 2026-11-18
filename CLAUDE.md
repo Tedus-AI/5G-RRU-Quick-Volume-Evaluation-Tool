@@ -481,6 +481,9 @@ docId → id≠名稱的專案每存一次就多一份分身、原專案永遠�
 
 ### 元件改名：`_renamed_from`（讓 AI-Thermal 把以名稱當 key 的資料搬過去）
 
+> ⚠ **2026-11 起元件名稱唯讀**（見「元件表唯讀」）：5G-RRU 畫面上已經改不了名稱，存檔時名稱一律用資料庫的值 → `renameMarksApply` 實際上不會再標出 `_renamed_from`。
+> 以下保留作為機制說明（函式還在；AI-Thermal 讀標記的那一半照舊）。契約測試 `tests/merge-save.test.js` [I] 改成驗「不改名、不標」。
+
 AI-Thermal 有好幾份資料用「元件名稱」當 key：TH/ME 頁的 `thermal_specs`／`hidden_components`、Tab3 的
 `validation_data`／`vd_hidden_components`、Tab1 標註的 `componentRef`。本工具**不碰這些資料**，所以在這裡改元件名稱，
 那些資料會變孤兒（AI-Thermal 的 TH/ME 頁那一列變空白、推導不出導熱方式／E-Pad → 回到本工具變必填紅框）。
@@ -1030,14 +1033,33 @@ AI-Thermal 下次存檔覆寫，還讓兩邊數字對不起來 → `rjcCellHtml`
 （推導欄位、介面材料、K_eff、取自 AI-Thermal 的板厚）。K_eff 一律在導熱方式下拉的**下一行**（使用者：並排太長），寬度只包住文字（`display:table`），藍邊貼著 K（原本整格寬、藍邊離文字很遠）。
 - **數量、單顆功耗、限溫不標**：它們是兩個工具共寫的同一個欄位（兩邊都能改、存檔三方合併，不會被對方覆寫），不是推導值。
 
+### 元件表唯讀：5G-RRU 不改 AI-Thermal 的值（使用者決定，2026-11）⚠️ 改元件表前先看這裡
+
+使用者：「5G RRU 的元件列表基本上就是讀取 AI-thermal 的資料，所以我希望 5G RRU 這邊不要去改動到 AI-thermal 的值」，並選了「全部唯讀」。
+
+- **元件表只有「元件相對高度」（`Height(mm)`）可以改**；板厚由參數控制台／AI-Thermal 分類板厚帶入（本來就是推導值）。
+  名稱、數量、單顆功耗、限溫、限溫對象、導熱方式、E-Pad、Rjc、介面材料（類型＋型號）一律是**唯讀文字**（`roCellHtml`：白底深字，不是反灰 input）。
+- 唯讀格的狀態：缺值 → 紅框「未填」＋tooltip 指路到 AI-Thermal 的哪一頁（`AI_FIELD_HOME`／`aiHomeOf`）；疑似舊預設值 → 紅虛線；
+  限溫疑似範例值 → 琥珀虛線；AI-Thermal 推導值 → 左側藍邊（同一個來源標記）。`tabindex="0"` → 缺值橫幅點欄位名稱跳得過去（`jumpToMissing`）。
+- **新增／刪除／複製／從資料庫快選元件的入口拿掉**（表格下方改成一行說明 `.ro-note`）；操作欄只剩 👁（排除＝本工具的 `_excluded`，不動 AI-Thermal 的值）。
+  「解除參照」鈕拿掉；Pad2 遷移橫幅不再提供「套用遷移」，改成指路到 AI-Thermal TH/ME 頁。
+  仍可在本工具按的只有寫**標記**的鈕：「確認是實際值」（`_defaults_ok`）、限溫「確認」（`_limit_ok`）—— 不改任何值。
+- **存檔第二道保險 `aiOwnedFromDb(fields, cur)`**：存回同一個專案時，`AI_OWNED_FIELDS`（上面那些欄位＋`_bt_from`／`_pad_from`／`_rjc_from`／`_tim_from`）
+  一律換成資料庫裡的值（沒有 key 就刪 key），用 `_cid` 對、舊資料用名稱對。新專案／匯入本機檔／複製專案沒有可以對照的資料 → 不做。
+  合併**之前**也先對「我的」那一份做一次 `aiOwnedFromDb(fields, projBase)`（＝載入時的值，等於「我沒改」）→ 這些欄位合併時一律採用資料庫的值、照常算進「併入資料庫最新的 N 項修改」，**不會為它們跳衝突視窗**（衝突只會出現在元件相對高度這類本工具自己的欄位）。
+- `addComp`／`removeComp`／`copyComp`／`addFromVariant`／`updateComp`／`updateCompNum`（非高度）／`timMigratePad2` 等函式還在（測試與舊流程用），只是畫面沒有入口。
+  下面「快選參照」「carry 白名單」「`Pad2` 遷移」等段落描述的是這些函式的規則，入口已不在本工具。
+- **介面材料**：類型與型號都是唯讀文字；表格容器 ≥ 1400px（24 吋）時兩個**並排**、k／t 來源在下一行（使用者要求，同原本可編輯時的排法），較窄時上下疊。
+- 契約測試：`tests/readonly-comp.test.js`。
+
 ### 每元件欄位的歸屬（同一顆元件物件由兩個工具共寫）
 
 | 欄位 | 誰有畫面可編輯 |
 |---|---|
-| `Component`、`Qty`、`Power(W)`、`Limit(C)`、`Limit_Ref` | 兩邊（`Limit_Ref`＝限溫對象 Tj／Tc，兩邊都在限溫欄底下有小下拉）|
+| `Component`、`Qty`、`Power(W)`、`Limit(C)`、`Limit_Ref` | **只有 AI-Thermal**（2026-11 起 5G-RRU 唯讀，見「元件表唯讀」）|
 | `Height(mm)` | 只有 5G-RRU（AI-Thermal 一律不寫）|
 | `Thick(mm)` | 只有 5G-RRU，且**由 AI-Thermal 的分類 PCB 板厚（Thermal Via）／參數控制台的 PCB 板厚度／銅塊厚度推導**（見「Thick(mm)」一節）；AI-Thermal 一律不寫 |
-| `Board_Type`、`Pad_L`、`Pad_W`、`TIM_Model`、`TIM_Type` | 5G-RRU 可編輯（標藍邊提醒會被覆寫）；AI-Thermal 存檔時由 Tab1/Tab2 推導後覆寫 |
+| `Board_Type`、`Pad_L`、`Pad_W`、`TIM_Model`、`TIM_Type` | **只有 AI-Thermal**（Tab1/Tab2 推導；5G-RRU 唯讀，見「元件表唯讀」）|
 | `R_jc` | **有 `_rjc_from` 且有值時本工具鎖定不可改**（見下節）；沒有標記（或值是空的）才可自行輸入 |
 | `Type`、`Power_RT(W)`、`TV_ID_mil`、`TV_Qty`、`Temp_Sensor`、`Local_Qty`、`Remote_Qty`、`note`、`Rth`、`SpecFile` | 只有 AI-Thermal（本工具不顯示但原樣保留）|
 

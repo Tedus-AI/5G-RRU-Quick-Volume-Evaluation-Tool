@@ -105,30 +105,28 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   ok('鎖定沒有把列撐高（' + h0 + ' → ' + aH.h + 'px）', Math.abs(aH.h - h0) < 1.5, { h0, aH });
   ok('數值與 🔒 同一行（nowrap，高度 < 30px）', aH.nowrap === 'nowrap' && aH.lines < 30, aH);
 
-  console.log('\n[B] 沒有推導標記 → 仍可自行輸入');
+  console.log('\n[B] 沒有推導標記 → 唯讀文字（5G-RRU 不改 AI-Thermal 的值）');
   const b = await page.evaluate(async () => {
+    components.rf[1].R_jc = 2.4; recalc();
     const td = document.querySelectorAll('#subtab0 table.comp-table tbody tr')[1].querySelector('td[data-col="R_jc"]');
-    const inp = td.querySelector('input');
-    if (!inp) return { hasInput: false };
-    inp.value = '2.4';
-    inp.dispatchEvent(new Event('change', { bubbles: true }));
-    return { hasInput: true, locked: !!td.querySelector('.rjc-ref'), stored: components.rf[1].R_jc };
+    const ro = td.querySelector('.ro-val');
+    return { hasInput: !!td.querySelector('input'), locked: !!td.querySelector('.rjc-ref'), txt: ro ? ro.textContent : '', tip: ro ? ro.title : '' };
   });
-  ok('可輸入且改得動（2.4 寫進元件）', b.hasInput && b.stored === 2.4 && !b.locked, b);
+  ok('顯示數值、沒有輸入框（tooltip 指路到 AI-Thermal）', !b.hasInput && !b.locked && b.txt === '2.4' && /AI-Thermal/.test(b.tip), b);
 
-  // 標記還在、值卻不見了（例：被清掉）→ 不可把一個空值鎖起來讓人改不了（Rjc 是必填）
+  // 標記還在、值卻不見了（例：被清掉）→ 不可顯示成鎖定值；紅框「未填」、計算被擋
   const b2 = await page.evaluate(() => {
     const c = components.rf[1];
     c._rjc_from = 'JC_bot'; delete c.R_jc; recalc();
     const td = document.querySelectorAll('#subtab0 table.comp-table tbody tr')[1].querySelector('td[data-col="R_jc"]');
-    const inp = td.querySelector('input');
-    const r = { locked: !!td.querySelector('.rjc-ref'), hasInput: !!inp,
-                missing: !!(inp && inp.classList.contains('cell-missing')), blocked: !!calcResults.blocked };
+    const ro = td.querySelector('.ro-val');
+    const r = { locked: !!td.querySelector('.rjc-ref'), txt: ro ? ro.textContent : '',
+                missing: !!(ro && ro.classList.contains('ro-missing')), blocked: !!calcResults.blocked };
     delete c._rjc_from; c.R_jc = 2.4; recalc();     // 還原給後面的情境用
     return r;
   });
-  ok('有標記但值是空的 → 可輸入＋紅框必填、計算被擋（不鎖成空值）',
-     !b2.locked && b2.hasInput && b2.missing && b2.blocked, b2);
+  ok('有標記但值是空的 → 紅框「未填」、計算被擋（不顯示成鎖定的空值）',
+     !b2.locked && b2.txt === '未填' && b2.missing && b2.blocked, b2);
 
   console.log('\n[C] 鎖定不影響計算');
   const c = await page.evaluate(() => {

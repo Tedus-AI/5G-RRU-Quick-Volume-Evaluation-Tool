@@ -96,12 +96,14 @@ const PROJECTS = () => ({
     await new Promise(r => setTimeout(r, 30));
   }, waitRefs);
   const rows = () => page.evaluate(() => [...document.querySelectorAll('#subtab0 .comp-table tbody tr')].map(tr => {
-    const name = tr.querySelector('td[data-col="Component"] input');
+    // 元件表唯讀（瓦數一律不能在 5G-RRU 改）→ 「瓦數鎖定」看 refLockedOf（參照徽章是橘色「↩ 參照自」）
+    const nm = tr.querySelector('td[data-col="Component"] .ro-name');
+    const name = nm ? nm.textContent.trim() : '';
     const o = tr.querySelector('.ref-origin');
-    const pw = tr.querySelector('td[data-col="Power(W)"]');
-    return { name: name ? name.value : '', origin: o ? o.textContent.trim() : '', tip: o ? o.getAttribute('title') : '',
+    const comp = components.rf.find(c => c.Component === name);
+    return { name, origin: o ? o.textContent.trim() : '', tip: o ? o.getAttribute('title') : '',
              text: tr.querySelector('td[data-col="Component"]').textContent,
-             locked: !!(pw && pw.querySelector('span')), input: !!(pw && pw.querySelector('input')) };
+             locked: !!(comp && refLockedOf(comp)), input: !(comp && refLockedOf(comp)) };
   }));
   const row = (list, n) => list.find(r => r.name === n) || {};
 

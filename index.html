@@ -904,6 +904,27 @@ input,select,button,textarea{font-family:inherit;}
 .derived-legend .derived-swatch{width:12px;height:16px;flex:none;vertical-align:middle;}
 /* K_eff 一律在下拉的下一行（使用者：並排太長）；寬度只包住文字（display:table），藍邊才貼著 K */
 .comp-table td .via-k-note.via-k-eff{display:table;width:auto;margin:3px auto 0;padding:1px 6px 1px 5px;border-radius:0 4px 4px 0;}
+/* ── 元件表唯讀（使用者決定：5G-RRU 不改 AI-Thermal 的值；只有「元件相對高度」可以改）──
+   唯讀值＝白底深字純文字（UX 慣例 2，不用反灰 input）；缺值紅框「未填」、疑似舊預設值紅虛線、疑似範例值琥珀虛線、AI-Thermal 推導值左側藍邊。 */
+.comp-table td .ro-val{display:inline-block;min-width:44px;padding:4px 8px;border:1px solid transparent;border-radius:6px;background:transparent;
+  color:#0f1b2d;font-family:var(--num-font);font-size:.86rem;line-height:1.3;white-space:nowrap;cursor:default;}
+.comp-table td .ro-val.ro-name{font-family:var(--ui-font);font-weight:600;white-space:normal;overflow-wrap:anywhere;}
+.comp-table td[data-col="Board_Type"] .ro-val,.comp-table td[data-col="TIM_Type"] > .ro-val{font-family:var(--ui-font);}
+.comp-table td .ro-val:focus-visible{outline:2px solid #0079c8;outline-offset:1px;}
+.comp-table td .ro-val.derived-src{border-left:3px solid #0550ae;background:#f5f9ff;border-radius:0 6px 6px 0;cursor:help;}
+.comp-table td .ro-val.ro-missing{border:2px solid #dc2626;background:#fef2f2;color:#b91c1c;font-family:var(--ui-font);font-weight:700;font-size:.78rem;cursor:help;}
+.comp-table td .ro-val.ro-stamped{border:2px dashed #dc2626;background:#fff5f5;cursor:help;}
+.comp-table td .ro-val.ro-suspect{border:2px dashed #d97706;background:#fffbeb;cursor:help;}
+.comp-table td .ro-sub{font-size:.74rem;color:#475569;margin-top:2px;}
+.comp-table td .tim-sub.ro-sub{display:table;margin:2px auto 0;padding:1px 6px;}
+.comp-table td .tim-sub.ro-sub.derived-src{border-left:3px solid #0550ae;background:#f5f9ff;color:#0f2e57;}
+.ro-note{margin:8px 0 0;font-size:.78rem;color:#475569;}
+/* 24 吋（表格容器夠寬）：介面材料的類型＋型號並排、k／t 來源在下一行（使用者要求，同原本可編輯時的排法） */
+@container comptbl (min-width:1400px){
+  .comp-table td[data-col="TIM_Type"]{white-space:nowrap;}
+  .comp-table td[data-col="TIM_Type"] > .tim-sub.ro-sub{display:inline-block;margin:0 0 0 6px;vertical-align:middle;font-size:.82rem;padding:3px 8px;}
+  .comp-table td[data-col="TIM_Type"] > .tim-note{white-space:normal;margin-top:2px;}
+}
 /* ▣V4-END */
 </style>
 <script src="config.js?v=__APP_VERSION__"></script>
@@ -3252,7 +3273,7 @@ function calcGateHtml(missing,badG){
   const title=[badG.length?'參數控制台有 '+badG.length+' 個參數沒填或不合理':'',tComp].filter(Boolean).join('；');
   let h='<div class="calc-gate"><div class="cg-title">⛔ 無法計算體積：'+title+'</div>'+badGlobalsHtml(badG);
   if(missing.length)h+=(badG.length?'<div class="cg-h">元件設定</div>':'')+'<div class="cg-sub">元件欄位不會自動套用預設值（預設值若是錯的，算出來的體積也是錯的）。'+
-        '暫時不想納入計算的元件，可以在元件設定按 👁 排除。</div>';
+        '除了「元件相對高度」，其他欄位都要到 <b>AI-Thermal</b> 填（5G-RRU 只讀取）；滑鼠停在紅框上看要到哪一頁。暫時不想納入計算的元件，可以按 👁 排除。</div>';
   if(miss.length){
     if(st.length)h+='<div class="cg-h">必填欄位還沒填（'+miss.length+' 顆）</div>';
     h+='<ul class="cg-list">';
@@ -3262,7 +3283,7 @@ function calcGateHtml(missing,badG){
   if(st.length){
     h+='<div class="cg-h">疑似舊版自動帶入的預設值（'+st.length+' 顆）</div>'+
        '<div class="cg-sub">這些元件的 7 個欄位（元件高度、E-Pad 長寬、導熱方式、限溫、Rjc、介面材料）<b>全部等於</b>舊版 AI-Thermal '+
-       '建立元件時自動填入的預設值，很可能不是實際值。請改成實際值；若確實就是這些值，按「確認是實際值」。</div><ul class="cg-list">';
+       '建立元件時自動填入的預設值，很可能不是實際值。請到 <b>AI-Thermal</b> 改成實際值；若確實就是這些值，按「確認是實際值」。</div><ul class="cg-list">';
     st.forEach(m=>{
       h+='<li><b>'+_vEsc(m.name)+'</b><span class="cg-cat">'+m.cat.toUpperCase()+'</span>：'+link(m)+
          '<button type="button" class="cg-ok" onclick="confirmStampedDefaults(\''+m.cat+'\','+m.idx+')">✓ 確認是實際值</button></li>';
@@ -3284,7 +3305,7 @@ function jumpToMissing(cat,idx,field){
   setTimeout(()=>{
     const tr=document.querySelectorAll('#subtab'+ci+' table.comp-table tbody tr')[idx];if(!tr)return;
     const cell=tr.querySelector('td[data-col="'+field+'"]')||tr;
-    const inp=cell.querySelector('input,select');
+    const inp=cell.querySelector('input,select,.ro-val');
     cell.scrollIntoView({block:'center'});
     if(inp&&inp.focus)inp.focus({preventScroll:true});
     cell.classList.remove('cell-flash');void cell.offsetWidth;cell.classList.add('cell-flash');
@@ -3646,14 +3667,8 @@ function renderTimMigrateBanner(){
                       :'本專案已查不到 K_Pad2／t_Pad2（這些元件的 R_TIM 目前以 0 計入，等於低估熱阻）';
   const names=hits.map(h=>_vEsc(String(h.c.Component||'(未命名)'))).join('、');
   const models=timLibListByType('Pad');
-  let action;
-  if(models.length){
-    action='<select id="tim-migrate-model"><option value="">（選擇要改用的 Pad 型號）</option>'+
-      models.map(m=>'<option value="'+_vEsc(m.model)+'">'+_vEsc(m.model)+'　k='+_timNum(m.k)+'、t='+_timNum(m.gapThickness)+'mm</option>').join('')+
-      '</select> <button class="btn btn-sm btn-primary" onclick="timMigratePad2()">套用遷移</button>';
-  }else{
-    action='<span style="color:#7c4a03;">型號庫裡還沒有 Pad 型號 → 請先到 <b>AI-Thermal</b> 工具 Tab2 的「🧪 TIM 型號庫」新增一筆（k 與填縫厚度照上面的殘留值填，數字才會 1:1 對得上），再回來這裡遷移。</span>';
-  }
+  // 元件唯讀：TIM 類型／型號只在 AI-Thermal 改（timMigratePad2 保留給程式使用，畫面不提供入口）
+  const action='<span style="color:#7c4a03;">請到 <b>AI-Thermal</b>「TH/ME-專案元件清單」把這些元件的 TIM Type 改成 Pad 並選型號'+(models.length?'':'（型號庫裡還沒有 Pad 型號 → 先到「🧪 TIM 型號庫」新增一筆，k 與填縫厚度照上面的殘留值填）')+'，存檔後這裡就會更新（5G-RRU 的元件資料唯讀）。</span>';
   el.innerHTML='<div class="tim-migrate">⚠️ <b>Pad 2 已停用</b>，請改用「Pad ＋型號」。'+
     '受影響元件 <b>'+hits.length+'</b> 顆：'+names+'<br>'+cur+
     '<div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'+action+'</div></div>';
@@ -3693,6 +3708,57 @@ function addRowHtml(arr,category){
   return h+'</div>';
 }
 
+/* ── 元件表唯讀（使用者決定，2026-11）：5G-RRU 的元件清單就是讀 AI-Thermal 的資料，本工具不改 AI-Thermal 的值 ──
+   只有「元件相對高度」（Height(mm)，5G-RRU 專屬）可以改；板厚由參數控制台帶入。其餘欄位顯示成唯讀文字，
+   新增／刪除／複製／快選元件的入口拿掉。存檔時 aiOwnedFromDb 再把這些欄位一律換回資料庫裡的值（第二道保險）。 */
+const AI_OWNED_FIELDS=['Component','Qty','Power(W)','Limit(C)','Limit_Ref','Board_Type','Pad_L','Pad_W','R_jc','TIM_Type','TIM_Model','_bt_from','_pad_from','_rjc_from','_tim_from'];
+// 缺值時指路：每個欄位在 AI-Thermal 的哪一頁填
+const AI_FIELD_HOME={Component:'EE/RF/PWR-專案元件清單',Qty:'EE/RF/PWR-專案元件清單','Power(W)':'EE/RF/PWR-專案元件清單','Limit(C)':'EE/RF/PWR-專案元件清單',
+  R_jc:'EE/RF/PWR-專案元件清單的「熱阻（θ）」',Board_Type:'TH/ME-專案元件清單的「主散熱路徑」',Pad_L:'TH/ME-專案元件清單的「元件大小／E-PAD」',
+  Pad_W:'TH/ME-專案元件清單的「元件大小／E-PAD」',TIM_Type:'TH/ME-專案元件清單的「TIM Type」'};
+function aiHomeOf(col){return AI_FIELD_HOME[col]?'AI-Thermal「'+AI_FIELD_HOME[col]+'」':'';}
+/* 唯讀格：白底深字純文字（UX 慣例 2：不用反灰的 disabled input）。缺值 → 紅框「未填」＋指路；
+   疑似舊預設值 → 虛線紅框；AI-Thermal 推導值 → 左側藍邊（同一個來源標記）。tabindex 讓「跳到缺值」聚焦得到。 */
+function roCellHtml(row,col,category,shown,extra){
+  const has=_hasVal(row[col],col!=='Component'&&col!=='Board_Type'&&col!=='TIM_Type');
+  const miss=compMissing(row).includes(col),stamped=!miss&&STAMPED_FIELDS.includes(col)&&compStamped(row,category);
+  const from=derivedFrom(row,col);
+  let cls='ro-val',tip='';
+  if(miss){cls+=' ro-missing';tip='必填，還沒填：請到 '+aiHomeOf(col)+' 填（5G-RRU 只讀取 AI-Thermal 的元件資料）。不想納入計算可按 👁 排除這顆元件。';}
+  else if(stamped){cls+=' ro-stamped';tip='疑似舊版自動帶入的預設值（這顆元件的 7 個欄位全部等於舊版 AI-Thermal 的預設值）。請到 '+aiHomeOf(col)+' 改成實際值；若確實就是這些值，按元件名稱下方的「確認是實際值」。';}
+  else if(from){cls+=' derived-src';tip='此值由 '+from+' 自動帶入（5G-RRU 唯讀，要改請到 AI-Thermal）。';}
+  else tip='取自 AI-Thermal（5G-RRU 唯讀，要改請到 '+(aiHomeOf(col)||'AI-Thermal')+'）。';
+  const txt=miss?'未填':(shown!=null?shown:(has?String(row[col]):'—'));
+  return '<td data-col="'+col+'"><span class="'+cls+'" tabindex="0" title="'+_vEsc(tip)+'">'+_vEsc(txt)+'</span>'+(extra||'')+'</td>';
+}
+const LIMIT_REF_LABEL={Tj:'Tj 接面',Tc:'Tc 外殼'};
+function roLimitCellHtml(row,category,i){
+  const sus=row._excluded?null:CompMerge.limitSuspect(row);
+  const au=limitRefAutoOf(row,category),cur=row.Limit_Ref==null?'':String(row.Limit_Ref);
+  const ref='<div class="lim-ref ro-sub" title="'+_vEsc('限溫對象：'+(cur?'指定為 '+cur:'自動＝'+au.ref+'（依'+au.why+'）')+'。以 Tc 判定時，內部溫降與允許溫升都不含 Rjc 那段。要改請到 AI-Thermal「EE/RF/PWR-專案元件清單」。')+'">'+
+            _vEsc(cur?(LIMIT_REF_LABEL[cur]||(cur+'（未知值）')):('自動·'+au.ref))+'</div>';
+  let extra=ref;
+  if(sus)extra+='<div class="lim-sus" title="'+_vEsc(sus.note+'。只提醒、不影響計算。')+'">⚠ 疑似範例值 <button class="btn btn-sm" onclick="confirmLimitOk(\''+category+'\','+i+')">確認</button></div>';
+  let h=roCellHtml(row,'Limit(C)',category,null,extra);
+  if(sus&&!compMissing(row).includes('Limit(C)'))h=h.replace('class="ro-val','class="ro-val ro-suspect');
+  return h;
+}
+function roTimCellHtml(row,category){
+  const type=String(row.TIM_Type||''),model=String(row.TIM_Model||'').trim();
+  let extra='';
+  if(type&&TIM_PARAM_TYPES.includes(type)){
+    const from=derivedFrom(row,'TIM_Model');
+    extra+='<div class="tim-sub ro-sub'+(from?' derived-src':'')+'" title="'+_vEsc(from?'型號由 '+from+' 帶入':'TIM 型號（AI-Thermal 選型；5G-RRU 唯讀）')+'">'+_vEsc(model||'— 未選型 —')+'</div>';
+  }
+  if(type)extra+=timSourceNoteHtml(row);
+  return roCellHtml(row,'TIM_Type',category,type?(type+(TIM_TYPES.includes(type)?'':'（已停用）')):null,extra);
+}
+function roRjcCellHtml(row,category,i){
+  const v=parseFloat(row&&row.R_jc);
+  if(row&&row._rjc_from&&isFinite(v))return rjcCellHtml(row,category,i,'');   // AI-Thermal 熱阻表推導 → 鎖定值（含 🔒、⚠）
+  return roCellHtml(row,'R_jc',category,isFinite(v)?String(+v.toFixed(3)):null);
+}
+
 function renderCompTable(arr,containerId,defaults,category){
   let lhtml='';
 
@@ -3720,19 +3786,19 @@ function renderCompTable(arr,containerId,defaults,category){
     let refOld=row._ref_origin_project||'';
     let refTip='來源專案：'+refOrigin+((refOld&&refOld!==refOrigin)?'\n（快選當時名稱：'+refOld+'；來源之後改名，下次存檔時一併更新）':'');
     COLS.forEach(col=>{
-      if(col==='Board_Type'){lhtml+=boardTypeCellHtml(row,category,i,dis);}
+      if(col==='Board_Type'){lhtml+=roCellHtml(row,'Board_Type',category,row.Board_Type?String(row.Board_Type)+(BOARD_TYPES.includes(String(row.Board_Type))?'':'（未知值）'):null,viaKNoteHtml(row));}
       else if(col==='Thick(mm)'){lhtml+=thickCellHtml(row,category);}
-      else if(col==='R_jc'){lhtml+=rjcCellHtml(row,category,i,dis);}
-      else if(col==='TIM_Type'){lhtml+=timCellHtml(row,category,i,dis);}
-      else if(col==='Limit(C)'){lhtml+=limitCellHtml(row,category,i,dis);}
+      else if(col==='R_jc'){lhtml+=roRjcCellHtml(row,category,i);}
+      else if(col==='TIM_Type'){lhtml+=roTimCellHtml(row,category);}
+      else if(col==='Limit(C)'){lhtml+=roLimitCellHtml(row,category,i);}
       else if(col==='Component'){
         let badge=refLocked
-          ? '<div class="ref-badge" style="font-size:0.72rem;color:#b45309;margin-top:3px;"><span class="ref-origin" title="'+_vEsc(refTip)+'">↩ 參照自 '+_vEsc(refOrigin)+'</span> <button class="btn btn-sm" style="padding:1px 6px;font-size:0.7rem;" title="解除後可自行修改瓦數" onclick="detachRef(\''+category+'\','+i+')">🔓 解除參照</button></div>'
+          ? '<div class="ref-badge" style="font-size:0.72rem;color:#b45309;margin-top:3px;"><span class="ref-origin" title="'+_vEsc(refTip)+'">↩ 參照自 '+_vEsc(refOrigin)+'</span></div>'
           : (refOrigin?'<div class="ref-badge" style="font-size:0.72rem;color:#9ca3af;margin-top:3px;"><span class="ref-origin" title="'+_vEsc(refTip)+'">曾參照自 '+_vEsc(refOrigin)+'</span></div>':'');
         if(compStamped(row,category))badge+='<div class="stamped-note">⚠ 疑似舊預設值 <button class="btn btn-sm" title="這顆元件的 7 個欄位全部等於舊版自動帶入的預設值；確認都是實際值才會納入計算" onclick="confirmStampedDefaults(\''+category+'\','+i+')">✓ 確認是實際值</button></div>';
-        lhtml+='<td data-col="Component"><input type="text" value="'+_vEsc(row[col]||'')+'"'+(row[col]?' title="'+_vEsc(row[col])+'"':'')+dis+' onchange="updateComp(\''+category+'\','+i+',\''+col+'\',this.value)">'+badge+'</td>';
+        lhtml+=roCellHtml(row,'Component',category,row.Component?String(row.Component):null,badge).replace('class="ro-val','class="ro-val ro-name');
       }
-      else if(col==='Power(W)'&&refLocked&&_hasVal(row[col],true)){lhtml+='<td data-col="Power(W)"><span title="瓦數已鎖定，請先按「解除參照」" style="display:inline-block;padding:4px 8px;color:#6b7280;background:#f3f4f6;border-radius:4px;white-space:nowrap;">'+(row[col]!=null?row[col]:'')+' 🔒</span></td>';}
+      else if(col!=='Height(mm)'){lhtml+=roCellHtml(row,col,category,null);}   // 數量／單顆功耗／E-Pad：唯讀
       else{
         // 沒填就顯示空白＋紅框「必填」（不可顯示成 0：看起來像有填，其實是空的）；
         // 清空欄位 → 刪 key（updateCompNum），不寫 0。
@@ -3742,12 +3808,11 @@ function renderCompTable(arr,containerId,defaults,category){
     });
     lhtml+='<td class="col-ops">';
     lhtml+='<button class="btn btn-sm eye-btn'+(excl?' excluded':'')+'" title="'+(excl?'顯示（納入計算）':'隱藏（排除計算）')+'" onclick="toggleComp(\''+category+'\','+i+')">👁️</button> ';
-    lhtml+='<button class="btn btn-sm btn-danger" title="刪除" onclick="removeComp(\''+category+'\','+i+')">🗑️</button> ';
-    lhtml+='<button class="btn btn-sm btn-primary" title="複製" onclick="copyComp(\''+category+'\','+i+')">📋</button>';
     lhtml+='</td></tr>';
   });
   lhtml+='</tbody></table></div>';
-  lhtml+=addRowHtml(arr,category);
+  // 新增／刪除／複製／快選元件已拿掉：元件清單唯讀，一律在 AI-Thermal 維護
+  lhtml+='<p class="ro-note">元件清單取自 <b>AI-Thermal</b>（唯讀）：新增、刪除或修改元件請到 AI-Thermal；這裡只填「元件相對高度」。</p>';
   document.getElementById(containerId).innerHTML=lhtml;
 }
 
@@ -4910,6 +4975,27 @@ function projScreenDigest(){
 function markProjectClean(){projClean=projScreenDigest();}
 function projectIsDirty(){return projClean!==null&&projScreenDigest()!==projClean;}
 // 合併進來的元件（對方可能改了導熱方式）→ 板厚依參數控制台重新帶入，寫進 DB 的數字才一致
+/* 存檔的第二道保險：寫回的元件若在資料庫裡找得到（_cid，舊資料沒有 id 用名稱），AI_OWNED_FIELDS 一律換成資料庫的值
+   （沒有 key 就刪 key）。畫面已經改不到這些欄位；這一步確保任何程式路徑（舊的遷移、測試、未來的功能）都不會把它們寫回去。
+   只在「存回同一個專案、資料庫有這份 document」時做；新專案／匯入／複製專案沒有可以對照的資料。回傳換掉的格數。 */
+function aiOwnedFromDb(fields,cur){   // cur＝要照抄的來源（資料庫最新內容，或載入時快照）
+  let n=0;
+  ['rf_data','digital_data','pwr_data'].forEach(k=>{
+    const mine=fields[k],db=Array.isArray(cur&&cur[k])?cur[k]:[];if(!Array.isArray(mine))return;
+    const byId=new Map(),byName=new Map();
+    db.forEach(c=>{if(!c)return;if(c._cid)byId.set(c._cid,c);if(c.Component!=null&&!byName.has(String(c.Component)))byName.set(String(c.Component),c);});
+    mine.forEach(c=>{
+      if(!c)return;
+      const d=(c._cid&&byId.get(c._cid))||byName.get(String(c.Component));if(!d)return;
+      AI_OWNED_FIELDS.forEach(f=>{
+        const has=Object.prototype.hasOwnProperty.call(d,f);
+        if(has){if(JSON.stringify(c[f])!==JSON.stringify(d[f])){c[f]=CompMerge.clone(d[f]);n++;}}
+        else if(Object.prototype.hasOwnProperty.call(c,f)){delete c[f];n++;}
+      });
+    });
+  });
+  return n;
+}
 function thickApplyToFields(fields,pcb){
   CompMerge.CATS.forEach(f=>(fields[f]||[]).forEach(c=>{
     if(!c)return;
@@ -5137,12 +5223,16 @@ async function cloudSaveProject(opts){
       await dbAdapter.updateDoc('projects',docId,(cur)=>{
         const fields=_buildProjectFields(name,cur);
         merged=null;
+        // 元件唯讀：5G-RRU 不改 AI-Thermal 的欄位 →「我的」那一份這些欄位一律等於載入時（＝我沒改）
+        // → 合併一律採用資料庫的值、照常算進「併入資料庫最新的 N 項修改」，也不會為它們跳衝突。
+        if(base&&cur)aiOwnedFromDb(fields,base);
         if(base&&cur){
           const m=CompMerge.mergeProject(base,fields,cur,{resolutions,scalars:MERGE_SCALARS,derivedKeys:MERGE_DERIVED});
           if(m.unresolved.length)throw CompMerge.MergePending(m.unresolved);
           Object.assign(fields,m.fields);
           merged=m;
         }
+        if(base&&cur)aiOwnedFromDb(fields,cur);   // 元件唯讀：AI-Thermal 的欄位一律用資料庫裡的值（第二道保險）
         // 板厚重新帶入：對方可能改了導熱方式，AI-Thermal 也可能剛改了分類 PCB 板厚
         // → 用寫入當下資料庫裡的 pcb_thickness（存完畫面也換成這一份，兩邊才一致）
         thickApplyToFields(fields,(cur&&cur.pcb_thickness)||{});

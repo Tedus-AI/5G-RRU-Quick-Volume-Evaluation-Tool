@@ -62,25 +62,26 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   await page.click('#login-page button');
   await page.waitForFunction(() => typeof calcResults !== 'undefined' && calcResults && calcResults.rows.length > 0);
 
-  console.log('\n[A] 元件表的限溫欄：限溫對象小下拉');
+  console.log('\n[A] 元件表的限溫欄：限溫對象（唯讀文字，AI-Thermal 改）');
   const a = await page.evaluate(() => {
     switchTab(0); switchSubTab(1);
     const idx = components.digital.findIndex(c => c.Component === '16G DDR');
     const td = () => document.querySelectorAll('#subtab1 table.comp-table tbody tr')[idx].querySelector('td[data-col="Limit(C)"]');
-    const sel = () => td().querySelector('.lim-ref select');
-    const r = { opts: Array.from(sel().options).map(o => o.textContent), val: sel().value, hasInput: !!td().querySelector('input[type="number"]') };
-    updateLimitRef('digital', idx, 'Tj');
-    r.afterTj = components.digital[idx].Limit_Ref; r.selTj = sel().value;
-    updateLimitRef('digital', idx, '');
-    r.afterAuto = ('Limit_Ref' in components.digital[idx]);
+    const ref = () => td().querySelector('.lim-ref').textContent;
+    const r = { auto: ref(), hasInput: !!td().querySelector('input,select'), tip: td().querySelector('.lim-ref').title };
+    components.digital[idx].Limit_Ref = 'Tj'; recalc(); r.tj = ref();
     components.digital[idx].Limit_Ref = 'Tcase'; recalc();
-    r.unknown = { val: sel().value, opts: Array.from(sel().options).map(o => o.textContent), kept: components.digital[idx].Limit_Ref, label: calcResults.rows.find(x => x.Component === '16G DDR').Temp_Label };
+    r.unknown = { txt: ref(), kept: components.digital[idx].Limit_Ref, label: calcResults.rows.find(x => x.Component === '16G DDR').Temp_Label };
     delete components.digital[idx].Limit_Ref; recalc();
+    // updateLimitRef 仍保留（程式用）：選自動 → 刪 key
+    updateLimitRef('digital', idx, 'Tj'); r.afterTj = components.digital[idx].Limit_Ref;
+    updateLimitRef('digital', idx, ''); r.afterAuto = ('Limit_Ref' in components.digital[idx]);
     return r;
   });
-  ok('限溫數字底下多一個小下拉：自動（寫出判定結果）／Tj 接面／Tc 外殼', a.hasInput && JSON.stringify(a.opts) === JSON.stringify(['自動·Tc', 'Tj 接面', 'Tc 外殼']) && a.val === '', a);
-  ok('選 Tj → 寫 Limit_Ref；選自動 → 刪 key（空值不寫 \'\'）', a.afterTj === 'Tj' && a.selTj === 'Tj' && a.afterAuto === false, a);
-  ok('不認得的值不被靜默改掉：補一個「（未知值）」選項，計算照自動判定', a.unknown.val === 'Tcase' && a.unknown.opts.includes('Tcase（未知值）') && a.unknown.kept === 'Tcase' && a.unknown.label === 'Tc', a.unknown);
+  ok('限溫底下寫限溫對象（自動寫出判定結果；沒有輸入框／下拉，tooltip 指路到 AI-Thermal）',
+     a.auto === '自動·Tc' && !a.hasInput && a.tj === 'Tj 接面' && /AI-Thermal/.test(a.tip), a);
+  ok('updateLimitRef：Tj → 寫 key；自動 → 刪 key（空值不寫 \'\'）', a.afterTj === 'Tj' && a.afterAuto === false, a);
+  ok('不認得的值照原字標「（未知值）」，計算照自動判定', a.unknown.txt === 'Tcase（未知值）' && a.unknown.kept === 'Tcase' && a.unknown.label === 'Tc', a.unknown);
 
   console.log('\n[B] 計算：限溫對象決定內部溫降與允許溫升');
   const b = await page.evaluate(() => {
@@ -128,11 +129,11 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
     const banner = () => (document.getElementById('limit-suspect-banner') || {}).textContent || '';
     const si = components.digital.findIndex(x => x.Component === 'SFP');
     const td = () => document.querySelectorAll('#subtab1 table.comp-table tbody tr')[si].querySelector('td[data-col="Limit(C)"]');
-    const r = { banner: banner(), cls: td().querySelector('input').className, note: (td().querySelector('.lim-sus') || {}).textContent || '',
+    const r = { banner: banner(), cls: td().querySelector('.ro-val').className, note: (td().querySelector('.lim-sus') || {}).textContent || '',
                 blocked: !!calcResults.blocked, vol: calcResults.Volume_L };
     confirmLimitOk('digital', si);
     r.ok = components.digital[si]._limit_ok; r.confirmMsg = window.__confirms.slice(-1)[0] || '';
-    r.after = banner(); r.afterCls = td().querySelector('input').className; r.afterNote = !!td().querySelector('.lim-sus');
+    r.after = banner(); r.afterCls = td().querySelector('.ro-val').className; r.afterNote = !!td().querySelector('.lim-sus');
     updateCompNum('digital', si, 'Limit(C)', '150');
     r.again = banner();
     updateCompNum('digital', si, 'Limit(C)', '200');
@@ -145,10 +146,10 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   });
   ok('橫幅列出範例的 SFP（光模組上限 70／85 °C）與 Cavity Filter（功放以外很少到 200 °C）',
      /限溫疑似範例值（2 顆）/.test(d.banner) && /SFP/.test(d.banner) && /70 或 85/.test(d.banner) && /Cavity Filter/.test(d.banner) && /很少到 200/.test(d.banner), d.banner.slice(0, 200));
-  ok('限溫格：琥珀色虛線框＋「疑似範例值」與確認鈕（不是紅色：不擋計算）', /cell-suspect/.test(d.cls) && /疑似範例值/.test(d.note), d);
+  ok('限溫格：琥珀色虛線框＋「疑似範例值」與確認鈕（不是紅色：不擋計算）', /ro-suspect/.test(d.cls) && /疑似範例值/.test(d.note), d);
   ok('不擋計算', d.blocked === false && d.vol > 0, d);
   ok('按確認：先問一次，記下確認的值（_limit_ok ＝ 200），提醒消失',
-     d.ok === 200 && /200 °C 是實際規格/.test(d.confirmMsg) && !/SFP/.test(d.after) && !/cell-suspect/.test(d.afterCls) && !d.afterNote, d);
+     d.ok === 200 && /200 °C 是實際規格/.test(d.confirmMsg) && !/SFP/.test(d.after) && !/ro-suspect/.test(d.afterCls) && !d.afterNote, d);
   ok('限溫改成別的值 → 再提醒；改回確認過的值 → 不提醒', /SFP/.test(d.again) && !/SFP/.test(d.back), [d.again.slice(0, 80), d.back.slice(0, 80)]);
   ok('按 👁 排除的元件不列', !/Cavity Filter/.test(d.excluded), d.excluded.slice(0, 120));
   ok('確認／提醒都不影響體積', near(d.vol, d.volAfter), [d.vol, d.volAfter]);
