@@ -903,7 +903,7 @@ input,select,button,textarea{font-family:inherit;}
 .derived-legend .dl-sub{color:#33557a;font-weight:400;font-size:.76rem;}
 .derived-legend .derived-swatch{width:12px;height:16px;flex:none;vertical-align:middle;}
 /* K_eff 一律在下拉的下一行（使用者：並排太長）；寬度只包住文字（display:table），藍邊才貼著 K */
-.comp-table td .via-k-note.via-k-eff{display:table;width:auto;margin:3px auto 0;padding:1px 6px 1px 5px;border-radius:0 4px 4px 0;}
+.comp-table td .via-k-note.via-k-eff{display:block;margin:2px 0 0;padding:0;border:0;background:none;color:#475569;}
 /* ── 元件表唯讀（使用者決定：5G-RRU 不改 AI-Thermal 的值；只有「元件相對高度」可以改）──
    唯讀值＝白底深字純文字（UX 慣例 2，不用反灰 input）；缺值紅框「未填」、疑似舊預設值紅虛線、疑似範例值琥珀虛線、AI-Thermal 推導值左側藍邊。 */
 .comp-table td .ro-val{display:inline-block;min-width:44px;padding:4px 8px;border:1px solid transparent;border-radius:6px;background:transparent;
@@ -925,6 +925,25 @@ input,select,button,textarea{font-family:inherit;}
   .comp-table td[data-col="TIM_Type"] > .tim-sub.ro-sub{display:inline-block;margin:0 0 0 6px;vertical-align:middle;font-size:.82rem;padding:3px 8px;}
   .comp-table td[data-col="TIM_Type"] > .tim-note{white-space:normal;margin-top:2px;}
 }
+
+/* ── 元件表唯讀之後（使用者要求）：表格上方一句話說明來源，儲存格不再加藍邊／🔒 標記 ──
+   唯讀值一律同一種純文字；板厚、Rjc 原本的白框也拿掉（只剩「元件相對高度」是輸入框，一眼看得出哪裡要填）。 */
+.derived-legend.ro-legend{display:block;width:fit-content;max-width:100%;}
+.comp-table td .ro-val.thick-ref,.comp-table td .ro-val.rjc-ref{border:1px solid transparent;background:transparent;border-radius:6px;cursor:help;white-space:nowrap;}
+.comp-table td .ro-val.rjc-ref.rjc-mism{border:2px dashed #d97706;background:#fffbeb;}
+.comp-table td .ro-val .rjc-warn{color:#b45309;margin-left:4px;font-family:var(--ui-font);}
+/* 欄寬（24 吋實測後重新分配）：每一欄都給建議寬度 → 表格比內容寬時，多出來的寬度依比例分給每一欄，
+   不再全部塞給導熱方式、介面材料兩欄（原本數字欄是 width:1%，名稱欄固定寬）。名稱欄的建議寬度＝最長名稱（compNameColW）。 */
+.comp-table th[data-col="Qty"]{width:64px;}
+.comp-table th[data-col="Power(W)"]{width:84px;}
+.comp-table th[data-col="Height(mm)"]{width:106px;}
+.comp-table th[data-col="Pad_L"],.comp-table th[data-col="Pad_W"]{width:80px;}
+.comp-table th[data-col="Thick(mm)"]{width:86px;}
+.comp-table th[data-col="Board_Type"]{width:262px;min-width:150px;}
+.comp-table th[data-col="Limit(C)"]{width:112px;}
+.comp-table th[data-col="R_jc"]{width:84px;}
+.comp-table th[data-col="TIM_Type"]{width:250px;}
+.comp-table th.col-ops{width:64px;}
 /* ▣V4-END */
 </style>
 <script src="config.js?v=__APP_VERSION__"></script>
@@ -2076,11 +2095,13 @@ function compNameColW(arr){
   try{
     if(!_compNameCtx)_compNameCtx=document.createElement('canvas').getContext('2d');
     const fs=parseFloat(getComputedStyle(document.documentElement).fontSize)||16;
-    _compNameCtx.font=(0.82*fs)+'px '+getComputedStyle(document.body).fontFamily;
+    // 名稱是唯讀文字（.ro-val.ro-name：粗體 600、0.86rem、UI 字型）→ 用同一組字型量
+    const ff=getComputedStyle(document.documentElement).getPropertyValue('--ui-font').trim()||getComputedStyle(document.body).fontFamily;
+    _compNameCtx.font='600 '+(0.86*fs)+'px '+ff;
     (arr||[]).forEach(r=>{const t=String((r&&r.Component)||'');if(t)w=Math.max(w,_compNameCtx.measureText(t).width);});
   }catch(e){}
-  // ＋輸入框內距 12、框線 2、儲存格內距 12、字型量測誤差的餘裕 8
-  return Math.round(Math.min(300,Math.max(140,w+34)));
+  // ＋文字內距 16、框線 2、儲存格內距 12、字型量測誤差的餘裕 8；名稱一行放得下（上限 320，再長才換行）
+  return Math.round(Math.min(320,Math.max(150,w+38)));
 }
 // 寫成固定寬度（不只是下限）：自動版面才不會因為底下的「↩ 參照自 … 解除參照」很長，就把多出來的寬度分給名稱欄，
 // 反而擠到導熱方式／介面材料的說明文字。多出來的寬度只分給那兩欄。
@@ -3452,7 +3473,7 @@ function thickCellHtml(row,category){
     ?'取自 '+tw.label+'（AI-Thermal EE/RF/PWR 頁的分類標題列），這個分類的 Thermal Via 元件共用同一個值。要改請到 AI-Thermal 改；那邊沒設定時才用參數控制台的「PCB 板厚度」。'
     :'由參數控制台的「'+src.label+'」帶入，所有 '+row.Board_Type+' 元件共用同一個值。要改請改參數控制台那一欄。'+
      (src.key==='t_PCB'?'（AI-Thermal 的 EE/RF/PWR 頁設定這個分類的 PCB 板厚後，會改用那個值。）':'');
-  return '<td data-col="Thick(mm)"><span class="thick-ref'+(tw.from==='pcb'?' derived-src':'')+'" title="'+_vEsc(tip)+'">'+_vEsc(shown)+
+  return '<td data-col="Thick(mm)"><span class="ro-val thick-ref" title="'+_vEsc(tip)+'">'+_vEsc(shown)+
     '</span></td>';
 }
 
@@ -3486,10 +3507,11 @@ function rjcCellHtml(row,category,i,dis){
                    (want==='JC_top'?'露銅焊墊封裝的 θJC,bottom 通常小很多 → Tj 可能被低估。':'')+
                    '請到 AI-Thermal 的「熱阻（θ）」補上。'):'';
   const tip='Rjc = '+shown+' °C/W，取自 AI-Thermal 熱阻表的 '+(fl||'θJC')+cond+
-            '。\n熱阻是規格書的值 → 這裡鎖定不開放修改；要改請到 AI-Thermal 的「熱阻（θ）」修改'+
+            '。\n熱阻是規格書的值（5G-RRU 唯讀）；要改請到 AI-Thermal 的「熱阻（θ）」修改'+
             '（依主散熱路徑取用：IC top 取 θJC,top，Copper Coin／Thermal Via 取 θJC,bottom）。'+warn;
-  return '<td data-col="R_jc"><span class="rjc-ref" title="'+_vEsc(tip)+'">'+_vEsc(shown)+
-         '<span class="rjc-lock">🔒</span>'+(mism?'<span class="rjc-warn">⚠</span>':'')+'</span></td>';
+  // 元件表全部唯讀之後不再加 🔒／藍邊（使用者：表格上方一句話說清楚即可）；導熱方式與 θJC 對不上的 ⚠ 照留（是提醒，不是標記）
+  return '<td data-col="R_jc"><span class="ro-val rjc-ref'+(mism?' rjc-mism':'')+'" tabindex="0" title="'+_vEsc(tip)+'">'+_vEsc(shown)+
+         (mism?'<span class="rjc-warn">⚠</span>':'')+'</span></td>';
 }
 
 /* ── 元件表的「導熱方式」欄 ─────────────────────────────────────
@@ -3726,7 +3748,7 @@ function roCellHtml(row,col,category,shown,extra){
   let cls='ro-val',tip='';
   if(miss){cls+=' ro-missing';tip='必填，還沒填：請到 '+aiHomeOf(col)+' 填（5G-RRU 只讀取 AI-Thermal 的元件資料）。不想納入計算可按 👁 排除這顆元件。';}
   else if(stamped){cls+=' ro-stamped';tip='疑似舊版自動帶入的預設值（這顆元件的 7 個欄位全部等於舊版 AI-Thermal 的預設值）。請到 '+aiHomeOf(col)+' 改成實際值；若確實就是這些值，按元件名稱下方的「確認是實際值」。';}
-  else if(from){cls+=' derived-src';tip='此值由 '+from+' 自動帶入（5G-RRU 唯讀，要改請到 AI-Thermal）。';}
+  else if(from){tip='此值由 '+from+' 自動帶入（5G-RRU 唯讀，要改請到 AI-Thermal）。';}
   else tip='取自 AI-Thermal（5G-RRU 唯讀，要改請到 '+(aiHomeOf(col)||'AI-Thermal')+'）。';
   const txt=miss?'未填':(shown!=null?shown:(has?String(row[col]):'—'));
   return '<td data-col="'+col+'"><span class="'+cls+'" tabindex="0" title="'+_vEsc(tip)+'">'+_vEsc(txt)+'</span>'+(extra||'')+'</td>';
@@ -3748,14 +3770,14 @@ function roTimCellHtml(row,category){
   let extra='';
   if(type&&TIM_PARAM_TYPES.includes(type)){
     const from=derivedFrom(row,'TIM_Model');
-    extra+='<div class="tim-sub ro-sub'+(from?' derived-src':'')+'" title="'+_vEsc(from?'型號由 '+from+' 帶入':'TIM 型號（AI-Thermal 選型；5G-RRU 唯讀）')+'">'+_vEsc(model||'— 未選型 —')+'</div>';
+    extra+='<div class="tim-sub ro-sub" title="'+_vEsc(from?'型號由 '+from+' 帶入':'TIM 型號（AI-Thermal 選型；5G-RRU 唯讀）')+'">'+_vEsc(model||'— 未選型 —')+'</div>';
   }
   if(type)extra+=timSourceNoteHtml(row);
   return roCellHtml(row,'TIM_Type',category,type?(type+(TIM_TYPES.includes(type)?'':'（已停用）')):null,extra);
 }
 function roRjcCellHtml(row,category,i){
   const v=parseFloat(row&&row.R_jc);
-  if(row&&row._rjc_from&&isFinite(v))return rjcCellHtml(row,category,i,'');   // AI-Thermal 熱阻表推導 → 鎖定值（含 🔒、⚠）
+  if(row&&row._rjc_from&&isFinite(v))return rjcCellHtml(row,category,i,'');   // AI-Thermal 熱阻表推導：tooltip 寫出取自哪一筆 θJC（對不上時標 ⚠）
   return roCellHtml(row,'R_jc',category,isFinite(v)?String(+v.toFixed(3)):null);
 }
 
@@ -3766,10 +3788,8 @@ function renderCompTable(arr,containerId,defaults,category){
   const cw=compWatts(arr);let pw=cw.w;
   let activeCount=arr.filter(r=>!r._excluded).length;
   lhtml+='<p style="color:#666;font-size:0.85rem;margin-bottom:8px;">📊 '+category.toUpperCase()+' 類總功耗：<b>'+pw.toFixed(1)+' W</b>'+(cw.unknown?'<span class="pw-unknown">（另有 '+cw.unknown+' 顆未填數量／瓦數）</span>':'')+' | 共 <b>'+activeCount+'</b>/<b>'+arr.length+'</b> 種元件納入計算</p>';
-  const viaKeff=arr.some(r=>{const vi=viaKInfo(r,G);return vi&&vi.src==='keff';});
-  // 來源標記圖例：一行、highlight（使用者要求：只說明「有這個標記＝AI-Thermal 自動帶入」，細節在各欄 tooltip）
-  const pcbT=arr.some(r=>{const src=thickSourceOf(r);return src&&thickWant(r,category).from==='pcb';});
-  if(hasDerivedRow(arr)||viaKeff||pcbT)lhtml+='<p class="derived-legend"><span class="derived-swatch" aria-hidden="true"></span>有這個標記的儲存格是由 <b>AI-Thermal</b> 自動帶入的值<span class="dl-sub">（滑鼠停在儲存格上看來源）</span></p>';
+  // 元件表唯讀：一句話說清楚（使用者要求，取代原本的「藍邊標記」圖例；各儲存格不再另加標記）
+  lhtml+='<p class="derived-legend ro-legend">表中數值皆取自 <b>AI-Thermal</b>，這裡只需填寫「元件相對高度」；其他欄位要修改，請回 AI-Thermal 修改。</p>';
 
   // Table
   lhtml+='<div class="comp-table-wrap"><table class="comp-table"><thead><tr>';
@@ -3812,7 +3832,6 @@ function renderCompTable(arr,containerId,defaults,category){
   });
   lhtml+='</tbody></table></div>';
   // 新增／刪除／複製／快選元件已拿掉：元件清單唯讀，一律在 AI-Thermal 維護
-  lhtml+='<p class="ro-note">元件清單取自 <b>AI-Thermal</b>（唯讀）：新增、刪除或修改元件請到 AI-Thermal；這裡只填「元件相對高度」。</p>';
   document.getElementById(containerId).innerHTML=lhtml;
 }
 

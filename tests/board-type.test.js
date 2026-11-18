@@ -108,47 +108,21 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
     delete components.rf[1]._bt_from; delete components.rf[1]._pad_from; delete components.rf[1]._rjc_from;
     recalc();
     const rows = document.querySelectorAll('#subtab0 table.comp-table tbody tr');
-    const marks = rows[0].querySelectorAll('.derived-src');
-    const rjcCell = rows[0].querySelector('td[data-col="R_jc"]');
-    const rjcRef = rjcCell.querySelector('.rjc-ref');
-    const titles = Array.from(marks).map(m => m.getAttribute('title'));
-    // Rjc 已改成鎖定的純參照值（不是 .derived-src input）→ 它的 tooltip 另外取
-    const rjcTitle = rjcRef ? (rjcRef.getAttribute('title') || '') : '';
-    const cells = Array.from(rows[0].querySelectorAll('td'))
-      .map(td => (td.querySelector('.derived-src') || td.querySelector('.rjc-ref')) ? 1 : 0);
-    // 標記不可讓該列變高（窄欄換行過）：與沒有標記的列比較列高
+    const tip = c => ((rows[0].querySelector('td[data-col="' + c + '"] .ro-val') || {}).title || '');
     const h1 = rows[0].getBoundingClientRect().height, h2 = heightBefore;
     return {
-      markCount: marks.length,
-      row2MarkCount: rows[1].querySelectorAll('.derived-src').length,
-      cells,                                   // COLS 順序：0 Component…4 Pad_L,5 Pad_W,7 Board_Type,9 R_jc
-      hasPath: titles.some(t => /主散熱路徑/.test(t)),
-      hasEpad: titles.some(t => /E-PAD 大小/.test(t)),
-      hasRjc:  /θJC,bottom/.test(rjcTitle),
-      overwriteWarned: titles.every(t => /5G-RRU 唯讀/.test(t) && /AI-Thermal/.test(t)),
-      // Rjc = 規格書值 → 鎖成純文字（白底黑字，不用反灰 disabled input）
-      rjcLocked: !!rjcRef && !rjcCell.querySelector('input'),
-      rjcTitle,
-      rjcBg: rjcRef ? getComputedStyle(rjcRef).backgroundColor : '',
-      rjcColor: rjcRef ? getComputedStyle(rjcRef).color : '',
-      rjcRow2Input: !!rows[1].querySelector('td[data-col="R_jc"] input'), rjcRow2Ro: (rows[1].querySelector('td[data-col="R_jc"] .ro-val') || {}).textContent || '',
-      legend: !!document.querySelector('#subtab0 .derived-legend'),
+      marks: document.querySelectorAll('#subtab0 .comp-table .derived-src, #subtab0 .comp-table .rjc-lock').length,
+      pathTip: tip('Board_Type'), padTip: tip('Pad_L'), rjcTip: tip('R_jc'),
+      legend: (document.querySelector('#subtab0 .ro-legend') || {}).textContent || '',
       sameRowHeight: Math.abs(h1 - h2) < 1.5, h1: Math.round(h1), h2: Math.round(h2),
     };
   });
-  // Rjc 現在是「鎖定的純參照值」而不是可編輯欄位 → 藍邊 input 只剩 3 欄（Pad_L/Pad_W/導熱方式）
-  ok('可編輯的推導欄位標 3 次（Pad_L / Pad_W / 導熱方式）', d.markCount === 3, d);
-  ok('標記落在 Pad_L / Pad_W / 導熱方式 / Rjc 這四欄',
-     d.cells[4] && d.cells[5] && d.cells[7] && d.cells[9], d.cells);
-  ok('tooltip 說得出來源（主散熱路徑 / E-PAD 大小 / θJC,bottom）', d.hasPath && d.hasEpad && d.hasRjc, d);
-  ok('tooltip 說明唯讀、要改請到 AI-Thermal', d.overwriteWarned, d);
-  ok('Rjc 鎖定：沒有輸入框，是白底黑字的純參照值（不反灰）',
-     d.rjcLocked && /rgb\(255, 255, 255\)/.test(d.rjcBg) && /rgb\(17, 24, 39\)/.test(d.rjcColor), d);
-  ok('Rjc 的 tooltip 指路到 AI-Thermal 的熱阻表', /AI-Thermal/.test(d.rjcTitle) && /θJC/.test(d.rjcTitle), d.rjcTitle);
-  ok('沒有推導標記的元件 Rjc 也是唯讀文字（5G-RRU 不改 AI-Thermal 的值）', d.rjcRow2Input === false && d.rjcRow2Ro !== '', d);
-  ok('沒有標記的列不標', d.row2MarkCount === 0, d.row2MarkCount);
-  ok('標記不佔額外寬度、不把列撐高（同一列加標記前後等高）', d.sameRowHeight, { 加標記後: d.h1, 加標記前: d.h2 });
-  ok('表格上方顯示圖例', d.legend === true);
+  // 使用者要求（2026-11）：元件表全部唯讀 → 儲存格不再加藍邊／🔒，表格上方一句話說明；來源細節留在 tooltip
+  ok('儲存格不再加藍邊／🔒 標記', d.marks === 0, d.marks);
+  ok('tooltip 照樣說得出來源（主散熱路徑 / E-PAD 大小 / θJC,bottom）、5G-RRU 唯讀',
+     /主散熱路徑/.test(d.pathTip) && /E-PAD 大小/.test(d.padTip) && /θJC,bottom/.test(d.rjcTip) && /唯讀/.test(d.pathTip), d);
+  ok('表格上方一句話：數值取自 AI-Thermal', /表中數值皆取自 AI-Thermal/.test(d.legend), d.legend);
+  ok('推導標記不影響列高', d.sameRowHeight, { 加標記後: d.h1, 加標記前: d.h2 });
 
   console.log('\n[E] 未知值不被靜默改掉');
   const e = await page.evaluate(() => {
@@ -182,23 +156,19 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   ok('板厚不適用：顯示「—」、值歸 0', f.thick === '—' && f.thickKey === 0, f);
   ok('詳細分析的 R_int 顯示「—」', f.rint === '—', f.rint);
 
-  console.log('\n[TIM] 介面材料由 AI-Thermal 帶入（_tim_from）→ 類型與型號下拉都標藍邊＋tooltip；圖例一行、有底色');
+  console.log('\n[TIM] 介面材料由 AI-Thermal 帶入（_tim_from）→ 純文字、tooltip 寫來源；表格上方的說明每個分類都有');
   const t = await page.evaluate(() => {
     switchTab(0); switchSubTab(0);
     const rows = components.rf; rows.forEach(r => { delete r._tim_from; delete r._bt_from; delete r._pad_from; delete r._rjc_from; });
     recalc();
-    const noLegend = !document.querySelector('#subtab0 .derived-legend');
+    const legend0 = !!document.querySelector('#subtab0 .ro-legend');
     rows[0]._tim_from = 'timType'; recalc();
-    const tr = document.querySelectorAll('#subtab0 .comp-table tbody tr')[0], tr1 = document.querySelectorAll('#subtab0 .comp-table tbody tr')[1];
-    const sel = tr.querySelector('td[data-col="TIM_Type"] > .ro-val'), other = tr1.querySelector('td[data-col="TIM_Type"] > .ro-val');
-    const leg = document.querySelector('#subtab0 .derived-legend'), cs = leg && getComputedStyle(leg);
-    const r = { noLegend, cls: sel.className, tip: sel.title, otherCls: other.className, legend: leg && leg.textContent, bg: cs && cs.backgroundColor, h: leg && Math.round(leg.getBoundingClientRect().height) };
+    const sel = document.querySelectorAll('#subtab0 .comp-table tbody tr')[0].querySelector('td[data-col="TIM_Type"] > .ro-val');
+    const r = { legend0, cls: sel.className, tip: sel.title };
     delete rows[0]._tim_from; recalc(); return r;
   });
-  ok('沒有任何 AI-Thermal 推導值 → 不顯示圖例', t.noLegend, t);
-  ok('_tim_from → 介面材料標藍邊、tooltip 寫來源（AI-Thermal TH/ME 頁的「TIM Type」）', /derived-src/.test(t.cls) && /AI-Thermal TH\/ME 頁的「TIM Type」/.test(t.tip), t);
-  ok('沒有 _tim_from 的列不標', !/derived-src/.test(t.otherCls), t.otherCls);
-  ok('圖例一行、有底色：「有這個標記的儲存格是由 AI-Thermal 自動帶入的值」', /^有這個標記的儲存格是由 AI-Thermal 自動帶入的值/.test(t.legend) && t.bg !== 'rgba(0, 0, 0, 0)' && t.h <= 40, t);
+  ok('沒有任何推導值也顯示表格上方的說明（數值本來就都取自 AI-Thermal）', t.legend0, t);
+  ok('_tim_from → 介面材料是純文字（不加藍邊）、tooltip 寫來源（AI-Thermal TH/ME 頁的「TIM Type」）', !/derived-src/.test(t.cls) && /AI-Thermal TH\/ME 頁的「TIM Type」/.test(t.tip), t);
 
   ok('頁面無 JS 例外', errors.length === 0, errors.slice(0, 3));
   await browser.close();

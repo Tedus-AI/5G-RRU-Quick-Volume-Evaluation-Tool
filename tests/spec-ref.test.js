@@ -77,7 +77,10 @@ function ok(name, cond, extra) {
     variantsCache = { rf: aggregateVariants(projects, 'rf'), digital: [], pwr: [] };
     components.rf = [];
     recalc();                                   // 重畫元件表 → 快選下拉才會長出來
-    const sel = document.getElementById('lib_sel_rf');
+    // 元件表唯讀之後畫面上已經沒有快選下拉（addFromVariant 保留給程式）→ 測試自己放一個同 id 的下拉
+    let sel = document.getElementById('lib_sel_rf');
+    if (!sel) { sel = document.createElement('select'); sel.id = 'lib_sel_rf'; sel.style.display = 'none'; document.body.appendChild(sel); }
+    sel.innerHTML = variantsCache.rf.map((v, i) => '<option value="' + i + '">' + v.name + '</option>').join('');
     sel.value = ([...sel.options].find(o => /Final PA/.test(o.textContent)) || {}).value;
     addFromVariant('rf');
     const added = components.rf[0];
@@ -108,7 +111,10 @@ function ok(name, cond, extra) {
     variantsCache = { rf: aggregateVariants(projects, 'rf'), digital: [], pwr: [] };
     components.rf = [];
     recalc();
-    const sel = document.getElementById('lib_sel_rf');
+    // 元件表唯讀之後畫面上已經沒有快選下拉（addFromVariant 保留給程式）→ 測試自己放一個同 id 的下拉
+    let sel = document.getElementById('lib_sel_rf');
+    if (!sel) { sel = document.createElement('select'); sel.id = 'lib_sel_rf'; sel.style.display = 'none'; document.body.appendChild(sel); }
+    sel.innerHTML = variantsCache.rf.map((v, i) => '<option value="' + i + '">' + v.name + '</option>').join('');
     sel.value = ([...sel.options].find(o => /LNA/.test(o.textContent)) || {}).value;
     addFromVariant('rf');
     const s = components.rf[0].SpecFile;
