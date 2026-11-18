@@ -182,6 +182,24 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   ok('板厚不適用：顯示「—」、值歸 0', f.thick === '—' && f.thickKey === 0, f);
   ok('詳細分析的 R_int 顯示「—」', f.rint === '—', f.rint);
 
+  console.log('\n[TIM] 介面材料由 AI-Thermal 帶入（_tim_from）→ 類型與型號下拉都標藍邊＋tooltip；圖例一行、有底色');
+  const t = await page.evaluate(() => {
+    switchTab(0); switchSubTab(0);
+    const rows = components.rf; rows.forEach(r => { delete r._tim_from; delete r._bt_from; delete r._pad_from; delete r._rjc_from; });
+    recalc();
+    const noLegend = !document.querySelector('#subtab0 .derived-legend');
+    rows[0]._tim_from = 'timType'; recalc();
+    const tr = document.querySelectorAll('#subtab0 .comp-table tbody tr')[0], tr1 = document.querySelectorAll('#subtab0 .comp-table tbody tr')[1];
+    const sel = tr.querySelector('td[data-col="TIM_Type"] > select'), other = tr1.querySelector('td[data-col="TIM_Type"] > select');
+    const leg = document.querySelector('#subtab0 .derived-legend'), cs = leg && getComputedStyle(leg);
+    const r = { noLegend, cls: sel.className, tip: sel.title, otherCls: other.className, legend: leg && leg.textContent, bg: cs && cs.backgroundColor, h: leg && Math.round(leg.getBoundingClientRect().height) };
+    delete rows[0]._tim_from; recalc(); return r;
+  });
+  ok('沒有任何 AI-Thermal 推導值 → 不顯示圖例', t.noLegend, t);
+  ok('_tim_from → 介面材料下拉標藍邊、tooltip 寫來源（AI-Thermal TH/ME 頁的「TIM Type」）', /derived-src/.test(t.cls) && /AI-Thermal TH\/ME 頁的「TIM Type」/.test(t.tip), t);
+  ok('沒有 _tim_from 的列不標', !/derived-src/.test(t.otherCls), t.otherCls);
+  ok('圖例一行、有底色：「有這個標記的儲存格是由 AI-Thermal 自動帶入的值」', /^有這個標記的儲存格是由 AI-Thermal 自動帶入的值/.test(t.legend) && t.bg !== 'rgba(0, 0, 0, 0)' && t.h <= 40, t);
+
   ok('頁面無 JS 例外', errors.length === 0, errors.slice(0, 3));
   await browser.close();
   console.log('\n通過 ' + pass + ' 項，失敗 ' + fail + ' 項');

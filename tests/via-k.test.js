@@ -150,12 +150,17 @@ function ok(name, cond, extra) {
       lbl: document.getElementById('K_Via').previousElementSibling.textContent, effTip: document.getElementById('Via_Eff').previousElementSibling.title,
       hint: (document.querySelector('.via-k-hint') || {}).textContent || '' };
   });
-  ok('Driver PA：導熱方式底下「K_eff … W/m·K ← AI-Thermal via 計算」、藍邊樣式', D.dp && /via-k-eff/.test(D.dp.cls) && /^K_eff \d+(\.\d)? W\/m·K← AI-Thermal via 計算$/.test(D.dp.text), D.dp);
+  ok('Driver PA：導熱方式底下「K_eff … W/m·K」、藍邊樣式（不再另寫「← AI-Thermal via 計算」：圖例已說明藍邊標記）', D.dp && /via-k-eff/.test(D.dp.cls) && /^K_eff \d+(\.\d)? W\/m·K$/.test(D.dp.text), D.dp);
   ok('tooltip 寫出算式、via 設計、焊盤來源、去哪裡改', D.dp && /R_int ＝ 板厚 ÷ \(K_eff × 焊盤面積 25 mm²\)/.test(D.dp.tip) && /25 顆 × 內徑 8 mil/.test(D.dp.tip)
     && /塞孔 電鍍填銅/.test(D.dp.tip) && /AI-Thermal TH\/ME 頁的 E-PAD/.test(D.dp.tip) && /到 AI-Thermal 的「Thermal Via 計算」/.test(D.dp.tip), D.dp && D.dp.tip);
   ok('Pre Driver：「通用值 K_Via 30 W/m·K」＋原因、不是藍邊', D.pd && !/via-k-eff/.test(D.pd.cls) && /^通用值 K_Via 30 W\/m·K/.test(D.pd.text) && /還沒有這顆的 via 設計/.test(D.pd.text), D.pd);
   ok('Copper Coin 元件沒有 K 標示', !D.fpNote);
-  ok('圖例說明藍邊的 K_eff 來自 AI-Thermal、只能在 AI-Thermal 改', /K\s*eff 是 AI-Thermal「Thermal Via 計算」的逐顆等效 K（只能在 AI-Thermal 改）/.test(D.legend), D.legend);
+  const gap = await page.evaluate(() => { const n = [...document.querySelectorAll('#subtab0 .via-k-note.via-k-eff')][0]; if (!n) return null;
+    const a = n.getBoundingClientRect(), b = n.querySelector('.via-k-lbl').getBoundingClientRect(), sel = n.closest('td').querySelector('select').getBoundingClientRect();
+    return { gap: Math.round(b.left - a.left), below: a.top >= sel.bottom - 1 }; });
+  ok('K_eff 的藍邊貼著文字（藍邊到「K」≤ 10px；原本整格寬、藍邊離文字很遠）', gap && gap.gap <= 10, gap);
+  ok('K_eff 在導熱方式下拉的下一行（不跟下拉擠在同一行）', gap && gap.below, gap);
+  ok('有 K_eff 時也有圖例：有標記的儲存格＝AI-Thermal 自動帶入', /有這個標記的儲存格是由 AI-Thermal 自動帶入的值/.test(D.legend), D.legend);
   ok('參數控制台：K_Via 標「通用值」、製程係數 tooltip 寫「只套用在通用值」＋說明', /Via K（通用值）/.test(D.lbl) && /只套用在通用值/.test(D.effTip) && /抓不到逐顆 K\s*eff 時才用這兩個值/.test(D.hint), D);
   await page.evaluate(() => { switchTab(1); tab1Expanded.clear(); const r = calcResults.rows.find(x => x.Component === 'Driver PA'); tab1Expanded.add(tab1RowKey(r)); renderTab1(); });
   const T = await page.evaluate(() => {
