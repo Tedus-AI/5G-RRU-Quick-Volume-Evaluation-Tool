@@ -113,7 +113,7 @@ function ok(name, cond, extra) {
   console.log('\n[C] 畫面');
   const C = await page.evaluate(() => {
     switchTab(0);
-    const cell = n => { const tr = [...document.querySelectorAll('#rf-table tr, #digital-table tr, table tr')].find(t => t.querySelector('input') && [...t.querySelectorAll('input')].some(i => i.value === n));
+    const cell = n => { const tr = [...document.querySelectorAll('#rf-table tr, #digital-table tr, table tr')].find(t => { const c = t.querySelector('td[data-col="Component"] .ro-name'); return c && c.textContent.trim() === n; });
       const td = tr && tr.querySelector('td[data-col="Thick(mm)"]'); return td ? { txt: td.textContent.trim(), tip: (td.querySelector('.thick-ref') || {}).title || '', cls: (td.querySelector('.thick-ref') || {}).className || '' } : null; };
     const note = document.getElementById('t_PCB_src');
     return { dp: cell('Driver PA'), si: cell('Si5518'), fp: cell('Final PA'), note: note.textContent, show: getComputedStyle(note).display };

@@ -125,13 +125,13 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
       hasPath: titles.some(t => /主散熱路徑/.test(t)),
       hasEpad: titles.some(t => /E-PAD 大小/.test(t)),
       hasRjc:  /θJC,bottom/.test(rjcTitle),
-      overwriteWarned: titles.every(t => /會被覆寫/.test(t)),
+      overwriteWarned: titles.every(t => /5G-RRU 唯讀/.test(t) && /AI-Thermal/.test(t)),
       // Rjc = 規格書值 → 鎖成純文字（白底黑字，不用反灰 disabled input）
       rjcLocked: !!rjcRef && !rjcCell.querySelector('input'),
       rjcTitle,
       rjcBg: rjcRef ? getComputedStyle(rjcRef).backgroundColor : '',
       rjcColor: rjcRef ? getComputedStyle(rjcRef).color : '',
-      rjcRow2Input: !!rows[1].querySelector('td[data-col="R_jc"] input'),
+      rjcRow2Input: !!rows[1].querySelector('td[data-col="R_jc"] input'), rjcRow2Ro: (rows[1].querySelector('td[data-col="R_jc"] .ro-val') || {}).textContent || '',
       legend: !!document.querySelector('#subtab0 .derived-legend'),
       sameRowHeight: Math.abs(h1 - h2) < 1.5, h1: Math.round(h1), h2: Math.round(h2),
     };
@@ -141,11 +141,11 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   ok('標記落在 Pad_L / Pad_W / 導熱方式 / Rjc 這四欄',
      d.cells[4] && d.cells[5] && d.cells[7] && d.cells[9], d.cells);
   ok('tooltip 說得出來源（主散熱路徑 / E-PAD 大小 / θJC,bottom）', d.hasPath && d.hasEpad && d.hasRjc, d);
-  ok('tooltip 提醒「會被覆寫」', d.overwriteWarned, d);
+  ok('tooltip 說明唯讀、要改請到 AI-Thermal', d.overwriteWarned, d);
   ok('Rjc 鎖定：沒有輸入框，是白底黑字的純參照值（不反灰）',
      d.rjcLocked && /rgb\(255, 255, 255\)/.test(d.rjcBg) && /rgb\(17, 24, 39\)/.test(d.rjcColor), d);
   ok('Rjc 的 tooltip 指路到 AI-Thermal 的熱阻表', /AI-Thermal/.test(d.rjcTitle) && /θJC/.test(d.rjcTitle), d.rjcTitle);
-  ok('沒有推導標記的元件 Rjc 仍可自行輸入', d.rjcRow2Input === true, d);
+  ok('沒有推導標記的元件 Rjc 也是唯讀文字（5G-RRU 不改 AI-Thermal 的值）', d.rjcRow2Input === false && d.rjcRow2Ro !== '', d);
   ok('沒有標記的列不標', d.row2MarkCount === 0, d.row2MarkCount);
   ok('標記不佔額外寬度、不把列撐高（同一列加標記前後等高）', d.sameRowHeight, { 加標記後: d.h1, 加標記前: d.h2 });
   ok('表格上方顯示圖例', d.legend === true);
@@ -154,11 +154,11 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   const e = await page.evaluate(() => {
     components.rf[1].Board_Type = 'Something-Else';
     recalc();
-    const sel = document.querySelectorAll('#subtab0 table.comp-table tbody tr')[1].querySelector('select');
-    return { value: sel.value, opts: Array.from(sel.options).map(o => o.text) };
+    const txt = document.querySelectorAll('#subtab0 table.comp-table tbody tr')[1].querySelector('td[data-col="Board_Type"] .ro-val').textContent;
+    return { txt, kept: components.rf[1].Board_Type };
   });
-  ok('未知的導熱方式仍被選中並標「未知值」',
-     e.value === 'Something-Else' && e.opts.some(t => /Something-Else（未知值）/.test(t)), e);
+  ok('未知的導熱方式照原字顯示並標「未知值」（不靜默改掉）',
+     e.txt === 'Something-Else（未知值）' && e.kept === 'Something-Else', e);
 
   console.log('\n[F] Metal Face（金屬散熱面）');
   const f = await page.evaluate(() => {
@@ -170,15 +170,15 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
     components.rf[1].Board_Type = 'Metal Face';
     recalc();
     const tr = document.querySelectorAll('#subtab0 table.comp-table tbody tr')[1];
-    const sel = tr.querySelector('td[data-col="Board_Type"] select');
+    const sel = tr.querySelector('td[data-col="Board_Type"] .ro-val');
     const thick = tr.querySelector('td[data-col="Thick(mm)"]').textContent.trim();
     const r = calcResults.rows.find(x => x.Component === components.rf[1].Component);
-    return { metal, icTop, value: sel.value, unknown: Array.from(sel.options).some(o => /未知值/.test(o.text)),
+    return { metal, icTop, value: sel.textContent, unknown: /未知值/.test(sel.textContent),
              thick, thickKey: components.rf[1]['Thick(mm)'], rint: r ? tab2Cell(r, 'R_int').text : null };
   });
   ok('Metal Face 不穿板：R_int = 0、沒有基板擴散', f.metal.R_int === 0 && f.metal.Base_L === 0 && f.metal.Base_W === 0, f.metal);
   ok('Metal Face 的 R_TIM 與 IC top 相同（Pad_L×Pad_W）', near(f.metal.R_TIM, f.icTop.R_TIM, 1e-12), [f.metal.R_TIM, f.icTop.R_TIM]);
-  ok('下拉選得到 Metal Face，不標「未知值」', f.value === 'Metal Face' && !f.unknown, f);
+  ok('顯示 Metal Face，不標「未知值」', f.value === 'Metal Face' && !f.unknown, f);
   ok('板厚不適用：顯示「—」、值歸 0', f.thick === '—' && f.thickKey === 0, f);
   ok('詳細分析的 R_int 顯示「—」', f.rint === '—', f.rint);
 
@@ -190,13 +190,13 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
     const noLegend = !document.querySelector('#subtab0 .derived-legend');
     rows[0]._tim_from = 'timType'; recalc();
     const tr = document.querySelectorAll('#subtab0 .comp-table tbody tr')[0], tr1 = document.querySelectorAll('#subtab0 .comp-table tbody tr')[1];
-    const sel = tr.querySelector('td[data-col="TIM_Type"] > select'), other = tr1.querySelector('td[data-col="TIM_Type"] > select');
+    const sel = tr.querySelector('td[data-col="TIM_Type"] > .ro-val'), other = tr1.querySelector('td[data-col="TIM_Type"] > .ro-val');
     const leg = document.querySelector('#subtab0 .derived-legend'), cs = leg && getComputedStyle(leg);
     const r = { noLegend, cls: sel.className, tip: sel.title, otherCls: other.className, legend: leg && leg.textContent, bg: cs && cs.backgroundColor, h: leg && Math.round(leg.getBoundingClientRect().height) };
     delete rows[0]._tim_from; recalc(); return r;
   });
   ok('沒有任何 AI-Thermal 推導值 → 不顯示圖例', t.noLegend, t);
-  ok('_tim_from → 介面材料下拉標藍邊、tooltip 寫來源（AI-Thermal TH/ME 頁的「TIM Type」）', /derived-src/.test(t.cls) && /AI-Thermal TH\/ME 頁的「TIM Type」/.test(t.tip), t);
+  ok('_tim_from → 介面材料標藍邊、tooltip 寫來源（AI-Thermal TH/ME 頁的「TIM Type」）', /derived-src/.test(t.cls) && /AI-Thermal TH\/ME 頁的「TIM Type」/.test(t.tip), t);
   ok('沒有 _tim_from 的列不標', !/derived-src/.test(t.otherCls), t.otherCls);
   ok('圖例一行、有底色：「有這個標記的儲存格是由 AI-Thermal 自動帶入的值」', /^有這個標記的儲存格是由 AI-Thermal 自動帶入的值/.test(t.legend) && t.bg !== 'rgba(0, 0, 0, 0)' && t.h <= 40, t);
 

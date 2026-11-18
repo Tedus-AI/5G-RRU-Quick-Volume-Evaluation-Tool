@@ -134,18 +134,16 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
     components.rf[0].TIM_Model = 'TG-A6200'; recalc();
     const cell = document.querySelector('#subtab0 table.comp-table tbody tr td .tim-note');
     const warnRows = document.querySelectorAll('#subtab0 .tim-note-warn').length;
-    const modelSel = document.querySelector('#subtab0 table.comp-table tbody tr .tim-sub select');
+    const modelSel = document.querySelector('#subtab0 table.comp-table tbody tr .tim-sub'), modelInput = !!document.querySelector('#subtab0 table.comp-table tbody tr td[data-col="TIM_Type"] select');
     switchTab(1);
     const tab1 = document.getElementById('tab1-table').innerHTML;
     return { note: cell ? cell.textContent.trim() : null, noteTitle: cell ? cell.getAttribute('title') : null,
-             warnRows, modelValue: modelSel ? modelSel.value : null,
-             modelOptions: modelSel ? Array.from(modelSel.options).map(o=>o.value) : [],
+             warnRows, modelValue: modelSel ? modelSel.textContent : null, modelInput,
              tab1HasMark: /tim-mark/.test(tab1) };
   });
   ok('元件表顯示「k=… · t=… ← 型號 …」', /k=6\.2/.test(a3.note||'') && /t=1\.2mm/.test(a3.note||'') && /TG-A6200/.test(a3.note||''), a3.note);
   ok('來源 tooltip 說明得出處', /TIM 型號庫/.test(a3.noteTitle||''), a3.noteTitle);
-  ok('型號下拉只列同類型（Pad）的型號', a3.modelOptions.join(',') === ',BAD-PAD,TG-A6200' || a3.modelOptions.includes('TG-A6200'), a3.modelOptions);
-  ok('型號下拉選到目前型號', a3.modelValue === 'TG-A6200', a3.modelValue);
+  ok('型號寫在類型底下（唯讀文字，沒有下拉：選型在 AI-Thermal）', a3.modelValue === 'TG-A6200' && !a3.modelInput, a3);
   ok('Tab1 的 R_TIM 有來源標記', a3.tab1HasMark === true);
 
   console.log('\n[B] Pad2 收斂');
@@ -171,8 +169,8 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
     const bw = row.Board_Type==='Copper Coin' ? G.Coin_W_Setting : (row['Power(W)']===0||row['Thick(mm)']===0 ? 0 : row.Pad_W+row['Thick(mm)']);
     const ba=(bl*bw)/1e6, ta=ba>0?ba:pa;
     const banner = document.getElementById('tim-migrate-banner').innerHTML;
-    const legacyOpt = Array.from(document.querySelectorAll('#subtab1 table.comp-table tbody tr td select'))
-      .flatMap(s => Array.from(s.options).map(o=>o.value)).filter(v=>v==='Pad2');
+    const legacyOpt = Array.from(document.querySelectorAll('#subtab1 table.comp-table tbody tr td[data-col="TIM_Type"] > .ro-val'))
+      .map(s => s.textContent).filter(v=>v==='Pad2（已停用）');
     return { name: row.Component, src:r.TIM_Src, k:r.TIM_k, t:r.TIM_t, warn:r.TIM_Warn,
              got:r.R_TIM, expect:(1.0/1000)/(7.5*ta),
              bannerHasWarn: /Pad 2 已停用/.test(banner), bannerHasName: banner.includes(row.Component),
@@ -180,24 +178,22 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   });
   ok('舊 Pad2 仍以 K_Pad2/t_Pad2 計算（不靜默變 0）', b2.src === 'legacy' && near(b2.got, b2.expect, 1e-12), b2);
   ok('舊 Pad2 有停用提醒', /已停用/.test(b2.warn||''), b2.warn);
-  ok('舊值仍出現在該列下拉（不靜默改掉使用者資料）', b2.legacyOptCount === 1, b2.legacyOptCount);
+  ok('舊值照原字顯示並標「已停用」（不靜默改掉使用者資料）', b2.legacyOptCount === 1, b2.legacyOptCount);
   ok('Tab0 跳出 Pad 2 遷移橫幅並列出元件', b2.bannerHasWarn && b2.bannerHasName, b2);
 
-  // B3 —— 遷移：Pad2 → Pad + 型號
+  // B3 —— 遷移：橫幅不再提供「套用遷移」（元件唯讀），指路到 AI-Thermal；AI-Thermal 改成 Pad＋型號後橫幅消失
   const b3 = await page.evaluate(() => {
-    document.getElementById('tim-migrate-model').value = 'TG-A6200';
-    window.__alerts = [];
-    timMigratePad2();
+    const before = document.getElementById('tim-migrate-banner');
+    const pre = { hasSelect: !!before.querySelector('select,button'), text: before.textContent };
     const row = components.digital[0];
+    row.TIM_Type = 'Pad'; row.TIM_Model = 'TG-A6200'; recalc();      // 模擬 AI-Thermal 存檔後重新載入
     const r = calcResults.rows.find(x => x.Component === row.Component);
-    return { type: row.TIM_Type, model: row.TIM_Model, src: r.TIM_Src, k: r.TIM_k, t: r.TIM_t,
-             banner: document.getElementById('tim-migrate-banner').innerHTML.trim(),
-             alerted: (window.__alerts[0]||'') };
+    return { pre, type: row.TIM_Type, model: row.TIM_Model, src: r.TIM_Src, k: r.TIM_k, t: r.TIM_t,
+             banner: document.getElementById('tim-migrate-banner').innerHTML.trim() };
   });
-  ok('遷移後 TIM_Type=Pad 且掛上型號', b3.type === 'Pad' && b3.model === 'TG-A6200', b3);
-  ok('遷移後改吃型號的 k/t', b3.src === 'model' && b3.k === 6.2 && b3.t === 1.2, b3);
+  ok('橫幅沒有下拉／套用鈕，指路到 AI-Thermal TH/ME 頁', !b3.pre.hasSelect && /AI-Thermal/.test(b3.pre.text) && /TH\/ME/.test(b3.pre.text), b3.pre);
+  ok('AI-Thermal 改成 Pad＋型號後改吃型號的 k/t', b3.src === 'model' && b3.k === 6.2 && b3.t === 1.2, b3);
   ok('遷移後橫幅消失', b3.banner === '', b3.banner);
-  ok('遷移後提醒要存檔', /儲存專案/.test(b3.alerted), b3.alerted);
 
   // B4 —— 換 TIM 類型 → 型號 key 被刪掉（不留下不相符的型號、也不寫 ''）
   const b4 = await page.evaluate(() => {

@@ -95,19 +95,19 @@ const SEED = {
     d.lock.evictRequested = true; d.lock.evictBy = by; d.lock.evictAt = new Date().toISOString();
   }), by);
   const poll = () => page.evaluate(async () => { await dbAdapter.peekLock(); updateLockStatusBar(); await _maintainLock(); });
-  const editPower = (w) => page.evaluate((w) => { components.rf[0]['Power(W)'] = w; recalc(); return projectIsDirty(); }, w);
+  const editPower = (w) => page.evaluate((w) => { components.rf[0]['Height(mm)'] = w; recalc(); return projectIsDirty(); }, w);
   const state = () => page.evaluate(() => ({ locked: cloudLocked, hasLock: dbAdapter.hasLock(), alerts: window.__alerts.slice(),
-    w: components.rf[0] && components.rf[0]['Power(W)'], cm: !!document.querySelector('.cm-mask'),
+    w: components.rf[0] && components.rf[0]['Height(mm)'], cm: !!document.querySelector('.cm-mask'),
     btn: (document.getElementById('cloudLockBtn') || {}).textContent }));
 
   console.log('\n[A] 有未存修改的已載入專案 → 自動儲存後釋放');
   let s0 = await start();
   ok('取得編輯鎖', s0.locked === false && s0.mine === true && (await disk()).lock.lockedByEmail === 'me@x.com', s0);
-  ok('改了瓦數 → 有未存修改', await editPower(42));
+  ok('改了元件高度 → 有未存修改', await editPower(342));
   await evict('管理員王');
   await poll();
   let d = await disk(), st = await state();
-  ok('專案已自動儲存（42 W 寫進資料庫）', d.projects.B.rf_data[0]['Power(W)'] === 42, d.projects.B.rf_data[0]);
+  ok('專案已自動儲存（高度 342 寫進資料庫）', d.projects.B.rf_data[0]['Height(mm)'] === 342, d.projects.B.rf_data[0]);
   ok('伺服器上的鎖已放掉', d.lock === undefined, d.lock);
   ok('資料庫保護重新啟用、本地不再持鎖', st.locked === true && st.hasLock === false && /啟用/.test(st.btn || ''), st);
   ok('通知：被誰請離、已自動儲存', st.alerts.length === 1 && /系統管理員已將你請離/.test(st.alerts[0]) && /管理員王/.test(st.alerts[0]) && /已自動儲存/.test(st.alerts[0]), st.alerts);
@@ -119,20 +119,20 @@ const SEED = {
   await evict('管理員王');
   await poll();
   d = await disk(); st = await state();
-  ok('只寫了一次（放掉鎖），沒有寫專案', (await page.evaluate(() => window.__puts)) === puts0 + 1 && d.projects.B.rf_data[0]['Power(W)'] === 42);
+  ok('只寫了一次（放掉鎖），沒有寫專案', (await page.evaluate(() => window.__puts)) === puts0 + 1 && d.projects.B.rf_data[0]['Height(mm)'] === 342);
   ok('鎖放掉、資料庫保護啟用', d.lock === undefined && st.locked === true, { lock: d.lock, st });
   ok('通知寫「沒有未儲存的修改」', st.alerts.length === 1 && /沒有未儲存的修改/.test(st.alerts[0]), st.alerts);
 
   console.log('\n[C] 兩邊改到同一格 → 不開衝突視窗、不寫入，修改留在畫面上');
   await start();
-  await editPower(50);
-  await page.evaluate(() => window.__ext(d => { d.projects.B.rf_data[0]['Power(W)'] = 60; }));   // 別人（AI-Thermal）改了同一格
+  await editPower(350);
+  await page.evaluate(() => window.__ext(d => { d.projects.B.rf_data[0]['Height(mm)'] = 360; }));   // 別人（另一個 5G-RRU 分頁）改了同一格
   await evict('管理員王');
   await poll();
   d = await disk(); st = await state();
   ok('沒有開衝突視窗（自動儲存不等使用者）', st.cm === false);
-  ok('資料庫維持對方的 60 W（沒有被蓋掉）', d.projects.B.rf_data[0]['Power(W)'] === 60, d.projects.B.rf_data[0]);
-  ok('畫面上的 50 W 還在', st.w === 50, st.w);
+  ok('資料庫維持對方的 360（沒有被蓋掉）', d.projects.B.rf_data[0]['Height(mm)'] === 360, d.projects.B.rf_data[0]);
+  ok('畫面上的 350 還在', st.w === 350, st.w);
   ok('鎖照樣放掉', d.lock === undefined && st.locked === true && st.hasLock === false, { lock: d.lock, st });
   ok('通知寫出沒有自動儲存的原因', st.alerts.length === 1 && /沒有自動儲存/.test(st.alerts[0]) && /兩邊都改了/.test(st.alerts[0]) && /修改都還在/.test(st.alerts[0]), st.alerts);
   await page.evaluate(() => cloudLoadOne('B', { silent: true }));   // 清場：放棄畫面上的修改
