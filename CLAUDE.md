@@ -165,7 +165,7 @@
 | `Board_Type` | 板厚來源 | 元件清單顯示 |
 |---|---|---|
 | `Copper Coin` | `Coin_T_Setting`（銅塊厚度）| 白底黑字純參照文字 |
-| `Thermal Via` | **AI-Thermal 該分類的 PCB 板厚**（`pcb_thickness[RF/Digital/PWR]`）→ 那個分類沒設定才用 `t_PCB`（PCB 板厚度）| 白底黑字純參照文字；取自 AI-Thermal 時加藍邊＋「AI-Thermal」小字 |
+| `Thermal Via` | **AI-Thermal 該分類的 PCB 板厚**（`pcb_thickness[RF/Digital/PWR]`）→ 那個分類沒設定才用 `t_PCB`（PCB 板厚度）| 白底黑字純參照文字；取自 AI-Thermal 時加藍邊（來源標記，不另寫字樣）|
 | `IC top` / `Metal Face` / `None` | 不穿板 → 不適用，`Thick(mm)` 歸 **0** | 反灰「—」|
 
 - **PCB 板厚以 AI-Thermal 為主（使用者決定，2026-10）**：AI-Thermal EE/RF/PWR 頁三個分類標題列的板厚下拉寫
@@ -1019,9 +1019,16 @@ AI-Thermal 下次存檔覆寫，還讓兩邊數字對不起來 → `rjcCellHtml`
 | `_bt_from = 'heatDirection'` | `Board_Type` 來自 Tab2 主散熱路徑 |
 | `_pad_from = 'epadSize' / 'heatSourceSize' / 'none'` | `Pad_L`/`Pad_W` 的來源尺寸 |
 | `_rjc_from = 'JC_bot' / 'JC_top'` | `R_jc` 取自熱阻表的哪一筆 θJC |
+| `_tim_from = 'timType'` | `TIM_Type`／`TIM_Model` 來自 TH/ME 頁的「TIM Type」（＋型號）；Tab2 改回「—」時 AI-Thermal 拿掉標記 |
 
 標記是底線開頭的內部欄位，**不列入 carry 白名單**（快選複製出來的元件不帶標記，
-等 AI-Thermal 下次推導時再標）。
+等 AI-Thermal 下次推導時再標）。`_tim_from` 在三方合併裡跟 `TIM_Type`／`TIM_Model` 綁成一組（`compMerge.js` 的 `GROUPS`）。
+
+**畫面（使用者要求，2026-11）**：所有 AI-Thermal 自動帶入的儲存格只用**同一個標記**（左側藍邊，`.derived-src`／`.via-k-eff`），
+儲存格旁**不另寫「AI-Thermal」字樣**（板厚、K_eff 底下原本都有，畫面太亂）；元件表上方一行**有底色的圖例**
+（`.derived-legend`：「有這個標記的儲存格是由 AI-Thermal 自動帶入的值」，細節在各儲存格的 tooltip）。圖例在這個分類有任何標記時才出現
+（推導欄位、介面材料、K_eff、取自 AI-Thermal 的板厚）。K_eff 一律在導熱方式下拉的**下一行**（使用者：並排太長），寬度只包住文字（`display:table`），藍邊貼著 K（原本整格寬、藍邊離文字很遠）。
+- **數量、單顆功耗、限溫不標**：它們是兩個工具共寫的同一個欄位（兩邊都能改、存檔三方合併，不會被對方覆寫），不是推導值。
 
 ### 每元件欄位的歸屬（同一顆元件物件由兩個工具共寫）
 

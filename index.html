@@ -895,6 +895,15 @@ input,select,button,textarea{font-family:inherit;}
 /* 提醒／狀態卡片一律四邊同樣的細框＋淡底色（基礎規則裡原本的「左側一條深色粗邊」已拿掉：使用者說太像 AI 產生的版面）。
    欄位左側的藍邊（AI-Thermal 推導值的標記）是欄位的來源記號，不是卡片，照舊。 */
 .alert,.power-summary,.calc-gate,.ls-note,.stale-note,.tim-migrate,.info-card{border-radius:10px;}
+/* ── AI-Thermal 自動帶入的來源標記（使用者要求：圖例只說「有這個標記＝AI-Thermal 自動帶入」，一行、顯眼的底色；
+   儲存格旁不再另寫「AI-Thermal」字樣，K_eff 的藍邊貼著文字）── */
+.derived-legend{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;margin:2px 0 10px;padding:6px 12px;border-radius:8px;
+  background:#e3f0ff;border:1px solid #9cc3ee;color:#0b2e55;font-size:.82rem;font-weight:500;line-height:1.4;}
+.derived-legend b{color:#0550ae;}
+.derived-legend .dl-sub{color:#33557a;font-weight:400;font-size:.76rem;}
+.derived-legend .derived-swatch{width:12px;height:16px;flex:none;vertical-align:middle;}
+/* K_eff 一律在下拉的下一行（使用者：並排太長）；寬度只包住文字（display:table），藍邊才貼著 K */
+.comp-table td .via-k-note.via-k-eff{display:table;width:auto;margin:3px auto 0;padding:1px 6px 1px 5px;border-radius:0 4px 4px 0;}
 /* ▣V4-END */
 </style>
 <script src="config.js?v=__APP_VERSION__"></script>
@@ -3392,6 +3401,8 @@ function derivedFrom(row,col){
   if(col==='Board_Type')return (row._bt_from||row._pad_from)?'AI-Thermal Tab2 的「主散熱路徑」':'';
   if(col==='Pad_L'||col==='Pad_W')return row._pad_from?('AI-Thermal '+(PAD_FROM_LABEL[row._pad_from]||'Tab2 的主散熱路徑')):'';
   if(col==='R_jc')return row._rjc_from?('AI-Thermal 熱阻表的 '+(RJC_FROM_LABEL[row._rjc_from]||'θJC')):'';
+  // _tim_from：AI-Thermal TH/ME 頁的「TIM Type」（＋型號）帶入；類型與型號是同一組，一起標
+  if(col==='TIM_Type'||col==='TIM_Model')return row._tim_from?'AI-Thermal TH/ME 頁的「TIM Type」':'';
   return '';
 }
 
@@ -3404,7 +3415,7 @@ function derivedAttrs(row,col){
 }
 
 function hasDerivedRow(arr){
-  return (arr||[]).some(r=>['Board_Type','Pad_L','Pad_W','R_jc'].some(c=>derivedFrom(r,c)));
+  return (arr||[]).some(r=>['Board_Type','Pad_L','Pad_W','R_jc','TIM_Type'].some(c=>derivedFrom(r,c)));
 }
 
 /* 板厚欄：由導熱方式決定吃哪個全域厚度。純參照值用白底黑字純文字（不用反灰 input）；
@@ -3421,7 +3432,7 @@ function thickCellHtml(row,category){
     :'由參數控制台的「'+src.label+'」帶入，所有 '+row.Board_Type+' 元件共用同一個值。要改請改參數控制台那一欄。'+
      (src.key==='t_PCB'?'（AI-Thermal 的 EE/RF/PWR 頁設定這個分類的 PCB 板厚後，會改用那個值。）':'');
   return '<td data-col="Thick(mm)"><span class="thick-ref'+(tw.from==='pcb'?' derived-src':'')+'" title="'+_vEsc(tip)+'">'+_vEsc(shown)+
-    (tw.from==='pcb'?'<span class="thick-from">AI-Thermal</span>':'')+'</span></td>';
+    '</span></td>';
 }
 
 /* 熱阻 Rjc 欄：由 AI-Thermal 熱阻表的 θJC 推導（comp._rjc_from 是來源標記）。
@@ -3537,7 +3548,7 @@ function viaKNoteHtml(row){
   const vi=viaKInfo(row,G);if(!vi)return '';
   const cls='via-k-note'+(vi.src==='keff'?' via-k-eff':'')+(vi.warn?' via-k-warn':'');
   return '<div class="'+cls+'" title="'+_vEsc(vi.detail)+'"><span class="via-k-lbl">'+(vi.warn?'⚠ ':'')+_vEsc(vi.label)+'</span>'+
-         '<span class="via-k-src">'+viaKSegHtml(vi.src==='keff'?'← AI-Thermal via 計算':viaWhyShort(vi.why))+'</span></div>';
+         (vi.src==='keff'?'':'<span class="via-k-src">'+viaKSegHtml(viaWhyShort(vi.why))+'</span>')+'</div>';
 }
 /* 表格裡顯示的原因：拿掉開頭的「AI-Thermal「Thermal Via 計算」」（每一列都一樣、佔一整行，把列撐高）；
    完整的句子在 tooltip（vi.detail）與詳細分析的展開列。其餘原因（暫不納入、還缺什麼、超過焊盤）照原字。 */
@@ -3559,7 +3570,7 @@ function timCellHtml(row,category,i,dis){
     const legacy=!TIM_TYPES.includes(o);
     opts+='<option value="'+_vEsc(o)+'"'+(type===o?' selected':'')+'>'+_vEsc(o)+(legacy?'（已停用）':'')+'</option>';
   });
-  let h='<td class="tim-cell" data-col="TIM_Type"><select style="min-width:110px;"'+(missingAttrs(row,'TIM_Type')||stampedAttrs(row,'TIM_Type',category))+dis+' onchange="updateComp(\''+category+'\','+i+',\'TIM_Type\',this.value)">'+opts+'</select>';
+  let h='<td class="tim-cell" data-col="TIM_Type"><select style="min-width:110px;"'+(missingAttrs(row,'TIM_Type')||stampedAttrs(row,'TIM_Type',category)||derivedAttrs(row,'TIM_Type'))+dis+' onchange="updateComp(\''+category+'\','+i+',\'TIM_Type\',this.value)">'+opts+'</select>';
   if(!type)return h+'</td>';   // 還沒選類型 → 沒有型號與 k/t 可顯示
   h+=timModelSelectHtml(row,category,i,dis);
   h+=timSourceNoteHtml(row);
@@ -3581,7 +3592,8 @@ function timModelSelectHtml(row,category,i,dis){
   // 型號在庫裡被刪掉（或型號庫還沒載入）時仍把舊值列出來，不讓畫面自己把選擇清掉
   if(gone)opts+='<option value="'+_vEsc(cur)+'" selected>'+_vEsc(cur)+(timLibLoaded?'（已從型號庫移除）':'（型號庫未載入）')+'</option>';
   list.forEach(r=>{opts+='<option value="'+_vEsc(r.model)+'"'+(!gone&&r.model===cur?' selected':'')+'>'+_vEsc(r.model)+'</option>';});
-  return '<div class="tim-sub'+(gone?' tim-sub-gone':'')+'"><select'+dis+' title="'+_vEsc(hint)+'" onchange="updateTimModel(\''+category+'\','+i+',this.value)">'+opts+'</select></div>';
+  const dA=derivedAttrs(row,'TIM_Model');
+  return '<div class="tim-sub'+(gone?' tim-sub-gone':'')+'"><select'+dis+(dA||' title="'+_vEsc(hint)+'"')+' onchange="updateTimModel(\''+category+'\','+i+',this.value)">'+opts+'</select></div>';
 }
 
 /* 來源標註：這一列的 R_TIM 用了哪一組 k/t、從哪來。有 warn 才轉琥珀色。 */
@@ -3689,9 +3701,9 @@ function renderCompTable(arr,containerId,defaults,category){
   let activeCount=arr.filter(r=>!r._excluded).length;
   lhtml+='<p style="color:#666;font-size:0.85rem;margin-bottom:8px;">📊 '+category.toUpperCase()+' 類總功耗：<b>'+pw.toFixed(1)+' W</b>'+(cw.unknown?'<span class="pw-unknown">（另有 '+cw.unknown+' 顆未填數量／瓦數）</span>':'')+' | 共 <b>'+activeCount+'</b>/<b>'+arr.length+'</b> 種元件納入計算</p>';
   const viaKeff=arr.some(r=>{const vi=viaKInfo(r,G);return vi&&vi.src==='keff';});
-  if(hasDerivedRow(arr))lhtml+='<p class="derived-legend"><span class="derived-swatch"></span> 左側藍邊的欄位由 <b>AI-Thermal</b> 推導：<b>導熱方式／E-Pad 尺寸</b>（Tab2「主散熱路徑」）在這裡改仍算得到，但下次從 AI-Thermal 存檔時會被覆寫；<b>Rjc</b> 是規格書值（熱阻表的 θJC）<b>直接鎖定 🔒 不開放修改</b>，要改請到 AI-Thermal 的熱阻（θ）填 θJC。'+
-    (viaKeff?'導熱方式底下藍邊的 <b>K<sub>eff</sub></b> 是 AI-Thermal「Thermal Via 計算」的逐顆等效 K（只能在 AI-Thermal 改）。':'')+'滑鼠停在欄位上可看來源。</p>';
-  else if(viaKeff)lhtml+='<p class="derived-legend"><span class="derived-swatch"></span> 導熱方式底下藍邊的 <b>K<sub>eff</sub></b> 是 <b>AI-Thermal</b>「Thermal Via 計算」的逐顆等效 K（只能在 AI-Thermal 改）；滑鼠停在上面可看 via 設計與算式。</p>';
+  // 來源標記圖例：一行、highlight（使用者要求：只說明「有這個標記＝AI-Thermal 自動帶入」，細節在各欄 tooltip）
+  const pcbT=arr.some(r=>{const src=thickSourceOf(r);return src&&thickWant(r,category).from==='pcb';});
+  if(hasDerivedRow(arr)||viaKeff||pcbT)lhtml+='<p class="derived-legend"><span class="derived-swatch" aria-hidden="true"></span>有這個標記的儲存格是由 <b>AI-Thermal</b> 自動帶入的值<span class="dl-sub">（滑鼠停在儲存格上看來源）</span></p>';
 
   // Table
   lhtml+='<div class="comp-table-wrap"><table class="comp-table"><thead><tr>';

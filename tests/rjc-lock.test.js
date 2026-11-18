@@ -180,8 +180,9 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
     const el = document.querySelector('#subtab0 .derived-legend');
     return el ? el.textContent : '';
   });
-  ok('圖例寫明 Rjc 鎖定、其餘推導欄位會被覆寫',
-     /Rjc/.test(e) && /鎖定/.test(e) && /會被覆寫/.test(e) && /熱阻/.test(e), e.slice(0, 120));
+  // 圖例只說「有這個標記＝AI-Thermal 自動帶入」（使用者要求精簡）；Rjc 鎖定的說明在鎖定值的 tooltip（[B] 已驗）
+  ok('圖例一行：有標記的儲存格＝AI-Thermal 自動帶入（不再逐欄說明）',
+     /有這個標記的儲存格是由 AI-Thermal 自動帶入的值/.test(e) && e.length < 60, e.slice(0, 120));
 
   ok('頁面無 JS 例外', errors.length === 0, errors.slice(0, 3));
 
