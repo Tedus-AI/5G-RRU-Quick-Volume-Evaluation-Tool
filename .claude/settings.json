@@ -1,4 +1,11 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(node tests/*)",
+      "Bash(CHROMIUM_PATH=* node tests/*)",
+      "Bash(npx -y http-server . -p 8123*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {

@@ -818,6 +818,20 @@ input,select,button,textarea{font-family:inherit;}
 .sidebar .ar-display.is-ok .rd-val,.sidebar .ar-display.is-ok .rd-msg{color:var(--sb-ok);}
 .sidebar .ar-display.is-poor .rd-val,.sidebar .ar-display.is-poor .rd-msg{color:var(--sb-warn);}
 .sidebar .ar-display.is-bad .rd-val,.sidebar .ar-display.is-bad .rd-msg{color:var(--sb-bad);}
+/* 流阻比卡片：找最低流阻比的 air gap（arFindLowest）；結果在卡片裡、套用＝寫回 Air Gap */
+.sidebar .ar-display .ar-find-btn{display:block;width:100%;margin-top:8px;padding:6px 10px;border:none;border-radius:999px;background:#fff;color:#0d2a45;font-weight:700;font-size:.76rem;cursor:pointer;}
+.sidebar .ar-display .ar-find-btn:hover{background:#e3f0fb;}
+.sidebar .ar-display .ar-find-res{margin-top:7px;padding-top:7px;border-top:1px dashed var(--sb-line);font-size:.76rem;color:var(--sb-text);line-height:1.55;text-align:left;}
+.sidebar .ar-display .ar-find-res b{color:var(--sb-num);font-family:var(--num-font);}
+.sidebar .ar-display .ar-find-res .af-hint{display:block;color:var(--sb-hint);}
+.sidebar .ar-display .ar-find-res .af-good{color:var(--sb-ok);font-weight:700;}
+.sidebar .ar-display .ar-find-res .af-off{color:var(--sb-warn);font-weight:700;}
+.sidebar .ar-display .ar-find-res button{margin-top:5px;padding:4px 12px;border:1px solid #fff;border-radius:999px;background:transparent;color:#fff;font-weight:700;font-size:.74rem;cursor:pointer;}
+.sidebar .ar-display .ar-find-res button:hover{background:#fff;color:#0d2a45;}
+.sa-apply{padding:3px 12px;border:1px solid var(--th-bg);border-radius:999px;background:#fff;color:var(--th-bg);font-weight:700;font-size:.78rem;cursor:pointer;white-space:nowrap;}
+.sa-apply:hover{background:var(--th-bg);color:#fff;}
+.sa-widen-tbl{margin-top:10px;max-width:none;}
+.sa-widen-tbl small{color:#475569;font-weight:600;}
 
 /* ── 頂列：白色、兩排；第一排（版本／專案名稱／資料庫與帳號）會捲走，第二排（品牌＋專案工具列）固定在頂端 ── */
 .main{padding:0 20px 40px;}
@@ -1115,7 +1129,7 @@ input,select,button,textarea{font-family:inherit;}
     <label class="sb-sub">鰭片幾何</label>
     <div class="row2"><div><label title="相鄰兩片鰭片之間的空氣間隙">Air Gap (mm)</label><input type="number" id="Gap" step="0.1" onchange="recalc()"></div><div><label>鰭片厚度 (mm)</label><input type="number" id="Fin_t" step="0.1" onchange="recalc()"></div></div>
     <div class="h-display" id="h-display" title="h 由鰭片 air gap 與鰭片高自動計算（h = h_conv + h_rad）"><div class="rd-title">h 自動計算 (W/m²K)</div><div class="h-val" id="h-val">--</div><div class="h-sub" id="h-sub">h = h_conv + h_rad</div></div>
-    <div class="ar-display" id="ar-display"><div class="rd-title">流阻比 Aspect Ratio</div><div id="ar-val" class="rd-val">--</div><div id="ar-msg" class="rd-msg">✅ 最佳建議：4.5 ~ 6.5</div><div id="ar-tip" class="rd-tip">最佳建議：4.5 ~ 6.5（建議值內，無風 AR 往低趨勢設計，反之亦然）</div></div>
+    <div class="ar-display" id="ar-display"><div class="rd-title">流阻比 Aspect Ratio</div><div id="ar-val" class="rd-val">--</div><div id="ar-msg" class="rd-msg">✅ 最佳建議：4.5 ~ 6.5</div><div id="ar-tip" class="rd-tip">最佳建議：4.5 ~ 6.5（建議值內，無風 AR 往低趨勢設計，反之亦然）</div><button type="button" class="ar-find-btn" id="ar-find" onclick="arFindLowest()" title="air gap 4～20 mm（每 0.5 mm）每一點重新設計，找流阻比最低的那個（與敏感度分析 ① 同一組計算）">找最低流阻比的 air gap</button><div id="ar-find-res" class="ar-find-res" aria-live="polite" hidden></div></div>
     <div id="diecast-info" class="ar-display" style="display:none;">
       <div class="rd-title">Die-casting 衍生參數</div>
       <div id="dc-troot" class="dd-row"><span>根部厚度 T_root</span><b>--</b></div>
@@ -3096,6 +3110,7 @@ function updateHDisplay(){
     else{arSt='is-poor';arMsg.textContent='⚠️ 不佳 (Poor)';}
   } else {arEl.textContent='--';arMsg.textContent='等待計算...';}
   ['is-ok','is-poor','is-bad'].forEach(c=>arBox.classList.toggle(c,c===arSt));
+  arFindStale();
   let isDC=G.fin_tech_selector_v2.includes("Die-casting");
   document.getElementById('diecast-params').style.display=isDC?'':'none';
   document.getElementById('fin-custom-emb').style.display=isDC?'none':'';
@@ -4437,6 +4452,34 @@ function r3dToast(msg){
   clearTimeout(r3dToastT);r3dToastT=setTimeout(()=>{el.hidden=true;},/^\s*(❌|⚠️)/.test(msg)?12000:6000);
 }
 window.addEventListener('rru3d-ready',()=>{tab3Stale=true;if(tab3Active())renderTab3();});
+/* 參數控制台流阻比卡片的「找最低流阻比的 air gap」（使用者要求 2026-11）：與敏感度分析 ① 同一組計算（saGapData：4～20 mm、每 0.5 mm，
+   每一點重新設計，DRC 不通過的點不算）。結果只是建議：按「套用」才寫回 Air Gap（UX 慣例 4：click-to-apply）。
+   參數或元件一改，結果就過時 → arFindStale 收起來（recalc → updateHDisplay 呼叫）。 */
+var arFindKey=null;   // var：init 之前 updateHDisplay 就可能被呼叫
+function arFindStateKey(){try{return JSON.stringify([G,components]);}catch(e){return null;}}
+function arFindStale(){const box=document.getElementById('ar-find-res');if(!box||box.hidden)return;if(arFindKey===null||arFindStateKey()!==arFindKey){box.hidden=true;box.innerHTML='';arFindKey=null;}}
+function arFindLowest(applied){
+  const box=document.getElementById('ar-find-res');if(!box)return;
+  const R=calcResults,st=R?vrState(R):'blocked',x=v=>_vEsc(String(v));let h='';
+  if(st==='blocked')h='必填欄位或參數還沒填完，算不出來（元件設定頁頂端有清單）。';
+  else if(st==='nohot')h='沒有發熱元件，不需要散熱器。';
+  else if(st==='nosol')h='瓶頸元件的允許溫升 ≤ 0：散熱器壓到環溫也不夠，換 air gap 也沒用。';
+  else{
+    const d=saGapData(G,components),lo=d.lowAR,cur=d.cur;
+    if(!lo)h='air gap '+SA_GAP_RANGE[0]+'～'+SA_GAP_RANGE[1]+' mm 都做不出來（DRC 不通過）。';
+    else{
+      const isCur=cur&&cur.ok&&Math.abs(cur.x-lo.x)<1e-6;
+      h=(applied?'已套用。':'')+'最低流阻比 <b>'+lo.AR.toFixed(2)+'</b>：air gap <b>'+x(lo.x)+' mm</b>（'+lo.n+' 片 × '+saF1(lo.FH)+' mm、'+saF1(lo.V)+' L）'
+        +(lo.good?' <span class="af-good">在建議範圍內</span>':' <span class="af-off">仍高於建議 '+AR_GOOD[1]+'</span>');
+      if(isCur)h+='<span class="af-hint">目前的 air gap 就是最低的。</span>';
+      else h+='<span class="af-hint">目前 '+x(G.Gap)+' mm'+(cur&&cur.ok?'：流阻比 '+cur.AR.toFixed(2)+'、'+saF1(cur.V)+' L':'：做不出來')+'</span>'
+        +'<button type="button" onclick="arFindApply('+lo.x+')">套用 '+x(lo.x)+' mm</button>';
+      if(!lo.good&&lo.AR>AR_GOOD[1])h+='<span class="af-hint">流阻比降不進建議範圍 → 敏感度分析頁有「機殼加寬」試算。</span>';
+    }
+  }
+  box.innerHTML=h;box.hidden=false;arFindKey=arFindStateKey();
+}
+function arFindApply(gap){const el=document.getElementById('Gap');if(!el)return;el.value=gap;recalc();arFindLowest(true);}
 window.addEventListener('rru3d-fail',()=>{if(tab3Active())renderTab3(true);});
 
 // =====================================================
@@ -4455,7 +4498,7 @@ window.addEventListener('rru3d-fail',()=>{if(tab3Active())renderTab3(true);});
 const SA_GAP_RANGE = [4, 20, 0.5];       // air gap 掃描（mm，絕對範圍；原本用 ±% 掃）
 const SA_PW_RANGE = [0.7, 1.3, 0.05];    // 熱耗倍數（全部元件同比例）
 const SA_AMB_STEPS = [0, 5, 10];         // 環溫 +°C
-const SA_COL = {line:'#1e3a5f', bad:'#94a3b8', cur:'#0f766e', best:'#6d28d9', cap:'#b45309', zero:'#d03b3b', band:'rgba(12,163,12,0.11)', bandTxt:'#1d6b24'};   // best＝① 建議範圍內體積最小、cap＝② 熱耗上限（琥珀＝到這裡就超溫）
+const SA_COL = {line:'#1e3a5f', bad:'#94a3b8', cur:'#0f766e', best:'#6d28d9', min:'#0369a1', cap:'#b45309', zero:'#d03b3b', band:'rgba(12,163,12,0.11)', bandTxt:'#1d6b24'};   // best＝① 建議範圍內體積最小、min＝① 延伸的最少加寬、cap＝② 熱耗上限（琥珀＝到這裡就超溫）
 const SA_DASH = ['solid', 'dash', 'dot'], SA_DASHC = ['solid', 'dashed', 'dotted'];
 const SA_FONT = 'Noto Sans TC, Microsoft JhengHei, sans-serif';
 var tab4Stale = true, tab4Timer = null;   // var：init 之前就可能被讀到（同 tab3Stale）
@@ -4539,6 +4582,47 @@ function saGapData(g, comps){
     bad:saRuns(pts, p => p.ok ? null : saWhyShort(p.why)),
     goodRuns:saRuns(pts, p => p.good ? 1 : null)};
 }
+/* ① 延伸：機殼加寬（PCB 不動）—— 使用者定義（2026-11）：PCB 由 RF/EE 定好、長寬跟著固定，① 找不到任何 air gap 能讓流阻比進建議範圍
+   （最低的還高於上限）時才自動算。加寬量平均加到左右防水邊距（Left／Right 各 +ΔW/2；整機寬 W = W_pcb + Left + Right，見 rruFootprint），
+   每個寬度都重跑一次 ① 的 air gap 掃描（saGapData → computeAll 原封不動）。流阻比太低（< 下限）的「縮窄」使用者說不做。
+   粗掃每 10 mm（左右各 5），找到第一個進建議範圍的寬度後在前一格之間每 2 mm 細找（左右各 1 mm → 邊距維持整數）。 */
+const SA_WIDEN = {max:100, step:10, fine:2, after:40};   // after：第一個進範圍之後再往外掃多少（看體積趨勢）
+function saWidenNeed(gap){ return !!gap && !gap.best && (!gap.lowAR || gap.lowAR.AR > AR_GOOD[1]); }
+function saWidenG(g, dw){ return {...g, Left:_num(g.Left) + dw / 2, Right:_num(g.Right) + dw / 2}; }
+function saWidenPt(g, comps, dw, gap){
+  const g2 = saWidenG(g, dw), d = gap || saGapData(g2, comps);
+  return {dw, W:rruFootprint(g2).W, best:d.best, lo:d.lowAR, pick:d.best || d.lowAR, good:!!d.best};
+}
+function saWidenData(g, comps, gap){
+  if (!saWidenNeed(gap)) return null;
+  const pts = [saWidenPt(g, comps, 0, gap)];
+  let first = null;
+  for (let dw = SA_WIDEN.step; dw <= SA_WIDEN.max + 1e-9; dw += SA_WIDEN.step) {
+    const p = saWidenPt(g, comps, dw); pts.push(p);
+    if (p.good && !first) first = p;
+    if (first && dw >= first.dw + SA_WIDEN.after) break;
+  }
+  let min = first;   // 最少加寬：片數是整數 → 不保證單調，照實找第一個進範圍的
+  if (first) for (let dw = first.dw - SA_WIDEN.step + SA_WIDEN.fine; dw < first.dw - 1e-9; dw += SA_WIDEN.fine) {
+    const p = saWidenPt(g, comps, dw); if (p.good) { min = p; break; }
+  }
+  if (min && pts.indexOf(min) < 0) { pts.push(min); pts.sort((a, b) => a.dw - b.dw); }
+  const small = pts.filter(p => p.good).reduce((m, p) => (!m || p.best.V < m.best.V - 1e-9 ? p : m), null);   // 建議範圍內體積最小
+  return {pts, min, small, W0:pts[0].W, last:pts[pts.length - 1]};
+}
+/* 「套用」：加寬量平均加到左右邊距＋那個 air gap 寫回參數控制台（PCB 不動）。只改畫面，要按「儲存專案」才寫進資料庫 */
+function saWidenApply(dw, gap){
+  const L = document.getElementById('Left'), Rt = document.getElementById('Right'), Gp = document.getElementById('Gap');
+  if (!L || !Rt || !Gp) return;
+  const l0 = _num(L.value), r0 = _num(Rt.value), g0 = _num(Gp.value), l1 = +(l0 + dw / 2).toFixed(2), r1 = +(r0 + dw / 2).toFixed(2);
+  if (!confirm('套用到參數控制台（PCB 大小不變，加寬的是機殼）：\n'
+    + '・左邊距 Left　' + vrN(l0) + ' → ' + vrN(l1) + ' mm\n'
+    + '・右邊距 Right　' + vrN(r0) + ' → ' + vrN(r1) + ' mm\n'
+    + '・鰭片 Air Gap　' + vrN(g0) + ' → ' + vrN(gap) + ' mm\n\n'
+    + '套用後要按「💾 儲存專案」才會寫進資料庫。')) return;
+  L.value = l1; Rt.value = r1; Gp.value = gap; recalc();
+  if (tab4Active()) renderTab4(true);
+}
 /* ② 熱耗：全部元件同比例。固定這顆散熱器的裕度＋重新設計的體積 */
 function saPwData(g, comps, fx, hr){
   const [a, b, st] = SA_PW_RANGE, pts = [];
@@ -4562,10 +4646,10 @@ function saAmbData(g, comps, fx, R){
 function saData(R, g, comps){
   const st = vrState(R);
   if (st === 'blocked' || st === 'nohot' || st === 'nosol') return {st};
-  const gap = saGapData(g, comps);
-  if (st === 'drc') return {st, gap};
+  const gap = saGapData(g, comps), widen = saWidenData(g, comps, gap);
+  if (st === 'drc') return {st, gap, widen};
   const fx = {A:R.Area_req, h:R.h_value, eff:R.eff}, hr = saHeadroom(g, comps, fx);
-  return {st, gap, fx, hr, pw:saPwData(g, comps, fx, hr), amb:saAmbData(g, comps, fx, R), V0:R.Volume_L};
+  return {st, gap, widen, fx, hr, pw:saPwData(g, comps, fx, hr), amb:saAmbData(g, comps, fx, R), V0:R.Volume_L, Wt0:R.total_weight_kg};
 }
 
 /* ── 讀圖說明（畫面與 PDF 共用；PDF 會把符號轉掉） ── */
@@ -4576,11 +4660,16 @@ const SA_READ = {
   pw: ['左圖（固定這顆散熱器）：熱耗變多，裕度從兩處被吃掉 —— 散熱器整體升溫（所有元件一起升）＋元件自己的 P×R。每條線一顆元件，線跟 0 的交點＝這顆散熱器能散的熱耗上限；最先碰到 0 的就是瓶頸（熱耗變動時瓶頸可能換人：裕度大、但自己 P×R 也大的元件掉得快）。',
        '右圖（重新設計）：熱耗真的變這麼多時，重新開一顆散熱器需要多大。灰色 ×＝用目前的鰭片規格做不出來{pw}。',
        '熱耗倍數＝所有元件的功耗同比例放大或縮小（×' + SA_PW_RANGE[0] + '～×' + SA_PW_RANGE[1] + '）：功耗預估的誤差、PA 效率或輸出功率改變。'],
+  widen: ['為什麼加寬有用：片數跟著寬度增加 → 每片鰭片需要的高度變矮 → 流阻比（鰭片高 ÷ air gap）下降。流阻比由「長 × 寬」決定，同樣加 10 mm，加在較短的一邊（通常是寬）效果較大；鰭片沿長度方向，加長還會讓實際的自然對流變差（工具的 h 沒有算進鰭片長度），所以這裡只試加寬。',
+          '為什麼體積可能不增反減：屏蔽罩＋濾波器＋基板那一段跟著寬度變大，但鰭片變矮之後 h 與鰭片效率變好、需要的散熱面積變小 —— 鰭片原本越高，後者越可能贏。',
+          '上圖：每個寬度取「流阻比在建議範圍內、體積最小」的 air gap（實心點）；寬度還不夠時取流阻比最低的 air gap（空心點）。虛線＝目前的體積。下圖：每個寬度做得到的最低流阻比。',
+          '加寬量平均加到左右防水邊距，PCB 大小不變。重量：工具把 PCB 到外殼之間當成實心鋁，邊距加大時重量會偏高估。{widen}'],
   amb: '本工具的 h 跟溫差無關，所以固定散熱器時環溫與裕度是 1:1，不需要畫圖；重新設計時，環溫越接近元件限溫，允許溫升越小，需要的面積照 1／允許溫升往上衝 —— 每多 5 °C 的代價越來越大。'
 };
 
-const SA_WHY = {gap:{s:'（滑到 × 上看原因）', p:'（原因見上面「做不出來」那一行）'}, pw:{s:'（滑過去看原因）', p:'（原因寫在圖例）'}};
-const saReadTxt = (t, pdf) => t.replace(/\{(gap|pw)\}/g, (m, k) => SA_WHY[k][pdf ? 'p' : 's']);
+const SA_WHY = {gap:{s:'（滑到 × 上看原因）', p:'（原因見上面「做不出來」那一行）'}, pw:{s:'（滑過去看原因）', p:'（原因寫在圖例）'},
+                widen:{s:'「套用」會把左右邊距與 air gap 寫回參數控制台，要按「💾 儲存專案」才會寫進資料庫。', p:''}};
+const saReadTxt = (t, pdf) => t.replace(/\{(gap|pw|widen)\}/g, (m, k) => SA_WHY[k][pdf ? 'p' : 's']);
 
 /* ── 圖（畫面與 PDF 共用；opt.pdf：字放大、圖例畫在圖裡） ── */
 function saBaseLayout(opt){
@@ -4623,6 +4712,40 @@ function saGapFig(d, opt){
     yaxis:{domain:[0.36, 1], anchor:'x', range:yr, title:{text:'需要的體積（L）', standoff:6}, gridcolor:'#eef2f7', zeroline:false},
     xaxis2:{domain:[0, 1], anchor:'y2', range:xr, dtick:2, title:{text:'鰭片 air gap（mm）', standoff:6}, gridcolor:'#eef2f7', zeroline:false},
     yaxis2:{domain:[0, 0.27], anchor:'x2', range:ar, title:{text:'流阻比', standoff:6}, gridcolor:'#eef2f7', zeroline:false},
+    shapes, annotations:ann});
+  return {data, layout};
+}
+/* ① 延伸：橫軸＝加寬量。上：每個寬度的代表設計（建議範圍內體積最小；還進不了範圍時＝流阻比最低的 air gap）的體積；下：最低流阻比 */
+function saWidenFig(d, opt){
+  const w = d.widen, P = w.pts, ok = P.filter(p => p.pick), bad = P.filter(p => !p.pick), L = saBaseLayout(opt);
+  const Vs = ok.map(p => p.pick.V).concat(d.V0 ? [d.V0] : []), vmax = Vs.length ? Math.max(...Vs) : 1, vmin = Vs.length ? Math.min(...Vs) : 0;
+  const pad = Math.max((vmax - vmin) * 0.16, vmax * 0.03), yr = [vmin - pad, vmax + pad * 1.6], yBad = yr[0] + (yr[1] - yr[0]) * 0.06;
+  const xr = [P[0].dw - 3, P[P.length - 1].dw + 3];
+  const ars = ok.map(p => p.lo ? p.lo.AR : p.pick.AR), ar = [Math.min(AR_GOOD[0] - 0.6, ...ars) - 0.3, Math.max(AR_GOOD[1] + 0.6, ...ars) + 0.3];
+  const hv = '加寬 +%{x} mm（整機寬 %{customdata[0]} mm）<br>air gap %{customdata[1]} mm · %{customdata[2]} 片 × %{customdata[3]:.1f} mm<br>流阻比 %{customdata[4]:.2f} · 體積 %{y:.1f} L · 重量 %{customdata[5]:.1f} kg<extra></extra>';
+  const cd = p => [vrN(p.W), p.pick.x, p.pick.n, p.pick.FH, p.pick.AR, p.pick.W], good = ok.filter(p => p.good), off = ok.filter(p => !p.good);
+  const data = [
+    {x:P.map(p => p.dw), y:P.map(p => p.pick ? p.pick.V : null), mode:'lines', line:{color:SA_COL.line, width:2.5}, connectgaps:false, hoverinfo:'skip', showlegend:false},
+    {x:good.map(p => p.dw), y:good.map(p => p.pick.V), mode:'markers', name:'流阻比在建議範圍', marker:{size:7, color:SA_COL.line}, customdata:good.map(cd), hovertemplate:hv},
+    {x:off.map(p => p.dw), y:off.map(p => p.pick.V), mode:'markers', name:'還進不了建議範圍', marker:{size:7, color:'#fff', line:{color:SA_COL.line, width:1.6}}, customdata:off.map(cd), hovertemplate:hv},
+    {x:P.map(p => p.dw), y:P.map(p => p.lo ? p.lo.AR : null), xaxis:'x2', yaxis:'y2', mode:'lines+markers', line:{color:SA_COL.line, width:2}, connectgaps:false, showlegend:false,
+     marker:{size:5, color:P.map(p => p.good ? SA_COL.line : '#fff'), line:{color:SA_COL.line, width:1.2}}, customdata:P.map(p => p.lo ? [p.lo.x] : [null]),
+     hovertemplate:'加寬 +%{x} mm<br>最低流阻比 %{y:.2f}（air gap %{customdata[0]} mm）<extra></extra>'}
+  ];
+  if (bad.length) data.push({x:bad.map(p => p.dw), y:bad.map(() => yBad), mode:'markers', name:'做不出來', marker:{symbol:'x-thin-open', size:9, color:SA_COL.bad, line:{width:2, color:SA_COL.bad}}, hovertemplate:'加寬 +%{x} mm<br>4～20 mm 的 air gap 都做不出來<extra></extra>'});
+  const ann = [{xref:'paper', x:1, yref:'y2', y:AR_GOOD[1], text:'建議 ' + AR_GOOD[0] + '～' + AR_GOOD[1], showarrow:false, xanchor:'right', yanchor:'top', font:{color:SA_COL.bandTxt, size:11}}];
+  const shapes = [{type:'rect', xref:'paper', x0:0, x1:1, yref:'y2', y0:AR_GOOD[0], y1:AR_GOOD[1], fillcolor:SA_COL.band, line:{width:0}, layer:'below'}];
+  if (d.V0) { shapes.push({type:'line', xref:'paper', x0:0, x1:1, yref:'y', y0:d.V0, y1:d.V0, line:{color:SA_COL.cur, width:1.5, dash:'dash'}});
+    ann.push({xref:'paper', x:0.005, yref:'y', y:d.V0, text:'目前 ' + saF1(d.V0) + ' L', showarrow:false, xanchor:'left', yanchor:'bottom', font:{color:SA_COL.cur, size:11}}); }
+  if (w.min) { data.push({x:[w.min.dw], y:[w.min.best.V], mode:'markers', name:'最少加寬', marker:{size:12, symbol:'square', color:SA_COL.min, line:{color:'#fff', width:2}}, hoverinfo:'skip'});
+    ann.push(saAnn(w.min.dw, w.min.best.V, '最少加寬 +' + w.min.dw + ' mm', SA_COL.min, -40, -38)); }
+  if (w.small && w.small !== w.min) { data.push({x:[w.small.dw], y:[w.small.best.V], mode:'markers', name:'建議範圍內體積最小', marker:{size:12, symbol:'diamond', color:SA_COL.best, line:{color:'#fff', width:2}}, hoverinfo:'skip'});
+    ann.push(saAnn(w.small.dw, w.small.best.V, '體積最小 ' + saF1(w.small.best.V) + ' L', SA_COL.best, 34, -40)); }
+  const layout = Object.assign(L, {
+    xaxis:{domain:[0, 1], anchor:'y', matches:'x2', showticklabels:false, range:xr, gridcolor:'#eef2f7', zeroline:false},
+    yaxis:{domain:[0.36, 1], anchor:'x', range:yr, title:{text:'需要的體積（L）', standoff:6}, gridcolor:'#eef2f7', zeroline:false},
+    xaxis2:{domain:[0, 1], anchor:'y2', range:xr, dtick:10, title:{text:'機殼加寬量（mm，左右邊距各加一半；目前整機寬 ' + vrN(w.W0) + ' mm）', standoff:6}, gridcolor:'#eef2f7', zeroline:false},
+    yaxis2:{domain:[0, 0.27], anchor:'x2', range:ar, title:{text:'最低流阻比', standoff:6}, gridcolor:'#eef2f7', zeroline:false},
     shapes, annotations:ann});
   return {data, layout};
 }
@@ -4707,7 +4830,8 @@ function saGapAns(d){
     .concat(!b ? [] : b === c ? [saT('；體積最小的就是目前這個')]
       : [saT('；其中體積最小 '), saB(b.x + ' mm'), saT(' → '), saB(saF1(b.V) + ' L'), saT((c && c.ok ? '（' + saPct((b.V / c.V - 1) * 100) + '）' : '') + '、流阻比 ' + b.AR.toFixed(1))])
     .concat(lo ? [saT('；流阻比最低 ' + lo.x + ' mm（' + lo.AR.toFixed(1) + '）')] : [])});
-  else out.push({k:'nogood', runs:[saT('沒有任何 air gap 能讓流阻比落在建議範圍（' + AR_GOOD[0] + '～' + AR_GOOD[1] + '）' + (lo ? '；最低 ' + lo.AR.toFixed(1) + '（' + lo.x + ' mm）' : ''))]});
+  else out.push({k:'nogood', runs:[saT('沒有任何 air gap 能讓流阻比落在建議範圍（' + AR_GOOD[0] + '～' + AR_GOOD[1] + '）' + (lo ? '；最低 ' + lo.AR.toFixed(1) + '（' + lo.x + ' mm）' : '')
+    + (d.widen ? ' —— 下面試算機殼加寬' : ''))]});
   if (G2.bad.length) out.push({k:'bad', runs:[saT('做不出來：' + G2.bad.map(q => saRunTxt(q, P, true) + ' ' + q.k).join('；'))]});
   return out;
 }
@@ -4723,6 +4847,50 @@ function saGapHtml(d){
     + '<span><span style="display:inline-block;width:14px;height:10px;background:' + SA_COL.band + ';border:1px solid #bfe0c1"></span>流阻比建議 ' + AR_GOOD[0] + '～' + AR_GOOD[1] + '</span>'
     + (d.gap.bad.length ? '<span><span style="display:inline-block;width:14px;height:10px;background:#e2e8f0"></span><span style="color:' + SA_COL.bad + ';font-weight:800">×</span>做不出來</span>' : '') + '</div>'
     + '<div class="sa-read"><span class="t">怎麼看</span><ol>' + SA_READ.gap.map(t => '<li>' + _vEsc(saReadTxt(t)) + '</li>').join('') + '</ol></div>'
+    + '</div></section>';
+}
+/* ① 延伸的答案與方案表（畫面與 PDF 共用） */
+function saWidenVs(d, V){ return d.V0 ? '（比目前 ' + saPct((V / d.V0 - 1) * 100) + '）' : ''; }
+function saWidenAns(d){
+  const w = d.widen, m = w.min, s = w.small, out = [];
+  if (!m) {
+    const lo = w.last.lo;
+    out.push({k:'nogood', runs:[saT('加寬到 +' + w.last.dw + ' mm（整機寬 ' + vrN(w.W0) + ' → ' + vrN(w.last.W) + ' mm）流阻比仍降不到 ' + AR_GOOD[1] + ' 以下'
+      + (lo ? '：最低 ' + lo.AR.toFixed(1) + '（air gap ' + lo.x + ' mm）' : '：4～20 mm 的 air gap 都做不出來') + '。要再從鰭片厚度、製程或熱負載著手。')]});
+    return out;
+  }
+  out.push({k:'min', runs:[saT('至少加寬 '), saB('+' + m.dw + ' mm'), saT('（整機寬 ' + vrN(w.W0) + ' → ' + vrN(m.W) + ' mm、左右邊距各 +' + vrN(m.dw / 2) + '）流阻比才進得了建議範圍：air gap ' + m.best.x + ' mm → 流阻比 ' + m.best.AR.toFixed(1) + '、'),
+    saB(saF1(m.best.V) + ' L'), saT(saWidenVs(d, m.best.V))]});
+  if (s && s !== m) out.push({k:'small', runs:[saT('試到 +' + w.last.dw + ' mm，建議範圍內體積最小：加寬 '), saB('+' + s.dw + ' mm'), saT('、air gap ' + s.best.x + ' mm → '), saB(saF1(s.best.V) + ' L'),
+    saT(saWidenVs(d, s.best.V) + '、流阻比 ' + s.best.AR.toFixed(1) + '、重量 ' + saF1(s.best.W) + ' kg' + (d.Wt0 ? '（目前 ' + saF1(d.Wt0) + ' kg）' : '')
+      + (s === w.last ? '；落在試算範圍的邊上，再加寬體積可能還會小一點，但重量一直增加' : ''))]});
+  else out.push({k:'small', runs:[saT('最少加寬的這個方案也是建議範圍內體積最小的（試到 +' + w.last.dw + ' mm）')]});
+  return out;
+}
+function saWidenRows(d){
+  const w = d.widen, rows = [{lbl:'不加寬（流阻比最低）', p:w.pts[0], apply:false}];
+  if (w.min) rows.push({lbl:'最少加寬', p:w.min, apply:true});
+  if (w.small && w.small !== w.min) rows.push({lbl:'建議範圍內體積最小', p:w.small, apply:true});
+  return rows.filter(r => r.p && r.p.pick).map(r => Object.assign(r, {q:r.p.pick}));
+}
+function saWidenHtml(d){
+  const w = d.widen; if (!w) return '';
+  const cls = {nogood:'sa-off'};
+  return '<section class="vr-panel" id="sa-widen-sec"><div class="vr-head"><span class="vr-title">① 延伸：機殼加寬（PCB 不動）</span><span class="vr-hsub">① 找不到流阻比在建議範圍的 air gap → 自動試加寬：加寬量平均加到左右防水邊距，每個寬度都重跑一次 ① · +0～+'
+    + w.last.dw + ' mm</span></div><div class="sa-pad">'
+    + '<div class="sa-ans">' + saWidenAns(d).map(a => '<span class="' + (cls[a.k] || '') + '">' + saRunsHtml(a.runs) + '</span>').join('') + '</div>'
+    + '<div id="sa-widen" class="sa-plot tall"></div>'
+    + '<div class="sa-leg"><span><i style="border-color:' + SA_COL.line + '"></i>需要的體積</span>'
+    + '<span><span style="color:' + SA_COL.line + '">●</span>流阻比在建議範圍</span><span><span style="color:' + SA_COL.line + '">○</span>還進不了建議範圍</span>'
+    + (d.V0 ? '<span><i style="border-color:' + SA_COL.cur + ';border-top-style:dashed;border-top-width:2px"></i>目前的體積</span>' : '')
+    + (w.min ? '<span><span style="color:' + SA_COL.min + '">■</span>最少加寬</span>' : '') + (w.small && w.small !== w.min ? '<span><span style="color:' + SA_COL.best + '">◆</span>建議範圍內體積最小</span>' : '')
+    + '<span><span style="display:inline-block;width:14px;height:10px;background:' + SA_COL.band + ';border:1px solid #bfe0c1"></span>流阻比建議 ' + AR_GOOD[0] + '～' + AR_GOOD[1] + '</span></div>'
+    + '<table class="sa-tbl sa-widen-tbl" id="sa-widen-tbl"><thead><tr><th>方案</th><th>加寬</th><th>整機寬</th><th>Air gap</th><th>片數 × 鰭片高</th><th>流阻比</th><th>體積</th><th>重量</th><th></th></tr></thead><tbody>'
+    + saWidenRows(d).map(r => '<tr><td>' + r.lbl + '</td><td>+' + r.p.dw + ' mm</td><td>' + vrN(r.p.W) + ' mm</td><td>' + r.q.x + ' mm</td><td>' + r.q.n + ' × ' + saF1(r.q.FH) + ' mm</td>'
+      + '<td' + (r.p.good ? '' : ' class="sa-off"') + '>' + r.q.AR.toFixed(2) + '</td><td>' + saF1(r.q.V) + ' L' + (d.V0 ? '<br><small>' + saPct((r.q.V / d.V0 - 1) * 100) + '</small>' : '') + '</td><td>' + saF1(r.q.W) + ' kg</td>'
+      + '<td>' + (r.apply ? '<button type="button" class="sa-apply" onclick="saWidenApply(' + r.p.dw + ',' + r.q.x + ')" title="左右邊距各 +' + vrN(r.p.dw / 2) + ' mm、air gap ' + r.q.x + ' mm 寫回參數控制台">套用</button>' : '') + '</td></tr>').join('')
+    + '</tbody></table>'
+    + '<div class="sa-read"><span class="t">怎麼看</span><ol>' + SA_READ.widen.map(t => '<li>' + _vEsc(saReadTxt(t)) + '</li>').join('') + '</ol></div>'
     + '</div></section>';
 }
 /* ② 的答案 */
@@ -4772,14 +4940,15 @@ function saHtml(d, R, g){
   if (d.st === 'blocked') return h + calcGateHtml(R.missing, R.badGlobals);
   if (d.st === 'nohot' || d.st === 'nosol') { const n = vrStateNote(R, d.st); return h + '<section class="vr-panel"><div class="vr-alert ' + n.cls + '" style="border-top:0">' + _vEsc(n.text) + (d.st === 'nosol' ? ' 先處理瓶頸元件，敏感度分析才有意義。' : '') + '</div></section>'; }
   if (d.st === 'drc') return h + '<section class="vr-panel"><div class="vr-alert fail" style="border-top:0">目前的設計 DRC 不通過：' + _vEsc(String(R.drc_msg || '').replace(/^⛔\s*/, ''))
-    + '。這顆散熱器做不出來 —— 下面先用 ① 找一個做得出來的 air gap；② ③ 要等設計做得出來才有意義。</div></section>' + saGapHtml(d);
-  return h + saSumHtml(d, R, g) + saGapHtml(d) + saPwHtml(d) + saAmbHtml(d, g);
+    + '。這顆散熱器做不出來 —— 下面先用 ① 找一個做得出來的 air gap；② ③ 要等設計做得出來才有意義。</div></section>' + saGapHtml(d) + saWidenHtml(d);
+  return h + saSumHtml(d, R, g) + saGapHtml(d) + saWidenHtml(d) + saPwHtml(d) + saAmbHtml(d, g);
 }
 function saPlot(d){
   const P = (id, fig) => { const el = document.getElementById(id); if (!el) return;
     if (!(window.Plotly && Plotly.newPlot)) { el.innerHTML = '<div class="sa-noplot">圖表元件（Plotly）沒有載入，數字請看上面的文字。</div>'; return; }
     Plotly.newPlot(el, fig.data, fig.layout, {responsive:true, displaylogo:false, displayModeBar:false}); };
   if (d.gap) P('sa-gap', saGapFig(d));
+  if (d.widen) P('sa-widen', saWidenFig(d));
   if (d.st === 'ok') { P('sa-pw-fix', saPwFixFig(d)); P('sa-pw-new', saPwNewFig(d)); }
 }
 /* 換專案、改參數 → recalc() 呼叫；這頁不在畫面上只標記，切過來再畫（switchTab）。在畫面上時合併連續的重算（打字時） */
@@ -5826,6 +5995,7 @@ async function generatePDFReport() {
     const saD = saData(R, G, components), saImg = {};
     if (window.Plotly && Plotly.toImage && (saD.st === 'ok' || saD.st === 'drc')) {
       const jobs = [['gap', saGapFig(saD, {pdf:true}), 520]];
+      if (saD.widen) jobs.push(['widen', saWidenFig(saD, {pdf:true}), 520]);
       if (saD.st === 'ok') jobs.push(['fix', saPwFixFig(saD, {pdf:true, h:380}), 380], ['new', saPwNewFig(saD, {pdf:true}), 340]);
       jobs.forEach(([k, fig, h]) => chartPromises.push(
         Plotly.toImage({data:fig.data, layout:Object.assign({}, fig.layout, {width:1000, height:h})}, {format:'png', width:1000, height:h, scale:2})
@@ -6408,6 +6578,16 @@ async function generatePDFReport() {
       }
       out.push({unbreakable:true, stack:[head('① 鰭片 air gap：選多少？', '每一點都照那個 air gap 重新設計散熱器（片數、鰭片高跟著變）'), ans(saGapAns(d)), img('gap')]});
       out.push(read(SA_READ.gap));
+      if (d.widen) {
+        const wth = t => ({text:t, bold:true, fontSize:7, color:'#f8fafc', fillColor:'#1e3a5f', alignment:'right'}), c = (t, o) => Object.assign({text:t, fontSize:7, alignment:'right', color:'#1e293b'}, o || {});
+        out.push({unbreakable:true, stack:[head('① 延伸：機殼加寬（PCB 不動）', '① 找不到流阻比在建議範圍的 air gap → 加寬量平均加到左右防水邊距，每個寬度都重跑一次 ①'), ans(saWidenAns(d)), img('widen'),
+          {table:{headerRows:1, widths:['22%','9%','11%','10%','15%','9%','14%','10%'], body:[[Object.assign(wth('方案'), {alignment:'left'}), wth('加寬'), wth('整機寬'), wth('Air gap'), wth('片數 × 鰭片高'), wth('流阻比'), wth('體積'), wth('重量')]]
+            .concat(saWidenRows(d).map(r => [c(r.lbl, {alignment:'left', bold:r.apply}), c('+' + r.p.dw + ' mm'), c(vrN(r.p.W) + ' mm'), c(r.q.x + ' mm'), c(r.q.n + ' × ' + saF1(r.q.FH) + ' mm'),
+              c(r.q.AR.toFixed(2), {color:r.p.good ? '#1e293b' : '#7a5200', bold:!r.p.good}), c(saF1(r.q.V) + ' L' + (d.V0 ? '（' + saPct((r.q.V / d.V0 - 1) * 100) + '）' : '')), c(saF1(r.q.W) + ' kg')]))},
+           layout:{hLineWidth:k => k === 1 ? 2 : 0.4, hLineColor:k => k === 1 ? '#00DFD8' : '#e2e8f0', vLineWidth:() => 0, paddingLeft:() => 5, paddingRight:() => 5, paddingTop:() => 3, paddingBottom:() => 3},
+           margin:[0,0,0,4]}]});
+        out.push(read(SA_READ.widen));
+      }
       if (d.st !== 'ok') return out;
       out.push({unbreakable:true, stack:[head('② 熱耗比預估高的時候', '全部元件同比例 ×' + SA_PW_RANGE[0] + '～×' + SA_PW_RANGE[1]), ans(saPwAns(d)), img('fix')]});
       out.push({unbreakable:true, stack:[img('new'), read(SA_READ.pw)]});
