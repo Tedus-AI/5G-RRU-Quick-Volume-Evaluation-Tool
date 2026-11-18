@@ -1171,33 +1171,41 @@ function omegaLoop(off, R, rf) {
   const cornerPt = c => [c === 0 || c === 3 ? off[3] : L - off[1], c < 2 ? off[0] : W - off[2]];
   const rel = (ln, C) => { const dx = C[0] - ln.P[0], dz = C[1] - ln.P[1]; return [dx * ln.d[0] + dz * ln.d[1], dx * ln.n[0] + dz * ln.n[1]]; };
   const at = (ln, s, v) => [ln.P[0] + ln.d[0] * s + ln.n[0] * v, ln.P[1] + ln.d[1] * s + ln.n[1] * v];
-  const fil = (ln, C, sg) => {                   // 圓角：貼著直線內側、跟主圓外切；sg＝−1 進、＋1 出
-    const [cu, cv] = rel(ln, C), q = (R + rf) ** 2 - (rf - cv) ** 2; if (q <= 0 || cv + R < 0.05) return null;
-    const s = cu + sg * Math.sqrt(q), F = at(ln, s, rf), k = rf / (R + rf);
+  const fil = (ln, C, sg, r = rf) => {           // 圓角（半徑 r）：貼著直線內側、跟主圓外切；sg＝−1 進、＋1 出；r＝0＝不加圓角（直線與主圓的交點）
+    const [cu, cv] = rel(ln, C), q = (R + r) ** 2 - (r - cv) ** 2; if (q <= 0 || cv + R < 0.05) return null;
+    const s = cu + sg * Math.sqrt(q), F = at(ln, s, r), k = r / (R + r);
     return { s, F, Q: at(ln, s, 0), T: [F[0] + (C[0] - F[0]) * k, F[1] + (C[1] - F[1]) * k] };
   };
   const TAU = Math.PI * 2, md = x => ((x % TAU) + TAU) % TAU, ang = (C, p) => Math.atan2(p[1] - C[1], p[0] - C[0]);
   const short = (a0, a1) => { const s = md(a1 - a0); return s > Math.PI ? s - TAU : s; };
   const arc = (o, C, r, a0, sw) => { const n = Math.max(2, Math.ceil(Math.abs(sw) * Math.max(r, 1) / 0.7), Math.ceil(Math.abs(sw) / 0.2));
     for (let i = 1; i <= n; i++) { const a = a0 + sw * i / n; o.push([C[0] + r * Math.cos(a), C[1] + r * Math.sin(a)]); } };
-  const detour = (lnA, lnB, C, dir) => {
-    const e1 = fil(lnA, C, -1), e2 = fil(lnB, C, 1); if (!e1 || !e2) return null;
+  // 缺口：先照圓角 rf 畫；畫出來有點跑到直線外側（缺口比圓角還淺：螺絲柱只擦到角落零點幾 mm，例：邊距 16 mm 的角落）→ 改成不加圓角；
+  // 還是在外側＝圓根本沒碰到角落（只碰到直線的延長線）→ 不開缺口（用轉角點）
+  const inner = (lnA, lnB, d) => !!d && d.o.every(p => Math.min(rel(lnA, p)[1], rel(lnB, p)[1]) > -1e-6);
+  const detour = (lnA, lnB, C) => { for (const r of rf ? [rf, 0] : [0]) { const d = detourR(lnA, lnB, C, r); if (inner(lnA, lnB, d)) return d; } return null; };
+  const detourR = (lnA, lnB, C, rf) => {
+    const e1 = fil(lnA, C, -1, rf), e2 = fil(lnB, C, 1, rf); if (!e1 || !e2) return null;
     const o = [e1.Q];
     arc(o, e1.F, rf, ang(e1.F, e1.Q), short(ang(e1.F, e1.Q), ang(e1.F, e1.T)));
-    const a0 = ang(C, e1.T), ccw = md(ang(C, e2.T) - a0);
-    arc(o, C, R, a0, md(Math.atan2(dir[1], dir[0]) - a0) < ccw ? ccw : ccw - TAU);        // 從內側繞過去
+    // 從內側繞過去：兩段圓弧（逆時針 ccw／順時針 ccw − 2π）取「中點在兩條直線內側較深」的那一段。
+    // ⚠ 不可只看 dir（往內的方向）落在哪一段：螺絲柱只擦到角落時（邊距大、孔離 PCB 遠，例：左右邊距 16 mm），
+    //    內側那段圓弧很短、不含對角線方向 → 會選到外側整圈，PCB／屏蔽罩外形繞著螺絲柱跑到牆邊（使用者回報 2026-11）。
+    const a0 = ang(C, e1.T), ccw = md(ang(C, e2.T) - a0), cw = ccw - TAU;
+    const depth = sw => { const a = a0 + sw / 2, p = [C[0] + R * Math.cos(a), C[1] + R * Math.sin(a)]; return Math.min(rel(lnA, p)[1], rel(lnB, p)[1]); };
+    arc(o, C, R, a0, depth(ccw) >= depth(cw) ? ccw : cw);
     arc(o, e2.F, rf, ang(e2.F, e2.T), short(ang(e2.F, e2.T), ang(e2.F, e2.Q)));
     return { o, s1: e1.s, s2: e2.s };
   };
   const pts = [], det = [];
   for (let k = 0; k < 4; k++) {
     const lp = lines[(k + 3) % 4], ln = lines[k], cs = SP.find(s => s.corner && s.k === k);
-    const cd = cs ? detour(lp, ln, [cs.x, cs.z], [lp.n[0] + ln.n[0], lp.n[1] + ln.n[1]]) : null;
+    const cd = cs ? detour(lp, ln, [cs.x, cs.z]) : null;
     let last = -Infinity;
     if (cd) { pts.push(...cd.o); det.push({ spot: cs, pts: cd.o, corner: cornerPt(k) }); last = cd.s2; } else pts.push(cornerPt(k));
     const nc = SP.find(s => s.corner && s.k === (k + 1) % 4), ncE = nc ? fil(ln, [nc.x, nc.z], -1) : null, lim = ncE ? ncE.s : Infinity;
     SP.filter(s => !s.corner && s.k === k).map(s => ({ s, cu: rel(ln, [s.x, s.z])[0] })).sort((a, b) => a.cu - b.cu).forEach(({ s }) => {
-      const d = detour(ln, ln, [s.x, s.z], ln.n);
+      const d = detour(ln, ln, [s.x, s.z]);
       if (!d || d.s1 < last + 0.3 || d.s2 > lim - 0.3) return;                                // 跟前後重疊就不繞（不會發生：擺位時已經留間距）
       pts.push(...d.o); det.push({ spot: s, pts: d.o }); last = d.s2;
     });
