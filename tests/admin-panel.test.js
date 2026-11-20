@@ -73,8 +73,6 @@ const SEED = {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  await page.fill('#login-pw', 'tedus');
-  await page.click('#login-page button');
   await page.waitForFunction(() => typeof adminOpen === 'function' && fbOk === true && dbAdapter.isSharePointMode());
   await page.waitForFunction(() => Object.values(JSON.parse(window.__disk).login_history || {}).some(r => r.tool === '5G-RRU'), null, { timeout: 5000 }).catch(() => {});
 

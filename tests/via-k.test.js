@@ -50,8 +50,6 @@ function ok(name, cond, extra) {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  await page.fill('#login-pw', 'tedus');
-  await page.click('#login-page button');
   await page.waitForFunction(() => typeof calcResults !== 'undefined' && calcResults && calcResults.rows && calcResults.rows.length > 0 && window.ViaCalc);
 
   // 獨立算的 K_eff（不呼叫 viaCalc.js）：N·A_cu·385 + N·A_fill·K_fill + A_FR4·0.3，全部 ÷ A_pad

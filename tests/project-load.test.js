@@ -57,8 +57,6 @@ const FULL = (name, extra) => Object.assign({ Component: name, Qty: 1, 'Power(W)
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  await page.fill('#login-pw', 'tedus');
-  await page.click('#login-page button');
   await page.waitForFunction(() => typeof cloudLoadOne === 'function' && calcResults && calcResults.rows.length > 0);
 
   // 模擬共用 DB：getDoc 跟真的後端一樣回「活參照」，才驗得出深拷貝

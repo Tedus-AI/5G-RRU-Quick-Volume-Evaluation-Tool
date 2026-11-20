@@ -87,8 +87,6 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  await page.fill('#login-pw', 'tedus');
-  await page.click('#login-page button');
   await page.waitForFunction(() => typeof calcResults !== 'undefined' && calcResults && calcResults.rows.length > 0);
   await page.waitForFunction(() => !!window.RRU3D, null, { timeout: 90000 });
   const show3d = async () => {
@@ -1337,8 +1335,6 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   const err2 = [];
   p2.on('pageerror', e => err2.push(String(e)));
   await p2.goto(BASE, { waitUntil: 'domcontentloaded' });
-  await p2.fill('#login-pw', 'tedus');
-  await p2.click('#login-page button');
   await p2.waitForFunction(() => typeof calcResults !== 'undefined' && calcResults && calcResults.rows.length > 0);
   await p2.waitForFunction(() => !!window.__rru3dFail, null, { timeout: 60000 });
   await p2.evaluate(() => switchTab(3));

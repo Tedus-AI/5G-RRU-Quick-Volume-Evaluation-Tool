@@ -303,7 +303,7 @@
   - 契約測試：`tests/sidebar-contrast.test.js`（每一個看得到的文字／輸入框／placeholder 對實際底色 ≥ 4.5:1、字 ≥ 11px，Embedded／Die-casting／
     流阻比三種狀態；[F] 窄版排列：輸入框左右緣對齊、標籤一行、沒有截斷、200px 也成立）。
 - **卡片不畫左側色條**（使用者：太像 AI 的樣板）：提示／警告／說明框一律四邊同粗細的 1px 框線＋淡底色（`.alert-*`、`.power-summary`、`.calc-gate`、
-  `.ls-note`、`.stale-note`、`.tim-migrate`、`.thick-migrate`、`.lock-modal-info`、登入頁 `.info-card`、3D 的 `.asm .q`）。
+  `.ls-note`、`.stale-note`、`.tim-migrate`、`.thick-migrate`、`.lock-modal-info`、登入頁 `.info-card`、3D 的 `.asm .q`、工具說明視窗的 `.info-card`）。
   例外只有**欄位**上的藍色左邊（`.derived-src`／`.rjc-ref`／`.via-k-eff`＝「AI-Thermal 推導值」的標記，不是卡片）。
 - **分頁**：白色膠囊容器，作用中＝實心台達藍。元件分類頁籤作用中整顆塗滿分類色：RF 藍 `#0f6fc6`／Digital 紫 `#5b3fc4`／PWR 橘 `#c05a12`
   （與 AI-Thermal 同一組；紅色保留給錯誤）。
@@ -372,7 +372,7 @@
 就先掉到第二行蓋到標題。目前的設計是空間不夠時名稱縮到 ellipsis，兩端永遠不重疊。
 
 **登入後右側按鈕群放不下 → `hdrFit()` 逐級收合**（`hdr-c1`／`hdr-c2` 掛在 `.header` 上）：登入後右側是
-「首頁、SharePoint｜姓名、離線、登出、email、備份、還原、管理」約 930px，17 吋筆電＋參數控制台展開時遠超過頂排寬度，
+「工具說明、SharePoint｜姓名、離線、登出、email、備份、還原、管理」約 930px，17 吋筆電＋參數控制台展開時遠超過頂排寬度，
 而 `.header` 是 overflow 裁切 → 原本**最右邊的備份／還原整個看不到**（`tests/header-toolbar.test.js` 只量沒登入的狀態，量不到）。
 - 先試完整標籤；名稱區 < `HDR_NAME_MIN`（180px）或右側超出 header → `hdr-c1`：藏 email（改放在 `#db-banner-text` 的 `title`）、
   按鈕換短標籤（每顆按鈕裡 `.hb-f` 完整／`.hb-s` 短標籤兩個 span）；還放不下 → `hdr-c2`：按鈕只留圖示、姓名截斷（160px）。
@@ -609,13 +609,21 @@ AI-Thermal 有好幾份資料用「元件名稱」當 key：TH/ME 頁的 `therma
 - 回公司同步：離線改的專案用「♻️ 還原資料庫」選那個本機檔、勾選專案寫回 SharePoint。
 - 契約測試：`tests/offline-db.test.js`。
 
+### 沒有密碼首頁：網址打開就是工具；原本首頁的說明在「📖 工具說明」
+
+2026-11 使用者要求：拿掉密碼首頁（`#login-page`／`doLogin`／`doLogout` 已移除），`DOMContentLoaded` 直接 `init()`。
+原本首頁的四張說明卡（主要功能／h 的計算原理／DRC／使用注意事項）搬進 header 頂排第一顆「📖 工具說明」（`#btn-help`，
+原本的「🏠 返回首頁」）打開的視窗 `#help-modal`（`helpOpen`／`helpClose`：Esc、點背景、✕ 關閉，關閉後焦點回到按鈕；
+高度跟著畫面走、內容在裡面捲動）。測試不需要再輸入密碼，`goto` 之後直接等 `calcResults`。
+（「資料庫保護」密碼、管理員密碼與 SharePoint 登入都照舊。）
+
 ### 參數控制台可調寬／收合
 
 `#sidebar-resizer` 同時是拖曳把手與收合鈕：`mousedown` 後位移超過 4px 才算拖曳，
 沒超過就當點一下 → 收合／展開（收合後分隔線變 ▶，這是收合狀態唯一回得去的路，不可拿掉）；
 標題列也有一顆同功能的按鈕。寬度（200–560px，預設 227）與收合狀態存 localStorage，
 讀寫一律 try/catch。⚠ **寬度變動後要呼叫 `resizePlots()`**，否則 Plotly 圖停在舊寬度；
-登入前／登出後由 `_setShellVisible(false)` 把側欄、分隔線、主區一起藏起來。
+啟動時由 `_setShellVisible(true)` 顯示側欄、分隔線、主區（已沒有密碼首頁）。
 
 - **標題列（含收合鈕）捲動時固定在頂端**（使用者要求）：側欄本身是捲動容器，`.sidebar h2` 用 `position:sticky; top:-20px`
   （sticky 的 top 從捲動容器的內距以內算，側欄上內距 20px → 寫 0 會停在距頂端 20px、上面露出一條捲上去的欄位），

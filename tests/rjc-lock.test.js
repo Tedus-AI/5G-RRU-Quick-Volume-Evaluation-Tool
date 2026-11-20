@@ -51,8 +51,6 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  await page.fill('#login-pw', 'tedus');
-  await page.click('#login-page button');
   await page.waitForFunction(() => typeof calcResults !== 'undefined' && calcResults && calcResults.rows.length > 0);
 
   // rf[0] = AI-Thermal 推導（含量測條件）、rf[1] = 沒有來源標記

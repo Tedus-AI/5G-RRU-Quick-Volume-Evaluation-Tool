@@ -61,8 +61,6 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  await page.fill('#login-pw', 'tedus');
-  await page.click('#login-page button');
   await page.waitForFunction(() => typeof calcResults !== 'undefined' && calcResults && calcResults.rows.length > 0);
   // 每個情境前：還原內建範例（元件與參數控制台）
   await page.evaluate(() => {

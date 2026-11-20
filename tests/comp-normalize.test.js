@@ -69,8 +69,6 @@ const AIT_PROJECT = {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  await page.fill('#login-pw', 'tedus');
-  await page.click('#login-page button');
   await page.waitForFunction(() => typeof normalizeComps === 'function' && calcResults && calcResults.rows.length > 0);
 
   console.log('\n[A] 數字存成字串也要算對（不可字串相接）');
