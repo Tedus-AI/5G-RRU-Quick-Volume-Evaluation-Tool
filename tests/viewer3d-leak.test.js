@@ -33,7 +33,6 @@ const ok = (name, cond, extra) => { if (cond) { pass++; console.log('  ✅ ' + n
   });
   const errors = []; page.on('pageerror', e => errors.push(String(e)));
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  await page.fill('#login-pw', 'tedus'); await page.click('#login-page button');
   await page.waitForFunction(() => typeof calcResults !== 'undefined' && calcResults && calcResults.rows.length > 0);
   await page.waitForFunction(() => !!window.RRU3D, null, { timeout: 90000 });
   await page.evaluate(() => switchTab(3));

@@ -67,8 +67,6 @@ const PROJECTS = () => ({
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  await page.fill('#login-pw', 'tedus');
-  await page.click('#login-page button');
   await page.waitForFunction(() => typeof cloudLoadOne === 'function' && typeof refInfoOf === 'function' && calcResults && calcResults.rows.length > 0);
 
   // 模擬共用 DB（比照 graphDb：getDoc／getCollection 回複本；updateDoc 的 fields 可以是函式，在最新內容上計算）

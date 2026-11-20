@@ -33,7 +33,6 @@ const ok = (name, cond, detail) => { if (cond) { pass++; console.log('  ✅ ' + 
   });
   const errors = []; page.on('pageerror', e => errors.push(String(e)));
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  await page.fill('#login-pw', 'tedus'); await page.click('#login-page button');
   await page.waitForFunction(() => typeof calcResults !== 'undefined' && calcResults && calcResults.rows.length > 0);
   await page.waitForTimeout(300);
   const setVal = (id, v) => page.evaluate(([id, v]) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); if (typeof recalc === 'function') recalc(); }, [id, v]);

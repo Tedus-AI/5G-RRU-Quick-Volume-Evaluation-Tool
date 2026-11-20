@@ -46,8 +46,6 @@ function ok(name, cond, extra) {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  await page.fill('#login-pw', 'tedus');
-  await page.click('#login-page button');
   await page.waitForFunction(() => typeof calcResults !== 'undefined' && calcResults && calcResults.rows && calcResults.rows.length > 0 && window.ViaCalc);
 
   const snap = () => page.evaluate(() => calcResults.rows.map(r => ({ n: r.Component, bt: r.Board_Type, ri: r.R_int, rt: r.R_TIM, t: r['Thick(mm)'] })));

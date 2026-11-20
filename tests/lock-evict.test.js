@@ -77,8 +77,6 @@ const SEED = {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  await page.fill('#login-pw', 'tedus');
-  await page.click('#login-page button');
   await page.waitForFunction(() => typeof cloudLoadOne === 'function' && fbOk === true && dbAdapter.isSharePointMode());
 
   const disk = () => page.evaluate(() => JSON.parse(window.__disk));

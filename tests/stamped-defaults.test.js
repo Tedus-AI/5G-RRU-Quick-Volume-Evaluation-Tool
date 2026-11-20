@@ -65,8 +65,6 @@ const PROJ = {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  await page.fill('#login-pw', 'tedus');
-  await page.click('#login-page button');
   await page.waitForFunction(() => typeof cloudLoadOne === 'function' && calcResults && calcResults.rows.length > 0);
 
   const seed = (projects) => page.evaluate((projects) => {

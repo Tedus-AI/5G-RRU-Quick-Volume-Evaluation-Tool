@@ -47,15 +47,6 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
 
-  console.log('\n[D0] 登入前');
-  const d0 = await page.evaluate(() => ({
-    resizer: !!document.getElementById('sidebar-resizer'),
-    hidden: getComputedStyle(document.getElementById('sidebar-resizer')).display === 'none',
-  }));
-  ok('分隔線存在但登入前不顯示', d0.resizer && d0.hidden, d0);
-
-  await page.fill('#login-pw', 'tedus');
-  await page.click('#login-page button');
   await page.waitForFunction(() => typeof calcResults !== 'undefined' && calcResults && calcResults.rows.length > 0);
 
   console.log('\n[A] 板厚由參數控制台統一');
@@ -223,8 +214,6 @@ const near = (a, b, eps) => Math.abs(a - b) < (eps || 1e-9);
   // 重新載入 → 記憶還在
   await page.evaluate(() => { try { localStorage.setItem('rru.sidebarWidth.v2','300'); localStorage.setItem('rru.sidebarCollapsed','0'); } catch(e){} });
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.fill('#login-pw', 'tedus');
-  await page.click('#login-page button');
   await page.waitForFunction(() => typeof calcResults !== 'undefined' && calcResults);
   const d6 = await page.evaluate(() => document.getElementById('sidebar').getBoundingClientRect().width);
   ok('重新載入後還原上次寬度（300）', Math.round(d6) === 300, d6);
