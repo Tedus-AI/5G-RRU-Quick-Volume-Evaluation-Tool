@@ -1009,7 +1009,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
       const bosses = []; H.traverse(m => { if (m.userData.what === 'screwBoss') { m.geometry.computeBoundingBox(); const b = m.geometry.boundingBox; bosses.push(+Math.min(b.min.x, b.min.z, L - b.max.x, W - b.max.z).toFixed(2)); } });
       return { faces, ring, inner: +inner.toFixed(2), core: [cb.min.x, cb.min.z, cb.max.x, cb.max.z].map(v => +v.toFixed(2)), LW: [L, W], cav: D.cavRect(), M: [g.Left, g.Top, g.Right, g.Btm],
         bossD: [...new Set(bosses)], nBoss: bosses.length, nScrew: D.LAY().screws.length, gasket: +dEdge(LP.gasket.pts).toFixed(2), boss: +dEdge(LP.boss.pts).toFixed(2), pcb: +dEdge(LP.pcb.pts).toFixed(2),
-        tree: document.getElementById('r3d-tree').textContent.includes('牆厚 3 · PCB 離外殼'), asm: document.getElementById('r3d-a-pcb-t').textContent.includes('外殼牆厚 3 mm') };
+        tree: [...document.querySelectorAll('#r3d-tree li')].map(li => li.textContent + ' ' + li.title).join(' ').includes('牆厚 3 · PCB 離外殼'), asm: document.getElementById('r3d-a-pcb-t').textContent.includes('外殼牆厚 3 mm') };
     });
     ok('殼體牆厚 3 mm（不是防水邊距）：牆只在外緣 3 mm 內、內腔＝[3, 3, L−3, W−3]', w.ring && Math.abs(w.inner - 3) < 0.01 && same(w.cav.slice(0, 4), [3, 3, w.LW[0] - 3, w.LW[1] - 3]), w);
     ok('基板底面鋪滿內腔（牆跟 PCB 之間露出基板，不是空洞）', same(w.core, [3, 3, w.LW[0] - 3, w.LW[1] - 3]), w.core);
@@ -1022,7 +1022,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
       const inner = fl.filter(f => !f.edge), gaps = inner.slice(1).map((f, i) => +(f.z - f.t / 2 - (inner[i].z + inner[i].t / 2)).toFixed(4));
       return { n: fl.length, calc: calcResults.Fin_Count, W, L, edge: fl.filter(f => f.edge).map(f => [+f.z.toFixed(3), f.t]), edges: edges.sort((a, b) => a[0] - b[0]), gaps: [...new Set(gaps)],
         first: +(inner[0].z - inner[0].t / 2 - 2.5).toFixed(4), last: +(W - 2.5 - (inner[inner.length - 1].z + inner[inner.length - 1].t / 2)).toFixed(4), t: [...new Set(inner.map(f => f.t))],
-        spec: document.getElementById('r3d-tree').textContent.includes('最外兩片壓鑄 2.5') }; });
+        spec: [...document.querySelectorAll('#r3d-tree li')].map(li => li.textContent + ' ' + li.title).join(' ').includes('最外兩片壓鑄 2.5') }; });
     ok('Embedded：最左、最右兩片是 2.5 mm 壓鑄鰭片、外側貼齊殼體側面（整條長度）；片數＝computeAll', e1.n === e1.calc && same(e1.edge, [[1.25, 2.5], [+(e1.W - 1.25).toFixed(3), 2.5]])
       && e1.edges.length === 2 && same(e1.edges[0].slice(0, 2), [0, 2.5]) && same(e1.edges[1].slice(0, 2), [+(e1.W - 2.5).toFixed(3), e1.W]) && e1.edges.every(q => Math.abs(q[2] - e1.L) < 0.01), e1);
     ok('中間的 Embedded 鰭片厚 Fin_t、等距排在兩片壓鑄鰭片之間（間距處處相同）；鰭片說明寫出「最外兩片壓鑄 2.5」', same(e1.t, [1.2]) && e1.gaps.length === 1 && Math.abs(e1.gaps[0] - e1.first) < 1e-3 && Math.abs(e1.gaps[0] - e1.last) < 1e-3 && e1.spec, e1);
@@ -1044,7 +1044,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
         l3d: layout3d && layout3d.cut ? JSON.parse(JSON.stringify(layout3d.cut)) : null, FH: calcResults.Fin_Height, V: calcResults.Volume_L,
         sum: document.getElementById('r3d-cut-sum').textContent, inputs: ['len', 'wid', 'x'].map(k => document.getElementById('r3d-cut-' + k).value),
         dim: (() => { let cd = null; D.scene.traverse(o => { if (o.userData && o.userData.cut && o.userData.cut.isObject3D) cd = o.userData.cut; }); const l = cd && cd.children.find(q => q.element); return l ? l.element.textContent : null; })(),
-        tree: document.getElementById('r3d-tree').textContent.includes('截斷') }; });
+        tree: [...document.querySelectorAll('#r3d-tree li')].map(li => li.textContent + ' ' + li.title).join(' ').includes('截斷') }; });
     const s0 = await segs();
     await page.click('#r3d-tab-fin');
     const pn0 = await page.evaluate(() => ({ off: document.querySelector('#r3d-pn-fin [data-cut="0"]').getAttribute('aria-pressed'), form: document.getElementById('r3d-cut-form').hidden, vis: !document.getElementById('r3d-pn-fin').hidden }));
@@ -1133,7 +1133,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
         bigOk: L.inst.filter(o => o.row.cat !== 'RF').every(o => !SH.cells.some(c => o.x > c.x0 && o.x < c.x1 && o.z > c.z0 && o.z < c.z1)),
         wallHits: SH.wallHits.map(o => o.row.name), merged: SH.keeps.filter(k => k.merged).length,
         cnt: document.getElementById('r3d-shd-cnt').textContent, list: document.getElementById('r3d-shd-list').textContent,
-        rules: document.getElementById('r3d-shd-rules').textContent, tree: document.getElementById('r3d-tree').textContent, tcnt: document.getElementById('r3d-shd-tcnt').textContent };
+        rules: document.getElementById('r3d-shd-rules').textContent, tree: [...document.querySelectorAll('#r3d-tree li')].map(li => li.textContent + ' ' + li.title).join(' '), tcnt: document.getElementById('r3d-shd-tcnt').textContent };
       function same2(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
     });
     const S1 = await grid();
@@ -1264,7 +1264,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
       return { n: sc.length, bossR: +bossR.toFixed(2), roof: +minTo(body.children.find(o => o.userData.part === 'roof').geometry).toFixed(2),
         frame: +minTo(body.children.find(o => o.userData.part === 'frame').geometry).toFixed(2), pcb: +minTo(pcbMesh.geometry).toFixed(2),
         rules: document.getElementById('r3d-shd-rules').textContent.includes('離螺絲柱留 2 mm 設計間隙'),
-        tree: document.getElementById('r3d-tree').textContent.includes('屏蔽罩離螺絲柱 2 mm') };
+        tree: [...document.querySelectorAll('#r3d-tree li')].map(li => li.textContent + ' ' + li.title).join(' ').includes('屏蔽罩離螺絲柱 2 mm') };
     });
     ok('屏蔽罩缺口離 HSK 螺絲柱 ' + (T2.roof - T2.bossR).toFixed(2) + ' mm（≥ 2）：頂板與外框的每一個頂點離孔心 ≥ 螺絲柱半徑 ' + T2.bossR + '＋2；PCB 缺口照舊 0.5 mm；屏蔽罩分頁規則、模型樹寫出來',
       T2.n > 0 && Math.abs(T2.bossR - 7) < 0.05 && T2.roof >= T2.bossR + 2 - 0.02 && T2.frame >= T2.bossR + 2 - 0.02 && Math.abs(T2.pcb - (T2.bossR + 0.5)) < 0.05 && T2.rules && T2.tree, T2);
@@ -1293,7 +1293,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     const T4 = await page.evaluate(() => {
       const kv = [...document.querySelectorAll('#r3d-fin-kv dt')].map(dt => [dt.textContent, dt.nextElementSibling.textContent]);
       const vr = vrSteps(calcResults, G).map(s => (s.note || '') + ' ' + (s.tip || '')).join(' ');
-      return { kv, def: document.getElementById('r3d-fin-def').textContent, tree: document.getElementById('r3d-tree').textContent, Gap: G.Gap, Fin_t: G.Fin_t, vr };
+      return { kv, def: document.getElementById('r3d-fin-def').textContent, tree: [...document.querySelectorAll('#r3d-tree li')].map(li => li.textContent + ' ' + li.title).join(' '), Gap: G.Gap, Fin_t: G.Fin_t, vr };
     });
     const pitch = +(T4.Gap + T4.Fin_t).toFixed(2), kvOf = k => (T4.kv.find(q => q[0] === k) || [])[1];
     ok('鰭片分頁：「Air gap ' + T4.Gap + ' mm」與「Fin pitch ' + pitch + ' mm」分開兩列（不再只寫「間距」），下面寫出定義（pitch＝中心距＝厚度＋air gap）',
